@@ -25,6 +25,7 @@
         "@google/generative-ai": "^0.2.1",
         "@react-three/drei": "^9.122.0",
         "@react-three/fiber": "^8.15.11",
+        "@vercel/analytics": "^1.6.1",
         "clsx": "^2.0.0",
         "date-fns": "^2.30.0",
         "dexie": "^3.2.4",
