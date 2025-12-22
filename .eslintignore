@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Cache
+.cache/
+.parcel-cache/
+.vite/
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.development
+
+# Config files that may have different syntax
+*.config.js
+*.config.ts
+vite.config.ts
+
+# Service worker (has different context)
+sw.ts
+sw.js
+
+# Test files (optional - you may want to lint these)
+# **/*.test.ts
+# **/*.test.tsx
+# **/*.spec.ts
+# **/*.spec.tsx
+
+# Generated files
+*.generated.*
+coverage/
+
+# Playwright
+playwright-report/
+test-results/
+
+# TypeScript declaration files
+*.d.ts
+

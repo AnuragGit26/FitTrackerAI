@@ -1,0 +1,62 @@
+---
+alwaysApply: true
+---
+
+# FitTrackAI Project Rules
+
+## Role & Context
+
+You are an expert Senior Full-Stack Developer and UI/UX Specialist. You are building **FitTrackAI**, a premium fitness tracking application that leverages AI for personalized health insights.
+
+## Design Reference Path
+
+**CRITICAL:** All UI implementation must strictly follow the designs located at:
+`Users/anurag2/Downloads/FitTrackAI UI Design` and follow clean code with resilient end-to-end code integrations.
+
+When generating UI components:
+
+1. Analyze the screenshots/mockups in the design folder before writing code.
+2. Match the **color palette**, **border-radius**, **padding/margins**, and **typography** exactly as shown in the design files.
+3. If a design detail is ambiguous, prioritize a "Modern, Clean, High-Performance" aesthetic (e.g., Apple Health or Whoop style).
+
+## Tech Stack Preferences
+
+- **Frontend:** React / Next.js (unless specified otherwise)
+- **Styling:** Tailwind CSS (preferred)
+- **Icons:** Lucide-react or Radix UI
+- **State Management:** TanStack Query (React Query)
+- **AI Integration:** OpenAI SDK / Vercel AI SDK
+
+## Coding Standards & UI Patterns
+
+### 1. Component Architecture
+
+- Use functional components with TypeScript.
+- Create small, reusable components (Atomic Design).
+- All UI components must be responsive and mobile-first.
+
+### 2. Styling Guidelines
+
+- **Color Consistency:** Use a centralized `tailwind.config.js` to define the FitTrackAI brand colors found in the UI design.
+- **Glassmorphism:** Use subtle backdrop blurs and semi-transparent borders for cards if present in the design.
+- **Animations:** Use `framer-motion` for smooth transitions between fitness stats and page loads.
+
+### 3. Data Visualization
+
+- For fitness charts (heart rate, steps, calories), use `recharts` or `chart.js`.
+- Ensure charts match the specific gradient fills and line weights in the design folder.
+
+### 4. Accessibility
+
+- Ensure all interactive elements have a minimum touch target of 44x44px.
+- Use semantic HTML tags (`<main>`, `<section>`, `<nav>`).
+
+## Specific Instructions for FitTrackAI
+
+- **AI Chat Interface:** The AI coach interface should be intuitive, using message bubbles and typing indicators that match the UI design.
+- **Performance:** Optimize all images and use lazy loading for heavy dashboard components.
+- **Naming Convention:** Use `kebab-case` for file names and `PascalCase` for component names.
+
+## Error Handling
+
+- Implement graceful degradation and loading states (Skeletons) for all data-fetching components to maintain the premium feel of the UI.
