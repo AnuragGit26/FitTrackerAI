@@ -20,12 +20,8 @@ import { PersonalRecord, StrengthProgression } from '@/types/analytics';
 import { MuscleGroup } from '@/types/muscle';
 import { aiDataProcessor } from './aiDataProcessor';
 import { parseAIJSON, sanitizeAIResponse, cleanPlainTextResponse } from '@/utils/aiResponseCleaner';
-<<<<<<< HEAD
-import { logError } from '@/utils/errorHandler';
-=======
 import { withErrorHandling, AppError, logError, getUserFriendlyErrorMessage } from '@/utils/errorHandler';
 import { canMakeAICall, getTimeUntilNextAICall } from '@/utils/rateLimiter';
->>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
 
 interface AIAnalysisContext {
   recentWorkouts: Workout[];
@@ -61,11 +57,7 @@ export const aiService = {
 
       const workoutSummary = formatWorkoutSummary(context.recentWorkouts);
       const muscleSummary = formatMuscleStatus(context.muscleStatuses);
-<<<<<<< HEAD
 
-=======
-      
->>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
       const prompt = `
 You are a certified personal trainer analyzing a gym member's workout data.
 
@@ -109,7 +101,6 @@ CRITICAL OUTPUT REQUIREMENTS:
       // Try to parse JSON from response with cleaning
       const parsed = parseAIJSON<any>(text);
       if (parsed) {
-<<<<<<< HEAD
         const cleaned = sanitizeAIResponse(parsed) as Record<string, unknown>;
         return {
           analysis: (typeof cleaned.analysis === 'string' ? cleaned.analysis : 'Analysis generated successfully.'),
@@ -121,19 +112,6 @@ CRITICAL OUTPUT REQUIREMENTS:
           ) : undefined,
           motivation: (typeof cleaned.motivation === 'string') ? cleanPlainTextResponse(cleaned.motivation) : undefined,
           tip: (typeof cleaned.tip === 'string') ? cleanPlainTextResponse(cleaned.tip) : undefined,
-=======
-        const cleaned = sanitizeAIResponse(parsed);
-        return {
-          analysis: cleaned.analysis || 'Analysis generated successfully.',
-          recommendations: (cleaned.recommendations || []).map((r: any) => 
-            typeof r === 'string' ? cleanPlainTextResponse(r) : String(r)
-          ),
-          warnings: cleaned.warnings ? (cleaned.warnings || []).map((w: any) => 
-            typeof w === 'string' ? cleanPlainTextResponse(w) : String(w)
-          ) : undefined,
-          motivation: cleaned.motivation ? cleanPlainTextResponse(cleaned.motivation) : undefined,
-          tip: cleaned.tip ? cleanPlainTextResponse(cleaned.tip) : undefined,
->>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
         };
       }
 
@@ -153,11 +131,7 @@ CRITICAL OUTPUT REQUIREMENTS:
         context: 'generateWorkoutInsights',
         userId: context.userGoals, // Add more context as needed
       });
-<<<<<<< HEAD
 
-=======
-      
->>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
       // Return fallback insights instead of throwing
       return {
         analysis: 'Unable to generate AI insights at this time. Please try again later.',
@@ -322,7 +296,6 @@ CRITICAL OUTPUT REQUIREMENTS:
 
       const parsed = parseAIJSON<any>(text);
       if (parsed) {
-<<<<<<< HEAD
         const cleaned = sanitizeAIResponse(parsed) as Record<string, unknown>;
         const breakthrough = cleaned.breakthrough as Record<string, unknown> | undefined;
         return {
@@ -331,15 +304,6 @@ CRITICAL OUTPUT REQUIREMENTS:
             projectedWeight: typeof breakthrough.projectedWeight === 'number' ? breakthrough.projectedWeight : undefined,
             improvementPercent: typeof breakthrough.improvementPercent === 'number' ? breakthrough.improvementPercent : undefined,
             reason: cleanPlainTextResponse(String(breakthrough.reason || '')),
-=======
-        const cleaned = sanitizeAIResponse(parsed);
-        return {
-          breakthrough: cleaned.breakthrough?.exercise ? {
-            exercise: cleanPlainTextResponse(cleaned.breakthrough.exercise),
-            projectedWeight: cleaned.breakthrough.projectedWeight,
-            improvementPercent: cleaned.breakthrough.improvementPercent,
-            reason: cleanPlainTextResponse(cleaned.breakthrough.reason || ''),
->>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
           } : undefined,
           consistencyScore,
           consistencyChange: consistencyScore - previousConsistencyScore,
@@ -618,17 +582,9 @@ function generateMockProgressAnalysis(
     };
   }
 
-<<<<<<< HEAD
   const latestPR = personalRecords.length > 0
     ? personalRecords.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
     : undefined;
-
-=======
-  const latestPR = personalRecords.length > 0 
-    ? personalRecords.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
-    : undefined;
-  
->>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
   const breakthrough: BreakthroughInsight | undefined = latestPR ? {
     exercise: latestPR.exerciseName,
     projectedWeight: latestPR.maxWeight + (latestPR.maxWeight * 0.05),
@@ -684,7 +640,6 @@ function generateMockSmartAlerts(
   return {
     readinessScore,
     readinessStatus: readinessScore >= 80 ? 'optimal' : readinessScore >= 60 ? 'good' : readinessScore >= 40 ? 'moderate' : 'low',
-<<<<<<< HEAD
     readinessMessage: readinessScore >= 80
       ? 'Readiness is high. Push for PRs today.'
       : readinessScore >= 60
@@ -692,15 +647,6 @@ function generateMockSmartAlerts(
         : readinessScore >= 40
           ? 'Readiness is moderate. Consider lighter training or rest.'
           : 'Readiness is low. Rest is recommended.',
-=======
-    readinessMessage: readinessScore >= 80 
-      ? 'Readiness is high. Push for PRs today.' 
-      : readinessScore >= 60 
-      ? 'Readiness is good. You can train with moderate intensity.'
-      : readinessScore >= 40
-      ? 'Readiness is moderate. Consider lighter training or rest.'
-      : 'Readiness is low. Rest is recommended.',
->>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
     criticalAlerts,
     suggestions: [],
     nutritionEvents: [],

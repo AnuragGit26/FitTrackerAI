@@ -38,20 +38,20 @@ export class ErrorBoundary extends Component<Props, State> {
             console.error('ErrorBoundary caught an error:', error, errorInfo);
         }
 
-    // Call optional error handler
-    this.props.onError?.(error, errorInfo);
+        // Call optional error handler
+        this.props.onError?.(error, errorInfo);
 
-    // Store error info for display
-    this.setState({
-      error,
-      errorInfo,
-    });
+        // Store error info for display
+        this.setState({
+            error,
+            errorInfo,
+        });
 
-    // Track error with analytics
-    analytics.trackError(error, {
-      componentStack: errorInfo.componentStack,
-      context: 'error_boundary',
-    });
+        // Track error with analytics
+        analytics.trackError(error, {
+            componentStack: errorInfo.componentStack,
+            context: 'error_boundary',
+        });
     }
 
     handleReset = () => {
@@ -91,11 +91,7 @@ export class ErrorBoundary extends Component<Props, State> {
                                     Something went wrong
                                 </h1>
                                 <p className="text-gray-600 dark:text-gray-400">
-<<<<<<< HEAD
                                     We&apos;re sorry, but something unexpected happened. Please try refreshing the page or return to the home page.
-=======
-                                    We're sorry, but something unexpected happened. Please try refreshing the page or return to the home page.
->>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
                                 </p>
                             </div>
 

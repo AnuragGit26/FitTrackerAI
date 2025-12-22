@@ -4,11 +4,7 @@ import { cn } from '@/utils/cn';
 import { checkmarkAnimation, prefersReducedMotion } from '@/utils/animations';
 import { Check } from 'lucide-react';
 
-<<<<<<< HEAD
 interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onAnimationStart' | 'onAnimationEnd' | 'onAnimationIteration'> {
-=======
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
->>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
   size?: 'sm' | 'md' | 'lg';
   children: ReactNode;
@@ -30,9 +26,9 @@ export function Button({
 }: ButtonProps) {
   const [showCheckmark, setShowCheckmark] = useState(false);
   const shouldReduceMotion = prefersReducedMotion();
-  
+
   const baseStyles = 'font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden';
-  
+
   const variants = {
     primary: 'bg-primary-600 text-white hover:bg-primary-700',
     secondary: 'bg-gray-200 text-gray-900 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600',
@@ -59,15 +55,9 @@ export function Button({
     <motion.button
       className={cn(baseStyles, variants[variant], sizes[size], className)}
       disabled={disabled || isLoading}
-<<<<<<< HEAD
       whileHover={!disabled && !isLoading && !shouldReduceMotion ? { scale: 1.02 } : undefined}
       whileTap={!disabled && !isLoading && !shouldReduceMotion ? { scale: 0.98 } : undefined}
       {...(props as any)}
-=======
-      whileHover={!disabled && !isLoading && !shouldReduceMotion ? { scale: 1.02 } : {}}
-      whileTap={!disabled && !isLoading && !shouldReduceMotion ? { scale: 0.98 } : {}}
-      {...props}
->>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
     >
       {isLoading ? (
         <span className="flex items-center gap-2">

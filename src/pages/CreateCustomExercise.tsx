@@ -22,11 +22,11 @@ const categories: Array<{
   label: string;
   icon: typeof Dumbbell;
 }> = [
-  { value: 'strength', label: 'Strength', icon: Dumbbell },
-  { value: 'cardio', label: 'Cardio', icon: Activity },
-  { value: 'flexibility', label: 'Flexibility', icon: Heart },
-  { value: 'plyometric', label: 'Plyometrics', icon: Zap },
-];
+    { value: 'strength', label: 'Strength', icon: Dumbbell },
+    { value: 'cardio', label: 'Cardio', icon: Activity },
+    { value: 'flexibility', label: 'Flexibility', icon: Heart },
+    { value: 'plyometric', label: 'Plyometrics', icon: Zap },
+  ];
 
 export function CreateCustomExercise() {
   const navigate = useNavigate();
@@ -59,10 +59,7 @@ export function CreateCustomExercise() {
         equipment: [],
         difficulty: 'intermediate',
         instructions: [],
-<<<<<<< HEAD
         trackingType: 'weight_reps',
-=======
->>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
       };
 
       await exerciseLibrary.createCustomExercise(exerciseData);
@@ -117,15 +114,9 @@ export function CreateCustomExercise() {
                   <p className="text-slate-600 dark:text-gray-300 text-sm leading-relaxed">
                     Use specific names like{' '}
                     <span className="text-slate-900 dark:text-white font-medium">
-<<<<<<< HEAD
                       &quot;Incline Bench Press&quot;
                     </span>{' '}
                     instead of &quot;Chest Press&quot; for better muscle tracking.
-=======
-                      "Incline Bench Press"
-                    </span>{' '}
-                    instead of "Chest Press" for better muscle tracking.
->>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
                   </p>
                 </div>
                 <button

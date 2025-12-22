@@ -2,10 +2,7 @@ import { dataService } from '@/services/dataService';
 import { exerciseLibrary } from '@/services/exerciseLibrary';
 import { Workout } from '@/types/workout';
 import { WorkoutExercise, WorkoutSet } from '@/types/exercise';
-<<<<<<< HEAD
-=======
 import { MuscleGroup } from '@/types/muscle';
->>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
 
 /**
  * Seed the database with varied workout logs for testing analytics and insights
@@ -127,7 +124,7 @@ export async function seedWorkoutLogs(userId: string = 'user-1'): Promise<void> 
   const workouts: Omit<Workout, 'id'>[] = [];
 
   // ===== WEEK 1 (Most Recent) =====
-  
+
   // Day 0 (Today) - Morning Push Workout
   const todayPush = daysAgo(0, 7, 30);
   const pushExercises: WorkoutExercise[] = [
@@ -136,7 +133,7 @@ export async function seedWorkoutLogs(userId: string = 'user-1'): Promise<void> 
     createWorkoutExercise('Overhead Press', createWeightRepsSets(3, 50, 8))!,
     createWorkoutExercise('Tricep Dips', createRepsOnlySets(3, 12))!,
   ].filter(Boolean);
-  
+
   workouts.push({
     userId,
     date: todayPush,
@@ -157,7 +154,7 @@ export async function seedWorkoutLogs(userId: string = 'user-1'): Promise<void> 
     createWorkoutExercise('Running', createCardioSets(5, 'km'))!,
     createWorkoutExercise('Plank', createDurationSets(60))!,
   ].filter(Boolean);
-  
+
   workouts.push({
     userId,
     date: yesterdayCardio,
@@ -179,7 +176,7 @@ export async function seedWorkoutLogs(userId: string = 'user-1'): Promise<void> 
     createWorkoutExercise('Pull-ups', createRepsOnlySets(4, 10))!,
     createWorkoutExercise('Barbell Bicep Curl', createWeightRepsSets(3, 20, 12))!,
   ].filter(Boolean);
-  
+
   workouts.push({
     userId,
     date: day2Pull,
@@ -194,7 +191,7 @@ export async function seedWorkoutLogs(userId: string = 'user-1'): Promise<void> 
   });
 
   // ===== WEEK 2 =====
-  
+
   // Day 3 - Leg Day
   const day3Legs = daysAgo(3, 10, 0);
   const legExercises: WorkoutExercise[] = [
@@ -204,7 +201,7 @@ export async function seedWorkoutLogs(userId: string = 'user-1'): Promise<void> 
     createWorkoutExercise('Leg Curl (Lying)', createWeightRepsSets(3, 40, 12))!,
     createWorkoutExercise('Calf Raises (Standing)', createWeightRepsSets(4, 50, 15))!,
   ].filter(Boolean);
-  
+
   workouts.push({
     userId,
     date: day3Legs,
@@ -229,7 +226,7 @@ export async function seedWorkoutLogs(userId: string = 'user-1'): Promise<void> 
     createWorkoutExercise('Barbell Squat', createWeightRepsSets(3, 90, 10))!,
     createWorkoutExercise('Overhead Press', createWeightRepsSets(3, 45, 8))!,
   ].filter(Boolean);
-  
+
   workouts.push({
     userId,
     date: day5FullBody,
@@ -250,7 +247,7 @@ export async function seedWorkoutLogs(userId: string = 'user-1'): Promise<void> 
     createWorkoutExercise('Plank', createDurationSets(45))!,
     createWorkoutExercise('Russian Twists', createWeightRepsSets(3, 5, 20))!,
   ].filter(Boolean);
-  
+
   workouts.push({
     userId,
     date: day6Cardio,
@@ -265,7 +262,7 @@ export async function seedWorkoutLogs(userId: string = 'user-1'): Promise<void> 
   });
 
   // ===== WEEK 3 =====
-  
+
   // Day 7 - Push Workout (Morning)
   const day7Push = daysAgo(7, 6, 45);
   const pushExercises2: WorkoutExercise[] = [
@@ -274,7 +271,7 @@ export async function seedWorkoutLogs(userId: string = 'user-1'): Promise<void> 
     createWorkoutExercise('Dumbbell Lateral Raises', createWeightRepsSets(3, 8, 15))!,
     createWorkoutExercise('Cable Tricep Extension', createWeightRepsSets(3, 15, 12))!,
   ].filter(Boolean);
-  
+
   workouts.push({
     userId,
     date: day7Push,
@@ -296,7 +293,7 @@ export async function seedWorkoutLogs(userId: string = 'user-1'): Promise<void> 
     createWorkoutExercise('Seated Cable Row', createWeightRepsSets(3, 60, 10))!,
     createWorkoutExercise('Hammer Curls', createWeightRepsSets(3, 18, 12))!,
   ].filter(Boolean);
-  
+
   workouts.push({
     userId,
     date: day8Pull,
@@ -320,7 +317,7 @@ export async function seedWorkoutLogs(userId: string = 'user-1'): Promise<void> 
     createWorkoutExercise('Leg Extension', createWeightRepsSets(3, 50, 12))!,
     createWorkoutExercise('Leg Curl (Lying)', createWeightRepsSets(3, 38, 12))!,
   ].filter(Boolean);
-  
+
   workouts.push({
     userId,
     date: day10Legs,
@@ -340,7 +337,7 @@ export async function seedWorkoutLogs(userId: string = 'user-1'): Promise<void> 
   const cardioExercises2: WorkoutExercise[] = [
     createWorkoutExercise('Running', createCardioSets(4.5, 'km'))!,
   ].filter(Boolean);
-  
+
   workouts.push({
     userId,
     date: day11Cardio,
@@ -355,7 +352,7 @@ export async function seedWorkoutLogs(userId: string = 'user-1'): Promise<void> 
   });
 
   // ===== WEEK 4 =====
-  
+
   // Day 12 - Push Workout
   const day12Push = daysAgo(12, 8, 15);
   const pushExercises3: WorkoutExercise[] = [
@@ -364,7 +361,7 @@ export async function seedWorkoutLogs(userId: string = 'user-1'): Promise<void> 
     createWorkoutExercise('Overhead Press', createWeightRepsSets(3, 48, 8))!,
     createWorkoutExercise('Tricep Dips', createRepsOnlySets(3, 11))!,
   ].filter(Boolean);
-  
+
   workouts.push({
     userId,
     date: day12Push,
@@ -386,7 +383,7 @@ export async function seedWorkoutLogs(userId: string = 'user-1'): Promise<void> 
     createWorkoutExercise('Barbell Bicep Curl', createWeightRepsSets(3, 19, 12))!,
     createWorkoutExercise('Seated Cable Row', createWeightRepsSets(3, 58, 10))!,
   ].filter(Boolean);
-  
+
   workouts.push({
     userId,
     date: day13Pull,
@@ -408,7 +405,7 @@ export async function seedWorkoutLogs(userId: string = 'user-1'): Promise<void> 
     createWorkoutExercise('Barbell Row', createWeightRepsSets(3, 63, 10))!,
     createWorkoutExercise('Overhead Press', createWeightRepsSets(3, 43, 8))!,
   ].filter(Boolean);
-  
+
   workouts.push({
     userId,
     date: day14FullBody,
@@ -428,7 +425,7 @@ export async function seedWorkoutLogs(userId: string = 'user-1'): Promise<void> 
     createWorkoutExercise('Running', createCardioSets(6, 'km'))!,
     createWorkoutExercise('Plank', createDurationSets(50))!,
   ].filter(Boolean);
-  
+
   workouts.push({
     userId,
     date: day15Cardio,
@@ -443,7 +440,7 @@ export async function seedWorkoutLogs(userId: string = 'user-1'): Promise<void> 
   });
 
   // ===== OLDER WORKOUTS (for trend analysis) =====
-  
+
   // Day 20 - Push (3 weeks ago)
   const day20Push = daysAgo(20, 10, 0);
   const pushExercises4: WorkoutExercise[] = [
@@ -451,7 +448,7 @@ export async function seedWorkoutLogs(userId: string = 'user-1'): Promise<void> 
     createWorkoutExercise('Dumbbell Bench Press', createWeightRepsSets(3, 26, 12))!,
     createWorkoutExercise('Overhead Press', createWeightRepsSets(3, 42, 8))!,
   ].filter(Boolean);
-  
+
   workouts.push({
     userId,
     date: day20Push,
@@ -472,7 +469,7 @@ export async function seedWorkoutLogs(userId: string = 'user-1'): Promise<void> 
     createWorkoutExercise('Barbell Row', createWeightRepsSets(4, 65, 8))!,
     createWorkoutExercise('Pull-ups', createRepsOnlySets(3, 8))!,
   ].filter(Boolean);
-  
+
   workouts.push({
     userId,
     date: day25Pull,
@@ -493,7 +490,7 @@ export async function seedWorkoutLogs(userId: string = 'user-1'): Promise<void> 
     createWorkoutExercise('Romanian Deadlift', createWeightRepsSets(4, 70, 10))!,
     createWorkoutExercise('Leg Press', createWeightRepsSets(3, 140, 15))!,
   ].filter(Boolean);
-  
+
   workouts.push({
     userId,
     date: day30Legs,
@@ -509,7 +506,7 @@ export async function seedWorkoutLogs(userId: string = 'user-1'): Promise<void> 
 
   // Save all workouts
   console.log(`Seeding ${workouts.length} workout logs...`);
-  
+
   for (const workout of workouts) {
     try {
       const id = await dataService.createWorkout(workout);
@@ -518,7 +515,7 @@ export async function seedWorkoutLogs(userId: string = 'user-1'): Promise<void> 
       console.error(`✗ Failed to create workout:`, error);
     }
   }
-  
+
   console.log(`\n✅ Successfully seeded ${workouts.length} workout logs!`);
   console.log(`Workouts span from ${workouts[workouts.length - 1].date.toLocaleDateString()} to ${workouts[0].date.toLocaleDateString()}`);
 }

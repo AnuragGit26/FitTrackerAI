@@ -49,11 +49,7 @@ export function RestTimer({
   useEffect(() => {
     if (settings.soundEnabled && !audioContextRef.current) {
       try {
-<<<<<<< HEAD
         audioContextRef.current = new (window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)();
-=======
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
->>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
       } catch (error) {
         console.warn('AudioContext not supported:', error);
       }
@@ -80,7 +76,7 @@ export function RestTimer({
               clearInterval(intervalRef.current);
               intervalRef.current = null;
             }
-            
+
             // Show notification if enabled
             if (notificationPermissionRef.current === 'granted') {
               new Notification('Rest Timer Complete', {
@@ -90,17 +86,17 @@ export function RestTimer({
                 tag: 'rest-timer',
               });
             }
-            
+
             // Play sound if enabled
             if (settings.soundEnabled && audioContextRef.current) {
               playCompletionSound();
             }
-            
+
             // Vibrate if enabled
             if (settings.vibrationEnabled && 'vibrate' in navigator) {
               navigator.vibrate([200, 100, 200]);
             }
-            
+
             // Defer onComplete to avoid updating parent during render
             setTimeout(() => {
               onCompleteRef.current();
@@ -154,20 +150,20 @@ export function RestTimer({
   // Play completion sound
   const playCompletionSound = () => {
     if (!audioContextRef.current) return;
-    
+
     try {
       const oscillator = audioContextRef.current.createOscillator();
       const gainNode = audioContextRef.current.createGain();
-      
+
       oscillator.connect(gainNode);
       gainNode.connect(audioContextRef.current.destination);
-      
+
       oscillator.frequency.value = 800;
       oscillator.type = 'sine';
-      
+
       gainNode.gain.setValueAtTime(0.3, audioContextRef.current.currentTime);
       gainNode.gain.exponentialRampToValueAtTime(0.01, audioContextRef.current.currentTime + 0.5);
-      
+
       oscillator.start(audioContextRef.current.currentTime);
       oscillator.stop(audioContextRef.current.currentTime + 0.5);
     } catch (error) {

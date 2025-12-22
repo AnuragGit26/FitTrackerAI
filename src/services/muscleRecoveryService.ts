@@ -19,13 +19,13 @@ class MuscleRecoveryService {
   ): number {
     const isPrimary = mapping.primary.includes(muscle);
     const isSecondary = mapping.secondary.includes(muscle);
-    
+
     if (!isPrimary && !isSecondary) return 0;
 
     // Calculate volume contribution for this muscle
     const totalMuscles = mapping.primary.length + mapping.secondary.length;
     const muscleVolume = exercise.totalVolume / totalMuscles;
-    
+
     // Primary muscles get full intensity, secondary get 0.5x
     const intensityMultiplier = isPrimary ? 1.0 : 0.5;
     const adjustedVolume = muscleVolume * intensityMultiplier;
@@ -129,12 +129,8 @@ class MuscleRecoveryService {
 
     for (const muscle of muscles) {
       // Get existing muscle status or create new one
-<<<<<<< HEAD
       const existingStatus = await dataService.getMuscleStatus(muscle);
-=======
-      let existingStatus = await dataService.getMuscleStatus(muscle);
->>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
-      
+
       // Calculate workload for this muscle from this workout
       let totalWorkload = 0;
       workout.exercises.forEach((exercise) => {
@@ -146,7 +142,7 @@ class MuscleRecoveryService {
 
       // Calculate volume last 7 days
       const volumeLast7Days = this.calculateVolumeLast7Days(muscle, allWorkouts);
-      
+
       // Calculate training frequency
       const trainingFrequency = this.calculateTrainingFrequency(muscle, allWorkouts);
 

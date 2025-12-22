@@ -43,11 +43,10 @@ export function OfflineIndicator() {
           className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center p-4 pointer-events-none"
         >
           <div
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg ${
-              isOnline
-                ? 'bg-success text-white'
-                : 'bg-error text-white'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg ${isOnline
+              ? 'bg-success text-white'
+              : 'bg-error text-white'
+              }`}
           >
             {isOnline ? (
               <>
@@ -57,11 +56,7 @@ export function OfflineIndicator() {
             ) : (
               <>
                 <WifiOff className="w-4 h-4" />
-<<<<<<< HEAD
                 <span className="text-sm font-semibold">You&apos;re offline</span>
-=======
-                <span className="text-sm font-semibold">You're offline</span>
->>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
               </>
             )}
           </div>

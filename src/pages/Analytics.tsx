@@ -23,11 +23,7 @@ import { AICoachInsightCard } from '@/components/analytics/AICoachInsightCard';
 import { FocusDistributionChart } from '@/components/analytics/FocusDistributionChart';
 import { VolumeByMuscleChart } from '@/components/analytics/VolumeByMuscleChart';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-<<<<<<< HEAD
 import { prefersReducedMotion } from '@/utils/animations';
-=======
-import { fadeIn, prefersReducedMotion } from '@/utils/animations';
->>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
 
 type View = 'progress' | 'muscle';
 type DateRangeOption = '30d' | '90d' | '180d' | '1y';
@@ -230,21 +226,19 @@ export function Analytics() {
           />
           <button
             onClick={() => setView('progress')}
-            className={`relative z-10 flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              view === 'progress'
+            className={`relative z-10 flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${view === 'progress'
                 ? 'text-[#102217]'
                 : 'text-gray-600 dark:text-gray-300'
-            }`}
+              }`}
           >
             Progress
           </button>
           <button
             onClick={() => setView('muscle')}
-            className={`relative z-10 flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              view === 'muscle'
+            className={`relative z-10 flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${view === 'muscle'
                 ? 'text-[#102217]'
                 : 'text-gray-600 dark:text-gray-300'
-            }`}
+              }`}
           >
             Muscle Groups
           </button>
@@ -262,33 +256,33 @@ export function Analytics() {
           >
             <ProgressHeader selectedRange={dateRange} onRangeChange={setDateRange} />
             <div className="p-4 space-y-5 max-w-2xl mx-auto">
-            <div className="grid grid-cols-2 gap-3">
-              <TotalVolumeCard
-                totalVolume={metrics.totalVolume}
-                trendPercentage={trendPercentage}
-                unit={unit}
-              />
-              <WorkoutStatsCards workoutCount={metrics.workoutCount} currentStreak={currentStreak} />
-            </div>
-
-            {isLoadingInsights ? (
-              <div className="flex items-center justify-center py-8">
-                <LoadingSpinner />
+              <div className="grid grid-cols-2 gap-3">
+                <TotalVolumeCard
+                  totalVolume={metrics.totalVolume}
+                  trendPercentage={trendPercentage}
+                  unit={unit}
+                />
+                <WorkoutStatsCards workoutCount={metrics.workoutCount} currentStreak={currentStreak} />
               </div>
-            ) : (
-              progressInsight && <AIInsightCard insight={progressInsight} />
-            )}
 
-            <VolumeTrendChart data={metrics.volumeTrend} />
+              {isLoadingInsights ? (
+                <div className="flex items-center justify-center py-8">
+                  <LoadingSpinner />
+                </div>
+              ) : (
+                progressInsight && <AIInsightCard insight={progressInsight} />
+              )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <ConsistencyHeatmap workouts={workouts} />
-              <MuscleFocusCard workouts={workouts} />
-            </div>
+              <VolumeTrendChart data={metrics.volumeTrend} />
 
-            <StrengthProgressionChart progressions={metrics.strengthProgression} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <ConsistencyHeatmap workouts={workouts} />
+                <MuscleFocusCard workouts={workouts} />
+              </div>
 
-            <RecentRecordsList records={metrics.personalRecords} />
+              <StrengthProgressionChart progressions={metrics.strengthProgression} />
+
+              <RecentRecordsList records={metrics.personalRecords} />
             </div>
           </motion.div>
         ) : (
@@ -301,31 +295,31 @@ export function Analytics() {
           >
             <MuscleAnalyticsHeader selectedPeriod={timePeriod} onPeriodChange={setTimePeriod} />
             <div className="px-4 py-4 space-y-4">
-            <SymmetryScoreCard score={metrics.symmetryScore} />
+              <SymmetryScoreCard score={metrics.symmetryScore} />
 
-            <MuscleActivationMap workouts={workouts} />
+              <MuscleActivationMap workouts={workouts} />
 
-            {isLoadingInsights ? (
-              <div className="flex items-center justify-center py-8">
-                <LoadingSpinner />
+              {isLoadingInsights ? (
+                <div className="flex items-center justify-center py-8">
+                  <LoadingSpinner />
+                </div>
+              ) : (
+                muscleInsight && <AICoachInsightCard insight={muscleInsight} />
+              )}
+
+              <FocusDistributionChart
+                legs={metrics.focusDistribution.legs}
+                push={metrics.focusDistribution.push}
+                pull={metrics.focusDistribution.pull}
+              />
+
+              <div className="flex items-end justify-between px-1">
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Volume by Muscle</h3>
+                <span className="text-xs font-medium text-primary cursor-pointer hover:underline">
+                  View All
+                </span>
               </div>
-            ) : (
-              muscleInsight && <AICoachInsightCard insight={muscleInsight} />
-            )}
-
-            <FocusDistributionChart
-              legs={metrics.focusDistribution.legs}
-              push={metrics.focusDistribution.push}
-              pull={metrics.focusDistribution.pull}
-            />
-
-            <div className="flex items-end justify-between px-1">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Volume by Muscle</h3>
-              <span className="text-xs font-medium text-primary cursor-pointer hover:underline">
-                View All
-              </span>
-            </div>
-            <VolumeByMuscleChart workouts={workouts} />
+              <VolumeByMuscleChart workouts={workouts} />
             </div>
           </motion.div>
         )}

@@ -25,11 +25,7 @@ export function AIFocusCard() {
       <div className="px-5 mt-6">
         <div className="flex items-center gap-2 mb-3">
           <Bot className="w-5 h-5 text-primary" />
-<<<<<<< HEAD
           <h2 className="text-slate-900 dark:text-white text-lg font-bold">Today&apos;s Focus</h2>
-=======
-          <h2 className="text-slate-900 dark:text-white text-lg font-bold">Today's Focus</h2>
->>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
         </div>
         <div className="rounded-2xl bg-surface-dark p-6">
           <EmptyState
@@ -68,11 +64,7 @@ export function AIFocusCard() {
     <div className="px-5 mt-6">
       <div className="flex items-center gap-2 mb-3">
         <Bot className="w-5 h-5 text-primary" />
-<<<<<<< HEAD
         <h2 className="text-slate-900 dark:text-white text-lg font-bold">Today&apos;s Focus</h2>
-=======
-        <h2 className="text-slate-900 dark:text-white text-lg font-bold">Today's Focus</h2>
->>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
       </div>
       <motion.div
         className="relative overflow-hidden rounded-2xl bg-surface-dark shadow-lg group cursor-pointer"

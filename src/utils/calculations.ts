@@ -10,7 +10,7 @@ export function calculateVolume(sets: WorkoutSet[], trackingType: ExerciseTracki
           return total + set.reps * set.weight;
         }
         return total;
-      
+
       case 'reps_only':
         // For bodyweight exercises, volume could be just total reps
         // or 0 if we want to exclude them from volume calculations
@@ -18,7 +18,7 @@ export function calculateVolume(sets: WorkoutSet[], trackingType: ExerciseTracki
           return total + set.reps;
         }
         return total;
-      
+
       case 'cardio':
         // For cardio, we could use distance or time, but for consistency
         // with existing analytics, return 0 or use distance
@@ -28,7 +28,7 @@ export function calculateVolume(sets: WorkoutSet[], trackingType: ExerciseTracki
           return total + distanceKm;
         }
         return total;
-      
+
       case 'duration':
         // For duration exercises, return total duration in seconds
         // or 0 if we want to exclude them from volume calculations
@@ -36,7 +36,7 @@ export function calculateVolume(sets: WorkoutSet[], trackingType: ExerciseTracki
           return total + set.duration;
         }
         return total;
-      
+
       default:
         return total;
     }
@@ -45,7 +45,7 @@ export function calculateVolume(sets: WorkoutSet[], trackingType: ExerciseTracki
 
 export function convertWeight(weight: number, from: 'kg' | 'lbs', to: 'kg' | 'lbs'): number {
   if (from === to) return weight;
-  
+
   if (from === 'kg' && to === 'lbs') {
     return weight * 2.20462;
   } else {
@@ -83,25 +83,21 @@ export function formatWeight(weight: number, unit: 'kg' | 'lbs'): string {
 
 export function calculateStreak(workoutDates: Date[]): number {
   if (workoutDates.length === 0) return 0;
-  
+
   const sortedDates = workoutDates
     .map(date => new Date(date.getFullYear(), date.getMonth(), date.getDate()))
     .sort((a, b) => b.getTime() - a.getTime());
-  
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
+
   let streak = 0;
-<<<<<<< HEAD
   const currentDate = new Date(today);
-=======
-  let currentDate = new Date(today);
->>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
-  
+
   for (const workoutDate of sortedDates) {
     const workoutDay = new Date(workoutDate);
     workoutDay.setHours(0, 0, 0, 0);
-    
+
     if (workoutDay.getTime() === currentDate.getTime()) {
       streak++;
       currentDate.setDate(currentDate.getDate() - 1);
@@ -109,17 +105,17 @@ export function calculateStreak(workoutDates: Date[]): number {
       break;
     }
   }
-  
+
   return streak;
 }
 
 export function estimateEnergy(workouts: Array<{ totalVolume: number; totalDuration: number }>): number {
   const totalVolume = workouts.reduce((sum, w) => sum + w.totalVolume, 0);
   const totalDuration = workouts.reduce((sum, w) => sum + w.totalDuration, 0);
-  
+
   const volumeCalories = totalVolume * 0.1;
   const timeCalories = totalDuration * 8;
-  
+
   return Math.round(volumeCalories + timeCalories);
 }
 

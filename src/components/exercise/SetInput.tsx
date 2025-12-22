@@ -22,36 +22,24 @@ export function SetInput({ set, onUpdate, onDelete, unit, previousSet }: SetInpu
   };
 
   const incrementWeight = () => {
-<<<<<<< HEAD
     if (set.weight === undefined) return;
-=======
->>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
     const increment = unit === 'kg' ? 2.5 : 5;
     onUpdate({ weight: set.weight + increment });
   };
 
   const decrementWeight = () => {
-<<<<<<< HEAD
     if (set.weight === undefined) return;
-=======
->>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
     const increment = unit === 'kg' ? 2.5 : 5;
     onUpdate({ weight: Math.max(0, set.weight - increment) });
   };
 
   const incrementReps = () => {
-<<<<<<< HEAD
     if (set.reps === undefined) return;
-=======
->>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
     onUpdate({ reps: set.reps + 1 });
   };
 
   const decrementReps = () => {
-<<<<<<< HEAD
     if (set.reps === undefined) return;
-=======
->>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
     onUpdate({ reps: Math.max(1, set.reps - 1) });
   };
 
@@ -80,11 +68,7 @@ export function SetInput({ set, onUpdate, onDelete, unit, previousSet }: SetInpu
           </button>
           <div className="flex-1 text-center">
             <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-<<<<<<< HEAD
               {set.weight !== undefined ? set.weight.toFixed(unit === 'kg' ? 1 : 0) : '0'}
-=======
-              {set.weight.toFixed(unit === 'kg' ? 1 : 0)}
->>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
             </div>
             <div className="text-xs text-gray-500 dark:text-gray-400">{unit}</div>
           </div>

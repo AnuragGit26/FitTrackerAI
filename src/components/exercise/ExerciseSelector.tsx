@@ -1,12 +1,6 @@
-<<<<<<< HEAD
 import { useState, useEffect } from 'react';
 import { Search, X, Filter } from 'lucide-react';
 import { FixedSizeList, ListChildComponentProps } from 'react-window';
-=======
-import { useState, useEffect, memo, useMemo } from 'react';
-import { Search, X, Filter } from 'lucide-react';
-import { FixedSizeList } from 'react-window';
->>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
 import { Exercise } from '@/types/exercise';
 import { exerciseLibrary, EquipmentCategory, getEquipmentCategories } from '@/services/exerciseLibrary';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -205,69 +199,65 @@ export function ExerciseSelector({ onSelect, onClose }: ExerciseSelectorProps) {
               <div className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-800">
                 Showing {filteredExercises.length} of {exercises.length} exercises
               </div>
-            <FixedSizeList
-              height={window.innerHeight - 300} // Adjust based on header height
-              itemCount={filteredExercises.length}
-              itemSize={80}
-              width="100%"
-              className="divide-y divide-gray-200 dark:divide-gray-800"
-            >
-<<<<<<< HEAD
-              {({ index, style }: ListChildComponentProps) => {
-=======
-              {({ index, style }) => {
->>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
-                const exercise = filteredExercises[index];
-                return (
-                  <div style={style}>
-                    <button
-                      onClick={() => {
-                        onSelect(exercise);
-                        onClose();
-                      }}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-inset"
-                      aria-label={`Select exercise ${exercise.name}`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate">
-                            {exercise.name}
-                          </h3>
-                          <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <span className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-gray-600 dark:text-gray-400">
-                              {exercise.category}
-                            </span>
-                            {getEquipmentCategories(exercise.equipment).map((category) => (
-                              <span
-                                key={category}
-                                className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded"
-                              >
-                                {category}
+              <FixedSizeList
+                height={window.innerHeight - 300} // Adjust based on header height
+                itemCount={filteredExercises.length}
+                itemSize={80}
+                width="100%"
+                className="divide-y divide-gray-200 dark:divide-gray-800"
+              >
+                {({ index, style }: ListChildComponentProps) => {
+                  const exercise = filteredExercises[index];
+                  return (
+                    <div style={style}>
+                      <button
+                        onClick={() => {
+                          onSelect(exercise);
+                          onClose();
+                        }}
+                        className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-inset"
+                        aria-label={`Select exercise ${exercise.name}`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate">
+                              {exercise.name}
+                            </h3>
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                              <span className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-gray-600 dark:text-gray-400">
+                                {exercise.category}
                               </span>
-                            ))}
-                            {exercise.equipment.length > 0 && (
-                              <span className="text-xs text-gray-500 dark:text-gray-400">
-                                {exercise.equipment.join(', ')}
-                              </span>
-                            )}
+                              {getEquipmentCategories(exercise.equipment).map((category) => (
+                                <span
+                                  key={category}
+                                  className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded"
+                                >
+                                  {category}
+                                </span>
+                              ))}
+                              {exercise.equipment.length > 0 && (
+                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                  {exercise.equipment.join(', ')}
+                                </span>
+                              )}
+                            </div>
                           </div>
+                          <span
+                            className={cn(
+                              'text-xs px-2 py-1 rounded',
+                              exercise.difficulty === 'beginner' && 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+                              exercise.difficulty === 'intermediate' && 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+                              exercise.difficulty === 'advanced' && 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                            )}
+                          >
+                            {exercise.difficulty}
+                          </span>
                         </div>
-                        <span
-                          className={cn(
-                            'text-xs px-2 py-1 rounded',
-                            exercise.difficulty === 'beginner' && 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-                            exercise.difficulty === 'intermediate' && 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-                            exercise.difficulty === 'advanced' && 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                          )}
-                        >
-                          {exercise.difficulty}
-                        </span>
-                      </div>
-                    </button>
-                  </div>
-                );
-              }}
-            </FixedSizeList>
+                      </button>
+                    </div>
+                  );
+                }}
+              </FixedSizeList>
             </>
           )}
         </div>

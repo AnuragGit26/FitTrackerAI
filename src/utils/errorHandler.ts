@@ -2,11 +2,7 @@
  * Error handling utilities for consistent error management across the app
  */
 
-<<<<<<< HEAD
 export interface AppErrorInterface {
-=======
-export interface AppError {
->>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
     message: string;
     code?: string;
     statusCode?: number;
@@ -14,11 +10,7 @@ export interface AppError {
     context?: Record<string, unknown>;
 }
 
-<<<<<<< HEAD
 export class AppError extends Error implements AppErrorInterface {
-=======
-export class AppError extends Error {
->>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
     code?: string;
     statusCode?: number;
     originalError?: Error;
