@@ -78,7 +78,11 @@ export function validateSet(set: WorkoutSet, trackingType: ExerciseTrackingType,
   if (!set.completed) return { valid: true };
 
   switch (trackingType) {
+<<<<<<< HEAD
     case 'weight_reps': {
+=======
+    case 'weight_reps':
+>>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
       if (set.weight === undefined || set.reps === undefined) {
         return { valid: false, error: 'Weight and reps are required for completed sets' };
       }
@@ -87,7 +91,10 @@ export function validateSet(set: WorkoutSet, trackingType: ExerciseTrackingType,
       const repsValidation = validateReps(set.reps);
       if (!repsValidation.valid) return repsValidation;
       return { valid: true };
+<<<<<<< HEAD
     }
+=======
+>>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
     
     case 'reps_only':
       if (set.reps === undefined) {
@@ -95,7 +102,11 @@ export function validateSet(set: WorkoutSet, trackingType: ExerciseTrackingType,
       }
       return validateReps(set.reps);
     
+<<<<<<< HEAD
     case 'cardio': {
+=======
+    case 'cardio':
+>>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
       if (set.distance === undefined) {
         return { valid: false, error: 'Distance is required for cardio exercises' };
       }
@@ -106,9 +117,14 @@ export function validateSet(set: WorkoutSet, trackingType: ExerciseTrackingType,
       const caloriesValidation = validateCalories(set.calories);
       if (!caloriesValidation.valid) return { valid: false, error: 'Calories must be between 0 and 10000' };
       return { valid: true };
+<<<<<<< HEAD
     }
     
     case 'duration': {
+=======
+    
+    case 'duration':
+>>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
       if (set.duration === undefined) {
         return { valid: false, error: 'Duration is required' };
       }
@@ -117,7 +133,10 @@ export function validateSet(set: WorkoutSet, trackingType: ExerciseTrackingType,
         return { valid: false, error: 'Duration must be between 0 and 24 hours' };
       }
       return { valid: true };
+<<<<<<< HEAD
     }
+=======
+>>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
     
     default:
       return { valid: false, error: 'Invalid tracking type' };

@@ -23,7 +23,11 @@
   "dependencies": {
     "@clerk/clerk-react": "^5.59.2",
     "@google/generative-ai": "^0.2.1",
+<<<<<<< HEAD
     "@react-three/drei": "^9.122.0",
+=======
+    "@react-three/drei": "^9.88.13",
+>>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
     "@react-three/fiber": "^8.15.11",
     "clsx": "^2.0.0",
     "date-fns": "^2.30.0",
@@ -37,7 +41,11 @@
     "react-window": "^1.8.10",
     "recharts": "^2.10.3",
     "tailwind-merge": "^2.2.0",
+<<<<<<< HEAD
     "three": "^0.165.0",
+=======
+    "three": "^0.158.0",
+>>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
     "zustand": "^4.4.7"
   },
   "devDependencies": {
@@ -49,8 +57,12 @@
     "@types/puppeteer": "^5.4.7",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
+<<<<<<< HEAD
     "@types/react-window": "^1.8.8",
     "@types/three": "^0.165.0",
+=======
+    "@types/three": "^0.158.3",
+>>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
     "@typescript-eslint/eslint-plugin": "^6.14.0",
     "@typescript-eslint/parser": "^6.14.0",
     "@vitejs/plugin-react": "^4.2.1",

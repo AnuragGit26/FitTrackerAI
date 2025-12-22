@@ -1,6 +1,12 @@
+<<<<<<< HEAD
 import { useState, useEffect } from 'react';
 import { Search, X, Filter } from 'lucide-react';
 import { FixedSizeList, ListChildComponentProps } from 'react-window';
+=======
+import { useState, useEffect, memo, useMemo } from 'react';
+import { Search, X, Filter } from 'lucide-react';
+import { FixedSizeList } from 'react-window';
+>>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
 import { Exercise } from '@/types/exercise';
 import { exerciseLibrary, EquipmentCategory, getEquipmentCategories } from '@/services/exerciseLibrary';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -206,7 +212,11 @@ export function ExerciseSelector({ onSelect, onClose }: ExerciseSelectorProps) {
               width="100%"
               className="divide-y divide-gray-200 dark:divide-gray-800"
             >
+<<<<<<< HEAD
               {({ index, style }: ListChildComponentProps) => {
+=======
+              {({ index, style }) => {
+>>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
                 const exercise = filteredExercises[index];
                 return (
                   <div style={style}>

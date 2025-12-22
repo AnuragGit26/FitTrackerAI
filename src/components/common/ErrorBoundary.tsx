@@ -91,7 +91,11 @@ export class ErrorBoundary extends Component<Props, State> {
                                     Something went wrong
                                 </h1>
                                 <p className="text-gray-600 dark:text-gray-400">
+<<<<<<< HEAD
                                     We&apos;re sorry, but something unexpected happened. Please try refreshing the page or return to the home page.
+=======
+                                    We're sorry, but something unexpected happened. Please try refreshing the page or return to the home page.
+>>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
                                 </p>
                             </div>
 

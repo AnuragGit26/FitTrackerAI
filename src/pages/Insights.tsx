@@ -3,6 +3,10 @@ import { Bot, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { InsightsTabNavigation } from '@/components/insights/InsightsTabNavigation';
 import { useInsightsData } from '@/hooks/useInsightsData';
+<<<<<<< HEAD
+=======
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+>>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
 import { Skeleton } from '@/components/common/Skeleton';
 import { BreakthroughCard } from '@/components/insights/BreakthroughCard';
 import { PerformanceTrendsCards } from '@/components/insights/PerformanceTrendsCards';

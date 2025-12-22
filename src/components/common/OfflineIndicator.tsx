@@ -57,7 +57,11 @@ export function OfflineIndicator() {
             ) : (
               <>
                 <WifiOff className="w-4 h-4" />
+<<<<<<< HEAD
                 <span className="text-sm font-semibold">You&apos;re offline</span>
+=======
+                <span className="text-sm font-semibold">You're offline</span>
+>>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
               </>
             )}
           </div>

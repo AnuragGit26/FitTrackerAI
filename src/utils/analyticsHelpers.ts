@@ -57,7 +57,10 @@ export function calculatePersonalRecords(workouts: Workout[]): PersonalRecord[] 
 
       exercise.sets.forEach((set) => {
         if (!set.completed) return;
+<<<<<<< HEAD
         if (set.weight === undefined || set.reps === undefined) return;
+=======
+>>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
 
         const currentMaxWeight = existingRecord?.maxWeight || 0;
         const currentMaxReps = existingRecord?.maxReps || 0;

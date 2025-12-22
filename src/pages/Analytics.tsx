@@ -23,7 +23,11 @@ import { AICoachInsightCard } from '@/components/analytics/AICoachInsightCard';
 import { FocusDistributionChart } from '@/components/analytics/FocusDistributionChart';
 import { VolumeByMuscleChart } from '@/components/analytics/VolumeByMuscleChart';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+<<<<<<< HEAD
 import { prefersReducedMotion } from '@/utils/animations';
+=======
+import { fadeIn, prefersReducedMotion } from '@/utils/animations';
+>>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
 
 type View = 'progress' | 'muscle';
 type DateRangeOption = '30d' | '90d' | '180d' | '1y';

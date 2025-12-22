@@ -38,7 +38,11 @@ export function AIInsightsPanel() {
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-2">
             <Brain className="w-6 h-6" />
+<<<<<<< HEAD
             <h3 className="text-lg font-semibold">Today&apos;s Insight</h3>
+=======
+            <h3 className="text-lg font-semibold">Today's Insight</h3>
+>>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
           </div>
           <Button
             variant="ghost"

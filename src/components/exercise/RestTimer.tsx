@@ -49,7 +49,11 @@ export function RestTimer({
   useEffect(() => {
     if (settings.soundEnabled && !audioContextRef.current) {
       try {
+<<<<<<< HEAD
         audioContextRef.current = new (window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)();
+=======
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+>>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
       } catch (error) {
         console.warn('AudioContext not supported:', error);
       }

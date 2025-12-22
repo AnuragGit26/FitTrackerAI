@@ -2,6 +2,10 @@ import { dataService } from '@/services/dataService';
 import { exerciseLibrary } from '@/services/exerciseLibrary';
 import { Workout } from '@/types/workout';
 import { WorkoutExercise, WorkoutSet } from '@/types/exercise';
+<<<<<<< HEAD
+=======
+import { MuscleGroup } from '@/types/muscle';
+>>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
 
 /**
  * Seed the database with varied workout logs for testing analytics and insights

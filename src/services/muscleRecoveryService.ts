@@ -129,7 +129,11 @@ class MuscleRecoveryService {
 
     for (const muscle of muscles) {
       // Get existing muscle status or create new one
+<<<<<<< HEAD
       const existingStatus = await dataService.getMuscleStatus(muscle);
+=======
+      let existingStatus = await dataService.getMuscleStatus(muscle);
+>>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
       
       // Calculate workload for this muscle from this workout
       let totalWorkload = 0;

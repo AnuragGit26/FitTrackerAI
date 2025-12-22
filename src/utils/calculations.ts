@@ -92,7 +92,11 @@ export function calculateStreak(workoutDates: Date[]): number {
   today.setHours(0, 0, 0, 0);
   
   let streak = 0;
+<<<<<<< HEAD
   const currentDate = new Date(today);
+=======
+  let currentDate = new Date(today);
+>>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
   
   for (const workoutDate of sortedDates) {
     const workoutDay = new Date(workoutDate);

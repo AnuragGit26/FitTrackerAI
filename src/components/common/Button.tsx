@@ -4,7 +4,11 @@ import { cn } from '@/utils/cn';
 import { checkmarkAnimation, prefersReducedMotion } from '@/utils/animations';
 import { Check } from 'lucide-react';
 
+<<<<<<< HEAD
 interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onAnimationStart' | 'onAnimationEnd' | 'onAnimationIteration'> {
+=======
+interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+>>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
   size?: 'sm' | 'md' | 'lg';
   children: ReactNode;
@@ -55,9 +59,15 @@ export function Button({
     <motion.button
       className={cn(baseStyles, variants[variant], sizes[size], className)}
       disabled={disabled || isLoading}
+<<<<<<< HEAD
       whileHover={!disabled && !isLoading && !shouldReduceMotion ? { scale: 1.02 } : undefined}
       whileTap={!disabled && !isLoading && !shouldReduceMotion ? { scale: 0.98 } : undefined}
       {...(props as any)}
+=======
+      whileHover={!disabled && !isLoading && !shouldReduceMotion ? { scale: 1.02 } : {}}
+      whileTap={!disabled && !isLoading && !shouldReduceMotion ? { scale: 0.98 } : {}}
+      {...props}
+>>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
     >
       {isLoading ? (
         <span className="flex items-center gap-2">

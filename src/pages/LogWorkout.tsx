@@ -263,6 +263,10 @@ export function LogWorkout() {
         };
       }
     }
+<<<<<<< HEAD
+=======
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+>>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
   }, [location.state, currentWorkout, profile, addExercise, success, showError]);
 
   useEffect(() => {

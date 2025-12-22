@@ -233,7 +233,11 @@ export function Login() {
       {/* Footer / Sign Up Link */}
       <div className="mt-auto py-8 text-center">
         <p className="text-gray-600 dark:text-secondary-text">
+<<<<<<< HEAD
           Don&apos;t have an account?{' '}
+=======
+          Don't have an account?{' '}
+>>>>>>> ee369b24fdc7224128bbae3cb927419803f1da73
           <Link to="/signup" className="text-primary font-bold hover:underline ml-1">
             Sign Up
           </Link>
