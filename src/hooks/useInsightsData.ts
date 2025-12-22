@@ -1,0 +1,385 @@
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useWorkoutStore } from '@/store/workoutStore';
+import { useUserStore } from '@/store/userStore';
+import { useMuscleRecovery } from './useMuscleRecovery';
+import { analyticsService } from '@/services/analyticsService';
+import { aiService } from '@/services/aiService';
+import { aiChangeDetector } from '@/services/aiChangeDetector';
+import { aiRefreshService } from '@/services/aiRefreshService';
+import { aiCallManager } from '@/services/aiCallManager';
+import { swCommunication } from '@/services/swCommunication';
+import { backgroundAIFetcher } from '@/services/backgroundAIFetcher';
+import {
+  ProgressAnalysis,
+  SmartAlerts,
+  WorkoutRecommendations,
+} from '@/types/insights';
+import { Workout } from '@/types/workout';
+import { MuscleStatus } from '@/types/muscle';
+import { PersonalRecord, StrengthProgression } from '@/types/analytics';
+import { getDateRange, filterWorkoutsByDateRange } from '@/utils/analyticsHelpers';
+
+export function useInsightsData() {
+  const { workouts, loadWorkouts } = useWorkoutStore();
+  const { profile } = useUserStore();
+  const { muscleStatuses } = useMuscleRecovery();
+  const [isLoading, setIsLoading] = useState(true);
+  const [isBackgroundFetching, setIsBackgroundFetching] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [progressAnalysis, setProgressAnalysis] = useState<ProgressAnalysis | null>(null);
+  const [smartAlerts, setSmartAlerts] = useState<SmartAlerts | null>(null);
+  const [workoutRecommendations, setWorkoutRecommendations] = useState<WorkoutRecommendations | null>(null);
+  const isLoadingRef = useRef(false);
+  const lastFingerprintRef = useRef<string | null>(null);
+  const swListenerCleanupRef = useRef<(() => void) | null>(null);
+  
+  const muscleStatusesKey = useMemo(() =>
+    muscleStatuses.map(s => `${s.muscle}-${s.recoveryPercentage}`).join(','),
+    [muscleStatuses]
+  );
+
+  // Load cached data immediately on mount
+  useEffect(() => {
+    async function loadCachedData() {
+      if (!profile) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        await loadWorkouts(profile.id);
+
+        const { start: monthStart } = getDateRange('30d');
+        const previousMonthStart = new Date(monthStart);
+        previousMonthStart.setMonth(previousMonthStart.getMonth() - 1);
+
+        const currentMonthWorkouts = filterWorkoutsByDateRange(workouts, '30d');
+        const metrics = analyticsService.getAllMetrics(currentMonthWorkouts, '30d');
+        const personalRecords = analyticsService.getPersonalRecords(currentMonthWorkouts);
+
+        // Get fingerprint for cache lookup
+        const fingerprint = aiChangeDetector.getFingerprint(
+          currentMonthWorkouts,
+          muscleStatuses,
+          metrics.consistencyScore,
+          personalRecords
+        );
+
+        // Try to load cached data
+        const [cachedProgress, cachedAlerts, cachedRecommendations] = await Promise.all([
+          aiCallManager.getCached<ProgressAnalysis>(fingerprint, 'progress'),
+          aiCallManager.getCached<SmartAlerts>(fingerprint, 'insights'),
+          aiCallManager.getCached<WorkoutRecommendations>(fingerprint, 'recommendations'),
+        ]);
+
+        // If we have any cached data, show it immediately
+        if (cachedProgress || cachedAlerts || cachedRecommendations) {
+          if (cachedProgress) setProgressAnalysis(cachedProgress);
+          if (cachedAlerts) setSmartAlerts(cachedAlerts);
+          if (cachedRecommendations) setWorkoutRecommendations(cachedRecommendations);
+          setIsLoading(false);
+          lastFingerprintRef.current = fingerprint;
+        } else {
+          // No cached data, keep loading state
+          setIsLoading(true);
+        }
+      } catch (error) {
+        console.error('Failed to load cached data:', error);
+        setIsLoading(false);
+      }
+    }
+
+    loadCachedData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.id]);
+
+  // Listen for service worker messages
+  useEffect(() => {
+    // Cleanup previous listener
+    if (swListenerCleanupRef.current) {
+      swListenerCleanupRef.current();
+    }
+
+    // Register handler for AI insights ready
+    const unsubscribeReady = swCommunication.onAIInsightsReady(async (data) => {
+      const { fingerprint, results } = data;
+
+      // Only update if fingerprint matches current
+      if (fingerprint === lastFingerprintRef.current) {
+        if (results.progress) {
+          setProgressAnalysis(results.progress);
+          await aiCallManager.setCached(fingerprint, 'progress', results.progress);
+        }
+        if (results.insights) {
+          setSmartAlerts(results.insights);
+          await aiCallManager.setCached(fingerprint, 'insights', results.insights);
+        }
+        if (results.recommendations) {
+          setWorkoutRecommendations(results.recommendations);
+          await aiCallManager.setCached(fingerprint, 'recommendations', results.recommendations);
+        }
+
+        setLastUpdated(new Date());
+        setIsBackgroundFetching(false);
+        setIsLoading(false);
+      }
+    });
+
+    // Register handler for errors
+    const unsubscribeError = swCommunication.onAIInsightsError((data) => {
+      console.error('[useInsightsData] Background fetch error:', data);
+      setIsBackgroundFetching(false);
+      setIsLoading(false);
+    });
+
+    // Store cleanup function
+    swListenerCleanupRef.current = () => {
+      unsubscribeReady();
+      unsubscribeError();
+    };
+
+    // Cleanup on unmount
+    return () => {
+      if (swListenerCleanupRef.current) {
+        swListenerCleanupRef.current();
+        swListenerCleanupRef.current = null;
+      }
+    };
+  }, []);
+
+  const loadInsights = useCallback(async () => {
+    if (!profile || isLoadingRef.current) {
+      if (!profile) setIsLoading(false);
+      return;
+    }
+
+    isLoadingRef.current = true;
+    setIsLoading(true);
+    setIsBackgroundFetching(true);
+    
+    try {
+      await loadWorkouts(profile.id);
+
+      const { start: monthStart } = getDateRange('30d');
+      const previousMonthStart = new Date(monthStart);
+      previousMonthStart.setMonth(previousMonthStart.getMonth() - 1);
+
+      const currentMonthWorkouts = filterWorkoutsByDateRange(workouts, '30d');
+      const previousMonthWorkouts = workouts.filter(
+        (w) => {
+          const workoutDate = new Date(w.date);
+          return workoutDate >= previousMonthStart && workoutDate < monthStart;
+        }
+      );
+
+      const metrics = analyticsService.getAllMetrics(currentMonthWorkouts, '30d');
+      const previousMetrics = analyticsService.getAllMetrics(previousMonthWorkouts, '30d');
+
+      const volumeTrend = analyticsService.calculateVolumeTrend(currentMonthWorkouts, '30d');
+      const personalRecords = analyticsService.getPersonalRecords(currentMonthWorkouts);
+      const strengthProgression = analyticsService.calculateStrengthProgression(currentMonthWorkouts);
+
+      // Calculate readiness score inline to avoid dependency issues
+      const readinessScore = muscleStatuses.length === 0 
+        ? 85 
+        : Math.round(muscleStatuses.reduce((sum, m) => sum + m.recoveryPercentage, 0) / muscleStatuses.length);
+
+      // Get fingerprint for caching (same for all insight types)
+      const fingerprint = aiChangeDetector.getFingerprint(
+        currentMonthWorkouts,
+        muscleStatuses,
+        metrics.consistencyScore,
+        personalRecords
+      );
+
+      // Skip if fingerprint hasn't changed (prevents unnecessary re-fetches)
+      if (lastFingerprintRef.current === fingerprint && progressAnalysis && smartAlerts && workoutRecommendations) {
+        setIsLoading(false);
+        setIsBackgroundFetching(false);
+        isLoadingRef.current = false;
+        return;
+      }
+
+      lastFingerprintRef.current = fingerprint;
+
+      // Check if service worker is available for background fetch
+      const swAvailable = swCommunication.isServiceWorkerAvailable();
+      
+      if (swAvailable) {
+        // Trigger background fetch via service worker
+        await backgroundAIFetcher.triggerBackgroundFetch(
+          {
+            currentMonthWorkouts,
+            previousMonthWorkouts,
+            muscleStatuses,
+            personalRecords,
+            strengthProgression,
+            volumeTrend,
+            metrics,
+            previousMetrics,
+            readinessScore,
+          },
+          profile.id,
+          ['progress', 'insights', 'recommendations']
+        );
+        
+        // Don't set loading to false here - wait for SW message
+        // But if we have cached data, we already showed it, so loading can be false
+        if (progressAnalysis || smartAlerts || workoutRecommendations) {
+          setIsLoading(false);
+        }
+      } else {
+        // Fallback to direct fetch if SW not available
+        console.warn('[useInsightsData] Service worker not available, using direct fetch');
+        await loadInsightsDirectly(
+          currentMonthWorkouts,
+          previousMonthWorkouts,
+          muscleStatuses,
+          personalRecords,
+          strengthProgression,
+          volumeTrend,
+          metrics,
+          previousMetrics,
+          readinessScore,
+          fingerprint
+        );
+      }
+
+    } catch (error) {
+      console.error('Failed to load insights:', error);
+      setIsLoading(false);
+      setIsBackgroundFetching(false);
+      isLoadingRef.current = false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.id, workouts.length, muscleStatusesKey, loadWorkouts]);
+
+  // Direct fetch fallback (when SW not available)
+  const loadInsightsDirectly = useCallback(async (
+    currentMonthWorkouts: Workout[],
+    _previousMonthWorkouts: Workout[],
+    muscleStatuses: MuscleStatus[],
+    personalRecords: PersonalRecord[],
+    strengthProgression: StrengthProgression[],
+    volumeTrend: Array<{ date: string; totalVolume: number }>,
+    metrics: { consistencyScore: number; workoutCount: number; symmetryScore: number; focusDistribution: { legs: number; push: number; pull: number } },
+    previousMetrics: { consistencyScore: number; workoutCount: number },
+    readinessScore: number,
+    fingerprint: string
+  ) => {
+    try {
+      // Helper function to add timeout to individual promises
+      const withTimeout = <T,>(promise: Promise<T | null>, timeoutMs: number, fallback: T | null): Promise<T | null> => {
+        return Promise.race([
+          promise.catch((error) => {
+            console.error('AI insight request failed:', error);
+            return fallback;
+          }),
+          new Promise<T | null>((resolve) => {
+            setTimeout(() => {
+              console.warn(`AI insight request timeout after ${timeoutMs}ms, using fallback`);
+              resolve(fallback);
+            }, timeoutMs);
+          }),
+        ]);
+      };
+
+      // Generate insights using refresh service (handles 24hr rule and new workout detection)
+      const progressPromise = aiRefreshService.refreshIfNeeded(
+        'progress',
+        fingerprint,
+        () => aiService.generateProgressAnalysis(
+          currentMonthWorkouts,
+          personalRecords,
+          strengthProgression,
+          volumeTrend,
+          metrics.consistencyScore,
+          previousMetrics.consistencyScore,
+          metrics.workoutCount,
+          previousMetrics.workoutCount
+        ),
+        profile?.id,
+        1
+      ).catch((error) => {
+        console.error('Failed to load progress analysis:', error);
+        return null;
+      });
+
+      const alertsPromise = aiRefreshService.refreshIfNeeded(
+        'insights',
+        fingerprint,
+        () => aiService.generateSmartAlerts(currentMonthWorkouts, muscleStatuses, readinessScore),
+        profile?.id,
+        1
+      ).catch((error) => {
+        console.error('Failed to load smart alerts:', error);
+        return null;
+      });
+
+      const recommendationsPromise = aiRefreshService.refreshIfNeeded(
+        'recommendations',
+        fingerprint,
+        () => aiService.generateWorkoutRecommendations(
+          currentMonthWorkouts,
+          muscleStatuses,
+          readinessScore,
+          metrics.symmetryScore,
+          metrics.focusDistribution
+        ),
+        profile?.id,
+        1
+      ).catch((error) => {
+        console.error('Failed to load workout recommendations:', error);
+        return null;
+      });
+
+      // Wait for all with individual 120-second timeouts
+      const [progress, alerts, recommendations] = await Promise.all([
+        withTimeout(progressPromise, 120000, null),
+        withTimeout(alertsPromise, 120000, null),
+        withTimeout(recommendationsPromise, 120000, null),
+      ]);
+
+      setProgressAnalysis(progress);
+      setSmartAlerts(alerts);
+      setWorkoutRecommendations(recommendations);
+      setLastUpdated(new Date());
+    } catch (error) {
+      console.error('Failed to load insights directly:', error);
+      setProgressAnalysis(null);
+      setSmartAlerts(null);
+      setWorkoutRecommendations(null);
+    } finally {
+      setIsLoading(false);
+      setIsBackgroundFetching(false);
+      isLoadingRef.current = false;
+    }
+  }, [profile?.id]);
+
+  useEffect(() => {
+    loadInsights();
+  }, [loadInsights]);
+
+  const refreshInsights = useCallback(() => {
+    loadInsights();
+  }, [loadInsights]);
+
+  const getTimeSinceUpdate = useCallback((): string => {
+    const minutes = Math.floor((new Date().getTime() - lastUpdated.getTime()) / 60000);
+    if (minutes < 1) return 'Just now';
+    if (minutes === 1) return '1m ago';
+    return `${minutes}m ago`;
+  }, [lastUpdated]);
+
+  return {
+    progressAnalysis,
+    smartAlerts,
+    workoutRecommendations,
+    isLoading,
+    isBackgroundFetching,
+    lastUpdated,
+    getTimeSinceUpdate,
+    refreshInsights,
+  };
+}
+

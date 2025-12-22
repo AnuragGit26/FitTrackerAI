@@ -1,0 +1,76 @@
+import { MuscleGroup } from './muscle';
+import { WorkoutExercise } from './exercise';
+
+export type WorkoutMood = 'great' | 'good' | 'okay' | 'tired' | 'exhausted';
+
+export interface Workout {
+  id?: number;
+  userId: string;
+  date: Date;
+  startTime: Date;
+  endTime?: Date;
+  exercises: WorkoutExercise[];
+  totalDuration: number; // minutes
+  totalVolume: number;
+  notes?: string;
+  musclesTargeted: MuscleGroup[];
+  workoutType: string;
+  mood?: WorkoutMood;
+}
+
+export type TemplateCategory = 'strength' | 'hypertrophy' | 'cardio' | 'home' | 'flexibility';
+export type TemplateDifficulty = 'beginner' | 'intermediate' | 'advanced';
+
+export interface WorkoutTemplate {
+  id: string;
+  userId: string;
+  name: string;
+  category: TemplateCategory;
+  description?: string;
+  imageUrl?: string;
+  difficulty?: TemplateDifficulty;
+  daysPerWeek?: number;
+  exercises: Array<{
+    exerciseId: string;
+    exerciseName: string;
+    sets: number;
+    reps: number;
+    weight?: number;
+    restTime?: number;
+  }>;
+  estimatedDuration: number;
+  musclesTargeted: MuscleGroup[];
+  isFeatured?: boolean;
+  isTrending?: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  matchPercentage?: number; // for AI recommendations
+}
+
+export interface PlannedExercise {
+  exerciseId: string;
+  exerciseName: string;
+  sets: number;
+  reps: number;
+  weight?: number;
+  restTime?: number;
+}
+
+export interface PlannedWorkout {
+  id: string;
+  userId: string;
+  scheduledDate: Date;
+  scheduledTime?: Date;
+  templateId?: string;
+  workoutName: string;
+  category: TemplateCategory;
+  estimatedDuration: number;
+  exercises: PlannedExercise[];
+  musclesTargeted: MuscleGroup[];
+  notes?: string;
+  isCompleted: boolean;
+  completedWorkoutId?: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+

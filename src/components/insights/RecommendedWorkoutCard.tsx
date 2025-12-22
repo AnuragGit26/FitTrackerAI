@@ -1,0 +1,61 @@
+import { Sparkles, Clock, Dumbbell, Play } from 'lucide-react';
+import { WorkoutRecommendation } from '@/types/insights';
+import { useNavigate } from 'react-router-dom';
+import { cleanPlainTextResponse } from '@/utils/aiResponseCleaner';
+
+interface RecommendedWorkoutCardProps {
+  workout?: WorkoutRecommendation;
+}
+
+export function RecommendedWorkoutCard({ workout }: RecommendedWorkoutCardProps) {
+  const navigate = useNavigate();
+
+  if (!workout) return null;
+
+  const handleStartWorkout = () => {
+    navigate('/log-workout');
+  };
+
+  return (
+    <div className="p-4">
+      <div className="group relative flex flex-col overflow-hidden rounded-xl bg-white dark:bg-card-dark shadow-lg border border-gray-100 dark:border-white/5">
+        <div
+          className="h-40 w-full bg-cover bg-center relative"
+          style={{
+            backgroundImage: workout.imageUrl || 'url("https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800")',
+          }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-t from-card-dark via-card-dark/60 to-transparent" />
+          <div className="absolute top-3 right-3">
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-xs font-bold text-background-dark shadow-sm">
+              <Sparkles className="w-3.5 h-3.5" />
+              Recommended
+            </span>
+          </div>
+        </div>
+        <div className="p-5 -mt-6 relative z-10">
+          <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-1">{cleanPlainTextResponse(workout.name)}</h3>
+          <p className="text-slate-500 dark:text-text-muted text-sm mb-4">{cleanPlainTextResponse(workout.description)}</p>
+          <div className="flex gap-2 mb-5">
+            <span className="inline-flex items-center px-2 py-1 rounded bg-white/5 border border-white/10 text-xs text-white/80">
+              <Clock className="w-3.5 h-3.5 mr-1" />
+              {workout.duration}m
+            </span>
+            <span className="inline-flex items-center px-2 py-1 rounded bg-white/5 border border-white/10 text-xs text-white/80">
+              <Dumbbell className="w-3.5 h-3.5 mr-1" />
+              {workout.intensity === 'high' ? 'High Volume' : workout.intensity === 'medium' ? 'Moderate' : 'Low Volume'}
+            </span>
+          </div>
+          <button
+            onClick={handleStartWorkout}
+            className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary py-3 px-4 text-center text-sm font-bold text-background-dark hover:brightness-110 transition-all active:scale-[0.98]"
+          >
+            <Play className="w-4 h-4" />
+            Start Recommended Workout
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
