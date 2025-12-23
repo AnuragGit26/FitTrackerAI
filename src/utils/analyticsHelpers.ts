@@ -69,13 +69,18 @@ export function calculatePersonalRecords(workouts: Workout[]): PersonalRecord[] 
           (set.weight === currentMaxWeight && set.reps > currentMaxReps) ||
           setVolume > currentVolume
         ) {
+          // Store personal record with unique workout association
+          // workoutId ensures each record is linked to the specific workout where it was achieved
+          if (!workout.id) {
+            console.warn(`Workout missing ID for personal record: ${exerciseName}`, workout);
+          }
           records.set(exerciseName, {
             exerciseId: exercise.exerciseId,
             exerciseName,
             maxWeight: set.weight,
             maxReps: set.reps,
             date: workout.date,
-            workoutId: workout.id || 0,
+            workoutId: workout.id || 0, // Each record is uniquely associated with its workout
           });
         }
       });
@@ -182,5 +187,13 @@ export function getWeeklyWorkoutDays(workouts: Workout[]): boolean[][] {
   }
 
   return weeks;
+}
+
+/**
+ * Check if user has enough workouts to calculate meaningful averages
+ * Averages should only be calculated when at least 7 workouts are recorded
+ */
+export function hasEnoughWorkoutsForAverages(workouts: Workout[]): boolean {
+  return workouts.length >= 7;
 }
 

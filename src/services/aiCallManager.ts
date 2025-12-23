@@ -1,5 +1,3 @@
-import { db } from './database';
-
 interface CachedResponse<T> {
   data: T;
   timestamp: number;
@@ -19,7 +17,6 @@ interface QueuedRequest<T = unknown> {
 const RATE_LIMIT_MS = 30000; // 30 seconds between calls
 const MAX_RETRIES = 3;
 const RETRY_DELAY_BASE = 1000; // 1 second
-const IDB_CACHE_STORE = 'aiCache'; // IndexedDB store name for AI cache
 
 class AICallManager {
   private cache: Map<string, CachedResponse<unknown>> = new Map();

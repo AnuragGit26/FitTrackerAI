@@ -117,11 +117,12 @@ export const dbHelpers = {
   },
 
   async getAllWorkouts(userId: string): Promise<Workout[]> {
-    return await db.workouts
+    const workouts = await db.workouts
       .where('userId')
       .equals(userId)
-      .reverse()
       .sortBy('date');
+    // Sort descending (most recent first) by reversing the array
+    return workouts.reverse();
   },
 
   async getWorkoutsByDateRange(

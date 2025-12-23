@@ -218,13 +218,11 @@ export function Login() {
             disabled={isLoading}
             className="flex items-center justify-center gap-2 h-12 rounded-lg border border-gray-300 dark:border-border-dark bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-surface-dark/80 text-gray-900 dark:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed group"
           >
-            <svg
-              className="w-5 h-5 text-gray-900 dark:text-white group-hover:text-primary transition-colors"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-            >
-              <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.96-3.24-.96-1.23 0-2.08.5-3.41.96-1.41.62-2.75 1.05-4.23.4C1.44 20.28.5 18.5.5 16.5c0-2.05.5-3.5 1.5-4.5.98-.98 2.5-1.5 4.5-1.5 1.23 0 2.08.5 3.41.96 1.41.62 2.75 1.05 4.23.4 1.33-.5 2.1-1.05 3.08-2.05.98-.98 1.5-2.5 1.5-4.5 0-2.05-.5-3.5-1.5-4.5-.98-.98-2.5-1.5-4.5-1.5-1.23 0-2.08.5-3.41.96-1.41.62-2.75 1.05-4.23.4C1.44 3.72.5 1.94.5 0c0-2.05.5-3.5 1.5-4.5.98-.98 2.5-1.5 4.5-1.5 1.23 0 2.08.5 3.41.96 1.41.62 2.75 1.05 4.23.4 1.33-.5 2.1-1.05 3.08-2.05.98-.98 1.5-2.5 1.5-4.5 0-2.05-.5-3.5-1.5-4.5z" />
-            </svg>
+            <img
+              src="https://i.pinimg.com/736x/65/22/5a/65225ab6d965e5804a632b643e317bf4.jpg"
+              alt="Apple"
+              className="w-5 h-5 object-contain group-hover:opacity-80 transition-opacity"
+            />
             <span className="text-sm font-medium">Apple</span>
           </button>
         </div>

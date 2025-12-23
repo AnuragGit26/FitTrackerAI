@@ -14,6 +14,7 @@ const STORAGE_KEYS = {
     pausedTime: 'fittrackai_workout_timer_pausedTime',
     pauseStartTime: 'fittrackai_workout_timer_pauseStartTime',
     isRunning: 'fittrackai_workout_timer_isRunning',
+    wasReset: 'fittrackai_workout_timer_wasReset',
 };
 
 function loadFromStorage(): {
@@ -74,8 +75,26 @@ function clearStorage(): void {
         Object.values(STORAGE_KEYS).forEach((key) => {
             localStorage.removeItem(key);
         });
+        // Set reset flag to prevent restoration
+        localStorage.setItem(STORAGE_KEYS.wasReset, 'true');
     } catch (error) {
         console.error('Failed to clear timer state from localStorage:', error);
+    }
+}
+
+function wasReset(): boolean {
+    try {
+        return localStorage.getItem(STORAGE_KEYS.wasReset) === 'true';
+    } catch {
+        return false;
+    }
+}
+
+function clearResetFlag(): void {
+    try {
+        localStorage.removeItem(STORAGE_KEYS.wasReset);
+    } catch (error) {
+        console.error('Failed to clear reset flag:', error);
     }
 }
 
@@ -91,6 +110,20 @@ export function useWorkoutDuration(startTime: Date | null): UseWorkoutDurationRe
 
     // Load persisted state on mount
     useEffect(() => {
+        // Check if timer was reset - if so, don't restore state
+        if (wasReset()) {
+            clearResetFlag();
+            // If startTime prop is provided, use it instead
+            if (startTime) {
+                startTimeRef.current = startTime;
+                setIsRunning(true);
+                setPausedTime(0);
+                setElapsedTime(0);
+                saveToStorage(startTime, 0, null, true);
+            }
+            return;
+        }
+
         const persisted = loadFromStorage();
 
         // If we have a persisted start time, use it
@@ -275,7 +308,7 @@ export function useWorkoutDuration(startTime: Date | null): UseWorkoutDurationRe
         setPausedTime(0);
         pauseStartRef.current = null;
         startTimeRef.current = null;
-        clearStorage();
+        clearStorage(); // This sets the reset flag
 
         if (intervalRef.current) {
             clearInterval(intervalRef.current);

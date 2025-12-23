@@ -1,8 +1,10 @@
-import { useState } from 'react';
-import { Bot, RefreshCw } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Bot, RefreshCw, User, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { InsightsTabNavigation } from '@/components/insights/InsightsTabNavigation';
 import { useInsightsData } from '@/hooks/useInsightsData';
+import { useUserStore } from '@/store/userStore';
 import { Skeleton } from '@/components/common/Skeleton';
 import { BreakthroughCard } from '@/components/insights/BreakthroughCard';
 import { PerformanceTrendsCards } from '@/components/insights/PerformanceTrendsCards';
@@ -23,7 +25,10 @@ import { staggerContainerSlow, prefersReducedMotion } from '@/utils/animations';
 type View = 'progress' | 'alerts' | 'recommendations';
 
 export function Insights() {
+  const navigate = useNavigate();
   const [view, setView] = useState<View>('progress');
+  const [showProfilePrompt, setShowProfilePrompt] = useState(false);
+  const { profile } = useUserStore();
   const {
     progressAnalysis,
     smartAlerts,
@@ -32,6 +37,27 @@ export function Insights() {
     getTimeSinceUpdate,
     refreshInsights,
   } = useInsightsData();
+
+  // Check if profile is incomplete
+  useEffect(() => {
+    if (profile) {
+      const isIncomplete = !profile.name || !profile.age || !profile.gender || !profile.experienceLevel;
+      // Check if user has dismissed the prompt in this session
+      const hasDismissed = sessionStorage.getItem('profilePromptDismissed') === 'true';
+      setShowProfilePrompt(isIncomplete && !hasDismissed);
+    }
+  }, [profile]);
+
+  const handleDismissProfilePrompt = () => {
+    setShowProfilePrompt(false);
+    sessionStorage.setItem('profilePromptDismissed', 'true');
+  };
+
+  const handleGoToProfile = () => {
+    setShowProfilePrompt(false);
+    sessionStorage.setItem('profilePromptDismissed', 'true');
+    navigate('/profile');
+  };
 
   if (isLoading) {
     return (
@@ -70,6 +96,45 @@ export function Insights() {
       </div>
 
       <InsightsTabNavigation currentView={view} onViewChange={setView} />
+
+      {/* Profile Completion Prompt */}
+      {showProfilePrompt && (
+        <div className="p-4 max-w-md mx-auto w-full">
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 relative"
+          >
+            <button
+              onClick={handleDismissProfilePrompt}
+              className="absolute top-3 right-3 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200"
+              aria-label="Dismiss"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="flex gap-3 items-start pr-6">
+              <div className="shrink-0 bg-blue-100 dark:bg-blue-900/40 p-2 rounded-full text-blue-600 dark:text-blue-400">
+                <User className="w-5 h-5" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-blue-900 dark:text-blue-100 font-bold text-base mb-1">
+                  Complete Your Profile
+                </h3>
+                <p className="text-blue-700 dark:text-blue-200 text-sm mb-3">
+                  To get the most accurate AI insights and recommendations, please complete your profile with your age, gender, and experience level.
+                </p>
+                <button
+                  onClick={handleGoToProfile}
+                  className="text-blue-900 dark:text-blue-100 font-semibold text-sm hover:underline"
+                >
+                  Go to Profile →
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       <div className="flex flex-col gap-6 p-4 max-w-md mx-auto w-full">
         <AnimatePresence mode="wait">

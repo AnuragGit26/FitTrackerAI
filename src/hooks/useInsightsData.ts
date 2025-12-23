@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useWorkoutStore } from '@/store/workoutStore';
 import { useUserStore } from '@/store/userStore';
+import { useSettingsStore } from '@/store/settingsStore';
 import { useMuscleRecovery } from './useMuscleRecovery';
 import { analyticsService } from '@/services/analyticsService';
 import { aiService } from '@/services/aiService';
@@ -22,6 +23,7 @@ import { getDateRange, filterWorkoutsByDateRange } from '@/utils/analyticsHelper
 export function useInsightsData() {
   const { workouts, loadWorkouts } = useWorkoutStore();
   const { profile } = useUserStore();
+  const { settings } = useSettingsStore();
   const { muscleStatuses } = useMuscleRecovery();
   const [isLoading, setIsLoading] = useState(true);
   const [isBackgroundFetching, setIsBackgroundFetching] = useState(false);
@@ -251,8 +253,7 @@ export function useInsightsData() {
       setIsBackgroundFetching(false);
       isLoadingRef.current = false;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.id, workouts.length, muscleStatusesKey, loadWorkouts]);
+  }, [profile?.id, profile?.experienceLevel, settings.baseRestInterval, workouts.length, muscleStatusesKey, loadWorkouts]);
 
   // Direct fetch fallback (when SW not available)
   const loadInsightsDirectly = useCallback(async (
@@ -324,7 +325,9 @@ export function useInsightsData() {
           muscleStatuses,
           readinessScore,
           metrics.symmetryScore,
-          metrics.focusDistribution
+          metrics.focusDistribution,
+          profile?.experienceLevel || 'intermediate',
+          settings.baseRestInterval || 48
         ),
         profile?.id,
         1

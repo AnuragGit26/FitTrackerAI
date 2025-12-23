@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Plus, Check, Edit, ChevronDown, Trash2, Loader2, BookOpen, Save } from 'lucide-react';
+import { X, Plus, Check, Edit, ChevronDown, Trash2, Loader2, BookOpen, Save, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWorkoutStore } from '@/store/workoutStore';
 import { useUserStore } from '@/store/userStore';
@@ -62,6 +62,8 @@ export function LogWorkout() {
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
   const [showClearWorkoutModal, setShowClearWorkoutModal] = useState(false);
   const [showCancelWorkoutModal, setShowCancelWorkoutModal] = useState(false);
+  const [showFinishWorkoutModal, setShowFinishWorkoutModal] = useState(false);
+  const [workoutCalories, setWorkoutCalories] = useState<number | ''>('');
   const [templateName, setTemplateName] = useState('');
   const [templateCategory, setTemplateCategory] = useState<TemplateCategory>('strength');
   const [templateDescription, setTemplateDescription] = useState('');
@@ -190,8 +192,47 @@ export function LogWorkout() {
 
   // Handle repeat workout from navigation state
   useEffect(() => {
-    const repeatWorkout = (location.state as { repeatWorkout?: Workout })?.repeatWorkout;
+    const locationState = location.state as { repeatWorkout?: Workout; recommendedWorkoutExercises?: WorkoutExercise[] };
+    const repeatWorkout = locationState?.repeatWorkout;
+    const recommendedWorkoutExercises = locationState?.recommendedWorkoutExercises;
 
+    // Handle recommended workout exercises
+    if (recommendedWorkoutExercises && currentWorkout && profile && currentWorkout.exercises.length === 0) {
+      const recommendedWorkoutId = `recommended-${Date.now()}`;
+
+      if (repeatWorkoutProcessedRef.current !== recommendedWorkoutId) {
+        repeatWorkoutProcessedRef.current = recommendedWorkoutId;
+
+        const processRecommendedWorkout = async () => {
+          try {
+            // Add all recommended exercises to current workout
+            for (const exercise of recommendedWorkoutExercises) {
+              addExercise(exercise);
+            }
+
+            // Show success message
+            success('Recommended workout loaded. Ready to log!');
+
+            // Clear the recommendedWorkoutExercises from location state to prevent re-processing
+            window.history.replaceState({}, document.title);
+          } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'Failed to load recommended workout';
+            showError(errorMessage);
+            console.error('Error loading recommended workout:', err);
+            repeatWorkoutProcessedRef.current = null;
+          }
+        };
+
+        // Process after a short delay to ensure workout is ready
+        const timeoutId = setTimeout(processRecommendedWorkout, 100);
+
+        return () => {
+          clearTimeout(timeoutId);
+        };
+      }
+    }
+
+    // Handle repeat workout
     if (repeatWorkout && currentWorkout && profile && currentWorkout.exercises.length === 0) {
       // Only process if current workout is empty and we have a repeat workout
       const isRepeatWorkout = repeatWorkout.exercises.length > 0;
@@ -1003,15 +1044,21 @@ export function LogWorkout() {
     navigate(-1);
   };
 
-  const handleFinishWorkout = async () => {
+  const handleFinishWorkoutClick = () => {
     if (!currentWorkout || currentWorkout.exercises.length === 0) {
       showError('Please add at least one exercise before finishing the workout');
       return;
     }
+    setShowFinishWorkoutModal(true);
+  };
+
+  const handleConfirmFinishWorkout = async () => {
+    if (!currentWorkout) return;
 
     setIsSaving(true);
     try {
-      await finishWorkout();
+      const calories = workoutCalories !== '' ? Number(workoutCalories) : undefined;
+      await finishWorkout(calories);
       // Reset timer when workout is finished
       resetWorkoutTimer();
       // Clear persisted state (already cleared in finishWorkout, but ensure it's cleared)
@@ -1030,6 +1077,8 @@ export function LogWorkout() {
       setRestTimerStartTime(null);
       setRestTimerPaused(false);
       setWorkoutTimerStartTime(null);
+      setWorkoutCalories('');
+      setShowFinishWorkoutModal(false);
       success('Workout saved successfully!');
       navigate('/home');
     } catch (err) {
@@ -1651,12 +1700,91 @@ export function LogWorkout() {
         </div>
       </Modal>
 
+      {/* Finish Workout Confirmation Modal */}
+      <AnimatePresence>
+        {showFinishWorkoutModal && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm transition-opacity duration-300"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowFinishWorkoutModal(false)}
+          >
+            <motion.div
+              className="relative w-full max-w-xs sm:max-w-sm overflow-hidden rounded-xl bg-white dark:bg-[#1c2e24] shadow-2xl border border-gray-200 dark:border-[#316847]/50 transform transition-all scale-100 opacity-100"
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setShowFinishWorkoutModal(false)}
+                className="absolute top-3 right-3 p-1 rounded-full text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
+                aria-label="Close modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <div className="flex flex-col p-6 text-center">
+                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/20">
+                  <CheckCircle2 className="w-6 h-6 text-primary" />
+                </div>
+                <h3 className="mb-2 text-lg font-bold leading-tight text-gray-900 dark:text-white">
+                  Finish Workout?
+                </h3>
+                <p className="mb-4 text-sm text-gray-600 dark:text-[#90cba8] font-normal leading-relaxed">
+                  Are you sure you want to mark this workout as finished?
+                </p>
+                <div className="mb-6 text-left">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Calories Burned <span className="text-gray-500 dark:text-gray-400">(optional)</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={workoutCalories}
+                    onChange={(e) => setWorkoutCalories(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
+                    placeholder="Enter calories"
+                    className="w-full rounded-lg bg-white dark:bg-[#224932] border border-gray-300 dark:border-[#316847] text-gray-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-[#1c2e24] h-10 px-3 text-sm"
+                  />
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row-reverse">
+                  <button
+                    onClick={handleConfirmFinishWorkout}
+                    disabled={isSaving}
+                    className="flex w-full flex-1 items-center justify-center rounded-lg bg-primary dark:bg-primary hover:bg-green-400 dark:hover:bg-green-500 px-4 py-2.5 text-sm font-bold text-background-dark shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-[#1c2e24] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Finish Workout'
+                    )}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowFinishWorkoutModal(false);
+                      setWorkoutCalories('');
+                    }}
+                    disabled={isSaving}
+                    className="flex w-full flex-1 items-center justify-center rounded-lg border border-gray-300 dark:border-[#316847] bg-white dark:bg-transparent px-4 py-2.5 text-sm font-bold text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-[#224932] transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-[#1c2e24] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Finish Workout Button - Fixed at bottom when exercises exist */}
       {existingExercises.length > 0 && !editingExerciseId && (
         <div className="fixed bottom-20 left-0 right-0 bg-gradient-to-t from-background-light via-background-light to-transparent dark:from-background-dark dark:via-background-dark dark:to-transparent pt-6 pb-6 px-4 z-20">
           <div className="max-w-md mx-auto">
             <motion.button
-              onClick={handleFinishWorkout}
+              onClick={handleFinishWorkoutClick}
               disabled={isSaving}
               className={cn(
                 'w-full rounded-xl bg-primary hover:bg-primary/90 text-background-dark font-bold text-lg py-4 shadow-lg shadow-primary/25 transition-all flex items-center justify-center gap-2 relative overflow-hidden',

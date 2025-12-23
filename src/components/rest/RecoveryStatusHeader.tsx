@@ -3,9 +3,10 @@ import { useMuscleRecovery } from '@/hooks/useMuscleRecovery';
 import { useWorkoutStore } from '@/store/workoutStore';
 import { useUserStore } from '@/store/userStore';
 import { useSettingsStore } from '@/store/settingsStore';
-import { DEFAULT_RECOVERY_SETTINGS } from '@/types/muscle';
 import { useMemo } from 'react';
 import { subDays, differenceInHours } from 'date-fns';
+import { calculateRecoveryStatus } from '@/services/recoveryCalculator';
+import { DEFAULT_RECOVERY_SETTINGS } from '@/types/muscle';
 
 export function RecoveryStatusHeader() {
   const { muscleStatuses, isLoading } = useMuscleRecovery();
@@ -29,11 +30,11 @@ export function RecoveryStatusHeader() {
     );
 
     // Calculate trend by comparing current recovery with recovery 7 days ago
+    // Uses the same calculation logic as calculateRecoveryStatus to ensure BaseRestInterval sync
     let trend = 0;
     if (profile && muscleStatuses.length > 0) {
       const sevenDaysAgo = subDays(new Date(), 7);
       
-      // Calculate what recovery would have been 7 days ago
       let totalRecovery7DaysAgo = 0;
       let count = 0;
 
@@ -48,7 +49,7 @@ export function RecoveryStatusHeader() {
           ? status.lastWorked 
           : new Date(status.lastWorked);
 
-        // Calculate recovery 7 days ago
+        // Calculate hours between last workout and 7 days ago
         const hoursSinceWorkout7DaysAgo = differenceInHours(sevenDaysAgo, lastWorked);
         
         if (hoursSinceWorkout7DaysAgo < 0) {
@@ -58,9 +59,10 @@ export function RecoveryStatusHeader() {
           return;
         }
 
-        // Calculate what recovery would have been 7 days ago
+        // Use the same calculation logic as calculateRecoveryStatus to ensure BaseRestInterval is applied
         const recoverySettings = DEFAULT_RECOVERY_SETTINGS;
         let baseRecoveryHours = 48;
+        
         if (profile.experienceLevel === 'beginner') {
           baseRecoveryHours = (recoverySettings.beginnerRestDays[status.muscle] || 2) * 24;
         } else if (profile.experienceLevel === 'intermediate') {
@@ -69,13 +71,19 @@ export function RecoveryStatusHeader() {
           baseRecoveryHours = (recoverySettings.advancedRestDays[status.muscle] || 1) * 24;
         }
 
-        if (settings.baseRestInterval) {
-          const ratio = settings.baseRestInterval / 48;
+        // Apply BaseRestInterval setting (same logic as calculateRecoveryStatus)
+        const baseRestInterval = settings.baseRestInterval || 48;
+        if (baseRestInterval !== undefined) {
+          const defaultBase = 48;
+          const ratio = baseRestInterval / defaultBase;
           baseRecoveryHours = baseRecoveryHours * ratio;
         }
 
+        // Calculate workload multiplier (same as calculateRecoveryStatus)
         const workloadMultiplier = 1 + (status.workloadScore / 100);
         const adjustedRecoveryHours = baseRecoveryHours * workloadMultiplier;
+
+        // Calculate recovery percentage for 7 days ago
         const recovery7DaysAgo = Math.min(
           100,
           Math.max(0, (hoursSinceWorkout7DaysAgo / adjustedRecoveryHours) * 100)

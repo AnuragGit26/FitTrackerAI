@@ -49,9 +49,9 @@ export function Modal({
 
   const sizes = {
     sm: 'max-w-md',
-    md: 'max-w-lg',
-    lg: 'max-w-2xl',
-    xl: 'max-w-4xl',
+    md: 'max-w-md',
+    lg: 'max-w-md',
+    xl: 'max-w-md',
     full: 'max-w-full mx-4',
   };
 
@@ -61,7 +61,7 @@ export function Modal({
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
           onClick={onClose}
           variants={shouldReduceMotion ? {} : modalBackdrop}
           initial="initial"
@@ -74,7 +74,7 @@ export function Modal({
             aria-labelledby={title ? 'modal-title' : undefined}
             tabIndex={-1}
             className={cn(
-              'bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full focus:outline-none',
+              'bg-white dark:bg-[#1c2e24] rounded-xl shadow-2xl border border-gray-200 dark:border-[#316847]/50 w-full focus:outline-none',
               sizes[size],
               'max-h-[90vh] overflow-y-auto'
             )}
@@ -84,25 +84,27 @@ export function Modal({
             animate="animate"
             exit="exit"
           >
-        {(title || showCloseButton) && (
-          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-            {title && (
-              <h2 id="modal-title" className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                {title}
-              </h2>
-            )}
-            {showCloseButton && (
-              <button
-                onClick={onClose}
-                className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                aria-label="Close modal"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            )}
-          </div>
-        )}
-        <div className="p-4">{children}</div>
+        <div className="relative">
+          {(title || showCloseButton) && (
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              {title && (
+                <h2 id="modal-title" className="text-xl font-semibold text-gray-900 dark:text-white">
+                  {title}
+                </h2>
+              )}
+              {showCloseButton && (
+                <button
+                  onClick={onClose}
+                  className="absolute top-3 right-3 p-2 rounded-full text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center touch-manipulation"
+                  aria-label="Close modal"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+          )}
+          <div className="p-4">{children}</div>
+        </div>
       </motion.div>
     </motion.div>
       )}

@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { useNavigate } from 'react-router-dom';
 import { staggerContainer, slideUp, prefersReducedMotion } from '@/utils/animations';
 import { useCountUp } from '@/hooks/useCountUp';
+import { hasEnoughWorkoutsForAverages } from '@/utils/analyticsHelpers';
 
 export function StatsCarousel() {
   const { workouts } = useWorkoutStore();
@@ -19,17 +20,20 @@ export function StatsCarousel() {
   const streak = calculateStreak(workoutDates);
   const energy = estimateEnergy(workouts);
 
-  const previousVolume = workouts.length > 1 
+  // Only calculate change percentages if user has enough workouts for meaningful averages
+  const hasEnoughWorkouts = hasEnoughWorkoutsForAverages(workouts);
+  
+  const previousVolume = hasEnoughWorkouts && workouts.length > 1
     ? workouts.slice(0, Math.floor(workouts.length / 2)).reduce((sum, w) => sum + w.totalVolume, 0)
     : totalVolume * 0.95;
-  const volumeChange = previousVolume > 0 
+  const volumeChange = hasEnoughWorkouts && previousVolume > 0 
     ? ((totalVolume - previousVolume) / previousVolume) * 100 
     : 0;
 
-  const previousEnergy = workouts.length > 1
+  const previousEnergy = hasEnoughWorkouts && workouts.length > 1
     ? estimateEnergy(workouts.slice(0, Math.floor(workouts.length / 2)))
     : energy * 0.88;
-  const energyChange = previousEnergy > 0
+  const energyChange = hasEnoughWorkouts && previousEnergy > 0
     ? ((energy - previousEnergy) / previousEnergy) * 100
     : 0;
 

@@ -9,6 +9,7 @@ import {
   aggregateVolumeByMuscleGroup,
   calculateConsistencyScore,
   getWeeklyWorkoutDays,
+  hasEnoughWorkoutsForAverages,
   DateRange,
 } from '@/utils/analyticsHelpers';
 import { calculateEstimatedOneRepMax } from '@/utils/calculations';
@@ -29,6 +30,9 @@ export interface AnalyticsMetrics {
     pull: number;
   };
   symmetryScore: number;
+  totalCalories?: number;
+  averageCalories?: number;
+  caloriesTrend?: Array<{ date: string; calories: number }>;
 }
 
 export const analyticsService = {
@@ -140,14 +144,22 @@ export const analyticsService = {
     const total = distribution.legs + distribution.push + distribution.pull;
     if (total === 0) return { legs: 0, push: 0, pull: 0 };
 
-    return {
+    // For new users with < 7 workouts, still show distribution but indicate it's preliminary
+    const percentages = {
       legs: Math.round((distribution.legs / total) * 100),
       push: Math.round((distribution.push / total) * 100),
       pull: Math.round((distribution.pull / total) * 100),
     };
+
+    return percentages;
   },
 
   calculateSymmetryScore(workouts: Workout[]): number {
+    // Only calculate averages if user has enough workouts
+    if (!hasEnoughWorkoutsForAverages(workouts)) {
+      return 85; // Default score for new users
+    }
+
     const muscleVolume = aggregateVolumeByMuscleGroup(workouts);
     
     const leftRightPairs: Array<[MuscleGroup, MuscleGroup]> = [
@@ -223,6 +235,45 @@ export const analyticsService = {
     };
   },
 
+  calculateTotalCalories(workouts: Workout[]): number {
+    return workouts.reduce((sum, w) => sum + (w.calories || 0), 0);
+  },
+
+  calculateAverageCalories(workouts: Workout[]): number {
+    const workoutsWithCalories = workouts.filter(w => w.calories !== undefined && w.calories > 0);
+    if (workoutsWithCalories.length === 0) return 0;
+    return Math.round(this.calculateTotalCalories(workoutsWithCalories) / workoutsWithCalories.length);
+  },
+
+  calculateCaloriesTrend(workouts: Workout[], range: DateRange = '30d'): Array<{ date: string; calories: number }> {
+    const filtered = filterWorkoutsByDateRange(workouts, range);
+    const { start } = getDateRange(range);
+    const weekCount = range === '30d' ? 4 : range === '90d' ? 12 : 52;
+
+    const weeklyData: Map<string, number> = new Map();
+
+    for (let week = 0; week < weekCount; week++) {
+      const weekStart = new Date(start);
+      weekStart.setDate(weekStart.getDate() + week * 7);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      
+      const weekKey = weekStart.toISOString().split('T')[0];
+      const weekWorkouts = filtered.filter(w => {
+        const workoutDate = new Date(w.date);
+        return workoutDate >= weekStart && workoutDate <= weekEnd;
+      });
+
+      const weekCalories = weekWorkouts.reduce((sum, w) => sum + (w.calories || 0), 0);
+      weeklyData.set(weekKey, weekCalories);
+    }
+
+    return Array.from(weeklyData.entries()).map(([date, calories]) => ({
+      date,
+      calories,
+    }));
+  },
+
   getAllMetrics(workouts: Workout[], range: DateRange = '30d'): AnalyticsMetrics {
     const filtered = filterWorkoutsByDateRange(workouts, range);
 
@@ -237,6 +288,9 @@ export const analyticsService = {
       muscleVolume: this.calculateMuscleVolume(filtered),
       focusDistribution: this.calculateFocusDistribution(filtered),
       symmetryScore: this.calculateSymmetryScore(filtered),
+      totalCalories: this.calculateTotalCalories(filtered),
+      averageCalories: this.calculateAverageCalories(filtered),
+      caloriesTrend: this.calculateCaloriesTrend(filtered, range),
     };
   },
 };

@@ -24,7 +24,7 @@ interface WorkoutState {
   removeExercise: (exerciseId: string) => void;
   addSet: (exerciseId: string, set: WorkoutSet) => void;
   updateSet: (exerciseId: string, setNumber: number, updates: Partial<WorkoutSet>) => void;
-  finishWorkout: () => Promise<void>;
+  finishWorkout: (calories?: number) => Promise<void>;
   cancelWorkout: () => void;
   loadWorkouts: (userId: string) => Promise<void>;
   getWorkout: (id: number) => Promise<Workout | undefined>;
@@ -333,7 +333,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     saveWorkoutState({ currentWorkout: updatedWorkout, templateId: get().templateId, plannedWorkoutId: get().plannedWorkoutId });
   },
 
-  finishWorkout: async () => {
+  finishWorkout: async (calories?: number) => {
     const { currentWorkout } = get();
     if (!currentWorkout) {
       throw new Error('No active workout to finish');
@@ -355,6 +355,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         ...currentWorkout,
         endTime,
         totalDuration: totalDurationMinutes,
+        calories: calories !== undefined ? calories : currentWorkout.calories,
       };
 
       const workoutId = await dataService.createWorkout(completedWorkout);

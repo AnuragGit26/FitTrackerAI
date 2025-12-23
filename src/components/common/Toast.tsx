@@ -62,7 +62,7 @@ export function Toast({ message, type = 'info', duration = 3000, onClose }: Toas
       <p className="flex-1 text-sm font-medium">{message}</p>
       <motion.button
         onClick={onClose}
-        className="p-1 rounded hover:bg-black/10 transition-colors"
+        className="p-2 rounded hover:bg-black/10 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center touch-manipulation"
         aria-label="Close toast"
         whileHover={shouldReduceMotion ? {} : { scale: 1.1, rotate: 90 }}
         whileTap={shouldReduceMotion ? {} : { scale: 0.9 }}
@@ -80,7 +80,7 @@ interface ToastContainerProps {
 
 export function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
   return (
-    <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none">
+    <div className="fixed top-[calc(1rem+env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 w-full max-w-[calc(100%-2rem)] px-4 pointer-events-none">
       <AnimatePresence>
         {toasts.map((toast) => (
           <motion.div

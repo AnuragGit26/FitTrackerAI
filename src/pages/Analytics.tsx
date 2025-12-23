@@ -4,19 +4,19 @@ import { useWorkoutStore } from '@/store/workoutStore';
 import { useUserStore } from '@/store/userStore';
 import { analyticsService } from '@/services/analyticsService';
 import { calculateStreak } from '@/utils/calculations';
-import { DateRange } from '@/utils/analyticsHelpers';
+import { DateRange, hasEnoughWorkoutsForAverages, filterWorkoutsByDateRange } from '@/utils/analyticsHelpers';
 import { aiCallManager } from '@/services/aiCallManager';
 import { aiService } from '@/services/aiService';
-import { ProgressHeader } from '@/components/analytics/ProgressHeader';
+import { UnifiedDateSelector } from '@/components/analytics/UnifiedDateSelector';
 import { TotalVolumeCard } from '@/components/analytics/TotalVolumeCard';
 import { WorkoutStatsCards } from '@/components/analytics/WorkoutStatsCards';
 import { AIInsightCard } from '@/components/analytics/AIInsightCard';
 import { VolumeTrendChart } from '@/components/analytics/VolumeTrendChart';
+import { CaloriesChart } from '@/components/analytics/CaloriesChart';
 import { ConsistencyHeatmap } from '@/components/analytics/ConsistencyHeatmap';
 import { MuscleFocusCard } from '@/components/analytics/MuscleFocusCard';
 import { StrengthProgressionChart } from '@/components/analytics/StrengthProgressionChart';
 import { RecentRecordsList } from '@/components/analytics/RecentRecordsList';
-import { MuscleAnalyticsHeader } from '@/components/analytics/MuscleAnalyticsHeader';
 import { SymmetryScoreCard } from '@/components/analytics/SymmetryScoreCard';
 import { MuscleActivationMap } from '@/components/analytics/MuscleActivationMap';
 import { AICoachInsightCard } from '@/components/analytics/AICoachInsightCard';
@@ -24,15 +24,17 @@ import { FocusDistributionChart } from '@/components/analytics/FocusDistribution
 import { VolumeByMuscleChart } from '@/components/analytics/VolumeByMuscleChart';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { prefersReducedMotion } from '@/utils/animations';
+import { CustomDateRangePicker } from '@/components/analytics/CustomDateRangePicker';
 
 type View = 'progress' | 'muscle';
-type DateRangeOption = '30d' | '90d' | '180d' | '1y';
 type TimePeriod = 'Week' | 'Month' | 'Year';
 
 export function Analytics() {
   const [view, setView] = useState<View>('progress');
-  const [dateRange, setDateRange] = useState<DateRangeOption>('30d');
+  const [dateRange, setDateRange] = useState<DateRange>('30d');
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('Month');
+  const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
+  const [customDateRange, setCustomDateRange] = useState<{ start: Date; end: Date } | null>(null);
   const [progressInsight, setProgressInsight] = useState<string>('');
   const [muscleInsight, setMuscleInsight] = useState<string>('');
   const [isLoadingInsights, setIsLoadingInsights] = useState(false);
@@ -55,9 +57,24 @@ export function Analytics() {
     }
   }, [profile, loadWorkouts]);
 
+  const filteredWorkouts = useMemo(() => {
+    // If custom date range is set, use it; otherwise use the standard date range
+    if (customDateRange) {
+      return workouts.filter((w) => {
+        const workoutDate = new Date(w.date);
+        return workoutDate >= customDateRange.start && workoutDate <= customDateRange.end;
+      });
+    }
+    return filterWorkoutsByDateRange(workouts, dateRange);
+  }, [workouts, dateRange, customDateRange]);
+
   const metrics = useMemo(() => {
-    return analyticsService.getAllMetrics(workouts, dateRange as DateRange);
-  }, [workouts, dateRange]);
+    return analyticsService.getAllMetrics(filteredWorkouts, dateRange);
+  }, [filteredWorkouts, dateRange]);
+
+  const hasEnoughWorkouts = useMemo(() => {
+    return hasEnoughWorkoutsForAverages(workouts);
+  }, [workouts]);
 
   const currentStreak = useMemo(() => {
     const workoutDates = workouts.map((w) => new Date(w.date));
@@ -254,12 +271,28 @@ export function Analytics() {
             exit={{ opacity: 0, x: 20 }}
             transition={{ duration: 0.3 }}
           >
-            <ProgressHeader selectedRange={dateRange} onRangeChange={setDateRange} />
+            <UnifiedDateSelector
+              mode="progress"
+              selectedRange={dateRange}
+              onRangeChange={(range) => {
+                setDateRange(range);
+                setCustomDateRange(null); // Clear custom range when selecting preset
+              }}
+              onCustomRange={() => setShowCustomDatePicker(true)}
+            />
             <div className="p-4 space-y-5 max-w-2xl mx-auto">
+              {!hasEnoughWorkouts && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    <strong>Building your data:</strong> You have {workouts.length} workout{workouts.length !== 1 ? 's' : ''} logged. 
+                    Averages and trends will be calculated after 7+ workouts for more accurate insights.
+                  </p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <TotalVolumeCard
                   totalVolume={metrics.totalVolume}
-                  trendPercentage={trendPercentage}
+                  trendPercentage={hasEnoughWorkouts ? trendPercentage : 0}
                   unit={unit}
                 />
                 <WorkoutStatsCards workoutCount={metrics.workoutCount} currentStreak={currentStreak} />
@@ -275,9 +308,13 @@ export function Analytics() {
 
               <VolumeTrendChart data={metrics.volumeTrend} />
 
+              {metrics.caloriesTrend && metrics.caloriesTrend.length > 0 && (
+                <CaloriesChart data={metrics.caloriesTrend} />
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <ConsistencyHeatmap workouts={workouts} />
-                <MuscleFocusCard workouts={workouts} />
+                <ConsistencyHeatmap workouts={filteredWorkouts} />
+                <MuscleFocusCard workouts={filteredWorkouts} />
               </div>
 
               <StrengthProgressionChart progressions={metrics.strengthProgression} />
@@ -293,11 +330,39 @@ export function Analytics() {
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.3 }}
           >
-            <MuscleAnalyticsHeader selectedPeriod={timePeriod} onPeriodChange={setTimePeriod} />
+            <UnifiedDateSelector
+              mode="muscle"
+              selectedPeriod={timePeriod}
+              selectedRange={dateRange}
+              onPeriodChange={(period) => {
+                setTimePeriod(period);
+                // Convert TimePeriod to DateRange
+                const rangeMap: Record<TimePeriod, DateRange> = {
+                  'Week': '7d',
+                  'Month': '30d',
+                  'Year': '1y',
+                };
+                setDateRange(rangeMap[period]);
+                setCustomDateRange(null);
+              }}
+              onRangeChange={(range) => {
+                setDateRange(range);
+                setCustomDateRange(null);
+              }}
+              onCustomRange={() => setShowCustomDatePicker(true)}
+            />
             <div className="px-4 py-4 space-y-4">
+              {!hasEnoughWorkouts && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    <strong>Building your data:</strong> You have {workouts.length} workout{workouts.length !== 1 ? 's' : ''} logged. 
+                    Muscle balance and symmetry scores will be calculated after 7+ workouts for more accurate insights.
+                  </p>
+                </div>
+              )}
               <SymmetryScoreCard score={metrics.symmetryScore} />
 
-              <MuscleActivationMap workouts={workouts} />
+              <MuscleActivationMap workouts={filteredWorkouts} />
 
               {isLoadingInsights ? (
                 <div className="flex items-center justify-center py-8">
@@ -319,11 +384,22 @@ export function Analytics() {
                   View All
                 </span>
               </div>
-              <VolumeByMuscleChart workouts={workouts} />
+              <VolumeByMuscleChart workouts={filteredWorkouts} />
             </div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Custom Date Range Picker Modal */}
+      <CustomDateRangePicker
+        isOpen={showCustomDatePicker}
+        onClose={() => setShowCustomDatePicker(false)}
+        onSelectRange={(start, end) => {
+          setCustomDateRange({ start, end });
+          setShowCustomDatePicker(false);
+        }}
+        currentRange={dateRange}
+      />
     </div>
   );
 }

@@ -2,6 +2,13 @@ import { Sparkles, Clock, Dumbbell, Play } from 'lucide-react';
 import { WorkoutRecommendation } from '@/types/insights';
 import { useNavigate } from 'react-router-dom';
 import { cleanPlainTextResponse } from '@/utils/aiResponseCleaner';
+import { useUserStore } from '@/store/userStore';
+import { useMuscleRecovery } from '@/hooks/useMuscleRecovery';
+import { exerciseLibrary } from '@/services/exerciseLibrary';
+import { WorkoutExercise, WorkoutSet } from '@/types/exercise';
+import { calculateVolume } from '@/utils/calculations';
+import { useToast } from '@/hooks/useToast';
+import { ToastContainer } from '@/components/common/Toast';
 
 interface RecommendedWorkoutCardProps {
   workout?: WorkoutRecommendation;
@@ -9,15 +16,128 @@ interface RecommendedWorkoutCardProps {
 
 export function RecommendedWorkoutCard({ workout }: RecommendedWorkoutCardProps) {
   const navigate = useNavigate();
+  const { profile } = useUserStore();
+  const { muscleStatuses } = useMuscleRecovery();
+  const { toasts, removeToast, error: showError } = useToast();
 
   if (!workout) return null;
 
-  const handleStartWorkout = () => {
-    navigate('/log-workout');
+  const handleStartWorkout = async () => {
+    try {
+      // Get exercises that match recommended muscle groups
+      const allExercises = await exerciseLibrary.getAllExercises();
+      const matchingExercises = allExercises.filter(ex => {
+        // Check if exercise targets any of the recommended muscle groups
+        const primaryMatch = ex.primaryMuscles.some(m => workout.muscleGroups.includes(m));
+        const secondaryMatch = ex.secondaryMuscles.some(m => workout.muscleGroups.includes(m));
+        return primaryMatch || secondaryMatch;
+      });
+
+      // Filter exercises based on muscle recovery - only include if muscles are ready (>=75%)
+      const readyMuscles = muscleStatuses
+        .filter(s => s.recoveryPercentage >= 75)
+        .map(s => s.muscle);
+      
+      const readyExercises = matchingExercises.filter(ex => {
+        return ex.primaryMuscles.some(m => readyMuscles.includes(m)) ||
+               ex.secondaryMuscles.some(m => readyMuscles.includes(m));
+      });
+
+      // Use ready exercises if available, otherwise use all matching exercises
+      const exercisesToUse = readyExercises.length > 0 ? readyExercises : matchingExercises;
+
+      // Limit to 4-6 exercises for a good workout
+      const selectedExercises = exercisesToUse.slice(0, 6);
+
+      if (selectedExercises.length === 0) {
+        showError('No suitable exercises found for this workout. Please try again later.');
+        return;
+      }
+
+      // Convert to WorkoutExercise format
+      const recommendedWorkoutExercises: WorkoutExercise[] = await Promise.all(
+        selectedExercises.map(async (exercise) => {
+          // Create default sets based on exercise type
+          let initialSets: WorkoutSet[] = [];
+          
+          switch (exercise.trackingType) {
+            case 'weight_reps':
+              initialSets = [
+                {
+                  setNumber: 1,
+                  reps: 10,
+                  weight: 0,
+                  unit: profile?.preferredUnit || 'kg',
+                  completed: false,
+                },
+                {
+                  setNumber: 2,
+                  reps: 10,
+                  weight: 0,
+                  unit: profile?.preferredUnit || 'kg',
+                  completed: false,
+                },
+                {
+                  setNumber: 3,
+                  reps: 10,
+                  weight: 0,
+                  unit: profile?.preferredUnit || 'kg',
+                  completed: false,
+                },
+              ];
+              break;
+            case 'reps_only':
+              initialSets = [
+                { setNumber: 1, reps: 10, completed: false },
+                { setNumber: 2, reps: 10, completed: false },
+                { setNumber: 3, reps: 10, completed: false },
+              ];
+              break;
+            case 'cardio':
+              initialSets = [
+                {
+                  setNumber: 1,
+                  distance: 0,
+                  distanceUnit: 'km',
+                  time: 0,
+                  completed: false,
+                },
+              ];
+              break;
+            case 'duration':
+              initialSets = [
+                { setNumber: 1, duration: 0, completed: false },
+              ];
+              break;
+          }
+
+          const initialVolume = calculateVolume(initialSets, exercise.trackingType);
+
+          return {
+            id: `${Date.now()}-${Math.random()}-${exercise.id}`,
+            exerciseId: exercise.id,
+            exerciseName: exercise.name,
+            sets: initialSets,
+            totalVolume: initialVolume,
+            musclesWorked: [...exercise.primaryMuscles, ...exercise.secondaryMuscles],
+            timestamp: new Date(),
+          };
+        })
+      );
+
+      // Navigate with recommended workout exercises
+      navigate('/log-workout', {
+        state: { recommendedWorkoutExercises },
+      });
+    } catch (error) {
+      console.error('Error preparing recommended workout:', error);
+      showError('Failed to prepare workout. Please try again.');
+    }
   };
 
   return (
     <div className="p-4">
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
       <div className="group relative flex flex-col overflow-hidden rounded-xl bg-white dark:bg-card-dark shadow-lg border border-gray-100 dark:border-white/5">
         <div
           className="h-40 w-full bg-cover bg-center relative"

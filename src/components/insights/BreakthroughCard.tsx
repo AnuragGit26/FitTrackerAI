@@ -1,13 +1,23 @@
-import { TrendingUp, ArrowRight } from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
 import { BreakthroughInsight } from '@/types/insights';
 import { cleanPlainTextResponse } from '@/utils/aiResponseCleaner';
+import { useUserStore, unitHelpers } from '@/store/userStore';
 
 interface BreakthroughCardProps {
   breakthrough?: BreakthroughInsight;
 }
 
 export function BreakthroughCard({ breakthrough }: BreakthroughCardProps) {
-  if (!breakthrough) return null;
+  const { profile } = useUserStore();
+
+  if (!breakthrough || !breakthrough.exercise || !breakthrough.projectedWeight) return null;
+
+  // Convert weight based on user's preferred unit
+  const preferredUnit = profile?.preferredUnit || 'kg';
+  const displayWeight = preferredUnit === 'lbs' 
+    ? Math.round(unitHelpers.kgToLbs(breakthrough.projectedWeight))
+    : Math.round(breakthrough.projectedWeight);
+  const unitLabel = preferredUnit === 'lbs' ? 'lbs' : 'kg';
 
   return (
     <section>
@@ -32,14 +42,14 @@ export function BreakthroughCard({ breakthrough }: BreakthroughCardProps) {
         <div className="flex w-full flex-col items-stretch justify-center gap-3 p-4">
           <p className="text-slate-600 dark:text-secondary-text text-sm font-normal leading-relaxed">
             Based on your velocity trends, you are ready to attempt a new max of{' '}
-            <span className="text-slate-900 dark:text-white font-bold">{breakthrough.projectedWeight} lbs</span>.
-            Your speed out of the hole has improved by{' '}
-            <span className="text-green-600 dark:text-primary font-bold">{breakthrough.improvementPercent}%</span>.
+            <span className="text-slate-900 dark:text-white font-bold">{displayWeight} {unitLabel}</span>.
+            {breakthrough.improvementPercent !== undefined && (
+              <>
+                {' '}Your speed out of the hole has improved by{' '}
+                <span className="text-green-600 dark:text-primary font-bold">{breakthrough.improvementPercent}%</span>.
+              </>
+            )}
           </p>
-          <button className="flex w-full cursor-pointer items-center justify-center rounded-lg h-10 px-4 bg-primary hover:bg-green-400 active:bg-green-500 transition-colors text-background-dark text-sm font-bold leading-normal gap-2">
-            <span>View Projection Details</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
         </div>
       </div>
     </section>

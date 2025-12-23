@@ -12,6 +12,7 @@ export interface Workout {
   exercises: WorkoutExercise[];
   totalDuration: number; // minutes
   totalVolume: number;
+  calories?: number; // calories burned during workout
   notes?: string;
   musclesTargeted: MuscleGroup[];
   workoutType: string;

@@ -23,7 +23,8 @@ function estimateTokens(text: string): number {
 
 function formatWorkoutAbbreviated(workout: Workout): string {
   const date = new Date(workout.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  return `${date}: ${workout.exercises.length}ex, ${Math.round(workout.totalVolume)}kg`;
+  const caloriesInfo = workout.calories ? `, ${workout.calories} cal` : '';
+  return `${date}: ${workout.exercises.length}ex, ${Math.round(workout.totalVolume)}kg${caloriesInfo}`;
 }
 
 function formatWorkoutDetailed(workout: Workout): string {
@@ -32,7 +33,8 @@ function formatWorkoutDetailed(workout: Workout): string {
     .slice(0, 5)
     .map(e => `${e.exerciseName} (${e.sets.length} sets)`)
     .join(', ');
-  return `${date}: ${exercises}${workout.exercises.length > 5 ? '...' : ''}, ${Math.round(workout.totalVolume)}kg`;
+  const caloriesInfo = workout.calories ? `, ${workout.calories} cal` : '';
+  return `${date}: ${exercises}${workout.exercises.length > 5 ? '...' : ''}, ${Math.round(workout.totalVolume)}kg${caloriesInfo}`;
 }
 
 class AIDataProcessor {
