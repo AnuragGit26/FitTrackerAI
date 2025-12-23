@@ -42,10 +42,40 @@ export const analyticsService = {
 
   calculateVolumeTrend(workouts: Workout[], range: DateRange = '30d'): VolumeData[] {
     const filtered = filterWorkoutsByDateRange(workouts, range);
-    const { start } = getDateRange(range);
+    const { start, end } = getDateRange(range);
 
+    // For 7d range, show daily data instead of weekly
+    if (range === '7d') {
+      const dailyData: Map<string, number> = new Map();
+      const currentDate = new Date(start);
+      
+      while (currentDate <= end) {
+        const dateKey = currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const dayVolume = filtered
+          .filter((w) => {
+            const workoutDate = new Date(w.date);
+            return (
+              workoutDate.getDate() === currentDate.getDate() &&
+              workoutDate.getMonth() === currentDate.getMonth() &&
+              workoutDate.getFullYear() === currentDate.getFullYear()
+            );
+          })
+          .reduce((sum, w) => sum + w.totalVolume, 0);
+        
+        dailyData.set(dateKey, dayVolume);
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+
+      return Array.from(dailyData.entries()).map(([date, totalVolume]) => ({
+        date,
+        totalVolume,
+        volumeByMuscle: {},
+      }));
+    }
+
+    // For other ranges, use weekly aggregation
     const weeklyData: Map<string, number> = new Map();
-    const weekCount = range === '30d' ? 4 : range === '90d' ? 12 : 52;
+    const weekCount = range === '30d' ? 4 : range === '90d' ? 12 : range === '180d' ? 26 : 52;
 
     for (let week = 0; week < weekCount; week++) {
       const weekStart = new Date(start);

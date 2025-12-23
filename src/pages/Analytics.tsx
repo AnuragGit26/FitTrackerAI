@@ -140,7 +140,8 @@ export function Analytics() {
           metrics.totalVolume,
           metrics.workoutCount,
           trendPercentage,
-          topMuscle
+          topMuscle,
+          profile?.preferredUnit || 'kg'
         ),
         0
       )
@@ -264,13 +265,7 @@ export function Analytics() {
 
       <AnimatePresence mode="wait">
         {view === 'progress' ? (
-          <motion.div
-            key="progress"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            transition={{ duration: 0.3 }}
-          >
+          <>
             <UnifiedDateSelector
               mode="progress"
               selectedRange={dateRange}
@@ -280,7 +275,14 @@ export function Analytics() {
               }}
               onCustomRange={() => setShowCustomDatePicker(true)}
             />
-            <div className="p-4 space-y-5 max-w-2xl mx-auto">
+            <motion.div
+              key="progress"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <div className="p-4 space-y-5 max-w-2xl mx-auto">
               {!hasEnoughWorkouts && (
                 <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
                   <p className="text-sm text-blue-800 dark:text-blue-200">
@@ -320,8 +322,9 @@ export function Analytics() {
               <StrengthProgressionChart progressions={metrics.strengthProgression} />
 
               <RecentRecordsList records={metrics.personalRecords} />
-            </div>
-          </motion.div>
+              </div>
+            </motion.div>
+          </>
         ) : (
           <motion.div
             key="muscle"

@@ -1,5 +1,6 @@
 import { Calendar, User } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '@/utils/cn';
 import { DateRange } from '@/utils/analyticsHelpers';
 
@@ -56,6 +57,20 @@ export function UnifiedDateSelector({
   title,
 }: UnifiedDateSelectorProps) {
   const [showRangeMenu, setShowRangeMenu] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    if (showRangeMenu && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom + 8,
+        left: rect.left,
+      });
+    } else {
+      setDropdownPosition(null);
+    }
+  }, [showRangeMenu]);
 
   const rangeLabels: Record<DateRange, string> = {
     '7d': 'Last 7 Days',
@@ -159,6 +174,7 @@ export function UnifiedDateSelector({
       <div className="px-4 pb-3 flex gap-3 overflow-x-auto no-scrollbar">
         <div className="relative">
           <button
+            ref={buttonRef}
             onClick={() => setShowRangeMenu(!showRangeMenu)}
             className="flex shrink-0 items-center gap-2 bg-primary text-[#102217] pl-4 pr-3 py-1.5 rounded-full text-sm font-bold shadow-lg shadow-primary/20 active:scale-95 transition-all"
           >
@@ -183,23 +199,31 @@ export function UnifiedDateSelector({
                 className="fixed inset-0 z-[9998]"
                 onClick={() => setShowRangeMenu(false)}
               />
-              <div className="absolute top-full mt-2 left-0 bg-surface-light dark:bg-surface-dark rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 py-2 z-[9999] min-w-[160px]">
-                {availableRanges.map((range) => (
-                  <button
-                    key={range}
-                    onClick={() => {
-                      onRangeChange?.(range);
-                      setShowRangeMenu(false);
-                    }}
-                    className={cn(
-                      'w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors',
-                      currentRange === range && 'text-primary font-bold'
-                    )}
-                  >
-                    {rangeLabels[range]}
-                  </button>
-                ))}
-              </div>
+              {dropdownPosition && createPortal(
+                <div 
+                  className="fixed bg-surface-light dark:bg-surface-dark rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 py-2 z-[9999] min-w-[160px]"
+                  style={{
+                    top: `${dropdownPosition.top}px`,
+                    left: `${dropdownPosition.left}px`,
+                  }}>
+                  {availableRanges.map((range) => (
+                    <button
+                      key={range}
+                      onClick={() => {
+                        onRangeChange?.(range);
+                        setShowRangeMenu(false);
+                      }}
+                      className={cn(
+                        'w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors',
+                        currentRange === range && 'text-primary font-bold'
+                      )}
+                    >
+                      {rangeLabels[range]}
+                    </button>
+                  ))}
+                </div>,
+                document.body
+              )}
             </>
           )}
         </div>

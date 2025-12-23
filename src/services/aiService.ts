@@ -145,9 +145,14 @@ CRITICAL OUTPUT REQUIREMENTS:
     totalVolume: number,
     workoutCount: number,
     trendPercentage: number,
-    topMuscle?: string
+    topMuscle?: string,
+    unit: 'kg' | 'lbs' = 'kg'
   ): Promise<string> {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+
+    // Convert volume from kg to user's preferred unit if needed
+    const displayVolume = unit === 'lbs' ? totalVolume * 2.20462 : totalVolume;
+    const formattedVolume = Math.round(displayVolume).toLocaleString();
 
     if (!apiKey) {
       return `Your ${topMuscle || 'chest'} volume is up ${trendPercentage}% this month. You're hitting new PRs consistently. Great consistency!`;
@@ -158,7 +163,7 @@ CRITICAL OUTPUT REQUIREMENTS:
       const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
       const prompt = `Generate a brief, encouraging progress insight (1-2 sentences) for a fitness tracker user:
-- Total volume: ${totalVolume} lbs
+- Total volume: ${formattedVolume} ${unit}
 - Workouts this month: ${workoutCount}
 - Trend: ${trendPercentage > 0 ? '+' : ''}${trendPercentage}% vs last month
 - Top muscle group: ${topMuscle || 'N/A'}
@@ -167,6 +172,7 @@ CRITICAL OUTPUT REQUIREMENTS:
 - Output ONLY clean, polished text - no markdown, no code blocks, no formatting
 - Ensure the text is professional, grammatically correct, and free of gibberish or typos
 - Keep it concise, positive, and specific
+- Use the same unit (${unit}) when mentioning volume in your response
 - Return only the insight text, nothing else.`;
 
       const result = await model.generateContent(prompt);

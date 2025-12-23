@@ -60,6 +60,10 @@ export function VolumeTrendChart({ data }: VolumeTrendChartProps) {
               stroke="#6b7280"
               style={{ fontSize: '12px' }}
               tick={{ fill: '#9ca3af' }}
+              angle={chartData.length > 7 ? -45 : 0}
+              textAnchor={chartData.length > 7 ? 'end' : 'middle'}
+              height={chartData.length > 7 ? 60 : 30}
+              interval={chartData.length > 14 ? Math.ceil(chartData.length / 7) : 0}
             />
             <YAxis
               stroke="#6b7280"
@@ -84,16 +88,22 @@ export function VolumeTrendChart({ data }: VolumeTrendChartProps) {
           </AreaChart>
         </ResponsiveContainer>
       </div>
-      <div className="flex justify-between mt-4 text-xs text-gray-400 font-medium px-1">
-        {chartData.map((item, index) => (
-          <span
-            key={index}
-            className={index === chartData.length - 1 ? 'text-primary' : ''}
-          >
-            {item.week}
-          </span>
-        ))}
-      </div>
+      {chartData.length <= 14 && (
+        <div className={`flex mt-4 text-xs text-gray-400 font-medium px-1 ${
+          chartData.length <= 7 ? 'justify-between' : 'gap-2 overflow-x-auto scrollbar-hide'
+        }`}>
+          {chartData.map((item, index) => (
+            <span
+              key={index}
+              className={`${chartData.length > 7 ? 'flex-shrink-0' : ''} ${
+                index === chartData.length - 1 ? 'text-primary' : ''
+              }`}
+            >
+              {item.week}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
