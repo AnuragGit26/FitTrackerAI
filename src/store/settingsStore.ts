@@ -10,6 +10,11 @@ interface AppSettings {
   recoveryMultiplier: number; // 0.5x to 2x
   baseRestInterval: number; // Base rest interval in hours (12-72)
   showOnboarding: boolean;
+  // Notification preferences
+  workoutReminderEnabled: boolean;
+  workoutReminderMinutes: number; // 15, 30, 60, or custom
+  muscleRecoveryAlertsEnabled: boolean;
+  notificationPermission: NotificationPermission;
 }
 
 interface SettingsState {
@@ -27,6 +32,11 @@ interface SettingsState {
   toggleNotifications: () => Promise<void>;
   setRecoveryMultiplier: (multiplier: number) => Promise<void>;
   setBaseRestInterval: (hours: number) => Promise<void>;
+  // Notification settings
+  setWorkoutReminderEnabled: (enabled: boolean) => Promise<void>;
+  setWorkoutReminderMinutes: (minutes: number) => Promise<void>;
+  setMuscleRecoveryAlertsEnabled: (enabled: boolean) => Promise<void>;
+  setNotificationPermission: (permission: NotificationPermission) => Promise<void>;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -38,6 +48,10 @@ const DEFAULT_SETTINGS: AppSettings = {
   recoveryMultiplier: 1.0,
   baseRestInterval: 48, // 48 hours default
   showOnboarding: true,
+  workoutReminderEnabled: true,
+  workoutReminderMinutes: 30,
+  muscleRecoveryAlertsEnabled: true,
+  notificationPermission: 'default',
 };
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
@@ -50,7 +64,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
     try {
       const savedSettings = await dataService.getSetting('appSettings');
-      const settings = savedSettings || DEFAULT_SETTINGS;
+      // Merge with defaults to handle new notification fields
+      const settings = { ...DEFAULT_SETTINGS, ...savedSettings };
+      
+      // Check notification permission from browser
+      if ('Notification' in window) {
+        settings.notificationPermission = Notification.permission;
+      }
       
       set({ settings, isLoading: false });
     } catch (error) {
@@ -116,6 +136,23 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setBaseRestInterval: async (hours: number) => {
     const clamped = Math.max(12, Math.min(72, hours));
     await get().updateSettings({ baseRestInterval: clamped });
+  },
+
+  setWorkoutReminderEnabled: async (enabled: boolean) => {
+    await get().updateSettings({ workoutReminderEnabled: enabled });
+  },
+
+  setWorkoutReminderMinutes: async (minutes: number) => {
+    const clamped = Math.max(15, Math.min(120, minutes));
+    await get().updateSettings({ workoutReminderMinutes: clamped });
+  },
+
+  setMuscleRecoveryAlertsEnabled: async (enabled: boolean) => {
+    await get().updateSettings({ muscleRecoveryAlertsEnabled: enabled });
+  },
+
+  setNotificationPermission: async (permission: NotificationPermission) => {
+    await get().updateSettings({ notificationPermission: permission });
   },
 }));
 

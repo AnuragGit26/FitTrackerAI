@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { PlannedWorkout } from '@/types/workout';
 import { plannedWorkoutService } from '@/services/plannedWorkoutService';
+import { notificationService } from '@/services/notificationService';
+import { useSettingsStore } from '@/store/settingsStore';
 
 export type PlannerViewMode = 'week' | 'month' | 'custom';
 
@@ -90,6 +92,15 @@ export const usePlannedWorkoutStore = create<PlannedWorkoutState>((set, get) => 
           plannedWorkouts: [...state.plannedWorkouts, newPlannedWorkout],
           isLoading: false,
         }));
+        
+        // Schedule notification if enabled
+        const settings = useSettingsStore.getState().settings;
+        if (settings.workoutReminderEnabled && settings.notificationPermission === 'granted' && newPlannedWorkout.scheduledTime) {
+          await notificationService.scheduleWorkoutReminder(
+            newPlannedWorkout,
+            settings.workoutReminderMinutes || 30
+          );
+        }
       }
       return id;
     } catch (error) {
@@ -107,6 +118,12 @@ export const usePlannedWorkoutStore = create<PlannedWorkoutState>((set, get) => 
   ) => {
     set({ isLoading: true, error: null });
     try {
+      // Cancel existing notification if scheduled time is changing
+      const existing = get().plannedWorkouts.find((pw) => pw.id === id);
+      if (existing && (updates.scheduledTime || updates.scheduledDate)) {
+        await notificationService.cancelWorkoutReminder(id);
+      }
+      
       await plannedWorkoutService.updatePlannedWorkout(id, updates);
       const updatedPlannedWorkout = await plannedWorkoutService.getPlannedWorkout(id);
       if (updatedPlannedWorkout) {
@@ -116,6 +133,15 @@ export const usePlannedWorkoutStore = create<PlannedWorkoutState>((set, get) => 
           ),
           isLoading: false,
         }));
+        
+        // Reschedule notification if enabled
+        const settings = useSettingsStore.getState().settings;
+        if (settings.workoutReminderEnabled && settings.notificationPermission === 'granted' && updatedPlannedWorkout.scheduledTime) {
+          await notificationService.scheduleWorkoutReminder(
+            updatedPlannedWorkout,
+            settings.workoutReminderMinutes || 30
+          );
+        }
       }
     } catch (error) {
       set({
@@ -128,6 +154,9 @@ export const usePlannedWorkoutStore = create<PlannedWorkoutState>((set, get) => 
   deletePlannedWorkout: async (id: string) => {
     set({ isLoading: true, error: null });
     try {
+      // Cancel notification before deleting
+      await notificationService.cancelWorkoutReminder(id);
+      
       await plannedWorkoutService.deletePlannedWorkout(id);
       set((state) => ({
         plannedWorkouts: state.plannedWorkouts.filter((pw) => pw.id !== id),
@@ -144,6 +173,9 @@ export const usePlannedWorkoutStore = create<PlannedWorkoutState>((set, get) => 
   markAsCompleted: async (id: string, completedWorkoutId: number) => {
     set({ isLoading: true, error: null });
     try {
+      // Cancel notification when workout is completed
+      await notificationService.cancelWorkoutReminder(id);
+      
       await plannedWorkoutService.markAsCompleted(id, completedWorkoutId);
       const updatedPlannedWorkout = await plannedWorkoutService.getPlannedWorkout(id);
       if (updatedPlannedWorkout) {

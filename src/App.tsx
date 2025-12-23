@@ -12,12 +12,15 @@ import { exerciseLibrary } from '@/services/exerciseLibrary';
 import { dataSync } from '@/services/dataSync';
 import { initializeDefaultTemplates } from '@/services/templateLibrary';
 import { workoutEventTracker } from '@/services/workoutEventTracker';
+import { muscleImageCache } from '@/services/muscleImageCache';
+import { notificationService } from '@/services/notificationService';
 import { ToastContainer } from '@/components/common/Toast';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { AnimatedPage } from '@/components/common/AnimatedPage';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { RouteLoader } from '@/components/common/RouteLoader';
 import { OfflineIndicator } from '@/components/common/OfflineIndicator';
+import { InstallPrompt } from '@/components/common/InstallPrompt';
 import { analytics } from '@/utils/analytics';
 import { seedWorkoutLogs } from '@/utils/seedWorkoutLogs';
 
@@ -214,6 +217,16 @@ function App() {
         // Initialize data synchronization
         dataSync.initialize();
         
+        // Preload and cache muscle images in the background
+        muscleImageCache.preloadAllImages().catch((error) => {
+          console.warn('Failed to preload muscle images:', error);
+        });
+        
+        // Clear expired muscle image cache
+        muscleImageCache.clearExpiredCache().catch((error) => {
+          console.warn('Failed to clear expired muscle image cache:', error);
+        });
+        
         // Initialize workout event tracker
         const user = getUserStore.getState().profile;
         if (user?.id) {
@@ -229,7 +242,7 @@ function App() {
           
           navigator.serviceWorker
             .register(swPath, { scope: '/' })
-            .then((registration) => {
+            .then(async (registration) => {
               console.log(`[SW] Service Worker registered (${import.meta.env.DEV ? 'DEV' : 'PROD'}):`, registration);
               
               // Check for updates periodically
@@ -249,6 +262,29 @@ function App() {
                   });
                 }
               });
+              
+              // Register background sync for workout reminders
+              if ('sync' in registration) {
+                try {
+                  await (registration as any).sync.register('workout-reminder-sync');
+                } catch (error) {
+                  console.warn('[SW] Background sync registration failed:', error);
+                }
+              }
+              
+              // Register periodic sync for recovery checks (if supported)
+              if ('periodicSync' in registration) {
+                try {
+                  await (registration as any).periodicSync.register('recovery-check', {
+                    minInterval: 60 * 60 * 1000, // 1 hour
+                  });
+                } catch (error) {
+                  console.warn('[SW] Periodic sync registration failed:', error);
+                }
+              }
+              
+              // Initialize notification service
+              await notificationService.initialize();
             })
             .catch((error) => {
               console.error('[SW] Service Worker registration failed:', error);
@@ -260,11 +296,54 @@ function App() {
           
           // Listen for service worker messages
           // Note: AI_INSIGHTS_READY messages are handled by swCommunication utility
-          navigator.serviceWorker.addEventListener('message', (event) => {
+          navigator.serviceWorker.addEventListener('message', async (event) => {
             if (event.data && event.data.type === 'AI_REFRESH_CHECK') {
               console.log('[SW] AI refresh check requested');
               // The refresh service will handle this automatically
             }
+            
+            if (event.data && event.data.type === 'CHECK_WORKOUT_REMINDERS') {
+              console.log('[SW] Checking workout reminders');
+              // Check and trigger any due workout reminders
+              const { usePlannedWorkoutStore } = await import('@/store/plannedWorkoutStore');
+              const { useUserStore } = await import('@/store/userStore');
+              const { useSettingsStore } = await import('@/store/settingsStore');
+              
+              const user = useUserStore.getState().profile;
+              const settings = useSettingsStore.getState().settings;
+              
+              if (user && settings.workoutReminderEnabled && settings.notificationPermission === 'granted') {
+                const { plannedWorkouts } = usePlannedWorkoutStore.getState();
+                const now = new Date();
+                
+                for (const workout of plannedWorkouts) {
+                  if (workout.scheduledTime && !workout.isCompleted) {
+                    const scheduledTime = new Date(workout.scheduledTime);
+                    const reminderTime = new Date(scheduledTime.getTime() - (settings.workoutReminderMinutes || 30) * 60 * 1000);
+                    
+                    // If reminder time is within the next minute, trigger notification
+                    if (reminderTime <= now && reminderTime > new Date(now.getTime() - 60 * 1000)) {
+                      await notificationService.scheduleWorkoutReminder(workout, settings.workoutReminderMinutes || 30);
+                    }
+                  }
+                }
+              }
+            }
+            
+            if (event.data && event.data.type === 'CHECK_MUSCLE_RECOVERY') {
+              console.log('[SW] Checking muscle recovery');
+              // Trigger muscle recovery recalculation
+              const { useUserStore } = await import('@/store/userStore');
+              const { muscleRecoveryService } = await import('@/services/muscleRecoveryService');
+              
+              const user = useUserStore.getState().profile;
+              if (user?.id) {
+                muscleRecoveryService.recalculateAllMuscleStatuses(user.id).catch((error) => {
+                  console.error('[SW] Failed to recalculate muscle recovery:', error);
+                });
+              }
+            }
+            
             // AI_INSIGHTS_READY and AI_INSIGHTS_ERROR are handled by swCommunication
             // which is imported and initialized by useInsightsData hook
           });
@@ -339,6 +418,7 @@ function App() {
       <BrowserRouter>
         <VercelAnalytics />
         <OfflineIndicator />
+        <InstallPrompt />
         <AppRoutes />
         <ToastContainer toasts={[]} onRemove={() => {}} />
       </BrowserRouter>

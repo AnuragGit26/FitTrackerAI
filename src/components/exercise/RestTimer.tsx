@@ -9,7 +9,10 @@ interface RestTimerProps {
   onSkip: () => void; // Callback when "Next Set" is clicked
   onPause?: (paused: boolean) => void; // Callback for pause state
   onTimeAdjust?: (seconds: number) => void; // Callback for time adjustments
+  onRemainingTimeChange?: (remainingTime: number) => void; // Callback when remaining time changes (for state sync)
   isVisible: boolean; // Controls visibility
+  initialPaused?: boolean; // Initial pause state (for restoration)
+  initialRemainingTime?: number; // Initial remaining time (for restoration)
 }
 
 export function RestTimer({
@@ -18,15 +21,19 @@ export function RestTimer({
   onSkip,
   onPause,
   onTimeAdjust,
+  onRemainingTimeChange,
   isVisible,
+  initialPaused = false,
+  initialRemainingTime,
 }: RestTimerProps) {
-  const [remainingTime, setRemainingTime] = useState(duration);
-  const [isPaused, setIsPaused] = useState(false);
+  const [remainingTime, setRemainingTime] = useState(initialRemainingTime ?? duration);
+  const [isPaused, setIsPaused] = useState(initialPaused);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const initialDurationRef = useRef(duration);
+  const initialDurationRef = useRef(initialRemainingTime ?? duration);
   const notificationPermissionRef = useRef<NotificationPermission | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const onCompleteRef = useRef(onComplete);
+  const hasInitializedRef = useRef(initialRemainingTime !== undefined || initialPaused);
   const { settings } = useSettingsStore();
 
   // Keep onComplete ref up to date
@@ -57,13 +64,20 @@ export function RestTimer({
   }, [settings.soundEnabled]);
 
   // Reset timer when duration changes or component becomes visible
+  // But don't reset if we're restoring from persisted state
   useEffect(() => {
-    if (isVisible) {
+    if (isVisible && !hasInitializedRef.current) {
       initialDurationRef.current = duration;
       setRemainingTime(duration);
       setIsPaused(false);
+    } else if (isVisible && hasInitializedRef.current) {
+      // We've restored from persisted state, mark as initialized
+      hasInitializedRef.current = false;
+      if (initialRemainingTime !== undefined) {
+        initialDurationRef.current = initialRemainingTime;
+      }
     }
-  }, [duration, isVisible]);
+  }, [duration, isVisible, initialRemainingTime]);
 
   // Timer countdown logic
   useEffect(() => {
@@ -101,9 +115,15 @@ export function RestTimer({
             setTimeout(() => {
               onCompleteRef.current();
             }, 0);
+            onRemainingTimeChange?.(0);
             return 0;
           }
-          return prev - 1;
+          const newTime = prev - 1;
+          // Report remaining time changes periodically (every 5 seconds) for state sync
+          if (newTime % 5 === 0) {
+            onRemainingTimeChange?.(newTime);
+          }
+          return newTime;
         });
       }, 1000);
     } else {
@@ -119,21 +139,33 @@ export function RestTimer({
         intervalRef.current = null;
       }
     };
-  }, [isVisible, isPaused, remainingTime, settings.soundEnabled, settings.vibrationEnabled]);
+  }, [isVisible, isPaused, remainingTime, settings.soundEnabled, settings.vibrationEnabled, onRemainingTimeChange]);
 
   const handlePause = () => {
     const newPausedState = !isPaused;
     setIsPaused(newPausedState);
     onPause?.(newPausedState);
+    // Report current remaining time when paused so parent can sync state
+    if (newPausedState) {
+      onRemainingTimeChange?.(remainingTime);
+    }
   };
 
   const handleAddTime = (seconds: number) => {
-    setRemainingTime((prev) => prev + seconds);
+    setRemainingTime((prev) => {
+      const newTime = prev + seconds;
+      onRemainingTimeChange?.(newTime);
+      return newTime;
+    });
     onTimeAdjust?.(seconds);
   };
 
   const handleSubtractTime = (seconds: number) => {
-    setRemainingTime((prev) => Math.max(0, prev - seconds));
+    setRemainingTime((prev) => {
+      const newTime = Math.max(0, prev - seconds);
+      onRemainingTimeChange?.(newTime);
+      return newTime;
+    });
     onTimeAdjust?.(-seconds);
   };
 

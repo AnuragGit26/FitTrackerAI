@@ -1,11 +1,11 @@
 import { useMemo } from 'react';
+import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { useMuscleRecovery } from '@/hooks/useMuscleRecovery';
 import { useWorkoutStore } from '@/store/workoutStore';
 import { useUserStore } from '@/store/userStore';
 import { useSettingsStore } from '@/store/settingsStore';
-import { calculateRecoveryStatus } from '@/services/recoveryCalculator';
 import { DEFAULT_RECOVERY_SETTINGS } from '@/types/muscle';
-import { subDays, differenceInHours } from 'date-fns';
+import { subDays, differenceInHours, format } from 'date-fns';
 
 export function RecoveryGraph() {
   const { muscleStatuses } = useMuscleRecovery();
@@ -14,29 +14,30 @@ export function RecoveryGraph() {
   const { settings } = useSettingsStore();
 
   // Calculate historical recovery data for the last 14 days
-  const historicalData = useMemo(() => {
-    if (!profile || muscleStatuses.length === 0) {
-      // Return default data if no data available
-      return [
-        { x: 0, y: 35 },
-        { x: 10, y: 32 },
-        { x: 20, y: 25 },
-        { x: 40, y: 20 },
-        { x: 60, y: 15 },
-        { x: 80, y: 8 },
-        { x: 100, y: 5 },
-      ];
-    }
-
-    // Get recovery percentages for the last 14 days
+  const chartData = useMemo(() => {
     const daysToShow = 14;
-    const dataPoints: { x: number; y: number }[] = [];
+    const dataPoints: { date: string; recovery: number; day: string }[] = [];
     const now = new Date();
+
+    // Generate default data if no profile or muscle statuses
+    if (!profile || muscleStatuses.length === 0) {
+      for (let i = daysToShow; i >= 0; i--) {
+        const targetDate = subDays(now, i);
+        const dayLabel = format(targetDate, 'MMM d');
+        const recovery = Math.max(60, 100 - (i * 2.5)); // Default decreasing recovery
+        dataPoints.push({
+          date: format(targetDate, 'MM/dd'),
+          recovery: Math.round(recovery),
+          day: dayLabel,
+        });
+      }
+      return dataPoints;
+    }
 
     // Calculate average recovery for each day going backwards
     for (let i = daysToShow; i >= 0; i--) {
       const targetDate = subDays(now, i);
-      const x = ((daysToShow - i) / daysToShow) * 100;
+      const dayLabel = format(targetDate, 'MMM d');
 
       // Calculate what recovery would have been on that date
       let totalRecovery = 0;
@@ -44,7 +45,7 @@ export function RecoveryGraph() {
 
       muscleStatuses.forEach((status) => {
         if (!status.lastWorked) {
-          totalRecovery += 100; // Ready if never worked
+          totalRecovery += 100;
           count++;
           return;
         }
@@ -57,14 +58,12 @@ export function RecoveryGraph() {
         const hoursSinceWorkout = differenceInHours(targetDate, lastWorked);
         
         if (hoursSinceWorkout < 0) {
-          // Future date, use current recovery
           totalRecovery += status.recoveryPercentage;
           count++;
           return;
         }
 
-        // For historical dates, we need to recalculate based on hours since workout at that date
-        // The calculateRecoveryStatus uses current time, so we need to manually calculate
+        // Calculate recovery for historical date
         const recoverySettings = DEFAULT_RECOVERY_SETTINGS;
         let baseRecoveryHours = 48;
         if (profile.experienceLevel === 'beginner') {
@@ -92,101 +91,61 @@ export function RecoveryGraph() {
       });
 
       const avgRecovery = count > 0 ? totalRecovery / count : 85;
-      // Convert recovery percentage to graph Y coordinate (0-40, inverted so higher recovery is lower on graph)
-      const y = 40 - (avgRecovery / 100) * 35; // Scale to 0-35 range, then invert
-      dataPoints.push({ x, y: Math.max(5, Math.min(35, y)) });
+      dataPoints.push({
+        date: format(targetDate, 'MM/dd'),
+        recovery: Math.round(avgRecovery),
+        day: dayLabel,
+      });
     }
 
     return dataPoints;
   }, [muscleStatuses, workouts, profile, settings.baseRestInterval]);
 
-  // Convert to path string with smooth curve
-  const pathData = useMemo(() => {
-    if (historicalData.length === 0) return '';
-    
-    return historicalData
-      .map((point, index) => {
-        if (index === 0) return `M${point.x},${point.y}`;
-        if (index === 1) return `Q${point.x},${point.y}`;
-        return `T${point.x},${point.y}`;
-      })
-      .join(' ');
-  }, [historicalData]);
-
-  // Create area path (closed path for gradient fill)
-  const areaPath = `${pathData} V40 H0 Z`;
-
   return (
-    <>
-      <div className="absolute inset-0 bg-gradient-to-t from-background-light dark:from-background-dark via-transparent to-transparent z-10 pointer-events-none" />
-      <svg
-        className="w-full h-full overflow-visible preserve-3d"
-        viewBox="0 0 100 40"
-        preserveAspectRatio="none"
-      >
-        {/* Grid lines */}
-        <line
-          className="text-slate-500"
-          stroke="currentColor"
-          strokeOpacity="0.1"
-          strokeWidth="0.2"
-          x1="0"
-          x2="100"
-          y1="0"
-          y2="0"
-        />
-        <line
-          className="text-slate-500"
-          stroke="currentColor"
-          strokeOpacity="0.1"
-          strokeWidth="0.2"
-          x1="0"
-          x2="100"
-          y1="20"
-          y2="20"
-        />
-        <line
-          className="text-slate-500"
-          stroke="currentColor"
-          strokeOpacity="0.1"
-          strokeWidth="0.2"
-          x1="0"
-          x2="100"
-          y1="40"
-          y2="40"
-        />
-
-        {/* Gradient definition */}
-        <defs>
-          <linearGradient id="recoveryGradient" x1="0%" x2="0%" y1="0%" y2="100%">
-            <stop offset="0%" style={{ stopColor: '#0df269', stopOpacity: 1 }} />
-            <stop offset="100%" style={{ stopColor: '#0df269', stopOpacity: 0 }} />
-          </linearGradient>
-        </defs>
-
-        {/* Area fill */}
-        {pathData && (
-          <path
-            d={areaPath}
-            fill="url(#recoveryGradient)"
-            opacity="0.2"
+    <div className="w-full h-full relative">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart
+          data={chartData}
+          margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
+        >
+          <defs>
+            <linearGradient id="recoveryGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#0df269" stopOpacity={0.3} />
+              <stop offset="100%" stopColor="#0df269" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid 
+            strokeDasharray="3 3" 
+            stroke="currentColor" 
+            strokeOpacity={0.1}
+            vertical={false}
           />
-        )}
-
-        {/* Line */}
-        {pathData && (
-          <path
-            className="drop-shadow-[0_0_10px_rgba(13,242,105,0.5)]"
-            d={pathData}
-            fill="none"
+          <XAxis
+            dataKey="day"
+            axisLine={false}
+            tickLine={false}
+            tick={{ fill: '#9ca3af', fontSize: 10 }}
+            interval="preserveStartEnd"
+          />
+          <YAxis
+            domain={[0, 100]}
+            axisLine={false}
+            tickLine={false}
+            tick={{ fill: '#9ca3af', fontSize: 10 }}
+            hide
+          />
+          <Area
+            type="monotone"
+            dataKey="recovery"
             stroke="#0df269"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.5"
+            strokeWidth={2}
+            fill="url(#recoveryGradient)"
+            dot={false}
+            activeDot={{ r: 4, fill: '#0df269' }}
           />
-        )}
-      </svg>
-    </>
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
   );
 }
 

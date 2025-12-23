@@ -6,6 +6,7 @@ import { useUserStore } from '@/store/userStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { calculateRecoveryStatus } from '@/services/recoveryCalculator';
 import { muscleRecoveryService } from '@/services/muscleRecoveryService';
+import { notificationService } from '@/services/notificationService';
 
 export function useMuscleRecovery() {
   const [muscleStatuses, setMuscleStatuses] = useState<MuscleStatus[]>([]);
@@ -135,6 +136,7 @@ export function useMuscleRecovery() {
       });
 
       // Only update if content actually changed
+      const prevStatuses = muscleStatuses;
       setMuscleStatuses(prev => {
         if (prev.length !== statuses.length) return statuses;
         const hasChanged = prev.some((p, i) => {
@@ -143,6 +145,22 @@ export function useMuscleRecovery() {
         });
         return hasChanged ? statuses : prev;
       });
+
+      // Check for muscle recovery notifications if settings allow
+      if (settings.muscleRecoveryAlertsEnabled && settings.notificationPermission === 'granted') {
+        // Only check if statuses actually changed
+        const statusesChanged = prevStatuses.length !== statuses.length || 
+          prevStatuses.some((p, i) => {
+            const s = statuses[i];
+            return !s || p.muscle !== s.muscle || p.recoveryPercentage !== s.recoveryPercentage;
+          });
+        
+        if (statusesChanged) {
+          notificationService.checkAndNotifyRecovery(statuses).catch((error) => {
+            console.error('Failed to check muscle recovery notifications:', error);
+          });
+        }
+      }
     } catch (error) {
       console.error('Failed to calculate muscle statuses:', error);
     } finally {

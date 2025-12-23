@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Scale, Ruler, Moon, Sun, Monitor, Bell, Volume2, Vibrate, Download, Upload, AlertCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Scale, Ruler, Moon, Sun, Monitor, Bell, Volume2, Vibrate, Download, Upload, AlertCircle, Clock } from 'lucide-react';
 import { useUserStore, Gender, UnitSystem, unitHelpers, Goal } from '@/store/userStore';
 import { useSettingsStore } from '@/store/settingsStore';
+import { notificationService } from '@/services/notificationService';
 import { ProfilePictureUpload } from '@/components/profile/ProfilePictureUpload';
 import { UnitSwitcher } from '@/components/profile/UnitSwitcher';
 import { GoalSelection } from '@/components/profile/GoalSelectionCard';
@@ -14,7 +15,18 @@ import { cn } from '@/utils/cn';
 export function Profile() {
   const navigate = useNavigate();
   const { profile, updateProfile, isLoading, setPreferredUnit, setDefaultRestTime } = useUserStore();
-  const { settings, setTheme, toggleAutoStartRestTimer, toggleSound, toggleVibration, loadSettings } = useSettingsStore();
+  const { 
+    settings, 
+    setTheme, 
+    toggleAutoStartRestTimer, 
+    toggleSound, 
+    toggleVibration, 
+    loadSettings,
+    setWorkoutReminderEnabled,
+    setWorkoutReminderMinutes,
+    setMuscleRecoveryAlertsEnabled,
+    setNotificationPermission,
+  } = useSettingsStore();
 
   const [name, setName] = useState('');
   const [age, setAge] = useState<number | ''>('');
@@ -41,7 +53,13 @@ export function Profile() {
 
   useEffect(() => {
     loadSettings();
-  }, [loadSettings]);
+    // Initialize notification service and check permission
+    notificationService.initialize().then(() => {
+      if ('Notification' in window) {
+        setNotificationPermission(Notification.permission);
+      }
+    });
+  }, [loadSettings, setNotificationPermission]);
 
   useEffect(() => {
     if (profile) {
@@ -560,6 +578,95 @@ export function Profile() {
                 className="w-5 h-5 rounded accent-primary"
               />
             </label>
+          </div>
+        </section>
+
+        {/* Push Notification Settings */}
+        <section className="space-y-4">
+          <h3 className="text-xl font-bold tracking-tight px-1">Push Notifications</h3>
+          <div className="space-y-3">
+            {settings.notificationPermission === 'default' && (
+              <button
+                onClick={async () => {
+                  const permission = await notificationService.requestPermission();
+                  await setNotificationPermission(permission);
+                  if (permission === 'granted') {
+                    success('Notification permission granted');
+                  } else if (permission === 'denied') {
+                    showError('Notification permission denied. Please enable it in your browser settings.');
+                  }
+                }}
+                className="w-full p-3 rounded-xl bg-primary hover:bg-[#0be060] text-black font-semibold transition-colors"
+              >
+                Enable Notifications
+              </button>
+            )}
+            
+            {settings.notificationPermission === 'denied' && (
+              <div className="p-3 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-yellow-600 dark:text-yellow-400 mt-0.5 shrink-0" />
+                  <p className="text-xs text-yellow-800 dark:text-yellow-300">
+                    Notifications are disabled. Please enable them in your browser settings to receive workout reminders and recovery alerts.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {settings.notificationPermission === 'granted' && (
+              <>
+                <label className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border">
+                  <div className="flex items-center gap-3">
+                    <Bell className="w-5 h-5 text-slate-400" />
+                    <div>
+                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300 block">Workout Reminders</span>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">Get notified before planned workouts</span>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={settings.workoutReminderEnabled ?? true}
+                    onChange={(e) => setWorkoutReminderEnabled(e.target.checked)}
+                    className="w-5 h-5 rounded accent-primary"
+                  />
+                </label>
+
+                {settings.workoutReminderEnabled && (
+                  <label className="block p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border">
+                    <div className="flex items-center gap-3 mb-2">
+                      <Clock className="w-5 h-5 text-slate-400" />
+                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Reminder Time</span>
+                    </div>
+                    <select
+                      value={settings.workoutReminderMinutes ?? 30}
+                      onChange={(e) => setWorkoutReminderMinutes(parseInt(e.target.value))}
+                      className="w-full rounded-lg border border-gray-300 dark:border-surface-border bg-white dark:bg-surface-dark px-3 py-2 text-sm text-slate-900 dark:text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                    >
+                      <option value={15}>15 minutes before</option>
+                      <option value={30}>30 minutes before</option>
+                      <option value={60}>1 hour before</option>
+                      <option value={120}>2 hours before</option>
+                    </select>
+                  </label>
+                )}
+
+                <label className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border">
+                  <div className="flex items-center gap-3">
+                    <Bell className="w-5 h-5 text-slate-400" />
+                    <div>
+                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300 block">Muscle Recovery Alerts</span>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">Get notified when muscles are ready</span>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={settings.muscleRecoveryAlertsEnabled ?? true}
+                    onChange={(e) => setMuscleRecoveryAlertsEnabled(e.target.checked)}
+                    className="w-5 h-5 rounded accent-primary"
+                  />
+                </label>
+              </>
+            )}
           </div>
         </section>
       </main>

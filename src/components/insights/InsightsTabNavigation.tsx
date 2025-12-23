@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { useRef, useEffect, useState } from 'react';
 import { cn } from '@/utils/cn';
 
 type View = 'progress' | 'alerts' | 'recommendations';
@@ -15,26 +16,64 @@ export function InsightsTabNavigation({ currentView, onViewChange }: InsightsTab
     { id: 'recommendations', label: 'Recommendations' },
   ];
 
-  const getTabPosition = () => {
-    const index = tabs.findIndex(tab => tab.id === currentView);
-    return index;
-  };
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [indicatorStyle, setIndicatorStyle] = useState({ width: 0, left: 0 });
+
+  useEffect(() => {
+    const updateIndicator = () => {
+      const activeIndex = tabs.findIndex(tab => tab.id === currentView);
+      const activeTab = tabRefs.current[activeIndex];
+      const container = containerRef.current;
+
+      if (activeTab && container) {
+        const containerRect = container.getBoundingClientRect();
+        const tabRect = activeTab.getBoundingClientRect();
+        
+        setIndicatorStyle({
+          width: tabRect.width,
+          left: tabRect.left - containerRect.left,
+        });
+      }
+    };
+
+    updateIndicator();
+    
+    const handleResize = () => {
+      updateIndicator();
+    };
+
+    window.addEventListener('resize', handleResize);
+    const timer = setTimeout(updateIndicator, 10);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(timer);
+    };
+  }, [currentView]);
 
   return (
     <div className="sticky top-[73px] z-40 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md border-b border-gray-200 dark:border-[#316847]">
-      <div className="flex items-center justify-center gap-2 p-2 relative">
+      <div ref={containerRef} className="flex items-center justify-center gap-2 p-2 relative">
         <motion.div
-          className="absolute left-2 right-2 h-[calc(100%-16px)] bg-primary rounded-lg"
-          layoutId="insightsTabIndicator"
-          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-          style={{
-            width: `calc(${100 / tabs.length}% - ${(tabs.length - 1) * 8 / tabs.length}px)`,
-            left: `${(getTabPosition() * (100 / tabs.length)) + 8}px`,
+          className="absolute h-[calc(100%-16px)] bg-primary rounded-lg top-2"
+          animate={{
+            width: indicatorStyle.width,
+            left: indicatorStyle.left,
+          }}
+          transition={{
+            type: 'spring',
+            stiffness: 400,
+            damping: 30,
+            mass: 0.8,
           }}
         />
-        {tabs.map((tab) => (
+        {tabs.map((tab, index) => (
           <motion.button
             key={tab.id}
+            ref={(el) => {
+              tabRefs.current[index] = el;
+            }}
             onClick={() => onViewChange(tab.id)}
             className={cn(
               'relative z-10 flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
@@ -43,7 +82,6 @@ export function InsightsTabNavigation({ currentView, onViewChange }: InsightsTab
                 : 'text-gray-600 dark:text-gray-300'
             )}
             style={{
-              // Remove any border styling from inactive tabs
               border: 'none',
               outline: 'none',
             }}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Plus, Check, Edit, ChevronDown, Trash2, Loader2, BookOpen, Save } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWorkoutStore } from '@/store/workoutStore';
@@ -77,6 +77,8 @@ export function LogWorkout() {
   const [restTimerVisible, setRestTimerVisible] = useState(false);
   const [restTimerRemaining, setRestTimerRemaining] = useState(60); // Default 60 seconds
   const [restTimerStartTime, setRestTimerStartTime] = useState<Date | null>(null);
+  const [restTimerPaused, setRestTimerPaused] = useState(false);
+  const [restTimerOriginalDuration, setRestTimerOriginalDuration] = useState<number | null>(null);
   const { settings } = useSettingsStore();
   const defaultRestDuration = 60; // Default 60 seconds (1 minute)
 
@@ -101,9 +103,46 @@ export function LogWorkout() {
       setEditingExerciseId(persistedState.editingExerciseId);
       setSelectedCategory(persistedState.selectedCategory);
       setSelectedMuscleGroups(persistedState.selectedMuscleGroups);
+      setShowAdditionalDetails(persistedState.showAdditionalDetails);
       setRestTimerVisible(persistedState.restTimerVisible);
-      setRestTimerRemaining(persistedState.restTimerRemaining);
-      setRestTimerStartTime(persistedState.restTimerStartTime ? new Date(persistedState.restTimerStartTime) : null);
+      setRestTimerPaused(persistedState.restTimerPaused);
+
+      // Restore rest timer with elapsed time calculation
+      if (persistedState.restTimerStartTime && persistedState.restTimerVisible) {
+        const restStartTime = new Date(persistedState.restTimerStartTime);
+        const now = new Date();
+        
+        // Calculate remaining time accounting for elapsed time (only if not paused)
+        let remainingTime = persistedState.restTimerRemaining;
+        if (!persistedState.restTimerPaused) {
+          // Calculate total elapsed time since the timer started
+          const totalElapsedSeconds = Math.floor((now.getTime() - restStartTime.getTime()) / 1000);
+          
+          // Use original duration if available to correctly calculate remaining time
+          const originalDuration = persistedState.restTimerOriginalDuration;
+          if (originalDuration !== null && originalDuration !== undefined) {
+            // Calculate remaining time from original duration minus total elapsed time
+            remainingTime = Math.max(0, originalDuration - totalElapsedSeconds);
+          } else {
+            // Fallback for old saved states without originalDuration:
+            // Use saved remaining time as-is (slightly inaccurate but better than the bug)
+            // The timer will continue counting down from the saved value
+            remainingTime = persistedState.restTimerRemaining;
+          }
+        } else {
+          // Timer was paused - use the persisted remaining time directly
+          // This is now correct because handleRestRemainingTimeChange syncs the state when paused
+          remainingTime = persistedState.restTimerRemaining;
+        }
+        
+        setRestTimerStartTime(restStartTime);
+        setRestTimerRemaining(remainingTime);
+        setRestTimerOriginalDuration(persistedState.restTimerOriginalDuration || null);
+      } else {
+        setRestTimerRemaining(persistedState.restTimerRemaining);
+        setRestTimerStartTime(persistedState.restTimerStartTime ? new Date(persistedState.restTimerStartTime) : null);
+        setRestTimerOriginalDuration(persistedState.restTimerOriginalDuration || null);
+      }
 
       // Restore workout timer start time (will be handled by useWorkoutDuration hook)
       if (persistedState.workoutTimerStartTime) {
@@ -279,14 +318,30 @@ export function LogWorkout() {
   useEffect(() => {
   }, [currentWorkout]);
 
-  // Auto-save component state whenever relevant state changes
-  useEffect(() => {
+  // Helper function to save all state
+  const saveAllState = useCallback(() => {
     // Don't save during initial state restoration
     if (isRestoringStateRef.current) {
       return;
     }
 
-    if (selectedExercise || sets.length > 0 || notes || editingExerciseId || selectedCategory || selectedMuscleGroups.length > 0 || restTimerEnabled || workoutTimerStartTime) {
+    // Read set duration state from localStorage (managed by useSetDuration hook)
+    let setDurationStartTime: string | null = null;
+    let setDurationElapsed = 0;
+    try {
+      const setStartTimeStr = localStorage.getItem('fittrackai_set_duration_startTime');
+      const isTracking = localStorage.getItem('fittrackai_set_duration_isTracking') === 'true';
+      if (setStartTimeStr && isTracking) {
+        setDurationStartTime = setStartTimeStr;
+        const startTime = new Date(setStartTimeStr);
+        const now = new Date();
+        setDurationElapsed = Math.floor((now.getTime() - startTime.getTime()) / 1000);
+      }
+    } catch (error) {
+      console.error('Failed to read set duration state:', error);
+    }
+
+    if (selectedExercise || sets.length > 0 || notes || editingExerciseId || selectedCategory || selectedMuscleGroups.length > 0 || restTimerEnabled || workoutTimerStartTime || showAdditionalDetails) {
       saveLogWorkoutState({
         selectedExerciseId: selectedExercise?.id || null,
         sets,
@@ -299,10 +354,46 @@ export function LogWorkout() {
         restTimerVisible,
         restTimerRemaining,
         restTimerStartTime: restTimerStartTime?.toISOString() || null,
+        restTimerPaused,
+        restTimerOriginalDuration,
         workoutTimerStartTime: workoutTimerStartTime?.toISOString() || null,
+        showAdditionalDetails,
+        setDurationStartTime,
+        setDurationElapsed,
       });
     }
-  }, [selectedExercise, sets, restTimerEnabled, workoutDate, notes, editingExerciseId, selectedCategory, selectedMuscleGroups, restTimerVisible, restTimerRemaining, restTimerStartTime, workoutTimerStartTime]);
+  }, [selectedExercise, sets, restTimerEnabled, workoutDate, notes, editingExerciseId, selectedCategory, selectedMuscleGroups, restTimerVisible, restTimerRemaining, restTimerStartTime, restTimerPaused, restTimerOriginalDuration, workoutTimerStartTime, showAdditionalDetails]);
+
+  // Auto-save component state whenever relevant state changes (with debouncing)
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      saveAllState();
+    }, 500); // Debounce by 500ms
+
+    return () => clearTimeout(timeoutId);
+  }, [saveAllState]);
+
+  // Save state on navigation/background events
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      saveAllState();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // App going to background - save state
+        saveAllState();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [saveAllState]);
 
   useEffect(() => {
     if (selectedExercise && !editingExerciseId) {
@@ -394,7 +485,12 @@ export function LogWorkout() {
       restTimerVisible,
       restTimerRemaining,
       restTimerStartTime: restTimerStartTime?.toISOString() || null,
+      restTimerPaused,
+      restTimerOriginalDuration,
       workoutTimerStartTime: workoutTimerStartTime?.toISOString() || null,
+      showAdditionalDetails,
+      setDurationStartTime: null,
+      setDurationElapsed: 0,
     });
   };
 
@@ -425,6 +521,7 @@ export function LogWorkout() {
     setRestTimerVisible(false);
     setRestTimerRemaining(defaultRestDuration);
     setRestTimerStartTime(null);
+    setRestTimerPaused(false);
 
     // Restore workout timer if it was running before rest timer
     if (workoutTimerWasRunningBeforeRestPauseRef.current === true && workoutTimerStartTime && !workoutTimerRunning) {
@@ -453,6 +550,7 @@ export function LogWorkout() {
     setRestTimerVisible(false);
     setRestTimerRemaining(defaultRestDuration);
     setRestTimerStartTime(null);
+    setRestTimerPaused(false);
 
     // Restore workout timer if it was running before rest timer
     if (workoutTimerWasRunningBeforeRestPauseRef.current === true && workoutTimerStartTime && !workoutTimerRunning) {
@@ -469,7 +567,15 @@ export function LogWorkout() {
     setRestTimerRemaining((prev) => Math.max(0, prev + seconds));
   };
 
+  const handleRestRemainingTimeChange = (remainingTime: number) => {
+    // Sync the parent state with the RestTimer's current remaining time
+    // This is especially important when the timer is paused
+    setRestTimerRemaining(remainingTime);
+  };
+
   const handleRestPause = (paused: boolean) => {
+    setRestTimerPaused(paused);
+    
     // Sync workout timer with rest timer pause/resume
     if (paused) {
       // Rest timer is being paused - pause workout timer if it's running
@@ -533,7 +639,12 @@ export function LogWorkout() {
       restTimerVisible,
       restTimerRemaining,
       restTimerStartTime: restTimerStartTime?.toISOString() || null,
+      restTimerPaused,
+      restTimerOriginalDuration: null,
       workoutTimerStartTime: workoutTimerStartTime?.toISOString() || null,
+      showAdditionalDetails,
+      setDurationStartTime: null,
+      setDurationElapsed: 0,
     });
   };
 
@@ -636,6 +747,7 @@ export function LogWorkout() {
             if (restTimerEnabled && settings.autoStartRestTimer) {
               setRestTimerRemaining(defaultRestDuration);
               setRestTimerStartTime(new Date());
+              setRestTimerOriginalDuration(defaultRestDuration);
               setRestTimerVisible(true);
             }
           }
@@ -833,6 +945,7 @@ export function LogWorkout() {
     setRestTimerVisible(false);
     setRestTimerRemaining(60);
     setRestTimerStartTime(null);
+    setRestTimerPaused(false);
     setWorkoutTimerStartTime(null);
     resetWorkoutTimer();
     resetSetDuration();
@@ -875,6 +988,7 @@ export function LogWorkout() {
     setRestTimerVisible(false);
     setRestTimerRemaining(60);
     setRestTimerStartTime(null);
+    setRestTimerPaused(false);
     setWorkoutTimerStartTime(null);
 
     // Reset all timers
@@ -914,6 +1028,7 @@ export function LogWorkout() {
       setRestTimerVisible(false);
       setRestTimerRemaining(60);
       setRestTimerStartTime(null);
+      setRestTimerPaused(false);
       setWorkoutTimerStartTime(null);
       success('Workout saved successfully!');
       navigate('/home');
@@ -1370,7 +1485,10 @@ export function LogWorkout() {
         onSkip={handleRestSkip}
         onPause={handleRestPause}
         onTimeAdjust={handleRestTimeAdjust}
+        onRemainingTimeChange={handleRestRemainingTimeChange}
         isVisible={restTimerVisible && restTimerEnabled}
+        initialPaused={restTimerPaused}
+        initialRemainingTime={restTimerVisible ? restTimerRemaining : undefined}
       />
 
       {/* Clear Workout Confirmation Modal */}

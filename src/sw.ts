@@ -69,6 +69,10 @@ self.addEventListener('sync', (event: SyncEvent) => {
     if (event.tag === 'ai-request-sync') {
         event.waitUntil(handleAISync());
     }
+    
+    if (event.tag === 'workout-reminder-sync') {
+        event.waitUntil(checkScheduledWorkoutReminders());
+    }
 });
 
 async function handleAISync(): Promise<void> {
@@ -82,6 +86,10 @@ self.addEventListener('periodicsync', (event: PeriodicSyncEvent) => {
     if (event.tag === 'ai-refresh-check') {
         event.waitUntil(checkAIRefresh());
     }
+    
+    if (event.tag === 'recovery-check') {
+        event.waitUntil(checkMuscleRecovery());
+    }
 });
 
 async function checkAIRefresh(): Promise<void> {
@@ -94,6 +102,32 @@ async function checkAIRefresh(): Promise<void> {
     clients.forEach((client) => {
         client.postMessage({
             type: 'AI_REFRESH_CHECK',
+            timestamp: Date.now(),
+        });
+    });
+}
+
+async function checkScheduledWorkoutReminders(): Promise<void> {
+    console.log('[SW] Checking scheduled workout reminders');
+    
+    // Send message to clients to check and trigger reminders
+    const clients = await self.clients.matchAll();
+    clients.forEach((client) => {
+        client.postMessage({
+            type: 'CHECK_WORKOUT_REMINDERS',
+            timestamp: Date.now(),
+        });
+    });
+}
+
+async function checkMuscleRecovery(): Promise<void> {
+    console.log('[SW] Checking muscle recovery status');
+    
+    // Send message to clients to check muscle recovery
+    const clients = await self.clients.matchAll();
+    clients.forEach((client) => {
+        client.postMessage({
+            type: 'CHECK_MUSCLE_RECOVERY',
             timestamp: Date.now(),
         });
     });
@@ -132,6 +166,141 @@ self.addEventListener('message', (event: MessageEvent) => {
                 });
             });
     }
+
+    // Notification scheduling handlers
+    if (event.data && event.data.type === 'SCHEDULE_WORKOUT_REMINDER') {
+        const { notification } = event.data;
+        scheduleWorkoutReminderNotification(notification);
+    }
+
+    if (event.data && event.data.type === 'CANCEL_WORKOUT_REMINDER') {
+        const { notificationId } = event.data;
+        cancelScheduledNotification(notificationId);
+    }
+
+    if (event.data && event.data.type === 'SHOW_MUSCLE_RECOVERY_NOTIFICATION') {
+        const { notification } = event.data;
+        showMuscleRecoveryNotification(notification);
+    }
+
+    if (event.data && event.data.type === 'CLEAR_ALL_NOTIFICATIONS') {
+        clearAllScheduledNotifications();
+    }
+});
+
+// Notification storage in service worker
+const scheduledNotifications = new Map<string, { timeoutId: number; notification: any }>();
+
+async function scheduleWorkoutReminderNotification(notification: any): Promise<void> {
+    const now = Date.now();
+    const delay = notification.scheduledTime - now;
+
+    if (delay <= 0) {
+        // Schedule immediately if time has passed
+        showWorkoutReminderNotification(notification);
+        return;
+    }
+
+    const timeoutId = self.setTimeout(() => {
+        showWorkoutReminderNotification(notification);
+        scheduledNotifications.delete(notification.id);
+    }, delay) as unknown as number;
+
+    scheduledNotifications.set(notification.id, { timeoutId, notification });
+}
+
+function cancelScheduledNotification(notificationId: string): void {
+    const scheduled = scheduledNotifications.get(notificationId);
+    if (scheduled) {
+        self.clearTimeout(scheduled.timeoutId);
+        scheduledNotifications.delete(notificationId);
+    }
+}
+
+function clearAllScheduledNotifications(): void {
+    scheduledNotifications.forEach(({ timeoutId }) => {
+        self.clearTimeout(timeoutId);
+    });
+    scheduledNotifications.clear();
+}
+
+async function showWorkoutReminderNotification(notification: any): Promise<void> {
+    const title = `Workout Reminder: ${notification.data.workoutName || 'Workout'}`;
+    const body = `Your ${notification.data.workoutName || 'workout'} is scheduled soon!`;
+    const icon = '/assests/img/fittrackAI.png';
+    const badge = '/assests/img/fittrackAI.png';
+
+    const options: NotificationOptions = {
+        body,
+        icon,
+        badge,
+        tag: notification.id,
+        requireInteraction: false,
+        data: {
+            type: 'workout_reminder',
+            workoutId: notification.data.workoutId,
+            url: '/planner',
+        },
+    };
+
+    try {
+        await self.registration.showNotification(title, options);
+    } catch (error) {
+        console.error('[SW] Failed to show workout reminder notification:', error);
+    }
+}
+
+async function showMuscleRecoveryNotification(notification: any): Promise<void> {
+    const muscleName = notification.data.muscle
+        ? notification.data.muscle.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
+        : 'Muscle';
+    
+    const title = `${muscleName} is Ready!`;
+    const body = `Your ${muscleName.toLowerCase()} has fully recovered and is ready for training`;
+    const icon = '/assests/img/fittrackAI.png';
+    const badge = '/assests/img/fittrackAI.png';
+
+    const options: NotificationOptions = {
+        body,
+        icon,
+        badge,
+        tag: notification.id,
+        requireInteraction: false,
+        data: {
+            type: 'muscle_recovery',
+            muscle: notification.data.muscle,
+            url: '/anatomy',
+        },
+    };
+
+    try {
+        await self.registration.showNotification(title, options);
+    } catch (error) {
+        console.error('[SW] Failed to show muscle recovery notification:', error);
+    }
+}
+
+// Notification click handler
+self.addEventListener('notificationclick', (event: NotificationEvent) => {
+    event.notification.close();
+
+    const data = event.notification.data;
+    const url = data?.url || '/';
+
+    event.waitUntil(
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+            // Check if there's already a window/tab open with the target URL
+            for (const client of clients) {
+                if (client.url === url && 'focus' in client) {
+                    return client.focus();
+                }
+            }
+            // If not, open a new window/tab
+            if (self.clients.openWindow) {
+                return self.clients.openWindow(url);
+            }
+        })
+    );
 });
 
 async function cacheAIResponse(

@@ -20,7 +20,12 @@ export interface LogWorkoutStateSnapshot {
   restTimerVisible: boolean;
   restTimerRemaining: number;
   restTimerStartTime: string | null; // ISO string
+  restTimerPaused: boolean;
+  restTimerOriginalDuration: number | null; // Original duration when timer started
   workoutTimerStartTime: string | null; // ISO string
+  showAdditionalDetails: boolean;
+  setDurationStartTime: string | null; // ISO string
+  setDurationElapsed: number; // seconds
 }
 
 export interface WorkoutStateSnapshot {
@@ -156,7 +161,12 @@ export function loadLogWorkoutState(): LogWorkoutStateSnapshot | null {
       restTimerVisible: parsed.restTimerVisible || false,
       restTimerRemaining: parsed.restTimerRemaining || 60,
       restTimerStartTime: parsed.restTimerStartTime || null,
+      restTimerPaused: parsed.restTimerPaused || false,
+      restTimerOriginalDuration: parsed.restTimerOriginalDuration || null,
       workoutTimerStartTime: parsed.workoutTimerStartTime || null,
+      showAdditionalDetails: parsed.showAdditionalDetails || false,
+      setDurationStartTime: parsed.setDurationStartTime || null,
+      setDurationElapsed: parsed.setDurationElapsed || 0,
     };
   } catch (error) {
     console.error('Failed to load log workout state:', error);

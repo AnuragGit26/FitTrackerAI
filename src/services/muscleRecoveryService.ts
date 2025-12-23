@@ -1,9 +1,10 @@
-import { Workout, WorkoutExercise } from '@/types/workout';
+import { Workout } from '@/types/workout';
+import { WorkoutExercise } from '@/types/exercise';
 import { MuscleGroup, MuscleStatus } from '@/types/muscle';
 import { getMuscleMapping } from './muscleMapping';
 import { calculateWorkloadScore } from './recoveryCalculator';
 import { dataService } from './dataService';
-import { differenceInDays, subDays } from 'date-fns';
+import { subDays } from 'date-fns';
 
 /**
  * Service for calculating and updating muscle recovery statuses from workouts
@@ -166,7 +167,7 @@ class MuscleRecoveryService {
   /**
    * Initialize muscle statuses from workout history
    */
-  async initializeMuscleStatusesFromHistory(workouts: Workout[], userId: string): Promise<void> {
+  async initializeMuscleStatusesFromHistory(workouts: Workout[], _userId: string): Promise<void> {
     if (workouts.length === 0) return;
 
     // Get all unique muscles from all workouts
@@ -204,8 +205,10 @@ class MuscleRecoveryService {
       const trainingFrequency = this.calculateTrainingFrequency(muscle, workouts);
 
       // Calculate workload from most recent workout
+      // TypeScript needs explicit type assertion after the null check
+      const workout: Workout = mostRecentWorkout;
       let totalWorkload = 0;
-      mostRecentWorkout.exercises.forEach((exercise) => {
+      workout.exercises.forEach((exercise: WorkoutExercise) => {
         const mapping = getMuscleMapping(exercise.exerciseName);
         if (mapping) {
           totalWorkload += this.calculateWorkloadForMuscle(muscle, exercise, mapping);
@@ -225,6 +228,75 @@ class MuscleRecoveryService {
       };
 
       await dataService.createMuscleStatus(initialStatus);
+    }
+  }
+
+  /**
+   * Trigger recalculation of all muscle recovery statuses
+   * This can be called from outside React components (e.g., service worker)
+   */
+  async recalculateAllMuscleStatuses(userId: string): Promise<void> {
+    try {
+      const allWorkouts = await dataService.getAllWorkouts(userId);
+      const allStatuses = await dataService.getAllMuscleStatuses();
+      
+      // Get all unique muscles from workouts
+      const allMuscles = new Set<MuscleGroup>();
+      allWorkouts.forEach((workout) => {
+        const muscles = this.getMusclesFromWorkout(workout);
+        muscles.forEach(m => allMuscles.add(m));
+      });
+
+      // Recalculate status for each muscle
+      for (const muscle of allMuscles) {
+        const existingStatus = allStatuses.find((s: MuscleStatus) => s.muscle === muscle);
+        if (!existingStatus) continue;
+
+        const volumeLast7Days = this.calculateVolumeLast7Days(muscle, allWorkouts);
+        const trainingFrequency = this.calculateTrainingFrequency(muscle, allWorkouts);
+        
+        // Find most recent workout for this muscle
+        let mostRecentWorkout: Workout | null = null;
+        let mostRecentDate: Date | null = null;
+        
+        allWorkouts.forEach((workout: Workout) => {
+          const muscles = this.getMusclesFromWorkout(workout);
+          if (muscles.has(muscle)) {
+            const workoutDate = new Date(workout.date);
+            if (!mostRecentDate || workoutDate > mostRecentDate) {
+              mostRecentDate = workoutDate;
+              mostRecentWorkout = workout;
+            }
+          }
+        });
+
+        if (!mostRecentWorkout || !mostRecentDate) continue;
+
+        // Calculate workload from most recent workout
+        // TypeScript needs explicit type assertion after the null check
+        const workout: Workout = mostRecentWorkout;
+        let totalWorkload = 0;
+        workout.exercises.forEach((exercise: WorkoutExercise) => {
+          const mapping = getMuscleMapping(exercise.exerciseName);
+          if (mapping) {
+            totalWorkload += this.calculateWorkloadForMuscle(muscle, exercise, mapping);
+          }
+        });
+
+        // Update status (recovery calculation will be done by the hook when it reads this)
+        const updatedStatus: MuscleStatus = {
+          ...existingStatus,
+          lastWorked: mostRecentDate,
+          workloadScore: totalWorkload,
+          totalVolumeLast7Days: volumeLast7Days,
+          trainingFrequency,
+        };
+
+        await dataService.upsertMuscleStatus(updatedStatus);
+      }
+    } catch (error) {
+      console.error('Failed to recalculate muscle statuses:', error);
+      throw error;
     }
   }
 }

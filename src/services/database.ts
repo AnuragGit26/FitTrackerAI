@@ -2,6 +2,7 @@ import Dexie, { Table } from 'dexie';
 import { Workout, WorkoutTemplate, PlannedWorkout } from '@/types/workout';
 import { Exercise, ExerciseAdvancedDetails } from '@/types/exercise';
 import { MuscleStatus } from '@/types/muscle';
+import { MuscleImageCache } from './muscleImageCache';
 
 export type InsightType = 'insights' | 'recommendations' | 'progress' | 'smart-coach';
 
@@ -25,11 +26,12 @@ class FitTrackAIDB extends Dexie {
   workouts!: Table<Workout, number>;
   exercises!: Table<Exercise, string>;
   muscleStatuses!: Table<MuscleStatus, number>;
-  settings!: Table<any, string>;
+  settings!: Table<{ key: string; value: unknown }, string>;
   workoutTemplates!: Table<WorkoutTemplate, string>;
   aiCacheMetadata!: Table<AICacheMetadata, number>;
   plannedWorkouts!: Table<PlannedWorkout, string>;
   exerciseDetailsCache!: Table<ExerciseDetailsCache, number>;
+  muscleImageCache!: Table<MuscleImageCache, number>;
 
   constructor() {
     super('FitTrackAIDB');
@@ -85,6 +87,18 @@ class FitTrackAIDB extends Dexie {
       aiCacheMetadata: '++id, insightType, userId, [insightType+userId], lastFetchTimestamp',
       plannedWorkouts: 'id, userId, scheduledDate, [userId+scheduledDate]',
       exerciseDetailsCache: '++id, exerciseSlug, cachedAt',
+    });
+
+    this.version(7).stores({
+      workouts: '++id, userId, date, *musclesTargeted',
+      exercises: 'id, name, category, *primaryMuscles, *secondaryMuscles',
+      muscleStatuses: '++id, muscle, lastWorked',
+      settings: 'key',
+      workoutTemplates: 'id, userId, category, name, [userId+category], *musclesTargeted',
+      aiCacheMetadata: '++id, insightType, userId, [insightType+userId], lastFetchTimestamp',
+      plannedWorkouts: 'id, userId, scheduledDate, [userId+scheduledDate]',
+      exerciseDetailsCache: '++id, exerciseSlug, cachedAt',
+      muscleImageCache: '++id, muscle, cachedAt',
     });
   }
 }
@@ -162,13 +176,14 @@ export const dbHelpers = {
       return await db.exercises.toArray();
     }
 
-    const { getEquipmentCategories, EquipmentCategory } = await import('./exerciseLibrary');
+    const { getEquipmentCategories } = await import('./exerciseLibrary');
     
     return await db.exercises
       .filter(exercise => {
         const exerciseCategories = getEquipmentCategories(exercise.equipment);
+        const exerciseCategoryStrings = exerciseCategories.map(cat => String(cat));
         return equipmentCategories.some(category => 
-          exerciseCategories.includes(category as EquipmentCategory)
+          exerciseCategoryStrings.includes(category)
         );
       })
       .toArray();
@@ -221,12 +236,12 @@ export const dbHelpers = {
   },
 
   // Settings operations
-  async getSetting(key: string): Promise<any> {
+  async getSetting(key: string): Promise<unknown> {
     const setting = await db.settings.get(key);
     return setting?.value;
   },
 
-  async setSetting(key: string, value: any): Promise<void> {
+  async setSetting(key: string, value: unknown): Promise<void> {
     await db.settings.put({ key, value });
   },
 

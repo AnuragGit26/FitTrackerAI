@@ -46,7 +46,7 @@ export function Rest() {
       {/* System Status Section */}
       <section className="px-4 pt-6 pb-2">
         <RecoveryStatusHeader />
-        <div className="w-full h-32 mt-6 relative group">
+        <div className="w-full h-40 mt-6 relative">
           <RecoveryGraph />
         </div>
       </section>
