@@ -33,6 +33,9 @@ export interface Exercise {
   strengthlogSlug?: string; // Slug for StrengthLog exercise (e.g., 'dumbbell-incline-press')
   advancedDetails?: ExerciseAdvancedDetails; // Cached advanced info
   muscleCategory?: string; // Muscle category for filtering (e.g., "Chest", "Shoulder", "Deltoid")
+  userId?: string; // User ID for custom exercises
+  version?: number; // For optimistic locking
+  deletedAt?: Date | null; // Soft delete timestamp
 }
 
 export interface WorkoutSet {

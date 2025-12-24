@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Scale, Ruler, Moon, Sun, Monitor, Bell, Volume2, Vibrate, Download, Upload, AlertCircle, Clock } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Scale, Ruler, Moon, Sun, Monitor, Bell, Volume2, Vibrate, Download, Upload, AlertCircle, Clock, Cloud, CloudOff, RefreshCw, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import { useUserStore, Gender, UnitSystem, unitHelpers, Goal } from '@/store/userStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { notificationService } from '@/services/notificationService';
@@ -11,6 +11,11 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { dataExport } from '@/services/dataExport';
 import { useToast } from '@/hooks/useToast';
 import { cn } from '@/utils/cn';
+import { dataService } from '@/services/dataService';
+import { supabaseSyncService } from '@/services/supabaseSyncService';
+import { syncMetadataService } from '@/services/syncMetadataService';
+import { SyncStatus, SyncProgress } from '@/types/sync';
+import { logger } from '@/utils/logger';
 
 export function Profile() {
   const navigate = useNavigate();
@@ -50,6 +55,15 @@ export function Profile() {
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { success, error: showError } = useToast();
+  
+  // Sync state
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+  const [syncMetadata, setSyncMetadata] = useState<Array<{ conflictCount?: number; syncStatus?: SyncStatus; lastSyncAt?: number | null }>>([]);
+  const [lastSyncMessage, setLastSyncMessage] = useState<string | null>(null);
 
   useEffect(() => {
     loadSettings();
@@ -59,7 +73,205 @@ export function Profile() {
         setNotificationPermission(Notification.permission);
       }
     });
+    
+    // Set up sync progress callback
+    supabaseSyncService.setProgressCallback((progress) => {
+      setSyncProgress(progress);
+    });
+    
+    return () => {
+      supabaseSyncService.setProgressCallback(null);
+    };
   }, [loadSettings, setNotificationPermission]);
+  
+  // Load sync status when profile is available
+  useEffect(() => {
+    if (profile?.id) {
+      loadSyncStatus();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.id]);
+  
+  const loadSyncStatus = useCallback(async () => {
+    if (!profile?.id) return;
+    
+    try {
+      const currentlySyncing = supabaseSyncService.getIsSyncing();
+      setIsSyncing(currentlySyncing);
+      
+      if (currentlySyncing) {
+        setSyncStatus('syncing');
+        setSyncProgress(supabaseSyncService.getCurrentProgress());
+      } else {
+        const status = await supabaseSyncService.getSyncStatus(profile.id);
+        setSyncStatus(status);
+      }
+      
+      const metadata = await syncMetadataService.getAllMetadata(profile.id);
+      setSyncMetadata(metadata);
+      
+      // Find the most recent sync time
+      const mostRecent = metadata
+        .filter(m => m.lastSyncAt)
+        .sort((a, b) => (b.lastSyncAt || 0) - (a.lastSyncAt || 0))[0];
+      
+      if (mostRecent?.lastSyncAt) {
+        setLastSyncTime(new Date(mostRecent.lastSyncAt));
+      }
+      
+      // Check if auto-sync is enabled (stored in settings)
+      const autoSyncSetting = await dataService.getSetting('autoSyncEnabled');
+      setAutoSyncEnabled(autoSyncSetting === true);
+    } catch (error) {
+      logger.error('Failed to load sync status', error);
+    }
+  }, [profile?.id]);
+  
+  // Poll sync status when syncing
+  useEffect(() => {
+    if (!isSyncing) return;
+    
+    const intervalId = setInterval(() => {
+      const currentlySyncing = supabaseSyncService.getIsSyncing();
+      setIsSyncing(currentlySyncing);
+      setSyncProgress(supabaseSyncService.getCurrentProgress());
+      
+      if (!currentlySyncing) {
+        loadSyncStatus();
+      }
+    }, 1000);
+    
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [isSyncing, loadSyncStatus]);
+  
+  const handleToggleAutoSync = async (enabled: boolean) => {
+    setAutoSyncEnabled(enabled);
+    dataService.enableSync(enabled);
+    await dataService.updateSetting('autoSyncEnabled', enabled);
+    if (enabled) {
+      success('Auto-sync enabled. Changes will be synced automatically.');
+    } else {
+      success('Auto-sync disabled.');
+    }
+  };
+  
+  const handleManualSync = async () => {
+    if (!profile?.id || isSyncing) return;
+    
+    setIsSyncing(true);
+    setSyncStatus('syncing');
+    
+    try {
+      const results = await supabaseSyncService.sync(profile.id, {
+        direction: 'bidirectional',
+      });
+      
+      const hasErrors = results.some((r) => r.status === 'error');
+      const totalConflicts = results.reduce((sum, r) => sum + r.conflicts, 0);
+      const totalRecordsProcessed = results.reduce((sum, r) => sum + r.recordsProcessed, 0);
+      const totalRecordsCreated = results.reduce((sum, r) => sum + r.recordsCreated, 0);
+      const totalRecordsUpdated = results.reduce((sum, r) => sum + r.recordsUpdated, 0);
+      const totalRecordsDeleted = results.reduce((sum, r) => sum + r.recordsDeleted, 0);
+      
+      // Check if no changes were found
+      const noChanges = totalRecordsProcessed === 0 && 
+                       totalRecordsCreated === 0 && 
+                       totalRecordsUpdated === 0 && 
+                       totalRecordsDeleted === 0;
+      
+      if (hasErrors) {
+        setSyncStatus('error');
+        showError('Sync completed with some errors. Check sync details for more information.');
+      } else if (totalConflicts > 0) {
+        setSyncStatus('conflict');
+        success(`Sync completed with ${totalConflicts} conflict(s) resolved.`);
+      } else if (noChanges) {
+        setSyncStatus('success');
+        setLastSyncMessage('All data is up to date. No changes to sync.');
+        success('All data is up to date. No changes to sync.');
+      } else {
+        setSyncStatus('success');
+        setLastSyncMessage(null); // Clear previous message when there are changes
+        const changesSummary = [];
+        if (totalRecordsCreated > 0) changesSummary.push(`${totalRecordsCreated} created`);
+        if (totalRecordsUpdated > 0) changesSummary.push(`${totalRecordsUpdated} updated`);
+        if (totalRecordsDeleted > 0) changesSummary.push(`${totalRecordsDeleted} deleted`);
+        const summaryText = changesSummary.length > 0 
+          ? `Sync completed! ${changesSummary.join(', ')}.`
+          : 'Sync completed successfully!';
+        success(summaryText);
+      }
+      
+      setLastSyncTime(new Date());
+      await loadSyncStatus();
+    } catch (error) {
+      setSyncStatus('error');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to sync data';
+      
+      // Provide helpful error message for missing env var
+      if (errorMessage.includes('VITE_SUPABASE') || errorMessage.includes('anonymous key is not configured')) {
+        showError(
+          'Supabase is not configured. Please add VITE_SUPABASE_ANON_KEY to your .env file. ' +
+          'Get your key from Supabase project settings → API.'
+        );
+      } else {
+        showError(errorMessage);
+      }
+    } finally {
+      setIsSyncing(false);
+      setSyncProgress(null);
+    }
+  };
+  
+  const formatLastSyncTime = (date: Date | null): string => {
+    if (!date) return 'Never';
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    return date.toLocaleDateString();
+  };
+  
+  const getSyncStatusIcon = (status: SyncStatus) => {
+    switch (status) {
+      case 'syncing':
+        return <RefreshCw className="w-5 h-5 text-blue-500 animate-spin" />;
+      case 'success':
+        return <CheckCircle2 className="w-5 h-5 text-green-500" />;
+      case 'error':
+        return <XCircle className="w-5 h-5 text-red-500" />;
+      case 'conflict':
+        return <AlertTriangle className="w-5 h-5 text-yellow-500" />;
+      default:
+        return <CloudOff className="w-5 h-5 text-slate-400" />;
+    }
+  };
+  
+  const getSyncStatusText = (status: SyncStatus): string => {
+    switch (status) {
+      case 'syncing':
+        return 'Syncing...';
+      case 'success':
+        return 'Synced';
+      case 'error':
+        return 'Sync Error';
+      case 'conflict':
+        return 'Conflicts Resolved';
+      default:
+        return 'Not Synced';
+    }
+  };
+  
+  const totalConflicts = syncMetadata.reduce((sum, m) => sum + (m.conflictCount || 0), 0);
+  const hasErrors = syncMetadata.some(m => m.syncStatus === 'error');
 
   useEffect(() => {
     if (profile) {
@@ -147,7 +359,7 @@ export function Profile() {
     setIsSaving(true);
 
     try {
-      const updates: any = {
+      const updates: Parameters<typeof updateProfile>[0] = {
         name: name || profile.name,
         age: age !== '' ? age : undefined,
         gender: gender || undefined,
@@ -446,6 +658,128 @@ export function Profile() {
                 </button>
               </div>
             </label>
+          </div>
+        </section>
+
+        {/* Cloud Sync */}
+        <section className="space-y-4">
+          <h3 className="text-xl font-bold tracking-tight px-1">Cloud Sync</h3>
+          <div className="space-y-3">
+            {/* Sync Status Card */}
+            <div className="p-4 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  {getSyncStatusIcon(syncStatus)}
+                  <div>
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300 block">
+                      {getSyncStatusText(syncStatus)}
+                    </span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                      Last sync: {formatLastSyncTime(lastSyncTime)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              {syncProgress && (
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
+                    <span>{syncProgress.currentOperation}</span>
+                    <span>{syncProgress.percentage}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 dark:bg-surface-border rounded-full h-2">
+                    <div
+                      className="bg-primary h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${syncProgress.percentage}%` }}
+                    />
+                  </div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">
+                    {syncProgress.completedTables} of {syncProgress.totalTables} tables synced
+                  </div>
+                </div>
+              )}
+              
+              {(totalConflicts > 0 || hasErrors || lastSyncMessage) && (
+                <div className="mt-3 pt-3 border-t border-gray-200 dark:border-surface-border space-y-1">
+                  {lastSyncMessage && syncStatus === 'success' && (
+                    <div className="flex items-center gap-2 text-xs text-green-600 dark:text-green-400">
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>{lastSyncMessage}</span>
+                    </div>
+                  )}
+                  {totalConflicts > 0 && (
+                    <div className="flex items-center gap-2 text-xs text-yellow-600 dark:text-yellow-400">
+                      <AlertTriangle className="w-4 h-4" />
+                      <span>{totalConflicts} conflict{totalConflicts > 1 ? 's' : ''} resolved</span>
+                    </div>
+                  )}
+                  {hasErrors && (
+                    <div className="flex items-center gap-2 text-xs text-red-600 dark:text-red-400">
+                      <XCircle className="w-4 h-4" />
+                      <span>Some sync errors occurred</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            {/* Auto Sync Toggle */}
+            <label className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border">
+              <div className="flex items-center gap-3">
+                <Cloud className="w-5 h-5 text-slate-400" />
+                <div>
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300 block">Auto Sync</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Automatically sync changes to cloud</span>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={autoSyncEnabled}
+                onChange={(e) => handleToggleAutoSync(e.target.checked)}
+                className="w-5 h-5 rounded accent-primary"
+                disabled={isSyncing}
+              />
+            </label>
+            
+            {/* Manual Sync Button */}
+            <button
+              onClick={handleManualSync}
+              disabled={isSyncing || !profile?.id}
+              className={cn(
+                'w-full flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border',
+                'hover:bg-gray-50 dark:hover:bg-surface-dark-light transition-colors',
+                'disabled:opacity-50 disabled:cursor-not-allowed'
+              )}
+            >
+              <div className="flex items-center gap-3">
+                {isSyncing ? (
+                  <RefreshCw className="w-5 h-5 text-slate-400 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-5 h-5 text-slate-400" />
+                )}
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  {isSyncing ? 'Syncing...' : 'Sync Now'}
+                </span>
+              </div>
+              {isSyncing ? (
+                <LoadingSpinner size="sm" />
+              ) : (
+                <ArrowRight className="w-4 h-4 text-slate-400" />
+              )}
+            </button>
+            
+            {/* Sync Info */}
+            <div className="flex items-start gap-2 p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+              <Cloud className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p className="text-xs text-blue-800 dark:text-blue-300 font-medium mb-1">
+                  Cloud Sync Information
+                </p>
+                <p className="text-xs text-blue-700 dark:text-blue-400">
+                  Your data is securely synced to the cloud. Enable auto-sync to keep your data backed up automatically, or sync manually whenever you want.
+                </p>
+              </div>
+            </div>
           </div>
         </section>
 

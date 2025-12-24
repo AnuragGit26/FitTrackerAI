@@ -24,6 +24,7 @@ import { MobileOnlyModal } from '@/components/common/MobileOnlyModal';
 import { analytics } from '@/utils/analytics';
 import { seedWorkoutLogs } from '@/utils/seedWorkoutLogs';
 import { cacheVersionService } from '@/services/cacheVersionService';
+import { logger } from '@/utils/logger';
 
 // Lazy load route components for code splitting
 const Home = lazy(() => import('@/pages/Home').then(m => ({ default: m.Home })));
@@ -250,8 +251,7 @@ function App() {
           navigator.serviceWorker
             .register(swPath, { scope: '/' })
             .then(async (registration) => {
-              // eslint-disable-next-line no-console
-              console.log(`[SW] Service Worker registered (${import.meta.env.DEV ? 'DEV' : 'PROD'}):`, registration);
+              logger.sw(`Service Worker registered (${import.meta.env.DEV ? 'DEV' : 'PROD'}):`, registration);
               
               // Check for updates periodically
               setInterval(() => {
@@ -265,8 +265,7 @@ function App() {
                   newWorker.addEventListener('statechange', () => {
                     if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                       // New service worker available, prompt user to refresh
-                      // eslint-disable-next-line no-console
-                      console.log('[SW] New service worker available');
+                      logger.sw('New service worker available');
                     }
                   });
                 }
@@ -277,8 +276,7 @@ function App() {
                 try {
                   await (registration as ServiceWorkerRegistration & { sync: { register: (tag: string) => Promise<void> } }).sync.register('workout-reminder-sync');
                 } catch (error) {
-                  // eslint-disable-next-line no-console
-                  console.warn('[SW] Background sync registration failed:', error);
+                  logger.warn('[SW] Background sync registration failed:', error);
                 }
               }
               
@@ -289,8 +287,7 @@ function App() {
                     minInterval: 60 * 60 * 1000, // 1 hour
                   });
                 } catch (error) {
-                  // eslint-disable-next-line no-console
-                  console.warn('[SW] Periodic sync registration failed:', error);
+                  logger.warn('[SW] Periodic sync registration failed:', error);
                 }
               }
               
@@ -298,12 +295,10 @@ function App() {
               await notificationService.initialize();
             })
             .catch((error) => {
-              // eslint-disable-next-line no-console
               console.error('[SW] Service Worker registration failed:', error);
               // In dev mode, this might fail initially - that's okay, it will work after first build
               if (import.meta.env.DEV) {
-                // eslint-disable-next-line no-console
-                console.log('[SW] Note: Service worker may not be available until VitePWA processes it');
+                logger.sw('Note: Service worker may not be available until VitePWA processes it');
               }
             });
           
@@ -311,14 +306,12 @@ function App() {
           // Note: AI_INSIGHTS_READY messages are handled by swCommunication utility
           navigator.serviceWorker.addEventListener('message', async (event) => {
             if (event.data && event.data.type === 'AI_REFRESH_CHECK') {
-              // eslint-disable-next-line no-console
-              console.log('[SW] AI refresh check requested');
+              logger.sw('AI refresh check requested');
               // The refresh service will handle this automatically
             }
             
             if (event.data && event.data.type === 'CHECK_WORKOUT_REMINDERS') {
-              // eslint-disable-next-line no-console
-              console.log('[SW] Checking workout reminders');
+              logger.sw('Checking workout reminders');
               // Check and trigger any due workout reminders
               const { usePlannedWorkoutStore } = await import('@/store/plannedWorkoutStore');
               const { useUserStore } = await import('@/store/userStore');
@@ -346,8 +339,7 @@ function App() {
             }
             
             if (event.data && event.data.type === 'CHECK_MUSCLE_RECOVERY') {
-              // eslint-disable-next-line no-console
-              console.log('[SW] Checking muscle recovery');
+              logger.sw('Checking muscle recovery');
               // Trigger muscle recovery recalculation
               const { useUserStore } = await import('@/store/userStore');
               const { muscleRecoveryService } = await import('@/services/muscleRecoveryService');
@@ -355,8 +347,7 @@ function App() {
               const user = useUserStore.getState().profile;
               if (user?.id) {
                 muscleRecoveryService.recalculateAllMuscleStatuses(user.id).catch((error) => {
-                  // eslint-disable-next-line no-console
-                  console.error('[SW] Failed to recalculate muscle recovery:', error);
+                  logger.error('[SW] Failed to recalculate muscle recovery', error);
                 });
               }
             }
@@ -371,16 +362,13 @@ function App() {
           (window as Window & { seedWorkoutLogs?: (userId?: string) => Promise<void> }).seedWorkoutLogs = async (userId?: string) => {
             const user = getUserStore.getState().profile;
             const targetUserId = userId || user?.id || 'user-1';
-            // eslint-disable-next-line no-console
-            console.log(`🌱 Seeding workout logs for user: ${targetUserId}`);
+            logger.log(`🌱 Seeding workout logs for user: ${targetUserId}`);
             await seedWorkoutLogs(targetUserId);
           };
-          // eslint-disable-next-line no-console
-          console.log('💡 Dev tip: Run seedWorkoutLogs() in console to seed test data');
+          logger.log('💡 Dev tip: Run seedWorkoutLogs() in console to seed test data');
         }
       } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('Failed to initialize app:', error);
+        logger.error('Failed to initialize app', error, { context: 'app_initialization' });
         const errorObj = error instanceof Error ? error : new Error(String(error));
         analytics.trackError(errorObj, { context: 'app_initialization' });
       } finally {
@@ -463,12 +451,12 @@ function AppRoutes() {
       }).then(() => {
         // Initialize workout event tracker for this user
         workoutEventTracker.initialize(clerkUser.id).catch((error) => {
-          console.error('Failed to initialize workout event tracker:', error);
+          logger.error('Failed to initialize workout event tracker', error);
         });
         
         // Initialize default templates after user is loaded
         initializeDefaultTemplates(clerkUser.id).catch((error) => {
-          console.error('Failed to initialize templates:', error);
+          logger.error('Failed to initialize templates', error);
         });
       });
     }

@@ -1,6 +1,7 @@
 import { Exercise, ExerciseAdvancedDetails } from '@/types/exercise';
 import { MuscleGroup } from '@/types/muscle';
 import { exerciseDetailsService } from './exerciseDetailsService';
+import { logger } from '@/utils/logger';
 
 export enum EquipmentCategory {
   FREE_WEIGHTS = 'Free Weights',
@@ -2481,15 +2482,15 @@ export const exerciseLibrary = {
             existingNames.add(normalizedName);
           });
 
-          console.log(`✅ Loaded ${STRENGTHLOG_EXERCISES.length} StrengthLog exercises (strength category only)`);
-          console.log(`✅ Loaded ${CORE_EXERCISES.filter(ex => ex.category !== 'strength').length} core exercises (non-strength categories)`);
+          logger.info(`✅ Loaded ${STRENGTHLOG_EXERCISES.length} StrengthLog exercises (strength category only)`);
+          logger.info(`✅ Loaded ${CORE_EXERCISES.filter(ex => ex.category !== 'strength').length} core exercises (non-strength categories)`);
         } else {
-          console.warn('⚠️ No StrengthLog exercises found. Strength category exercises will be missing.');
+          logger.warn('⚠️ No StrengthLog exercises found. Strength category exercises will be missing.');
         }
       } catch (error) {
         // If StrengthLog exercises file doesn't exist or has errors, log warning
-        console.warn('⚠️ Could not load StrengthLog exercises:', error);
-        console.warn('⚠️ Strength category exercises will not be available.');
+        logger.warn('⚠️ Could not load StrengthLog exercises:', error);
+        logger.warn('⚠️ Strength category exercises will not be available.');
       }
 
       // Save all exercises to database
@@ -2497,7 +2498,7 @@ export const exerciseLibrary = {
         await dbHelpers.saveExercise(exercise);
       }
 
-      console.log(`✅ Initialized ${exercises.length} exercises`);
+      logger.info(`✅ Initialized ${exercises.length} exercises`);
     }
   },
 
@@ -2518,11 +2519,33 @@ export const exerciseLibrary = {
 
   async createCustomExercise(exercise: Omit<Exercise, 'id' | 'isCustom'>): Promise<string> {
     const { dbHelpers } = await import('./database');
-    const id = `custom-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const { userContextManager } = await import('./userContextManager');
+    
+    // Generate UUID for custom exercises to prevent multi-user collisions
+    // Using crypto.randomUUID() if available, fallback to a more robust method
+    const generateUUID = (): string => {
+      if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+      }
+      // Fallback: more robust UUID v4 generation
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        const v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      });
+    };
+    
+    const userId = userContextManager.getUserId();
+    // Include user_id in ID prefix for additional safety and easier debugging
+    const id = userId 
+      ? `custom-${userId}-${generateUUID()}`
+      : `custom-${generateUUID()}`;
+    
     const customExercise: Exercise = {
       ...exercise,
       id,
       isCustom: true,
+      userId: userId || undefined,
     };
     await dbHelpers.saveExercise(customExercise);
     return id;

@@ -41,10 +41,29 @@ cd FitTrackAI
 npm install
 ```
 
-3. Create a `.env` file in the root directory:
+3. Create a `.env` file in the root directory with the following variables:
 ```env
+# Clerk Authentication (Required)
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_your_clerk_publishable_key_here
+
+# Supabase Configuration (Required)
+# Use VITE_ prefix (recommended) or REACT_APP_ prefix (for backward compatibility)
+VITE_SUPABASE_URL=https://your-project.supabase.co
+# OR: REACT_APP_SUPABASE_URL=https://your-project.supabase.co
+
+# Supabase Anonymous Key (choose one):
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+# OR: VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY=your_supabase_anon_key_here
+# OR: REACT_APP_SUPABASE_PUBLISHABLE_DEFAULT_KEY=your_supabase_anon_key_here
+
+# Google Gemini AI API Key (Optional - for AI insights)
 VITE_GEMINI_API_KEY=your_gemini_api_key_here
 ```
+
+**Getting your API keys:**
+- **Clerk**: Get your publishable key from [Clerk Dashboard](https://dashboard.clerk.com/)
+- **Supabase**: Get your URL and anon key from [Supabase Dashboard](https://supabase.com/dashboard/project/_/settings/api)
+- **Gemini AI**: Get your API key from [Google AI Studio](https://makersuite.google.com/app/apikey) (optional)
 
 4. Start the development server:
 ```bash
@@ -81,15 +100,32 @@ src/
 
 ## Configuration
 
-### Gemini AI API Key
+### Required Environment Variables
 
-To enable AI insights, you need a Gemini API key from Google:
+The following environment variables are required for the app to function:
 
-1. Visit [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. Create a new API key
-3. Add it to your `.env` file as `VITE_GEMINI_API_KEY`
+1. **VITE_CLERK_PUBLISHABLE_KEY** (Required)
+   - Used for user authentication
+   - Get it from: [Clerk Dashboard](https://dashboard.clerk.com/)
+   - The app will fail to start without this key
 
-Without the API key, the app will still work but AI insights will show placeholder messages.
+2. **VITE_SUPABASE_URL** (Required)
+   - Supabase project URL for data synchronization
+   - Get it from: [Supabase Dashboard](https://supabase.com/dashboard/project/_/settings/api)
+   - The app will fail to start without this variable
+
+3. **VITE_SUPABASE_ANON_KEY** (Required)
+   - Supabase anonymous/public key for API access
+   - Alternative name: `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` (for backward compatibility)
+   - Get it from: [Supabase Dashboard](https://supabase.com/dashboard/project/_/settings/api)
+   - The app will fail to start without this key
+
+### Optional Environment Variables
+
+4. **VITE_GEMINI_API_KEY** (Optional)
+   - Used for AI-powered workout insights and recommendations
+   - Get it from: [Google AI Studio](https://makersuite.google.com/app/apikey)
+   - Without this key, the app will still work but AI insights will show placeholder messages
 
 ## Usage
 

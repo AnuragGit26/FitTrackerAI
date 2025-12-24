@@ -30,7 +30,7 @@ export function sanitizeString(input: string): string {
 /**
  * Sanitizes an object by recursively sanitizing all string values
  */
-export function sanitizeObject<T extends Record<string, any>>(obj: T): T {
+export function sanitizeObject<T extends Record<string, unknown>>(obj: T): T {
   const sanitized = { ...obj };
   
   for (const key in sanitized) {
@@ -38,11 +38,11 @@ export function sanitizeObject<T extends Record<string, any>>(obj: T): T {
       sanitized[key] = sanitizeString(sanitized[key]) as T[Extract<keyof T, string>];
     } else if (typeof sanitized[key] === 'object' && sanitized[key] !== null) {
       if (Array.isArray(sanitized[key])) {
-        sanitized[key] = sanitized[key].map((item: any) =>
+        sanitized[key] = sanitized[key].map((item: unknown) =>
           typeof item === 'string' ? sanitizeString(item) : item
         ) as T[Extract<keyof T, string>];
       } else {
-        sanitized[key] = sanitizeObject(sanitized[key]) as T[Extract<keyof T, string>];
+        sanitized[key] = sanitizeObject(sanitized[key] as Record<string, unknown>) as T[Extract<keyof T, string>];
       }
     }
   }

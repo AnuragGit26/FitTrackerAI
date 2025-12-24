@@ -3,6 +3,7 @@ import { Workout, WorkoutTemplate, PlannedWorkout } from '@/types/workout';
 import { Exercise, ExerciseAdvancedDetails } from '@/types/exercise';
 import { MuscleStatus } from '@/types/muscle';
 import { MuscleImageCache } from './muscleImageCache';
+import { SyncableTable } from '@/types/sync';
 
 export type InsightType = 'insights' | 'recommendations' | 'progress' | 'smart-coach';
 
@@ -22,6 +23,23 @@ export interface ExerciseDetailsCache {
   cachedAt: number; // timestamp
 }
 
+export interface LocalSyncMetadata {
+  id?: number;
+  tableName: SyncableTable;
+  userId: string;
+  lastSyncAt: number | null; // timestamp
+  lastPushAt: number | null; // timestamp
+  lastPullAt: number | null; // timestamp
+  syncStatus: 'idle' | 'syncing' | 'success' | 'error' | 'conflict';
+  conflictCount: number;
+  errorMessage?: string;
+  lastErrorAt?: number; // timestamp
+  recordCount?: number;
+  version?: number;
+  lastSuccessfulSyncAt?: number | null; // timestamp
+  syncToken?: string;
+}
+
 class FitTrackAIDB extends Dexie {
   workouts!: Table<Workout, number>;
   exercises!: Table<Exercise, string>;
@@ -32,6 +50,7 @@ class FitTrackAIDB extends Dexie {
   plannedWorkouts!: Table<PlannedWorkout, string>;
   exerciseDetailsCache!: Table<ExerciseDetailsCache, number>;
   muscleImageCache!: Table<MuscleImageCache, number>;
+  syncMetadata!: Table<LocalSyncMetadata, number>;
 
   constructor() {
     super('FitTrackAIDB');
@@ -99,6 +118,55 @@ class FitTrackAIDB extends Dexie {
       plannedWorkouts: 'id, userId, scheduledDate, [userId+scheduledDate]',
       exerciseDetailsCache: '++id, exerciseSlug, cachedAt',
       muscleImageCache: '++id, muscle, cachedAt',
+    });
+
+    // Version 8: Add version fields, sync metadata, and improved indexes
+    this.version(8).stores({
+      workouts: '++id, userId, date, version, [userId+date], [userId+updatedAt], *musclesTargeted',
+      exercises: 'id, name, category, userId, version, [userId+isCustom], [userId+updatedAt], *primaryMuscles, *secondaryMuscles',
+      muscleStatuses: '++id, muscle, userId, version, [userId+muscle], [userId+updatedAt], lastWorked',
+      settings: 'key, userId, version, [userId+key]',
+      workoutTemplates: 'id, userId, category, name, version, [userId+category], [userId+updatedAt], *musclesTargeted',
+      aiCacheMetadata: '++id, insightType, userId, [insightType+userId], lastFetchTimestamp',
+      plannedWorkouts: 'id, userId, scheduledDate, version, [userId+scheduledDate], [userId+updatedAt]',
+      exerciseDetailsCache: '++id, exerciseSlug, cachedAt',
+      muscleImageCache: '++id, muscle, cachedAt',
+      syncMetadata: '++id, tableName, userId, [userId+tableName], syncStatus, lastSyncAt',
+    }).upgrade(async (tx) => {
+      // Migration: Add version field to all existing records
+      const tables = ['workouts', 'exercises', 'muscleStatuses', 'settings', 'workoutTemplates', 'plannedWorkouts'];
+      
+      for (const tableName of tables) {
+        const table = tx.table(tableName);
+        const records = await table.toArray();
+        
+        for (const record of records) {
+          if (!record.version) {
+            await table.update(record, { version: 1 });
+          }
+        }
+      }
+
+      // Migration: Add userId to muscleStatuses if missing
+      const muscleStatuses = await tx.table('muscleStatuses').toArray();
+      for (const status of muscleStatuses) {
+        if (!status.userId) {
+          // Try to infer from workouts or use default
+          const workouts = await tx.table('workouts').toArray();
+          const userId = workouts[0]?.userId || 'user-1';
+          await tx.table('muscleStatuses').update(status, { userId });
+        }
+      }
+
+      // Migration: Add userId to exercises if missing (for custom exercises)
+      const exercises = await tx.table('exercises').toArray();
+      for (const exercise of exercises) {
+        if (exercise.isCustom && !exercise.userId) {
+          const workouts = await tx.table('workouts').toArray();
+          const userId = workouts[0]?.userId || 'user-1';
+          await tx.table('exercises').update(exercise, { userId });
+        }
+      }
     });
   }
 }
@@ -492,6 +560,46 @@ export const dbHelpers = {
         .delete();
     } else {
       await db.exerciseDetailsCache.clear();
+    }
+  },
+
+  // Sync metadata operations
+  async getSyncMetadata(tableName: SyncableTable, userId: string): Promise<LocalSyncMetadata | undefined> {
+    return await db.syncMetadata
+      .where('[userId+tableName]')
+      .equals([userId, tableName])
+      .first();
+  },
+
+  async saveSyncMetadata(metadata: LocalSyncMetadata): Promise<number> {
+    const existing = await db.syncMetadata
+      .where('[userId+tableName]')
+      .equals([metadata.userId, metadata.tableName])
+      .first();
+
+    if (existing) {
+      await db.syncMetadata.update(existing.id!, metadata);
+      return existing.id!;
+    } else {
+      return await db.syncMetadata.add(metadata);
+    }
+  },
+
+  async getAllSyncMetadata(userId: string): Promise<LocalSyncMetadata[]> {
+    return await db.syncMetadata
+      .where('userId')
+      .equals(userId)
+      .toArray();
+  },
+
+  async deleteSyncMetadata(tableName: SyncableTable, userId: string): Promise<void> {
+    const existing = await db.syncMetadata
+      .where('[userId+tableName]')
+      .equals([userId, tableName])
+      .first();
+
+    if (existing) {
+      await db.syncMetadata.delete(existing.id!);
     }
   },
 };

@@ -14,7 +14,7 @@ export function VolumeTrendChart({ data }: VolumeTrendChartProps) {
         volume: 0,
       }));
     }
-    return data.map((item, index) => ({
+    return data.map((item) => ({
       week: item.date,
       volume: item.totalVolume,
     }));

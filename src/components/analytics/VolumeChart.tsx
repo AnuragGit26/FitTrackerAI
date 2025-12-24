@@ -6,7 +6,6 @@ import { formatDateShort } from '@/utils/dateHelpers';
 
 export const VolumeChart = memo(function VolumeChart() {
   const { workouts } = useWorkoutStore();
-  const { profile } = useUserStore();
 
   const chartData = useMemo(() => {
     const last30Days = workouts

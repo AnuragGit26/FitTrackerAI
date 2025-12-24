@@ -36,8 +36,11 @@ module.exports = {
     'react/prop-types': 'off', // TypeScript handles prop validation
     'react/react-in-jsx-scope': 'off', // Not needed with React 17+
     '@typescript-eslint/explicit-module-boundary-types': 'off',
-    '@typescript-eslint/no-explicit-any': 'warn',
-    'no-console': ['warn', { allow: ['warn', 'error'] }],
+    '@typescript-eslint/no-explicit-any': ['error', { 
+      fixToUnknown: true,
+      ignoreRestArgs: false 
+    }],
+    'no-console': ['error', { allow: ['warn', 'error'] }],
   },
   overrides: [
     {

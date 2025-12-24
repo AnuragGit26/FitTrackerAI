@@ -2,6 +2,7 @@ import { WorkoutTemplate } from '@/types/workout';
 import { MuscleGroup } from '@/types/muscle';
 import { templateService } from './templateService';
 import { exerciseLibrary } from './exerciseLibrary';
+import { logger } from '@/utils/logger';
 
 // Type for seed data (exerciseId will be resolved during initialization)
 type TemplateSeedData = Omit<WorkoutTemplate, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'exercises'> & {
@@ -332,12 +333,12 @@ async function updateTemplatesWithImages(userId: string): Promise<void> {
                         imageUrl: defaultImageUrl,
                         updatedAt: new Date(),
                     });
-                    console.log(`Updated template "${template.name}" with imageUrl`);
+                    logger.debug(`Updated template "${template.name}" with imageUrl`);
                 }
             }
         }
     } catch (error) {
-        console.error('Failed to update templates with images:', error);
+        logger.error('Failed to update templates with images:', error);
     }
 }
 
@@ -399,15 +400,15 @@ export async function initializeDefaultTemplates(userId: string): Promise<void> 
             
             // Debug: Log imageUrl to verify it's included
             if (template.imageUrl) {
-                console.log(`Creating template "${template.name}" with imageUrl:`, template.imageUrl);
+                logger.debug(`Creating template "${template.name}" with imageUrl:`, template.imageUrl);
             }
             
             await templateService.createTemplate(templateToCreate);
         }
 
-        console.log(`Initialized ${DEFAULT_TEMPLATES.length} default templates for user ${userId}`);
+        logger.info(`Initialized ${DEFAULT_TEMPLATES.length} default templates for user ${userId}`);
     } catch (error) {
-        console.error('Failed to initialize default templates:', error);
+        logger.error('Failed to initialize default templates:', error);
         // Don't throw - allow app to continue even if template initialization fails
     }
 }

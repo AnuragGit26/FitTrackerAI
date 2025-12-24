@@ -14,10 +14,10 @@ type MessageType =
 
 interface SWMessage {
   type: MessageType;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
-type MessageHandler = (data: any) => void;
+type MessageHandler = (data: SWMessage) => void;
 
 class SWCommunication {
   private messageHandlers: Map<MessageType, Set<MessageHandler>> = new Map();
@@ -80,7 +80,7 @@ class SWCommunication {
   /**
    * Send message to service worker
    */
-  async sendMessage(type: MessageType, data: any = {}): Promise<void> {
+  async sendMessage(type: MessageType, data: Record<string, unknown> = {}): Promise<void> {
     const sw = this.getServiceWorker();
     if (!sw) {
       console.warn('[SW Communication] Service worker not available, message not sent:', type);
@@ -101,7 +101,7 @@ class SWCommunication {
    * Request background AI insights fetch
    */
   async requestBackgroundFetch(
-    context: any,
+    context: Record<string, unknown>,
     fingerprint: string,
     insightTypes: string[],
     userId?: string,
@@ -119,7 +119,7 @@ class SWCommunication {
   /**
    * Register handler for AI insights ready messages
    */
-  onAIInsightsReady(handler: (data: { fingerprint: string; results: any; errors?: any }) => void): () => void {
+  onAIInsightsReady(handler: (data: { fingerprint: string; results: Record<string, unknown>; errors?: unknown }) => void): () => void {
     return this.registerHandler('AI_INSIGHTS_READY', handler);
   }
 

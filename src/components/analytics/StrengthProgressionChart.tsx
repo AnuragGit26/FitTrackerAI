@@ -1,10 +1,36 @@
 import { useMemo, useState, useCallback } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Brush, ReferenceLine, Dot } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Brush, ReferenceLine, Dot } from 'recharts';
 import { StrengthProgression } from '@/types/analytics';
 import { format } from 'date-fns';
 
 interface StrengthProgressionChartProps {
   progressions: StrengthProgression[];
+}
+
+interface ChartDataPoint {
+  date: string;
+  [exerciseName: string]: string | number | { maxWeight: number; maxReps: number; totalVolume: number } | undefined;
+}
+
+interface TooltipPayload {
+  dataKey: string;
+  value: number;
+  color: string;
+  payload: ChartDataPoint;
+}
+
+interface TooltipProps {
+  active?: boolean;
+  payload?: TooltipPayload[];
+  label?: string;
+}
+
+interface DotProps {
+  cx?: number;
+  cy?: number;
+  payload: ChartDataPoint;
+  dataKey: string;
+  [key: string]: unknown;
 }
 
 export function StrengthProgressionChart({ progressions }: StrengthProgressionChartProps) {
@@ -22,7 +48,7 @@ export function StrengthProgressionChart({ progressions }: StrengthProgressionCh
     const sortedDates = Array.from(allDates).sort();
 
     return sortedDates.map((date) => {
-      const point: Record<string, any> = { date };
+      const point: ChartDataPoint = { date };
       progressions.forEach((prog) => {
         const dp = prog.dataPoints.find((p) => p.date === date);
         if (dp) {
@@ -55,16 +81,16 @@ export function StrengthProgressionChart({ progressions }: StrengthProgressionCh
   }, []);
 
   // Custom Tooltip Component
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-gray-900 dark:bg-gray-800 border border-gray-700 rounded-lg p-3 shadow-xl">
           <p className="text-white font-semibold mb-2 text-sm">
-            {format(new Date(label), 'MMM d, yyyy')}
+            {label && format(new Date(label), 'MMM d, yyyy')}
           </p>
-          {payload.map((entry: any, index: number) => {
+          {payload.map((entry, index) => {
             if (hiddenSeries.has(entry.dataKey)) return null;
-            const dataPoint = entry.payload[`${entry.dataKey}_data`];
+            const dataPoint = entry.payload[`${entry.dataKey}_data`] as { maxWeight: number; maxReps: number; totalVolume: number } | undefined;
             return (
               <div key={index} className="mb-1 last:mb-0">
                 <div className="flex items-center gap-2 mb-1">
@@ -94,14 +120,14 @@ export function StrengthProgressionChart({ progressions }: StrengthProgressionCh
   };
 
   // Custom Dot Component with click handler
-  const CustomDot = (props: any) => {
-    const { cx, cy, payload, dataKey } = props;
+  const CustomDot = (props: DotProps) => {
+    const { payload, dataKey } = props;
     return (
       <Dot
         {...props}
         onClick={() => {
           const value = payload[dataKey];
-          if (value) {
+          if (typeof value === 'number' && value > 0) {
             setSelectedPoint({
               date: payload.date,
               exercise: dataKey,

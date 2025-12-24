@@ -9,6 +9,7 @@ import { Workout } from '@/types/workout';
 import { MuscleStatus } from '@/types/muscle';
 import { PersonalRecord, StrengthProgression } from '@/types/analytics';
 import { InsightType } from './aiCacheManager';
+import { logger } from '@/utils/logger';
 
 interface BackgroundFetchContext {
   currentMonthWorkouts: Workout[];
@@ -48,7 +49,7 @@ export class BackgroundAIFetcher {
     // Check if service worker is available
     const isAvailable = await swCommunication.waitForServiceWorker(2000);
     if (!isAvailable) {
-      console.warn('[Background AI Fetcher] Service worker not available, skipping background fetch');
+      logger.warn('[Background AI Fetcher] Service worker not available, skipping background fetch');
       return;
     }
 
@@ -88,13 +89,13 @@ export class BackgroundAIFetcher {
       apiKey
     );
 
-    console.log('[Background AI Fetcher] Background fetch triggered for:', insightTypes);
+    logger.debug('[Background AI Fetcher] Background fetch triggered for:', insightTypes);
   }
 
   /**
    * Serialize workouts for service worker (convert dates to strings)
    */
-  private serializeWorkouts(workouts: Workout[]): any[] {
+  private serializeWorkouts(workouts: Workout[]): Array<Record<string, unknown>> {
     return workouts.map((workout) => ({
       ...workout,
       date: workout.date instanceof Date ? workout.date.toISOString() : workout.date,
@@ -108,7 +109,7 @@ export class BackgroundAIFetcher {
   /**
    * Serialize muscle statuses for service worker
    */
-  private serializeMuscleStatuses(muscleStatuses: MuscleStatus[]): any[] {
+  private serializeMuscleStatuses(muscleStatuses: MuscleStatus[]): Array<Record<string, unknown>> {
     return muscleStatuses.map((status) => ({
       ...status,
       lastWorked: status.lastWorked instanceof Date 
@@ -120,7 +121,7 @@ export class BackgroundAIFetcher {
   /**
    * Serialize personal records for service worker
    */
-  private serializePersonalRecords(records: PersonalRecord[]): any[] {
+  private serializePersonalRecords(records: PersonalRecord[]): Array<Record<string, unknown>> {
     return records.map((record) => ({
       ...record,
       date: record.date instanceof Date ? record.date.toISOString() : record.date,
@@ -130,7 +131,7 @@ export class BackgroundAIFetcher {
   /**
    * Serialize strength progression for service worker
    */
-  private serializeStrengthProgression(progression: StrengthProgression[]): any[] {
+  private serializeStrengthProgression(progression: StrengthProgression[]): Array<Record<string, unknown>> {
     return progression.map((prog) => ({
       ...prog,
       date: prog.date instanceof Date ? prog.date.toISOString() : prog.date,

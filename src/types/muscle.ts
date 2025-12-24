@@ -46,6 +46,9 @@ export interface MuscleStatus {
   recommendedRestDays: number;
   totalVolumeLast7Days: number;
   trainingFrequency: number; // times per week
+  userId?: string; // User ID for multi-user support
+  version?: number; // For optimistic locking
+  deletedAt?: Date | null; // Soft delete timestamp
 }
 
 export interface RecoverySettings {

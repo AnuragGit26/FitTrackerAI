@@ -1,6 +1,18 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+  // Clerk Authentication (Required)
+  readonly VITE_CLERK_PUBLISHABLE_KEY: string;
+  
+  // Supabase Configuration (Required)
+  // Support both VITE_ and REACT_APP_ prefixes for backward compatibility
+  readonly VITE_SUPABASE_URL?: string;
+  readonly REACT_APP_SUPABASE_URL?: string;
+  readonly VITE_SUPABASE_ANON_KEY?: string;
+  readonly VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY?: string;
+  readonly REACT_APP_SUPABASE_PUBLISHABLE_DEFAULT_KEY?: string;
+  
+  // Google Gemini AI API Key (Optional - for AI insights)
   readonly VITE_GEMINI_API_KEY?: string;
 }
 

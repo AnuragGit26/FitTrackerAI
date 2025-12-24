@@ -37,7 +37,7 @@ export interface WorkoutStateSnapshot {
 /**
  * Serialize a Workout object for storage (convert Dates to ISO strings)
  */
-function serializeWorkout(workout: Workout | null): any {
+function serializeWorkout(workout: Workout | null): Record<string, unknown> | null {
   if (!workout) return null;
 
   return {
@@ -60,22 +60,22 @@ function serializeWorkout(workout: Workout | null): any {
 /**
  * Deserialize a Workout object from storage (convert ISO strings to Dates)
  */
-function deserializeWorkout(workoutData: any): Workout | null {
+function deserializeWorkout(workoutData: Record<string, unknown>): Workout | null {
   if (!workoutData) return null;
 
   try {
     return {
       ...workoutData,
-      date: workoutData.date ? new Date(workoutData.date) : new Date(),
-      startTime: workoutData.startTime ? new Date(workoutData.startTime) : new Date(),
-      endTime: workoutData.endTime ? new Date(workoutData.endTime) : undefined,
-      exercises: workoutData.exercises?.map((ex: any) => ({
+      date: workoutData.date ? new Date(workoutData.date as string) : new Date(),
+      startTime: workoutData.startTime ? new Date(workoutData.startTime as string) : new Date(),
+      endTime: workoutData.endTime ? new Date(workoutData.endTime as string) : undefined,
+      exercises: (workoutData.exercises as Array<Record<string, unknown>>)?.map((ex) => ({
         ...ex,
-        timestamp: ex.timestamp ? new Date(ex.timestamp) : new Date(),
-        sets: ex.sets?.map((set: any) => ({
+        timestamp: ex.timestamp ? new Date(ex.timestamp as string) : new Date(),
+        sets: (ex.sets as Array<Record<string, unknown>>)?.map((set) => ({
           ...set,
-          setStartTime: set.setStartTime ? new Date(set.setStartTime) : undefined,
-          setEndTime: set.setEndTime ? new Date(set.setEndTime) : undefined,
+          setStartTime: set.setStartTime ? new Date(set.setStartTime as string) : undefined,
+          setEndTime: set.setEndTime ? new Date(set.setEndTime as string) : undefined,
         })) || [],
       })) || [],
     };
@@ -143,10 +143,10 @@ export function loadLogWorkoutState(): LogWorkoutStateSnapshot | null {
     const parsed = JSON.parse(stored);
     
     // Deserialize sets with Date objects
-    const sets = parsed.sets?.map((set: any) => ({
+    const sets = (parsed.sets as Array<Record<string, unknown>>)?.map((set) => ({
       ...set,
-      setStartTime: set.setStartTime ? new Date(set.setStartTime) : undefined,
-      setEndTime: set.setEndTime ? new Date(set.setEndTime) : undefined,
+      setStartTime: set.setStartTime ? new Date(set.setStartTime as string) : undefined,
+      setEndTime: set.setEndTime ? new Date(set.setEndTime as string) : undefined,
     })) || [];
 
     return {

@@ -2,17 +2,18 @@ import { aiCacheManager } from './aiCacheManager';
 import { workoutEventTracker } from './workoutEventTracker';
 import { aiCallManager } from './aiCallManager';
 import { InsightType } from './aiCacheManager';
+import { logger } from '@/utils/logger';
 
-interface RefreshRequest {
+interface RefreshRequest<T = unknown> {
   insightType: InsightType;
   fingerprint: string;
-  generateFn: () => Promise<any>;
+  generateFn: () => Promise<T>;
   priority?: number;
 }
 
 class AIRefreshService {
-  private pendingRefreshes: Map<string, Promise<any>> = new Map();
-  private refreshQueue: RefreshRequest[] = [];
+  private pendingRefreshes: Map<string, Promise<unknown>> = new Map();
+  private refreshQueue: RefreshRequest<unknown>[] = [];
   private isProcessingQueue = false;
 
   /**
@@ -57,7 +58,7 @@ class AIRefreshService {
       // Try to get from cache
       const cached = await aiCallManager.getCached<T>(fingerprint, insightType);
       if (cached) {
-        console.log(`[AI Refresh] Using cached ${insightType} (${reason})`);
+        logger.debug(`[AI Refresh] Using cached ${insightType} (${reason})`);
         return cached;
       }
     }
@@ -67,8 +68,8 @@ class AIRefreshService {
 
     // Check if there's already a pending refresh for this key
     if (this.pendingRefreshes.has(refreshKey)) {
-      console.log(`[AI Refresh] Waiting for pending ${insightType} refresh`);
-      return this.pendingRefreshes.get(refreshKey)!;
+      logger.debug(`[AI Refresh] Waiting for pending ${insightType} refresh`);
+      return this.pendingRefreshes.get(refreshKey) as Promise<T>;
     }
 
     // Create refresh promise
@@ -104,7 +105,7 @@ class AIRefreshService {
     userId?: string,
     priority: number = 0
   ): Promise<T> {
-    console.log(`[AI Refresh] Refreshing ${insightType} (fingerprint: ${fingerprint.substring(0, 8)}...)`);
+    logger.debug(`[AI Refresh] Refreshing ${insightType} (fingerprint: ${fingerprint.substring(0, 8)}...)`);
 
     try {
       // Execute AI call with caching
@@ -123,10 +124,10 @@ class AIRefreshService {
         userId
       );
 
-      console.log(`[AI Refresh] Successfully refreshed ${insightType}`);
+      logger.debug(`[AI Refresh] Successfully refreshed ${insightType}`);
       return result;
     } catch (error) {
-      console.error(`[AI Refresh] Failed to refresh ${insightType}:`, error);
+      logger.error(`[AI Refresh] Failed to refresh ${insightType}:`, error);
       throw error;
     }
   }
@@ -161,8 +162,8 @@ class AIRefreshService {
   /**
    * Queue a refresh request (for background processing)
    */
-  queueRefresh(request: RefreshRequest): void {
-    this.refreshQueue.push(request);
+  queueRefresh<T>(request: RefreshRequest<T>): void {
+    this.refreshQueue.push(request as RefreshRequest<unknown>);
     this.processQueue();
   }
 
@@ -191,7 +192,7 @@ class AIRefreshService {
           request.priority
         );
       } catch (error) {
-        console.error(`[AI Refresh] Failed to process queued refresh for ${request.insightType}:`, error);
+        logger.error(`[AI Refresh] Failed to process queued refresh for ${request.insightType}:`, error);
       }
     }
 

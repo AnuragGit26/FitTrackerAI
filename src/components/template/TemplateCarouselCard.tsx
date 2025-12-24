@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles, Flame } from 'lucide-react';
 import { WorkoutTemplate } from '@/types/workout';
+import { logger } from '@/utils/logger';
 
 interface TemplateCarouselCardProps {
     template: WorkoutTemplate;
@@ -19,11 +20,6 @@ export function TemplateCarouselCard({ template, onClick }: TemplateCarouselCard
 
     const hasValidImage = template.imageUrl && !imageError;
 
-    // Debug: Log image URL
-    if (template.imageUrl && imageLoading) {
-        console.log(`Loading image for "${template.name}":`, template.imageUrl);
-    }
-
     return (
         <motion.div
             onClick={onClick}
@@ -39,12 +35,12 @@ export function TemplateCarouselCard({ template, onClick }: TemplateCarouselCard
                         alt={template.name}
                         className="w-full h-full object-cover"
                         onError={(e) => {
-                            console.error(`Failed to load image for "${template.name}":`, template.imageUrl, e);
+                            logger.error(`Failed to load image for "${template.name}":`, e, { imageUrl: template.imageUrl });
                             setImageError(true);
                             setImageLoading(false);
                         }}
                         onLoad={() => {
-                            console.log(`Successfully loaded image for "${template.name}"`);
+                            logger.debug(`Successfully loaded image for "${template.name}"`);
                             setImageLoading(false);
                         }}
                         crossOrigin="anonymous"

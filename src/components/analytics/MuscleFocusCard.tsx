@@ -17,34 +17,6 @@ export function MuscleFocusCard({ workouts }: MuscleFocusCardProps) {
       .map(([muscle]) => muscle);
   }, [workouts]);
 
-  const getMuscleLabel = (muscle: MuscleGroup): string => {
-    const labels: Record<MuscleGroup, string> = {
-      [MuscleGroup.CHEST]: 'Chest',
-      [MuscleGroup.UPPER_CHEST]: 'Upper Chest',
-      [MuscleGroup.LOWER_CHEST]: 'Lower Chest',
-      [MuscleGroup.BACK]: 'Back',
-      [MuscleGroup.LATS]: 'Lats',
-      [MuscleGroup.TRAPS]: 'Traps',
-      [MuscleGroup.RHOMBOIDS]: 'Rhomboids',
-      [MuscleGroup.LOWER_BACK]: 'Lower Back',
-      [MuscleGroup.SHOULDERS]: 'Shoulders',
-      [MuscleGroup.FRONT_DELTS]: 'Front Delts',
-      [MuscleGroup.SIDE_DELTS]: 'Side Delts',
-      [MuscleGroup.REAR_DELTS]: 'Rear Delts',
-      [MuscleGroup.BICEPS]: 'Biceps',
-      [MuscleGroup.TRICEPS]: 'Triceps',
-      [MuscleGroup.FOREARMS]: 'Forearms',
-      [MuscleGroup.ABS]: 'Abs',
-      [MuscleGroup.OBLIQUES]: 'Obliques',
-      [MuscleGroup.QUADS]: 'Quads',
-      [MuscleGroup.HAMSTRINGS]: 'Hamstrings',
-      [MuscleGroup.GLUTES]: 'Glutes',
-      [MuscleGroup.CALVES]: 'Calves',
-      [MuscleGroup.HIP_FLEXORS]: 'Hip Flexors',
-    };
-    return labels[muscle] || muscle;
-  };
-
   const getFocusZone = (muscles: MuscleGroup[]): string => {
     const hasUpper = muscles.some((m) =>
       [MuscleGroup.CHEST, MuscleGroup.SHOULDERS, MuscleGroup.BACK, MuscleGroup.LATS].includes(m)

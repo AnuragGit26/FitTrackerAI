@@ -1,3 +1,5 @@
+import { logger } from '@/utils/logger';
+
 interface VersionInfo {
     version: string;
     timestamp: number;
@@ -19,8 +21,7 @@ class CacheVersionService {
         try {
             const currentVersion = await this.fetchCurrentVersion();
             if (!currentVersion) {
-                // eslint-disable-next-line no-console
-                console.warn('[CacheVersionService] Could not fetch version.json, skipping cache check');
+                logger.warn('[CacheVersionService] Could not fetch version.json, skipping cache check');
                 return false;
             }
 
@@ -38,8 +39,7 @@ class CacheVersionService {
             }
 
             // Version changed - clear all caches
-            // eslint-disable-next-line no-console
-            console.log(`[CacheVersionService] Version changed: ${storedVersion} -> ${currentVersion.version}`);
+            logger.log(`[CacheVersionService] Version changed: ${storedVersion} -> ${currentVersion.version}`);
             await this.clearAllCaches();
 
             // Store new version
@@ -50,8 +50,7 @@ class CacheVersionService {
 
             return true;
         } catch (error) {
-            // eslint-disable-next-line no-console
-            console.error('[CacheVersionService] Error checking version:', error);
+            logger.error('[CacheVersionService] Error checking version:', error);
             return false;
         }
     }
@@ -64,8 +63,7 @@ class CacheVersionService {
             }
             return await response.json();
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('[CacheVersionService] Failed to fetch version.json:', error);
+      logger.error('[CacheVersionService] Failed to fetch version.json:', error);
       return null;
     }
     }
@@ -78,8 +76,7 @@ class CacheVersionService {
             if ('caches' in window) {
                 const cacheNames = await caches.keys();
                 const clearPromises = cacheNames.map(cacheName => {
-                    // eslint-disable-next-line no-console
-                    console.log(`[CacheVersionService] Clearing cache: ${cacheName}`);
+                    logger.log(`[CacheVersionService] Clearing cache: ${cacheName}`);
                     return caches.delete(cacheName);
                 });
                 await Promise.all(clearPromises);
@@ -89,8 +86,7 @@ class CacheVersionService {
             if ('serviceWorker' in navigator) {
                 const registrations = await navigator.serviceWorker.getRegistrations();
                 const unregisterPromises = registrations.map(registration => {
-                    // eslint-disable-next-line no-console
-                    console.log('[CacheVersionService] Unregistering service worker');
+                    logger.log('[CacheVersionService] Unregistering service worker');
                     return registration.unregister();
                 });
                 await Promise.all(unregisterPromises);
@@ -116,11 +112,9 @@ class CacheVersionService {
                 }
             }
 
-            // eslint-disable-next-line no-console
-            console.log('[CacheVersionService] All caches cleared successfully');
+            logger.log('[CacheVersionService] All caches cleared successfully');
         } catch (error) {
-            // eslint-disable-next-line no-console
-            console.error('[CacheVersionService] Error clearing caches:', error);
+            logger.error('[CacheVersionService] Error clearing caches:', error);
         } finally {
             this.isClearingCache = false;
         }
@@ -133,8 +127,7 @@ class CacheVersionService {
 
                 messageChannel.port1.onmessage = (event) => {
                     if (event.data && event.data.type === 'CACHE_CLEARED') {
-                        // eslint-disable-next-line no-console
-                        console.log('[CacheVersionService] Service worker confirmed cache cleared');
+                        logger.log('[CacheVersionService] Service worker confirmed cache cleared');
                         resolve();
                     }
                 };
@@ -146,8 +139,7 @@ class CacheVersionService {
 
         // Timeout after 5 seconds
         setTimeout(() => {
-          // eslint-disable-next-line no-console
-          console.warn('[CacheVersionService] Service worker cache clear timeout');
+          logger.warn('[CacheVersionService] Service worker cache clear timeout');
           resolve();
         }, 5000);
             });

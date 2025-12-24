@@ -211,9 +211,14 @@ class NotificationService {
       // Register periodic sync for recovery checks
       if (this.swRegistration && 'periodicSync' in this.swRegistration) {
         try {
-          await (this.swRegistration as any).periodicSync.register('recovery-check', {
-            minInterval: 60 * 60 * 1000, // 1 hour
-          });
+          const registration = this.swRegistration as ServiceWorkerRegistration & {
+            periodicSync?: { register: (tag: string, options: { minInterval: number }) => Promise<void> };
+          };
+          if (registration.periodicSync) {
+            await registration.periodicSync.register('recovery-check', {
+              minInterval: 60 * 60 * 1000, // 1 hour
+            });
+          }
         } catch (error) {
           console.warn('[NotificationService] Periodic sync not supported:', error);
         }
@@ -232,7 +237,7 @@ class NotificationService {
         .toArray();
 
       return allSettings
-        .map((setting: any) => setting.value as ScheduledNotification)
+        .map((setting: { value: unknown }) => setting.value as ScheduledNotification)
         .filter((n) => n && n.scheduledTime > Date.now());
     } catch (error) {
       console.error('[NotificationService] Failed to get scheduled notifications:', error);
@@ -249,7 +254,7 @@ class NotificationService {
         .toArray();
 
       await Promise.all(
-        allNotifications.map((setting: any) => dbHelpers.deleteSetting(setting.key))
+        allNotifications.map((setting: { key: string }) => dbHelpers.deleteSetting(setting.key))
       );
 
       // Notify service worker

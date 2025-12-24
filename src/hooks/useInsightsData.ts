@@ -93,7 +93,7 @@ export function useInsightsData() {
           }
           if (cachedRecommendations) {
             // Skip old format cached data (check if first prediction has 'muscle' property which indicates old format)
-            const firstPred = cachedRecommendations.recoveryPredictions?.[0] as any;
+            const firstPred = cachedRecommendations.recoveryPredictions?.[0];
             if (firstPred && 'muscle' in firstPred && !('dayLabel' in firstPred)) {
               console.warn('[useInsightsData] Old format detected in cached recommendations, skipping');
               // Don't set cached data, let it regenerate
@@ -148,7 +148,7 @@ export function useInsightsData() {
         }
         if (results.recommendations) {
           // Fix old format if detected (has 'muscle' property instead of 'dayLabel')
-          const firstPred = results.recommendations.recoveryPredictions?.[0] as any;
+          const firstPred = results.recommendations.recoveryPredictions?.[0];
           if (firstPred && 'muscle' in firstPred && !('dayLabel' in firstPred)) {
             // Old format detected - skip it and let the main service regenerate
             console.warn('[useInsightsData] Old format detected in SW recommendations, skipping');

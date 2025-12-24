@@ -20,6 +20,8 @@ interface UserProfile {
   weight?: number; // stored in kg
   height?: number; // stored in cm
   profilePicture?: string; // base64 data URL
+  version?: number; // For optimistic locking
+  deletedAt?: Date | null; // Soft delete timestamp
 }
 
 interface UserState {

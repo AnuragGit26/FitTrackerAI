@@ -29,6 +29,7 @@ class Analytics {
 
     // In development, log to console
     if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
       console.log('[Analytics]', eventName, properties);
     }
 

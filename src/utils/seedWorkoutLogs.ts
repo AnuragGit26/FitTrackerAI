@@ -3,6 +3,7 @@ import { exerciseLibrary } from '@/services/exerciseLibrary';
 import { Workout } from '@/types/workout';
 import { WorkoutExercise, WorkoutSet } from '@/types/exercise';
 import { MuscleGroup } from '@/types/muscle';
+import { logger } from '@/utils/logger';
 
 /**
  * Seed the database with varied workout logs for testing analytics and insights
@@ -505,18 +506,18 @@ export async function seedWorkoutLogs(userId: string = 'user-1'): Promise<void> 
   });
 
   // Save all workouts
-  console.log(`Seeding ${workouts.length} workout logs...`);
+  logger.info(`Seeding ${workouts.length} workout logs...`);
 
   for (const workout of workouts) {
     try {
       const id = await dataService.createWorkout(workout);
-      console.log(`✓ Created workout ${id} - ${workout.workoutType} on ${workout.date.toLocaleDateString()}`);
+      logger.debug(`✓ Created workout ${id} - ${workout.workoutType} on ${workout.date.toLocaleDateString()}`);
     } catch (error) {
-      console.error(`✗ Failed to create workout:`, error);
+      logger.error(`✗ Failed to create workout:`, error);
     }
   }
 
-  console.log(`\n✅ Successfully seeded ${workouts.length} workout logs!`);
-  console.log(`Workouts span from ${workouts[workouts.length - 1].date.toLocaleDateString()} to ${workouts[0].date.toLocaleDateString()}`);
+  logger.info(`\n✅ Successfully seeded ${workouts.length} workout logs!`);
+  logger.info(`Workouts span from ${workouts[workouts.length - 1].date.toLocaleDateString()} to ${workouts[0].date.toLocaleDateString()}`);
 }
 

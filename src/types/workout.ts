@@ -17,6 +17,8 @@ export interface Workout {
   musclesTargeted: MuscleGroup[];
   workoutType: string;
   mood?: WorkoutMood;
+  version?: number; // For optimistic locking
+  deletedAt?: Date | null; // Soft delete timestamp
 }
 
 export type TemplateCategory = 'strength' | 'hypertrophy' | 'cardio' | 'home' | 'flexibility';
@@ -46,6 +48,8 @@ export interface WorkoutTemplate {
   createdAt: Date;
   updatedAt: Date;
   matchPercentage?: number; // for AI recommendations
+  version?: number; // For optimistic locking
+  deletedAt?: Date | null; // Soft delete timestamp
 }
 
 export interface PlannedExercise {
@@ -73,5 +77,7 @@ export interface PlannedWorkout {
   completedWorkoutId?: number;
   createdAt: Date;
   updatedAt: Date;
+  version?: number; // For optimistic locking
+  deletedAt?: Date | null; // Soft delete timestamp
 }
 

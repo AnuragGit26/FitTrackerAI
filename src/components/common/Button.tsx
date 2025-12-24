@@ -57,7 +57,7 @@ export function Button({
       disabled={disabled || isLoading}
       whileHover={!disabled && !isLoading && !shouldReduceMotion ? { scale: 1.02 } : undefined}
       whileTap={!disabled && !isLoading && !shouldReduceMotion ? { scale: 0.98 } : undefined}
-      {...(props as any)}
+      {...props}
     >
       {isLoading ? (
         <span className="flex items-center gap-2">
