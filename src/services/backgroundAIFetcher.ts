@@ -32,6 +32,8 @@ interface BackgroundFetchContext {
     workoutCount: number;
   };
   readinessScore: number;
+  userLevel?: 'beginner' | 'intermediate' | 'advanced';
+  baseRestInterval?: number;
 }
 
 export class BackgroundAIFetcher {
@@ -73,6 +75,8 @@ export class BackgroundAIFetcher {
       metrics: context.metrics,
       previousMetrics: context.previousMetrics,
       readinessScore: context.readinessScore,
+      userLevel: context.userLevel,
+      baseRestInterval: context.baseRestInterval,
     };
 
     // Send request to service worker

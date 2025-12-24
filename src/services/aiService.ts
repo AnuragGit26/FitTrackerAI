@@ -25,6 +25,16 @@ interface AIAnalysisContext {
   userLevel: string;
   weakPoints: string[];
   progressTrends: Record<string, unknown>;
+  personalRecords?: PersonalRecord[];
+  consistencyScore?: number;
+  volumeTrend?: Array<{ date: string; totalVolume: number }>;
+  readinessScore?: number;
+  symmetryScore?: number;
+  focusDistribution?: { legs: number; push: number; pull: number };
+  workoutCount?: number;
+  currentStreak?: number;
+  equipment?: string[];
+  workoutFrequency?: number;
 }
 
 export const aiService = {
@@ -50,38 +60,84 @@ export const aiService = {
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-      const workoutSummary = formatWorkoutSummary(context.recentWorkouts);
+      const workoutSummary = formatWorkoutSummary(context.recentWorkouts, context.personalRecords || []);
       const muscleSummary = formatMuscleStatus(context.muscleStatuses);
+      
+      // Calculate readiness score if not provided
+      const readinessScore = context.readinessScore ?? (context.muscleStatuses.length > 0
+        ? Math.round(context.muscleStatuses.reduce((sum, m) => sum + m.recoveryPercentage, 0) / context.muscleStatuses.length)
+        : 85);
+      
+      // Build comprehensive context
+      const prSummary = context.personalRecords && context.personalRecords.length > 0
+        ? `\nRecent Personal Records:\n${context.personalRecords.slice(0, 5).map(pr => 
+            `${pr.exerciseName}: ${pr.maxWeight}kg x ${pr.maxReps} reps (${new Date(pr.date).toLocaleDateString()})`
+          ).join('\n')}`
+        : '';
+      
+      const volumeInfo = context.volumeTrend && context.volumeTrend.length > 0
+        ? `\nVolume Trend: Current ${Math.round(context.volumeTrend[context.volumeTrend.length - 1]?.totalVolume || 0)}kg, Previous ${Math.round(context.volumeTrend[0]?.totalVolume || 0)}kg${context.volumeTrend.length > 1 ? ` (${context.volumeTrend[0]?.totalVolume > 0 ? Math.round(((context.volumeTrend[context.volumeTrend.length - 1].totalVolume - context.volumeTrend[0].totalVolume) / context.volumeTrend[0].totalVolume) * 100) : 0}% change)` : ''}`
+        : '';
+      
+      const consistencyInfo = context.consistencyScore !== undefined
+        ? `\nConsistency Score: ${context.consistencyScore}%`
+        : '';
+      
+      const focusInfo = context.focusDistribution
+        ? `\nTraining Focus: Legs ${context.focusDistribution.legs}%, Push ${context.focusDistribution.push}%, Pull ${context.focusDistribution.pull}%`
+        : '';
+      
+      const symmetryInfo = context.symmetryScore !== undefined
+        ? `\nSymmetry Score: ${context.symmetryScore}%`
+        : '';
+      
+      const streakInfo = context.currentStreak !== undefined
+        ? `\nCurrent Streak: ${context.currentStreak} days`
+        : '';
+      
+      const workoutCountInfo = context.workoutCount !== undefined
+        ? `\nWorkouts This Month: ${context.workoutCount}`
+        : '';
+      
+      const equipmentInfo = context.equipment && context.equipment.length > 0
+        ? `\nAvailable Equipment: ${context.equipment.join(', ')}`
+        : '';
+      
+      const frequencyInfo = context.workoutFrequency !== undefined
+        ? `\nTarget Frequency: ${context.workoutFrequency} days/week`
+        : '';
 
       const prompt = `
-You are a certified personal trainer analyzing a gym member's workout data.
+You are a certified personal trainer providing TODAY'S FOCUS - a single, actionable, data-packed recommendation for this user's workout today.
 
 Recent Training Summary:
-${workoutSummary}
+${workoutSummary}${prSummary}
 
 Muscle Recovery Status:
 ${muscleSummary}
+Readiness Score: ${readinessScore}%${volumeInfo}${consistencyInfo}${focusInfo}${symmetryInfo}${streakInfo}${workoutCountInfo}
 
 User Profile:
 - Experience Level: ${context.userLevel}
-- Goals: ${context.userGoals.join(', ')}
+- Goals: ${context.userGoals.join(', ')}${equipmentInfo}${frequencyInfo}
 - Identified Weak Points: ${context.weakPoints.join(', ') || 'None identified'}
 
-Please provide a comprehensive analysis in JSON format with the following structure:
+Provide a JSON response with this structure:
 {
-  "analysis": "A brief analysis of their training balance and volume",
-  "recommendations": ["Recommendation 1", "Recommendation 2", "Recommendation 3"],
-  "warnings": ["Any warnings about overtraining or imbalances"],
-  "motivation": "A motivational message based on their progress",
-  "tip": "One specific tip to optimize their training"
+  "analysis": "A brief analysis (2-3 sentences) referencing specific metrics like recovery percentages, volume trends, PRs, or consistency scores",
+  "recommendations": ["ONE primary recommendation for TODAY that is data-packed and specific. Include concrete numbers like 'Your chest is 95% recovered' or 'Volume is up 12% this month' or 'Based on your 3 PRs this week'. Keep it to 1-2 sentences max.", "Secondary recommendation if relevant", "Third recommendation if relevant"],
+  "warnings": ["Any warnings about overtraining or imbalances with specific data"],
+  "motivation": "A motivational message referencing their actual progress (mention specific achievements like PRs, consistency, or volume increases)",
+  "tip": "One specific, actionable tip with data context (e.g., 'Your quads are 90% recovered - perfect for leg day' or 'Your consistency is 85% - maintain this pace')"
 }
 
 CRITICAL OUTPUT REQUIREMENTS:
-- Output ONLY valid JSON, no markdown formatting, no code blocks, no explanatory text before or after
+- The FIRST recommendation MUST be the "Today's Focus" - make it crisp, clear, and data-packed (1-2 sentences)
+- Include specific metrics, percentages, or numbers in recommendations when possible
+- Reference concrete data points (PRs, recovery percentages, volume changes, consistency scores)
+- Output ONLY valid JSON, no markdown formatting, no code blocks, no explanatory text
 - All text must be clean, professional, and polished - no gibberish, typos, or unpolished content
-- Ensure all strings are properly formatted and grammatically correct
 - Return only the JSON object, nothing else
-- Be concise, actionable, and encouraging.
       `;
 
       const tokenEstimate = estimatePromptTokens(prompt);
@@ -255,34 +311,56 @@ CRITICAL OUTPUT REQUIREMENTS:
 
       const workoutSummary = formatWorkoutSummary(workouts, personalRecords);
       const prSummary = personalRecords.length > 0
-        ? personalRecords.slice(0, 10).map(pr => `${pr.exerciseName}: ${pr.maxWeight}kg x ${pr.maxReps}`).join(', ')
+        ? personalRecords.slice(0, 10).map(pr => `${pr.exerciseName}: ${pr.maxWeight}kg x ${pr.maxReps} reps (${new Date(pr.date).toLocaleDateString()})`).join('\n')
         : 'No PRs yet';
       const volumeTrendSummary = volumeTrend.length > 20
         ? `${volumeTrend.slice(0, 10).map(v => `${v.date}: ${v.totalVolume}kg`).join(', ')}... (${volumeTrend.length} total weeks)`
         : volumeTrend.map(v => `${v.date}: ${v.totalVolume}kg`).join(', ');
+      
+      const volumeChange = volumeTrend.length > 1 && volumeTrend[0].totalVolume > 0
+        ? Math.round(((volumeTrend[volumeTrend.length - 1].totalVolume - volumeTrend[0].totalVolume) / volumeTrend[0].totalVolume) * 100)
+        : 0;
+      const consistencyChange = consistencyScore - previousConsistencyScore;
+      const workoutCountChange = workoutCount - previousWorkoutCount;
+      const prCount = personalRecords.length;
+      const recentPRs = personalRecords.filter(pr => {
+        const prDate = new Date(pr.date);
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        return prDate >= sevenDaysAgo;
+      }).length;
 
-      const prompt = `Analyze workout progress and provide insights in JSON format:
+      const prompt = `Analyze workout progress and provide detailed insights in JSON format:
 {
   "breakthrough": {
     "exercise": "exercise name or null",
     "projectedWeight": number or null,
     "improvementPercent": number or null,
-    "reason": "brief explanation"
+    "reason": "brief explanation with specific data points"
   },
-  "plateaus": [{"exercise": "name", "weight": number, "weeksStuck": number, "suggestion": "tip"}],
+  "plateaus": [{"exercise": "name", "weight": number, "weeksStuck": number, "suggestion": "specific tip with data context"}],
   "formChecks": [{"exercise": "name", "issue": "description", "muscleGroup": "muscle"}],
-  "trainingPatterns": [{"type": "sleep|caffeine|timing", "title": "title", "description": "description", "impact": "impact statement"}]
+  "trainingPatterns": [{"type": "sleep|caffeine|timing", "title": "title", "description": "description", "impact": "impact statement with metrics"}]
 }
 
-Workout data: ${workoutSummary}
-PRs: ${prSummary}
-Volume trend: ${volumeTrendSummary}
-Consistency: ${consistencyScore}% (was ${previousConsistencyScore}%)
-Workouts this month: ${workoutCount} (was ${previousWorkoutCount})
+Performance Metrics:
+- Consistency Score: ${consistencyScore}% (${consistencyChange >= 0 ? '+' : ''}${consistencyChange}% change from previous period)
+- Workout Count: ${workoutCount} workouts this month (${workoutCountChange >= 0 ? '+' : ''}${workoutCountChange} vs previous)
+- Volume Trend: ${volumeChange >= 0 ? '+' : ''}${volumeChange}% change (Current: ${Math.round(volumeTrend[volumeTrend.length - 1]?.totalVolume || 0)}kg, Previous: ${Math.round(volumeTrend[0]?.totalVolume || 0)}kg)
+- Personal Records: ${prCount} total PRs, ${recentPRs} in last 7 days
+
+Workout Data:
+${workoutSummary}
+
+Personal Records:
+${prSummary}
+
+Volume Trend (${volumeTrend.length} data points):
+${volumeTrendSummary}
 
 CRITICAL OUTPUT REQUIREMENTS:
 - Output ONLY valid JSON, no markdown formatting, no code blocks, no explanatory text before or after
 - All text fields must be clean, professional, and polished - no gibberish, typos, or unpolished content
+- Include specific metrics, percentages, and data points in explanations
 - Ensure all strings are properly formatted and grammatically correct
 - Return only the JSON object, nothing else.`;
 
@@ -381,22 +459,50 @@ CRITICAL OUTPUT REQUIREMENTS:
 
       const muscleSummary = formatMuscleStatus(muscleStatuses);
       const workoutSummary = formatWorkoutSummary(workouts);
+      
+      // Calculate recovery details
+      const overworkedMuscles = muscleStatuses.filter(m => m.recoveryStatus === 'overworked');
+      const readyMuscles = muscleStatuses.filter(m => m.recoveryStatus === 'ready');
+      const avgRecovery = muscleStatuses.length > 0
+        ? Math.round(muscleStatuses.reduce((sum, m) => sum + m.recoveryPercentage, 0) / muscleStatuses.length)
+        : 85;
+      const avgWorkload = muscleStatuses.length > 0
+        ? Math.round(muscleStatuses.reduce((sum, m) => sum + m.workloadScore, 0) / muscleStatuses.length)
+        : 0;
+      
+      // Get recent workout intensity
+      const recentWorkouts = workouts.slice(0, 5);
+      const avgRecentVolume = recentWorkouts.length > 0
+        ? Math.round(recentWorkouts.reduce((sum, w) => sum + w.totalVolume, 0) / recentWorkouts.length)
+        : 0;
 
-      const prompt = `Generate smart alerts in JSON format:
+      const prompt = `Generate smart alerts with detailed context in JSON format:
 {
   "readinessStatus": "optimal|good|moderate|low",
-  "readinessMessage": "actionable message",
-  "criticalAlerts": [{"type": "critical|warning", "title": "title", "message": "message", "muscleGroup": "muscle"}],
-  "suggestions": [{"type": "deload|sleep|nutrition", "title": "title", "description": "description"}],
+  "readinessMessage": "actionable message with specific readiness score and recovery data",
+  "criticalAlerts": [{"type": "critical|warning", "title": "title", "message": "message with specific metrics (recovery %, workload, hours since workout)", "muscleGroup": "muscle"}],
+  "suggestions": [{"type": "deload|sleep|nutrition", "title": "title", "description": "description with data context"}],
   "nutritionEvents": [{"time": "HH:MM", "relativeTime": "In X mins", "title": "title", "description": "description", "type": "protein|carb|meal"}]
 }
 
-Readiness: ${readinessScore}%
-Muscle status: ${muscleSummary}
-Recent workouts: ${workoutSummary}
+Recovery Metrics:
+- Readiness Score: ${readinessScore}%
+- Average Recovery: ${avgRecovery}%
+- Average Workload: ${avgWorkload}
+- Overworked Muscles: ${overworkedMuscles.length}
+- Ready Muscles: ${readyMuscles.length}
+
+Muscle Status Details:
+${muscleSummary}
+
+Recent Training:
+${workoutSummary}
+- Average Recent Volume: ${avgRecentVolume}kg per workout
+- Recent Workouts: ${recentWorkouts.length} in last period
 
 CRITICAL OUTPUT REQUIREMENTS:
 - Output ONLY valid JSON, no markdown formatting, no code blocks, no explanatory text before or after
+- Include specific metrics (percentages, hours, volumes) in messages and descriptions
 - All text fields must be clean, professional, and polished - no gibberish, typos, or unpolished content
 - Ensure all strings are properly formatted and grammatically correct
 - Return only the JSON object, nothing else.`;
@@ -479,30 +585,58 @@ CRITICAL OUTPUT REQUIREMENTS:
       const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
       const muscleSummary = formatMuscleStatus(muscleStatuses);
+      
+      // Get ready muscle groups with recovery percentages
+      const readyMuscles = muscleStatuses
+        .filter(m => m.recoveryPercentage >= 75)
+        .sort((a, b) => b.recoveryPercentage - a.recoveryPercentage)
+        .slice(0, 10);
+      const readyMusclesList = readyMuscles.length > 0
+        ? readyMuscles.map(m => `${m.muscle} (${m.recoveryPercentage}%)`).join(', ')
+        : 'None ready';
+      
+      // Get recent workout types to avoid repetition
+      const recentWorkoutTypes = workouts.slice(0, 5).map(w => {
+        const exercises = w.exercises.map(e => e.exerciseName).join(', ');
+        return `${new Date(w.date).toLocaleDateString()}: ${exercises.substring(0, 50)}...`;
+      }).join('\n');
 
-      const prompt = `Generate workout recommendations in JSON format:
+      const prompt = `Generate workout recommendations with comprehensive context in JSON format:
 {
   "readinessStatus": "Go Heavy|Moderate|Rest",
   "recommendedWorkout": {
     "name": "workout name",
-    "description": "why this workout",
+    "description": "why this workout with specific recovery data",
     "duration": number in minutes,
     "intensity": "low|medium|high",
     "muscleGroups": ["muscle1", "muscle2"],
-    "reason": "explanation"
+    "reason": "explanation with specific recovery percentages and readiness score"
   },
   "imbalances": [{"muscle": "muscle", "leftVolume": number, "rightVolume": number, "imbalancePercent": number}],
-  "correctiveExercises": [{"name": "exercise", "description": "why", "targetMuscle": "muscle", "category": "imbalance|posture|weakness"}],
+  "correctiveExercises": [{"name": "exercise", "description": "why with data context", "targetMuscle": "muscle", "category": "imbalance|posture|weakness"}],
   "recoveryPredictions": [{"dayLabel": "Mon", "workoutType": "push|pull|legs|rest", "recoveryPercentage": number, "prPotential": ["exercise"], "fatigueWarnings": ["warning"]}]
 }
 
-Readiness: ${readinessScore}%
-Symmetry: ${symmetryScore}%
-Focus: Legs ${focusDistribution.legs}%, Push ${focusDistribution.push}%, Pull ${focusDistribution.pull}%
-Muscle status: ${muscleSummary}
+Recovery & Readiness:
+- Readiness Score: ${readinessScore}%
+- Ready Muscle Groups: ${readyMusclesList}
+- User Level: ${userLevel}
+- Base Rest Interval: ${baseRestInterval} hours
+
+Balance Metrics:
+- Symmetry Score: ${symmetryScore}%
+- Focus Distribution: Legs ${focusDistribution.legs}%, Push ${focusDistribution.push}%, Pull ${focusDistribution.pull}%
+
+Muscle Status Details:
+${muscleSummary}
+
+Recent Workouts (to avoid repetition):
+${recentWorkoutTypes || 'No recent workouts'}
 
 CRITICAL OUTPUT REQUIREMENTS:
 - Output ONLY valid JSON, no markdown formatting, no code blocks, no explanatory text before or after
+- Include specific recovery percentages and readiness data in recommendations
+- Reference ready muscle groups with their recovery percentages
 - All text fields must be clean, professional, and polished - no gibberish, typos, or unpolished content
 - Ensure all strings are properly formatted and grammatically correct
 - Return only the JSON object, nothing else.`;
@@ -520,6 +654,21 @@ CRITICAL OUTPUT REQUIREMENTS:
       if (parsed) {
         const cleaned = sanitizeAIResponse(parsed) as Record<string, unknown>;
         const recommendedWorkout = cleaned.recommendedWorkout as Record<string, unknown> | undefined;
+        const finalRecoveryPredictions = (Array.isArray(cleaned.recoveryPredictions) && cleaned.recoveryPredictions.length > 0)
+          ? (cleaned.recoveryPredictions as unknown[]).map((pred: unknown, i: number) => {
+              const prediction = pred as Record<string, unknown>;
+              const rawDayLabel = String(prediction.dayLabel || '');
+              const cleanedDayLabel = cleanPlainTextResponse(rawDayLabel);
+              return {
+                date: new Date(Date.now() + i * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                dayLabel: cleanedDayLabel,
+                workoutType: String(prediction.workoutType || '') as 'push' | 'pull' | 'legs' | 'rest',
+                recoveryPercentage: typeof prediction.recoveryPercentage === 'number' ? prediction.recoveryPercentage : 0,
+                prPotential: (Array.isArray(prediction.prPotential) ? prediction.prPotential : []).map((p: unknown) => cleanPlainTextResponse(String(p))),
+                fatigueWarnings: (Array.isArray(prediction.fatigueWarnings) ? prediction.fatigueWarnings : []).map((w: unknown) => cleanPlainTextResponse(String(w))),
+              };
+            })
+          : calculatedPredictions;
         return {
           readinessScore,
           readinessStatus: String(cleaned.readinessStatus || 'Moderate'),
@@ -557,19 +706,7 @@ CRITICAL OUTPUT REQUIREMENTS:
               reason: cleanPlainTextResponse(String(exercise.reason || exercise.description || '')),
             };
           }),
-          recoveryPredictions: (Array.isArray(cleaned.recoveryPredictions) && cleaned.recoveryPredictions.length > 0)
-            ? (cleaned.recoveryPredictions as unknown[]).map((pred: unknown, i: number) => {
-                const prediction = pred as Record<string, unknown>;
-                return {
-                  date: new Date(Date.now() + i * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                  dayLabel: cleanPlainTextResponse(String(prediction.dayLabel || '')),
-                  workoutType: String(prediction.workoutType || '') as 'push' | 'pull' | 'legs' | 'rest',
-                  recoveryPercentage: typeof prediction.recoveryPercentage === 'number' ? prediction.recoveryPercentage : 0,
-                  prPotential: (Array.isArray(prediction.prPotential) ? prediction.prPotential : []).map((p: unknown) => cleanPlainTextResponse(String(p))),
-                  fatigueWarnings: (Array.isArray(prediction.fatigueWarnings) ? prediction.fatigueWarnings : []).map((w: unknown) => cleanPlainTextResponse(String(w))),
-                };
-              })
-            : calculatedPredictions,
+          recoveryPredictions: finalRecoveryPredictions,
         };
       }
     } catch (error) {
@@ -796,14 +933,15 @@ function calculateRecoveryPredictions(
       workoutType = 'rest';
     }
 
-    predictions.push({
+    const prediction = {
       date: targetDate.toISOString().split('T')[0],
       dayLabel,
       workoutType,
-      recoveryPercentage: avgRecovery,
+      recoveryPercentage: Math.max(1, avgRecovery), // Ensure minimum 1% so bar is always visible
       prPotential: avgRecovery >= 90 ? ['Optimal recovery for PR attempts'] : [],
       fatigueWarnings: avgRecovery < 50 ? ['High fatigue - consider rest'] : [],
-    });
+    };
+    predictions.push(prediction);
   }
 
   return predictions;

@@ -8,7 +8,9 @@ import { CacheFirst, NetworkFirst, StaleWhileRevalidate } from 'workbox-strategi
 import type { AIContext, InsightType, AIInsightsResults, AIInsightsErrors, SyncEvent, PeriodicSyncEvent } from '@/types/serviceWorker';
 import type { Workout } from '@/types/workout';
 import type { MuscleStatus } from '@/types/muscle';
+import { MuscleGroup, DEFAULT_RECOVERY_SETTINGS } from '@/types/muscle';
 import type { PersonalRecord, StrengthProgression } from '@/types/analytics';
+import type { RecoveryPrediction, WorkoutRecommendations, ProgressAnalysis, SmartAlerts } from '@/types/insights';
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -69,7 +71,7 @@ self.addEventListener('sync', (event: SyncEvent) => {
     if (event.tag === 'ai-request-sync') {
         event.waitUntil(handleAISync());
     }
-    
+
     if (event.tag === 'workout-reminder-sync') {
         event.waitUntil(checkScheduledWorkoutReminders());
     }
@@ -86,7 +88,7 @@ self.addEventListener('periodicsync', (event: PeriodicSyncEvent) => {
     if (event.tag === 'ai-refresh-check') {
         event.waitUntil(checkAIRefresh());
     }
-    
+
     if (event.tag === 'recovery-check') {
         event.waitUntil(checkMuscleRecovery());
     }
@@ -109,7 +111,7 @@ async function checkAIRefresh(): Promise<void> {
 
 async function checkScheduledWorkoutReminders(): Promise<void> {
     console.log('[SW] Checking scheduled workout reminders');
-    
+
     // Send message to clients to check and trigger reminders
     const clients = await self.clients.matchAll();
     clients.forEach((client) => {
@@ -122,7 +124,7 @@ async function checkScheduledWorkoutReminders(): Promise<void> {
 
 async function checkMuscleRecovery(): Promise<void> {
     console.log('[SW] Checking muscle recovery status');
-    
+
     // Send message to clients to check muscle recovery
     const clients = await self.clients.matchAll();
     clients.forEach((client) => {
@@ -185,6 +187,16 @@ self.addEventListener('message', (event: MessageEvent) => {
 
     if (event.data && event.data.type === 'CLEAR_ALL_NOTIFICATIONS') {
         clearAllScheduledNotifications();
+    }
+
+    if (event.data && event.data.type === 'CLEAR_ALL_CACHES') {
+        // Clear all caches from service worker context
+        clearAllServiceWorkerCaches().then(() => {
+            // Send confirmation back to client
+            if (event.ports && event.ports[0]) {
+                event.ports[0].postMessage({ type: 'CACHE_CLEARED' });
+            }
+        });
     }
 });
 
@@ -254,7 +266,7 @@ async function showMuscleRecoveryNotification(notification: any): Promise<void> 
     const muscleName = notification.data.muscle
         ? notification.data.muscle.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
         : 'Muscle';
-    
+
     const title = `${muscleName} is Ready!`;
     const body = `Your ${muscleName.toLowerCase()} has fully recovered and is ready for training`;
     const icon = '/assests/img/fittrackAI.png';
@@ -338,6 +350,31 @@ async function getCachedAIResponse(
     }
 }
 
+async function clearAllServiceWorkerCaches(): Promise<void> {
+    try {
+        // eslint-disable-next-line no-console
+        console.log('[SW] Clearing all caches...');
+        
+        // Get all cache names
+        const cacheNames = await caches.keys();
+        
+        // Delete all caches
+        const deletePromises = cacheNames.map(cacheName => {
+            // eslint-disable-next-line no-console
+            console.log(`[SW] Deleting cache: ${cacheName}`);
+            return caches.delete(cacheName);
+        });
+        
+        await Promise.all(deletePromises);
+        // eslint-disable-next-line no-console
+        console.log('[SW] All caches cleared successfully');
+    } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('[SW] Failed to clear caches:', error);
+        throw error;
+    }
+}
+
 // Send message to all connected clients
 async function sendMessageToClients(type: string, data: Record<string, unknown>): Promise<void> {
     try {
@@ -396,9 +433,11 @@ async function fetchAIInsightsInBackground(
                     context.currentMonthWorkouts,
                     context.muscleStatuses,
                     context.readinessScore,
-                    context.metrics.symmetryScore,
-                    context.metrics.focusDistribution,
-                    apiKey
+                    context.metrics.symmetryScore || 85,
+                    context.metrics.focusDistribution || { legs: 33, push: 33, pull: 34 },
+                    apiKey,
+                    context.userLevel || 'intermediate',
+                    context.baseRestInterval || 48
                 );
             }
 
@@ -451,34 +490,56 @@ async function generateProgressAnalysisInSW(
     try {
         const workoutSummary = formatWorkoutSummaryForSW(workouts, personalRecords);
         const prSummary = personalRecords.length > 0
-            ? personalRecords.slice(0, 10).map((pr) => `${pr.exerciseName}: ${pr.maxWeight}kg x ${pr.maxReps}`).join(', ')
+            ? personalRecords.slice(0, 10).map((pr) => `${pr.exerciseName}: ${pr.maxWeight}kg x ${pr.maxReps} reps (${new Date(pr.date).toLocaleDateString()})`).join('\n')
             : 'No PRs yet';
         const volumeTrendSummary = volumeTrend.length > 20
             ? `${volumeTrend.slice(0, 10).map((v) => `${v.date}: ${v.totalVolume}kg`).join(', ')}... (${volumeTrend.length} total weeks)`
             : volumeTrend.map((v) => `${v.date}: ${v.totalVolume}kg`).join(', ');
 
-        const prompt = `Analyze workout progress and provide insights in JSON format:
+        const volumeChange = volumeTrend.length > 1 && volumeTrend[0].totalVolume > 0
+            ? Math.round(((volumeTrend[volumeTrend.length - 1].totalVolume - volumeTrend[0].totalVolume) / volumeTrend[0].totalVolume) * 100)
+            : 0;
+        const consistencyChange = consistencyScore - previousConsistencyScore;
+        const workoutCountChange = workoutCount - previousWorkoutCount;
+        const prCount = personalRecords.length;
+        const recentPRs = personalRecords.filter((pr: PersonalRecord) => {
+            const prDate = new Date(pr.date);
+            const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+            return prDate >= sevenDaysAgo;
+        }).length;
+
+        const prompt = `Analyze workout progress and provide detailed insights in JSON format:
 {
   "breakthrough": {
     "exercise": "exercise name or null",
     "projectedWeight": number or null,
     "improvementPercent": number or null,
-    "reason": "brief explanation"
+    "reason": "brief explanation with specific data points"
   },
-  "plateaus": [{"exercise": "name", "weight": number, "weeksStuck": number, "suggestion": "tip"}],
+  "plateaus": [{"exercise": "name", "weight": number, "weeksStuck": number, "suggestion": "specific tip with data context"}],
   "formChecks": [{"exercise": "name", "issue": "description", "muscleGroup": "muscle"}],
-  "trainingPatterns": [{"type": "sleep|caffeine|timing", "title": "title", "description": "description", "impact": "impact statement"}]
+  "trainingPatterns": [{"type": "sleep|caffeine|timing", "title": "title", "description": "description", "impact": "impact statement with metrics"}]
 }
 
-Workout data: ${workoutSummary}
-PRs: ${prSummary}
-Volume trend: ${volumeTrendSummary}
-Consistency: ${consistencyScore}% (was ${previousConsistencyScore}%)
-Workouts this month: ${workoutCount} (was ${previousWorkoutCount})
+Performance Metrics:
+- Consistency Score: ${consistencyScore}% (${consistencyChange >= 0 ? '+' : ''}${consistencyChange}% change from previous period)
+- Workout Count: ${workoutCount} workouts this month (${workoutCountChange >= 0 ? '+' : ''}${workoutCountChange} vs previous)
+- Volume Trend: ${volumeChange >= 0 ? '+' : ''}${volumeChange}% change (Current: ${Math.round(volumeTrend[volumeTrend.length - 1]?.totalVolume || 0)}kg, Previous: ${Math.round(volumeTrend[0]?.totalVolume || 0)}kg)
+- Personal Records: ${prCount} total PRs, ${recentPRs} in last 7 days
+
+Workout Data:
+${workoutSummary}
+
+Personal Records:
+${prSummary}
+
+Volume Trend (${volumeTrend.length} data points):
+${volumeTrendSummary}
 
 CRITICAL OUTPUT REQUIREMENTS:
 - Output ONLY valid JSON, no markdown formatting, no code blocks, no explanatory text before or after
 - All text fields must be clean, professional, and polished - no gibberish, typos, or unpolished content
+- Include specific metrics, percentages, and data points in explanations
 - Ensure all strings are properly formatted and grammatically correct
 - Return only the JSON object, nothing else.`;
 
@@ -500,11 +561,11 @@ CRITICAL OUTPUT REQUIREMENTS:
 
         const data = await response.json();
         let text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-        
+
         // Clean the response text
         text = text.replace(/^```(?:json|javascript|typescript)?\s*\n?/gm, '').replace(/```\s*$/gm, '').trim();
         const jsonMatch = text.match(/\{[\s\S]*\}/);
-        
+
         if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0]);
             // Clean string fields
@@ -512,7 +573,7 @@ CRITICAL OUTPUT REQUIREMENTS:
                 if (typeof str !== 'string') return String(str || '').trim();
                 return str.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1').replace(/`(.*?)`/g, '$1').trim();
             };
-            
+
             const cleanObject = (obj: unknown): unknown => {
                 if (typeof obj === 'string') return cleanString(obj);
                 if (Array.isArray(obj)) return obj.map(cleanObject);
@@ -525,9 +586,9 @@ CRITICAL OUTPUT REQUIREMENTS:
                 }
                 return obj;
             };
-            
+
             const cleaned = cleanObject(parsed);
-            
+
             return {
                 breakthrough: cleaned.breakthrough?.exercise ? {
                     exercise: cleanString(cleaned.breakthrough.exercise),
@@ -550,27 +611,27 @@ CRITICAL OUTPUT REQUIREMENTS:
                 plateaus: (Array.isArray(cleaned.plateaus) ? cleaned.plateaus : []).map((p: unknown) => {
                     const plateau = p as Record<string, unknown>;
                     return {
-                    exercise: cleanString(p.exercise || ''),
-                    weight: p.weight,
-                    weeksStuck: p.weeksStuck,
-                    suggestion: cleanString(plateau.suggestion || ''),
+                        exercise: cleanString(p.exercise || ''),
+                        weight: p.weight,
+                        weeksStuck: p.weeksStuck,
+                        suggestion: cleanString(plateau.suggestion || ''),
                     };
                 }),
                 formChecks: (Array.isArray(cleaned.formChecks) ? cleaned.formChecks : []).map((f: unknown) => {
                     const formCheck = f as Record<string, unknown>;
                     return {
-                    exercise: cleanString(f.exercise || ''),
-                    issue: cleanString(f.issue || ''),
-                    muscleGroup: cleanString(formCheck.muscleGroup || ''),
+                        exercise: cleanString(f.exercise || ''),
+                        issue: cleanString(f.issue || ''),
+                        muscleGroup: cleanString(formCheck.muscleGroup || ''),
                     };
                 }),
                 trainingPatterns: (Array.isArray(cleaned.trainingPatterns) ? cleaned.trainingPatterns : []).map((t: unknown) => {
                     const pattern = t as Record<string, unknown>;
                     return {
-                    type: t.type,
-                    title: cleanString(t.title || ''),
-                    description: cleanString(t.description || ''),
-                    impact: cleanString(pattern.impact || ''),
+                        type: t.type,
+                        title: cleanString(t.title || ''),
+                        description: cleanString(t.description || ''),
+                        impact: cleanString(pattern.impact || ''),
                     };
                 }),
             };
@@ -604,21 +665,49 @@ async function generateSmartAlertsInSW(
         const muscleSummary = formatMuscleStatusForSW(muscleStatuses);
         const workoutSummary = formatWorkoutSummaryForSW(workouts);
 
-        const prompt = `Generate smart alerts in JSON format:
+        // Calculate recovery details
+        const overworkedMuscles = muscleStatuses.filter((m: MuscleStatus) => m.recoveryStatus === 'overworked');
+        const readyMuscles = muscleStatuses.filter((m: MuscleStatus) => m.recoveryStatus === 'ready');
+        const avgRecovery = muscleStatuses.length > 0
+            ? Math.round(muscleStatuses.reduce((sum: number, m: MuscleStatus) => sum + m.recoveryPercentage, 0) / muscleStatuses.length)
+            : 85;
+        const avgWorkload = muscleStatuses.length > 0
+            ? Math.round(muscleStatuses.reduce((sum: number, m: MuscleStatus) => sum + m.workloadScore, 0) / muscleStatuses.length)
+            : 0;
+
+        // Get recent workout intensity
+        const recentWorkouts = workouts.slice(0, 5);
+        const avgRecentVolume = recentWorkouts.length > 0
+            ? Math.round(recentWorkouts.reduce((sum: number, w: Workout) => sum + w.totalVolume, 0) / recentWorkouts.length)
+            : 0;
+
+        const prompt = `Generate smart alerts with detailed context in JSON format:
 {
   "readinessStatus": "optimal|good|moderate|low",
-  "readinessMessage": "actionable message",
-  "criticalAlerts": [{"type": "critical|warning", "title": "title", "message": "message", "muscleGroup": "muscle"}],
-  "suggestions": [{"type": "deload|sleep|nutrition", "title": "title", "description": "description"}],
+  "readinessMessage": "actionable message with specific readiness score and recovery data",
+  "criticalAlerts": [{"type": "critical|warning", "title": "title", "message": "message with specific metrics (recovery %, workload, hours since workout)", "muscleGroup": "muscle"}],
+  "suggestions": [{"type": "deload|sleep|nutrition", "title": "title", "description": "description with data context"}],
   "nutritionEvents": [{"time": "HH:MM", "relativeTime": "In X mins", "title": "title", "description": "description", "type": "protein|carb|meal"}]
 }
 
-Readiness: ${readinessScore}%
-Muscle status: ${muscleSummary}
-Recent workouts: ${workoutSummary}
+Recovery Metrics:
+- Readiness Score: ${readinessScore}%
+- Average Recovery: ${avgRecovery}%
+- Average Workload: ${avgWorkload}
+- Overworked Muscles: ${overworkedMuscles.length}
+- Ready Muscles: ${readyMuscles.length}
+
+Muscle Status Details:
+${muscleSummary}
+
+Recent Training:
+${workoutSummary}
+- Average Recent Volume: ${avgRecentVolume}kg per workout
+- Recent Workouts: ${recentWorkouts.length} in last period
 
 CRITICAL OUTPUT REQUIREMENTS:
 - Output ONLY valid JSON, no markdown formatting, no code blocks, no explanatory text before or after
+- Include specific metrics (percentages, hours, volumes) in messages and descriptions
 - All text fields must be clean, professional, and polished - no gibberish, typos, or unpolished content
 - Ensure all strings are properly formatted and grammatically correct
 - Return only the JSON object, nothing else.`;
@@ -641,11 +730,11 @@ CRITICAL OUTPUT REQUIREMENTS:
 
         const data = await response.json();
         let text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-        
+
         // Clean the response text
         text = text.replace(/^```(?:json|javascript|typescript)?\s*\n?/gm, '').replace(/```\s*$/gm, '').trim();
         const jsonMatch = text.match(/\{[\s\S]*\}/);
-        
+
         if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0]);
             // Clean string fields
@@ -653,7 +742,7 @@ CRITICAL OUTPUT REQUIREMENTS:
                 if (typeof str !== 'string') return String(str || '').trim();
                 return str.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1').replace(/`(.*?)`/g, '$1').trim();
             };
-            
+
             return {
                 readinessScore,
                 readinessStatus: parsed.readinessStatus || 'good',
@@ -661,31 +750,31 @@ CRITICAL OUTPUT REQUIREMENTS:
                 criticalAlerts: (Array.isArray(parsed.criticalAlerts) ? parsed.criticalAlerts : []).map((a: unknown, i: number) => {
                     const alert = a as Record<string, unknown>;
                     return {
-                    id: `alert-${i}`,
-                    type: a.type,
-                    title: cleanString(a.title || ''),
-                    message: cleanString(a.message || ''),
-                    muscleGroup: cleanString(alert.muscleGroup || ''),
+                        id: `alert-${i}`,
+                        type: a.type,
+                        title: cleanString(a.title || ''),
+                        message: cleanString(a.message || ''),
+                        muscleGroup: cleanString(alert.muscleGroup || ''),
                     };
                 }),
                 suggestions: (Array.isArray(parsed.suggestions) ? parsed.suggestions : []).map((s: unknown, i: number) => {
                     const suggestion = s as Record<string, unknown>;
                     return {
-                    id: `suggestion-${i}`,
-                    type: s.type,
-                    title: cleanString(s.title || ''),
-                    description: cleanString(suggestion.description || ''),
+                        id: `suggestion-${i}`,
+                        type: s.type,
+                        title: cleanString(s.title || ''),
+                        description: cleanString(suggestion.description || ''),
                     };
                 }),
                 nutritionEvents: (Array.isArray(parsed.nutritionEvents) ? parsed.nutritionEvents : []).map((e: unknown, i: number) => {
                     const event = e as Record<string, unknown>;
                     return {
-                    id: `nutrition-${i}`,
-                    time: e.time,
-                    relativeTime: cleanString(e.relativeTime || ''),
-                    title: cleanString(e.title || ''),
-                    description: cleanString(e.description || ''),
-                    type: event.type,
+                        id: `nutrition-${i}`,
+                        time: e.time,
+                        relativeTime: cleanString(e.relativeTime || ''),
+                        title: cleanString(e.title || ''),
+                        description: cleanString(e.description || ''),
+                        type: event.type,
                     };
                 }),
             };
@@ -697,46 +786,236 @@ CRITICAL OUTPUT REQUIREMENTS:
     return generateMockSmartAlertsInSW(workouts, muscleStatuses, readinessScore);
 }
 
+// Helper function to categorize muscle groups
+function categorizeMuscleGroupSW(muscle: MuscleGroup): 'legs' | 'push' | 'pull' {
+    const legs = [
+        MuscleGroup.QUADS,
+        MuscleGroup.HAMSTRINGS,
+        MuscleGroup.GLUTES,
+        MuscleGroup.CALVES,
+        MuscleGroup.HIP_FLEXORS,
+    ];
+    const push = [
+        MuscleGroup.CHEST,
+        MuscleGroup.UPPER_CHEST,
+        MuscleGroup.LOWER_CHEST,
+        MuscleGroup.FRONT_DELTS,
+        MuscleGroup.SIDE_DELTS,
+        MuscleGroup.TRICEPS,
+    ];
+    const pull = [
+        MuscleGroup.BACK,
+        MuscleGroup.LATS,
+        MuscleGroup.TRAPS,
+        MuscleGroup.RHOMBOIDS,
+        MuscleGroup.BICEPS,
+        MuscleGroup.REAR_DELTS,
+    ];
+    if (legs.includes(muscle)) return 'legs';
+    if (push.includes(muscle)) return 'push';
+    if (pull.includes(muscle)) return 'pull';
+    return 'legs';
+}
+
+// Calculate recovery predictions for the next 7 days (duplicated from aiService.ts for SW context)
+function calculateRecoveryPredictionsSW(
+    muscleStatuses: MuscleStatus[],
+    userLevel: 'beginner' | 'intermediate' | 'advanced',
+    baseRestInterval: number
+): RecoveryPrediction[] {
+    const predictions: RecoveryPrediction[] = [];
+    const today = new Date();
+
+    // Helper to add days
+    const addDays = (date: Date, days: number): Date => {
+        const result = new Date(date);
+        result.setDate(result.getDate() + days);
+        return result;
+    };
+
+    // Helper to format date as day label
+    const formatDayLabel = (date: Date): string => {
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        return days[date.getDay()];
+    };
+
+    // Helper to calculate hours difference
+    const differenceInHours = (dateLeft: Date, dateRight: Date): number => {
+        const diffTime = dateLeft.getTime() - dateRight.getTime();
+        return Math.round(diffTime / (1000 * 60 * 60));
+    };
+
+    for (let i = 0; i < 7; i++) {
+        const targetDate = addDays(today, i);
+        const dayLabel = formatDayLabel(targetDate);
+
+        let totalRecovery = 0;
+        let count = 0;
+        const readyMusclesByCategory: { legs: MuscleGroup[]; push: MuscleGroup[]; pull: MuscleGroup[] } = {
+            legs: [],
+            push: [],
+            pull: [],
+        };
+
+        muscleStatuses.forEach((status) => {
+            if (!status.lastWorked) {
+                totalRecovery += 100;
+                count++;
+                const category = categorizeMuscleGroupSW(status.muscle);
+                readyMusclesByCategory[category].push(status.muscle);
+                return;
+            }
+
+            const lastWorked = status.lastWorked instanceof Date
+                ? status.lastWorked
+                : new Date(status.lastWorked);
+
+            const hoursSinceWorkout = differenceInHours(targetDate, lastWorked);
+
+            if (hoursSinceWorkout < 0) {
+                totalRecovery += status.recoveryPercentage;
+                count++;
+                if (status.recoveryPercentage >= 75) {
+                    const category = categorizeMuscleGroupSW(status.muscle);
+                    readyMusclesByCategory[category].push(status.muscle);
+                }
+                return;
+            }
+
+            const recoverySettings = DEFAULT_RECOVERY_SETTINGS;
+            let baseRecoveryHours = 48;
+
+            if (userLevel === 'beginner') {
+                baseRecoveryHours = (recoverySettings.beginnerRestDays[status.muscle] || 2) * 24;
+            } else if (userLevel === 'intermediate') {
+                baseRecoveryHours = (recoverySettings.intermediateRestDays[status.muscle] || 2) * 24;
+            } else {
+                baseRecoveryHours = (recoverySettings.advancedRestDays[status.muscle] || 1) * 24;
+            }
+
+            if (baseRestInterval !== undefined) {
+                const defaultBase = 48;
+                const ratio = baseRestInterval / defaultBase;
+                baseRecoveryHours = baseRecoveryHours * ratio;
+            }
+
+            const workloadMultiplier = 1 + (status.workloadScore / 100);
+            const adjustedRecoveryHours = baseRecoveryHours * workloadMultiplier;
+
+            const projectedRecovery = Math.min(
+                100,
+                Math.max(0, (hoursSinceWorkout / adjustedRecoveryHours) * 100)
+            );
+
+            totalRecovery += projectedRecovery;
+            count++;
+
+            if (projectedRecovery >= 75) {
+                const category = categorizeMuscleGroupSW(status.muscle);
+                readyMusclesByCategory[category].push(status.muscle);
+            }
+        });
+
+        const avgRecovery = count > 0 ? Math.round(totalRecovery / count) : 85;
+
+        let workoutType: 'push' | 'pull' | 'legs' | 'rest' = 'rest';
+        if (readyMusclesByCategory.legs.length >= 2) {
+            workoutType = 'legs';
+        } else if (readyMusclesByCategory.push.length >= 2) {
+            workoutType = 'push';
+        } else if (readyMusclesByCategory.pull.length >= 2) {
+            workoutType = 'pull';
+        } else if (avgRecovery >= 75) {
+            workoutType = 'rest';
+        }
+
+        const prediction = {
+            date: targetDate.toISOString().split('T')[0],
+            dayLabel,
+            workoutType,
+            recoveryPercentage: Math.max(1, avgRecovery), // Ensure minimum 1% so bar is always visible
+            prPotential: avgRecovery >= 90 ? ['Optimal recovery for PR attempts'] : [],
+            fatigueWarnings: avgRecovery < 50 ? ['High fatigue - consider rest'] : [],
+        };
+        predictions.push(prediction);
+    }
+
+    return predictions;
+}
+
 async function generateWorkoutRecommendationsInSW(
     workouts: Workout[],
     muscleStatuses: MuscleStatus[],
     readinessScore: number,
     symmetryScore: number,
     focusDistribution: { legs: number; push: number; pull: number },
-    apiKey?: string
+    apiKey?: string,
+    userLevel: 'beginner' | 'intermediate' | 'advanced' = 'intermediate',
+    baseRestInterval: number = 48
 ): Promise<WorkoutRecommendations> {
+    // Always calculate recovery predictions (don't rely on AI for this)
+    const calculatedPredictions = calculateRecoveryPredictionsSW(muscleStatuses, userLevel, baseRestInterval);
+
     if (!apiKey) {
-        return generateMockWorkoutRecommendationsInSW(workouts, muscleStatuses, readinessScore, symmetryScore, focusDistribution);
+        return generateMockWorkoutRecommendationsInSW(workouts, muscleStatuses, readinessScore, symmetryScore, focusDistribution, calculatedPredictions);
     }
 
     try {
         const muscleSummary = formatMuscleStatusForSW(muscleStatuses);
 
-        const prompt = `Generate workout recommendations in JSON format:
+        // Get ready muscle groups with recovery percentages
+        const readyMuscles = muscleStatuses
+            .filter((m: MuscleStatus) => m.recoveryPercentage >= 75)
+            .sort((a: MuscleStatus, b: MuscleStatus) => b.recoveryPercentage - a.recoveryPercentage)
+            .slice(0, 10);
+        const readyMusclesList = readyMuscles.length > 0
+            ? readyMuscles.map((m: MuscleStatus) => `${m.muscle} (${m.recoveryPercentage}%)`).join(', ')
+            : 'None ready';
+
+        // Get recent workout types to avoid repetition
+        const recentWorkoutTypes = workouts.slice(0, 5).map((w: Workout) => {
+            const exercises = w.exercises?.map((e: any) => e.exerciseName).join(', ') || 'No exercises';
+            return `${new Date(w.date).toLocaleDateString()}: ${exercises.substring(0, 50)}...`;
+        }).join('\n');
+
+        const prompt = `Generate workout recommendations with comprehensive context in JSON format:
 {
   "readinessStatus": "Go Heavy|Moderate|Rest",
   "recommendedWorkout": {
     "name": "workout name",
-    "description": "why this workout",
+    "description": "why this workout with specific recovery data",
     "duration": number in minutes,
     "intensity": "low|medium|high",
     "muscleGroups": ["muscle1", "muscle2"],
     "exercises": [{"name": "exercise", "sets": number, "reps": "8-12", "rest": "60s"}]
   },
   "muscleBalance": {
-    "imbalances": [{"muscle": "name", "side": "left|right|both", "severity": "mild|moderate|severe", "recommendation": "suggestion"}]
+    "imbalances": [{"muscle": "muscle", "leftVolume": number, "rightVolume": number, "imbalancePercent": number}]
   },
-  "correctiveExercises": [{"name": "exercise", "muscle": "target muscle", "reason": "why", "sets": number, "reps": string}],
+  "correctiveExercises": [{"name": "exercise", "description": "why with data context", "targetMuscle": "muscle", "category": "imbalance|posture|weakness"}],
   "recoveryPredictions": [{"muscle": "name", "hoursUntilReady": number, "recommendedActivity": "rest|light|moderate|heavy"}]
 }
 
-Readiness: ${readinessScore}%
-Symmetry: ${symmetryScore}%
-Focus: Legs ${focusDistribution.legs}%, Push ${focusDistribution.push}%, Pull ${focusDistribution.pull}%
-Muscle status: ${muscleSummary}
+Recovery & Readiness:
+- Readiness Score: ${readinessScore}%
+- Ready Muscle Groups: ${readyMusclesList}
+- User Level: ${userLevel}
+- Base Rest Interval: ${baseRestInterval} hours
+
+Balance Metrics:
+- Symmetry Score: ${symmetryScore}%
+- Focus Distribution: Legs ${focusDistribution.legs}%, Push ${focusDistribution.push}%, Pull ${focusDistribution.pull}%
+
+Muscle Status Details:
+${muscleSummary}
+
+Recent Workouts (to avoid repetition):
+${recentWorkoutTypes || 'No recent workouts'}
 
 CRITICAL OUTPUT REQUIREMENTS:
 - Output ONLY valid JSON, no markdown formatting, no code blocks, no explanatory text before or after
+- Include specific recovery percentages and readiness data in recommendations
+- Reference ready muscle groups with their recovery percentages
 - All text fields must be clean, professional, and polished - no gibberish, typos, or unpolished content
 - Ensure all strings are properly formatted and grammatically correct
 - Return only the JSON object, nothing else.`;
@@ -759,11 +1038,11 @@ CRITICAL OUTPUT REQUIREMENTS:
 
         const data = await response.json();
         let text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-        
+
         // Clean the response text
         text = text.replace(/^```(?:json|javascript|typescript)?\s*\n?/gm, '').replace(/```\s*$/gm, '').trim();
         const jsonMatch = text.match(/\{[\s\S]*\}/);
-        
+
         if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0]);
             // Clean string fields
@@ -771,59 +1050,52 @@ CRITICAL OUTPUT REQUIREMENTS:
                 if (typeof str !== 'string') return String(str || '').trim();
                 return str.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1').replace(/`(.*?)`/g, '$1').trim();
             };
-            
+
             return {
                 readinessScore,
                 readinessStatus: parsed.readinessStatus || 'Moderate',
                 recommendedWorkout: parsed.recommendedWorkout ? {
+                    id: 'rec-1',
                     name: cleanString(parsed.recommendedWorkout.name || ''),
                     description: cleanString(parsed.recommendedWorkout.description || ''),
                     duration: parsed.recommendedWorkout.duration,
                     intensity: parsed.recommendedWorkout.intensity,
                     muscleGroups: (parsed.recommendedWorkout.muscleGroups || []).map((m: any) => cleanString(String(m))),
-                    exercises: (parsed.recommendedWorkout.exercises || []).map((e: any) => ({
-                        name: cleanString(e.name || ''),
-                        sets: e.sets,
-                        reps: cleanString(e.reps || ''),
-                        rest: cleanString(e.rest || ''),
-                    })),
-                } : null,
+                    reason: cleanString(parsed.recommendedWorkout.description || ''),
+                } : undefined,
                 muscleBalance: {
                     imbalances: (parsed.muscleBalance?.imbalances || []).map((im: any, i: number) => ({
                         id: `imbalance-${i}`,
-                        muscle: cleanString(im.muscle || ''),
-                        side: im.side,
-                        severity: im.severity,
-                        recommendation: cleanString(im.recommendation || ''),
+                        muscle: cleanString(im.muscle || '') as MuscleGroup,
+                        leftVolume: typeof im.leftVolume === 'number' ? im.leftVolume : 0,
+                        rightVolume: typeof im.rightVolume === 'number' ? im.rightVolume : 0,
+                        imbalancePercent: typeof im.imbalancePercent === 'number' ? im.imbalancePercent : 0,
+                        status: (typeof im.imbalancePercent === 'number' && im.imbalancePercent > 10 ? 'imbalanced' : 'balanced') as 'balanced' | 'imbalanced',
                     })),
+                    overallScore: symmetryScore,
                 },
                 correctiveExercises: (parsed.correctiveExercises || []).map((ex: any, i: number) => ({
                     id: `corrective-${i}`,
                     name: cleanString(ex.name || ''),
-                    muscle: cleanString(ex.muscle || ''),
-                    reason: cleanString(ex.reason || ''),
-                    sets: ex.sets,
-                    reps: cleanString(ex.reps || ''),
+                    description: cleanString(ex.description || ex.reason || ''),
+                    targetMuscle: cleanString(ex.targetMuscle || ex.muscle || '') as MuscleGroup,
+                    reason: cleanString(ex.reason || ex.description || ''),
+                    category: (cleanString(ex.category || '') as 'imbalance' | 'posture' | 'weakness' | 'mobility') || 'weakness',
                 })),
-                recoveryPredictions: (parsed.recoveryPredictions || []).map((pred: any, i: number) => ({
-                    id: `recovery-${i}`,
-                    muscle: cleanString(pred.muscle || ''),
-                    hoursUntilReady: pred.hoursUntilReady,
-                    recommendedActivity: pred.recommendedActivity,
-                })),
+                recoveryPredictions: calculatedPredictions,
             };
         }
     } catch (error) {
         console.error('[SW] AI service error:', error);
     }
 
-    return generateMockWorkoutRecommendationsInSW(workouts, muscleStatuses, readinessScore, symmetryScore, focusDistribution);
+    return generateMockWorkoutRecommendationsInSW(workouts, muscleStatuses, readinessScore, symmetryScore, focusDistribution, calculatedPredictions);
 }
 
 // Helper functions for formatting data in SW
 function formatWorkoutSummaryForSW(workouts: Workout[], personalRecords?: PersonalRecord[]): string {
     if (workouts.length === 0) return 'No workouts logged yet.';
-    
+
     const recent = workouts.slice(0, 10);
     return recent.map((w) => {
         const date = new Date(w.date).toLocaleDateString();
@@ -834,11 +1106,63 @@ function formatWorkoutSummaryForSW(workouts: Workout[], personalRecords?: Person
 
 function formatMuscleStatusForSW(muscleStatuses: MuscleStatus[]): string {
     if (muscleStatuses.length === 0) return 'No muscle status data available.';
-    
-    return muscleStatuses.map((m) => {
-        const name = m.muscle.replace(/_/g, ' ');
-        return `${name}: ${m.recoveryPercentage}% (${m.recoveryStatus})`;
-    }).join(', ');
+
+    // Group by recovery status
+    const byStatus = new Map<string, MuscleStatus[]>();
+    muscleStatuses.forEach((ms: MuscleStatus) => {
+        const status = ms.recoveryStatus;
+        if (!byStatus.has(status)) {
+            byStatus.set(status, []);
+        }
+        byStatus.get(status)!.push(ms);
+    });
+
+    const overworked = byStatus.get('overworked') || [];
+    const ready = byStatus.get('ready') || [];
+    const recovering = byStatus.get('recovering') || [];
+    const others = muscleStatuses.filter(
+        (ms: MuscleStatus) => !overworked.includes(ms) && !ready.includes(ms) && !recovering.includes(ms)
+    );
+
+    const parts: string[] = [];
+
+    if (overworked.length > 0) {
+        parts.push(
+            `Overworked: ${overworked.map((m: MuscleStatus) => {
+                const hoursAgo = m.lastWorked
+                    ? `${Math.round((Date.now() - new Date(m.lastWorked).getTime()) / (1000 * 60 * 60))}h ago`
+                    : 'never worked';
+                return `${m.muscle} (${m.recoveryPercentage}%, workload: ${m.workloadScore}, ${hoursAgo})`;
+            }).join(', ')}`
+        );
+    }
+
+    if (ready.length > 0) {
+        parts.push(
+            `Ready: ${ready.map((m: MuscleStatus) => {
+                const hoursAgo = m.lastWorked
+                    ? `${Math.round((Date.now() - new Date(m.lastWorked).getTime()) / (1000 * 60 * 60))}h ago`
+                    : 'never worked';
+                return `${m.muscle} (${m.recoveryPercentage}%, ${hoursAgo})`;
+            }).join(', ')}`
+        );
+    }
+
+    if (recovering.length > 0) {
+        const avgRecovery = Math.round(
+            recovering.reduce((sum: number, m: MuscleStatus) => sum + m.recoveryPercentage, 0) / recovering.length
+        );
+        const avgWorkload = Math.round(
+            recovering.reduce((sum: number, m: MuscleStatus) => sum + m.workloadScore, 0) / recovering.length
+        );
+        parts.push(`Recovering: ${recovering.length} muscles (avg ${avgRecovery}% recovery, ${avgWorkload} workload)`);
+    }
+
+    if (others.length > 0) {
+        parts.push(`Other: ${others.length} muscles`);
+    }
+
+    return parts.join('\n');
 }
 
 // Mock generation functions for when API key is not available
@@ -870,10 +1194,10 @@ function generateMockProgressAnalysisInSW(
         };
     }
 
-    const latestPR = personalRecords.length > 0 
+    const latestPR = personalRecords.length > 0
         ? personalRecords.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
         : undefined;
-    
+
     const breakthrough = latestPR ? {
         exercise: latestPR.exerciseName,
         projectedWeight: latestPR.maxWeight + (latestPR.maxWeight * 0.05),
@@ -909,11 +1233,11 @@ function generateMockSmartAlertsInSW(
     return {
         readinessScore,
         readinessStatus: readinessScore >= 80 ? 'optimal' : readinessScore >= 60 ? 'good' : 'moderate',
-        readinessMessage: readinessScore >= 80 
+        readinessMessage: readinessScore >= 80
             ? 'Your body is ready for intense training.'
             : readinessScore >= 60
-            ? 'You can train, but consider moderate intensity.'
-            : 'Consider taking a rest day or light activity.',
+                ? 'You can train, but consider moderate intensity.'
+                : 'Consider taking a rest day or light activity.',
         criticalAlerts: [],
         suggestions: [],
         nutritionEvents: [],
@@ -925,17 +1249,19 @@ function generateMockWorkoutRecommendationsInSW(
     muscleStatuses: MuscleStatus[],
     readinessScore: number,
     symmetryScore: number,
-    focusDistribution: { legs: number; push: number; pull: number }
+    focusDistribution: { legs: number; push: number; pull: number },
+    calculatedPredictions: RecoveryPrediction[]
 ): WorkoutRecommendations {
     return {
         readinessScore,
         readinessStatus: readinessScore >= 80 ? 'Go Heavy' : readinessScore >= 60 ? 'Moderate' : 'Rest',
-        recommendedWorkout: null,
+        recommendedWorkout: undefined,
         muscleBalance: {
             imbalances: [],
+            overallScore: symmetryScore,
         },
         correctiveExercises: [],
-        recoveryPredictions: [],
+        recoveryPredictions: calculatedPredictions,
     };
 }
 

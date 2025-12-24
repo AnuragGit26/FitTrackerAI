@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import eslint from 'vite-plugin-eslint'
 import path from 'path'
+import { versionPlugin } from './vite-plugin-version'
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -13,6 +14,7 @@ export default defineConfig({
   },
   plugins: [
     react(),
+    versionPlugin(),
     eslint({
       failOnError: false, // Don't fail build on ESLint errors in dev
       failOnWarning: false, // Don't fail build on ESLint warnings in dev

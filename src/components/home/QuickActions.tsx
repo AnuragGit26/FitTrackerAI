@@ -31,7 +31,7 @@ export function QuickActions() {
   const shouldReduceMotion = prefersReducedMotion();
 
   return (
-    <div className="px-5 pb-6">
+    <div className="px-5 mt-6 pb-6">
       <h3 className="text-slate-500 dark:text-gray-400 text-sm font-bold uppercase tracking-wider mb-3">
         Quick Actions
       </h3>

@@ -46,15 +46,15 @@ export function Home() {
         </motion.div>
         
         <motion.div variants={shouldReduceMotion ? {} : slideUp}>
+          <QuickActions />
+        </motion.div>
+        
+        <motion.div variants={shouldReduceMotion ? {} : slideUp}>
           <AIFocusCard />
         </motion.div>
         
         <motion.div variants={shouldReduceMotion ? {} : slideUp}>
           <MuscleRecoverySection />
-        </motion.div>
-        
-        <motion.div variants={shouldReduceMotion ? {} : slideUp}>
-          <QuickActions />
         </motion.div>
         
         <motion.div variants={shouldReduceMotion ? {} : slideUp}>

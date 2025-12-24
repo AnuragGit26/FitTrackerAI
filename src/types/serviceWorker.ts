@@ -36,6 +36,8 @@ export interface AIContext {
   };
   muscleStatuses: MuscleStatus[];
   readinessScore: number;
+  userLevel?: 'beginner' | 'intermediate' | 'advanced';
+  baseRestInterval?: number;
 }
 
 export type InsightType = 'progress' | 'insights' | 'recommendations';

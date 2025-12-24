@@ -23,6 +23,7 @@ import { InstallPrompt } from '@/components/common/InstallPrompt';
 import { MobileOnlyModal } from '@/components/common/MobileOnlyModal';
 import { analytics } from '@/utils/analytics';
 import { seedWorkoutLogs } from '@/utils/seedWorkoutLogs';
+import { cacheVersionService } from '@/services/cacheVersionService';
 
 // Lazy load route components for code splitting
 const Home = lazy(() => import('@/pages/Home').then(m => ({ default: m.Home })));
@@ -204,6 +205,13 @@ function App() {
   useEffect(() => {
     async function init() {
       try {
+        // Check version and clear cache if needed (must be first, before any other initialization)
+        const cacheCleared = await cacheVersionService.checkAndClearCacheIfNeeded();
+        if (cacheCleared) {
+          // Page will reload, so we can return early
+          return;
+        }
+        
         // Track app initialization
         analytics.track('app_initialized');
         

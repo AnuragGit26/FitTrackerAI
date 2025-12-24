@@ -81,11 +81,36 @@ export function useInsightsData() {
 
         // If we have any cached data, show it immediately
         if (cachedProgress || cachedAlerts || cachedRecommendations) {
-          if (cachedProgress) setProgressAnalysis(cachedProgress);
-          if (cachedAlerts) setSmartAlerts(cachedAlerts);
-          if (cachedRecommendations) setWorkoutRecommendations(cachedRecommendations);
-          setIsLoading(false);
-          lastFingerprintRef.current = fingerprint;
+          let dataWasSet = false;
+          
+          if (cachedProgress) {
+            setProgressAnalysis(cachedProgress);
+            dataWasSet = true;
+          }
+          if (cachedAlerts) {
+            setSmartAlerts(cachedAlerts);
+            dataWasSet = true;
+          }
+          if (cachedRecommendations) {
+            // Skip old format cached data (check if first prediction has 'muscle' property which indicates old format)
+            const firstPred = cachedRecommendations.recoveryPredictions?.[0] as any;
+            if (firstPred && 'muscle' in firstPred && !('dayLabel' in firstPred)) {
+              console.warn('[useInsightsData] Old format detected in cached recommendations, skipping');
+              // Don't set cached data, let it regenerate
+            } else {
+              setWorkoutRecommendations(cachedRecommendations);
+              dataWasSet = true;
+            }
+          }
+          
+          // Only mark as loaded if we actually set some data
+          if (dataWasSet) {
+            setIsLoading(false);
+            lastFingerprintRef.current = fingerprint;
+          } else {
+            // All cached data was invalid/old format, keep loading state
+            setIsLoading(true);
+          }
         } else {
           // No cached data, keep loading state
           setIsLoading(true);
@@ -122,8 +147,16 @@ export function useInsightsData() {
           await aiCallManager.setCached(fingerprint, 'insights', results.insights);
         }
         if (results.recommendations) {
-          setWorkoutRecommendations(results.recommendations);
-          await aiCallManager.setCached(fingerprint, 'recommendations', results.recommendations);
+          // Fix old format if detected (has 'muscle' property instead of 'dayLabel')
+          const firstPred = results.recommendations.recoveryPredictions?.[0] as any;
+          if (firstPred && 'muscle' in firstPred && !('dayLabel' in firstPred)) {
+            // Old format detected - skip it and let the main service regenerate
+            console.warn('[useInsightsData] Old format detected in SW recommendations, skipping');
+            // Don't set the old format data, but continue with state updates
+          } else {
+            setWorkoutRecommendations(results.recommendations);
+            await aiCallManager.setCached(fingerprint, 'recommendations', results.recommendations);
+          }
         }
 
         setLastUpdated(new Date());
@@ -233,6 +266,8 @@ export function useInsightsData() {
             metrics,
             previousMetrics,
             readinessScore,
+            userLevel: profile?.experienceLevel || 'intermediate',
+            baseRestInterval: settings.baseRestInterval || 48,
           },
           profile.id,
           ['progress', 'insights', 'recommendations']

@@ -27,14 +27,16 @@ function formatWorkoutAbbreviated(workout: Workout): string {
   return `${date}: ${workout.exercises.length}ex, ${Math.round(workout.totalVolume)}kg${caloriesInfo}`;
 }
 
-function formatWorkoutDetailed(workout: Workout): string {
+function formatWorkoutDetailed(workout: Workout, isPR: boolean = false): string {
   const date = new Date(workout.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const exercises = workout.exercises
     .slice(0, 5)
     .map(e => `${e.exerciseName} (${e.sets.length} sets)`)
     .join(', ');
   const caloriesInfo = workout.calories ? `, ${workout.calories} cal` : '';
-  return `${date}: ${exercises}${workout.exercises.length > 5 ? '...' : ''}, ${Math.round(workout.totalVolume)}kg${caloriesInfo}`;
+  const prIndicator = isPR ? ' [PR]' : '';
+  const duration = workout.duration ? `, ${Math.round(workout.duration)}min` : '';
+  return `${date}: ${exercises}${workout.exercises.length > 5 ? '...' : ''}, ${Math.round(workout.totalVolume)}kg${duration}${caloriesInfo}${prIndicator}`;
 }
 
 class AIDataProcessor {
@@ -264,13 +266,23 @@ class AIDataProcessor {
 
     if (overworked.length > 0) {
       parts.push(
-        `Overworked: ${overworked.map(m => `${m.muscle} (${m.recoveryPercentage}%)`).join(', ')}`
+        `Overworked: ${overworked.map(m => {
+          const hoursAgo = m.lastWorked 
+            ? `${Math.round((Date.now() - new Date(m.lastWorked).getTime()) / (1000 * 60 * 60))}h ago`
+            : 'never worked';
+          return `${m.muscle} (${m.recoveryPercentage}%, workload: ${m.workloadScore}, ${hoursAgo})`;
+        }).join(', ')}`
       );
     }
 
     if (ready.length > 0) {
       parts.push(
-        `Ready: ${ready.map(m => `${m.muscle} (${m.recoveryPercentage}%)`).join(', ')}`
+        `Ready: ${ready.map(m => {
+          const hoursAgo = m.lastWorked 
+            ? `${Math.round((Date.now() - new Date(m.lastWorked).getTime()) / (1000 * 60 * 60))}h ago`
+            : 'never worked';
+          return `${m.muscle} (${m.recoveryPercentage}%, ${hoursAgo})`;
+        }).join(', ')}`
       );
     }
 
@@ -278,7 +290,10 @@ class AIDataProcessor {
       const avgRecovery = Math.round(
         recovering.reduce((sum, m) => sum + m.recoveryPercentage, 0) / recovering.length
       );
-      parts.push(`Recovering: ${recovering.length} muscles (avg ${avgRecovery}%)`);
+      const avgWorkload = Math.round(
+        recovering.reduce((sum, m) => sum + m.workloadScore, 0) / recovering.length
+      );
+      parts.push(`Recovering: ${recovering.length} muscles (avg ${avgRecovery}% recovery, ${avgWorkload} workload)`);
     }
 
     if (others.length > 0) {
