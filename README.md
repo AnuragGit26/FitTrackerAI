@@ -5,7 +5,7 @@ A comprehensive mobile-first Progressive Web App (PWA) for gym exercise tracking
 ## Features
 
 - **Workout Logging**: Track exercises, sets, reps, and weights with an intuitive interface
-- **Muscle Recovery Tracking**: Visualize muscle recovery status with 3D anatomy maps
+- **Muscle Recovery Tracking**: Track muscle recovery status and readiness
 - **Analytics Dashboard**: View progress charts, volume trends, and workout frequency heatmaps
 - **AI-Powered Insights**: Get personalized workout recommendations using Gemini AI
 - **Offline-First**: All data stored locally with IndexedDB for offline functionality
@@ -68,7 +68,6 @@ src/
 ├── components/       # React components
 │   ├── layout/      # Layout components (Header, Navigation)
 │   ├── exercise/    # Exercise-related components
-│   ├── anatomy/     # Muscle anatomy visualization
 │   ├── analytics/   # Analytics charts and visualizations
 │   ├── insights/    # AI insights components
 │   └── common/      # Shared components (Button, Modal, etc.)
@@ -101,13 +100,6 @@ Without the API key, the app will still work but AI insights will show placehold
 3. Add exercises by searching and selecting from the library
 4. Log sets with reps and weight
 5. Complete sets and finish the workout
-
-### Viewing Muscle Recovery
-
-1. Navigate to the "Anatomy" tab
-2. View the 3D muscle map with color-coded recovery status
-3. Toggle between front and back views
-4. Click on muscles to see detailed recovery information
 
 ### Analytics
 

@@ -146,35 +146,36 @@ export function Insights() {
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.3 }}
               variants={prefersReducedMotion() ? {} : staggerContainerSlow}
+              className="flex flex-col gap-6"
             >
-              <motion.div variants={prefersReducedMotion() ? {} : {}}>
-                <BreakthroughCard breakthrough={progressAnalysis.breakthrough} />
-              </motion.div>
-              <motion.div variants={prefersReducedMotion() ? {} : {}}>
-                <PerformanceTrendsCards
-                  consistencyScore={progressAnalysis.consistencyScore}
-                  consistencyChange={progressAnalysis.consistencyChange}
-                  workoutCount={progressAnalysis.workoutCount}
-                  workoutCountChange={progressAnalysis.workoutCountChange}
-                />
-              </motion.div>
-              <motion.div variants={prefersReducedMotion() ? {} : {}}>
-                <VolumeTrendChart
-                  currentVolume={progressAnalysis.volumeTrend.current}
-                  previousVolume={progressAnalysis.volumeTrend.previous}
-                  changePercent={progressAnalysis.volumeTrend.changePercent}
-                  weeklyData={progressAnalysis.volumeTrend.weeklyData}
-                />
-              </motion.div>
-              <motion.div variants={prefersReducedMotion() ? {} : {}}>
-                <AttentionNeededSection
-                  plateaus={progressAnalysis.plateaus}
-                  formChecks={progressAnalysis.formChecks}
-                />
-              </motion.div>
-              <motion.div variants={prefersReducedMotion() ? {} : {}}>
-                <TrainingPatternsSection patterns={progressAnalysis.trainingPatterns} />
-              </motion.div>
+                <motion.div variants={prefersReducedMotion() ? {} : {}}>
+                  <BreakthroughCard breakthrough={progressAnalysis.breakthrough} />
+                </motion.div>
+                <motion.div variants={prefersReducedMotion() ? {} : {}}>
+                  <PerformanceTrendsCards
+                    consistencyScore={progressAnalysis.consistencyScore}
+                    consistencyChange={progressAnalysis.consistencyChange}
+                    workoutCount={progressAnalysis.workoutCount}
+                    workoutCountChange={progressAnalysis.workoutCountChange}
+                  />
+                </motion.div>
+                <motion.div variants={prefersReducedMotion() ? {} : {}}>
+                  <VolumeTrendChart
+                    currentVolume={progressAnalysis.volumeTrend.current}
+                    previousVolume={progressAnalysis.volumeTrend.previous}
+                    changePercent={progressAnalysis.volumeTrend.changePercent}
+                    weeklyData={progressAnalysis.volumeTrend.weeklyData}
+                  />
+                </motion.div>
+                <motion.div variants={prefersReducedMotion() ? {} : {}}>
+                  <AttentionNeededSection
+                    plateaus={progressAnalysis.plateaus}
+                    formChecks={progressAnalysis.formChecks}
+                  />
+                </motion.div>
+                <motion.div variants={prefersReducedMotion() ? {} : {}}>
+                  <TrainingPatternsSection patterns={progressAnalysis.trainingPatterns} />
+                </motion.div>
             </motion.div>
           )}
 
@@ -186,20 +187,21 @@ export function Insights() {
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.3 }}
               variants={prefersReducedMotion() ? {} : staggerContainerSlow}
+              className="flex flex-col gap-6"
             >
-              <motion.div variants={prefersReducedMotion() ? {} : {}}>
-                <SystemStatusCard alerts={smartAlerts} />
-              </motion.div>
-              <div className="w-full h-px bg-gray-200 dark:bg-white/5 mx-4" />
-              <motion.div variants={prefersReducedMotion() ? {} : {}}>
-                <CriticalAlertsCard alerts={smartAlerts.criticalAlerts} />
-              </motion.div>
-              <motion.div variants={prefersReducedMotion() ? {} : {}}>
-                <SuggestionsSection suggestions={smartAlerts.suggestions} />
-              </motion.div>
-              <motion.div variants={prefersReducedMotion() ? {} : {}}>
-                <NutritionTimingTimeline events={smartAlerts.nutritionEvents} />
-              </motion.div>
+                <motion.div variants={prefersReducedMotion() ? {} : {}}>
+                  <SystemStatusCard alerts={smartAlerts} />
+                </motion.div>
+                <div className="w-full h-px bg-gray-200 dark:bg-white/5 mx-4" />
+                <motion.div variants={prefersReducedMotion() ? {} : {}}>
+                  <CriticalAlertsCard alerts={smartAlerts.criticalAlerts} />
+                </motion.div>
+                <motion.div variants={prefersReducedMotion() ? {} : {}}>
+                  <SuggestionsSection suggestions={smartAlerts.suggestions} />
+                </motion.div>
+                <motion.div variants={prefersReducedMotion() ? {} : {}}>
+                  <NutritionTimingTimeline events={smartAlerts.nutritionEvents} />
+                </motion.div>
             </motion.div>
           )}
 
@@ -211,22 +213,23 @@ export function Insights() {
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.3 }}
               variants={prefersReducedMotion() ? {} : staggerContainerSlow}
+              className="flex flex-col gap-6"
             >
-              <motion.div variants={prefersReducedMotion() ? {} : {}}>
-                <ReadinessScoreHeader recommendations={workoutRecommendations} />
-              </motion.div>
-              <motion.div variants={prefersReducedMotion() ? {} : {}}>
-                <RecommendedWorkoutCard workout={workoutRecommendations.recommendedWorkout} />
-              </motion.div>
-              <motion.div variants={prefersReducedMotion() ? {} : {}}>
-                <MuscleBalanceSection imbalances={workoutRecommendations.muscleBalance.imbalances} />
-              </motion.div>
-              <motion.div variants={prefersReducedMotion() ? {} : {}}>
-                <CorrectiveExercisesCarousel exercises={workoutRecommendations.correctiveExercises} />
-              </motion.div>
-              <motion.div variants={prefersReducedMotion() ? {} : {}}>
-                <PredictedRecoveryChart predictions={workoutRecommendations.recoveryPredictions} />
-              </motion.div>
+                <motion.div variants={prefersReducedMotion() ? {} : {}}>
+                  <ReadinessScoreHeader recommendations={workoutRecommendations} />
+                </motion.div>
+                <motion.div variants={prefersReducedMotion() ? {} : {}}>
+                  <RecommendedWorkoutCard workout={workoutRecommendations.recommendedWorkout} />
+                </motion.div>
+                <motion.div variants={prefersReducedMotion() ? {} : {}}>
+                  <MuscleBalanceSection imbalances={workoutRecommendations.muscleBalance.imbalances} />
+                </motion.div>
+                <motion.div variants={prefersReducedMotion() ? {} : {}}>
+                  <CorrectiveExercisesCarousel exercises={workoutRecommendations.correctiveExercises} />
+                </motion.div>
+                <motion.div variants={prefersReducedMotion() ? {} : {}}>
+                  <PredictedRecoveryChart predictions={workoutRecommendations.recoveryPredictions} />
+                </motion.div>
             </motion.div>
           )}
         </AnimatePresence>

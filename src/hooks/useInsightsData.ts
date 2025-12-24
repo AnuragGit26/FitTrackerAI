@@ -24,7 +24,7 @@ export function useInsightsData() {
   const { workouts, loadWorkouts } = useWorkoutStore();
   const { profile } = useUserStore();
   const { settings } = useSettingsStore();
-  const { muscleStatuses } = useMuscleRecovery();
+  const { muscleStatuses, isLoading: isMuscleRecoveryLoading } = useMuscleRecovery();
   const [isLoading, setIsLoading] = useState(true);
   const [isBackgroundFetching, setIsBackgroundFetching] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
@@ -45,6 +45,11 @@ export function useInsightsData() {
     async function loadCachedData() {
       if (!profile) {
         setIsLoading(false);
+        return;
+      }
+
+      // Wait for muscle recovery to finish so we calculate the correct fingerprint
+      if (isMuscleRecoveryLoading) {
         return;
       }
 
@@ -93,7 +98,7 @@ export function useInsightsData() {
 
     loadCachedData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.id]);
+  }, [profile?.id, isMuscleRecoveryLoading]);
 
   // Listen for service worker messages
   useEffect(() => {
@@ -155,6 +160,11 @@ export function useInsightsData() {
       return;
     }
 
+    // Wait for dependencies to be ready before proceeding
+    if (isMuscleRecoveryLoading) {
+      return;
+    }
+
     isLoadingRef.current = true;
     setIsLoading(true);
     setIsBackgroundFetching(true);
@@ -162,12 +172,15 @@ export function useInsightsData() {
     try {
       await loadWorkouts(profile.id);
 
+      // Get fresh workouts from store after loadWorkouts completes (store updates synchronously)
+      const loadedWorkouts = useWorkoutStore.getState().workouts;
+
       const { start: monthStart } = getDateRange('30d');
       const previousMonthStart = new Date(monthStart);
       previousMonthStart.setMonth(previousMonthStart.getMonth() - 1);
 
-      const currentMonthWorkouts = filterWorkoutsByDateRange(workouts, '30d');
-      const previousMonthWorkouts = workouts.filter(
+      const currentMonthWorkouts = filterWorkoutsByDateRange(loadedWorkouts, '30d');
+      const previousMonthWorkouts = loadedWorkouts.filter(
         (w) => {
           const workoutDate = new Date(w.date);
           return workoutDate >= previousMonthStart && workoutDate < monthStart;
@@ -253,7 +266,7 @@ export function useInsightsData() {
       setIsBackgroundFetching(false);
       isLoadingRef.current = false;
     }
-  }, [profile?.id, profile?.experienceLevel, settings.baseRestInterval, workouts.length, muscleStatusesKey, loadWorkouts]);
+  }, [profile?.id, profile?.experienceLevel, settings.baseRestInterval, workouts.length, muscleStatusesKey, loadWorkouts, isMuscleRecoveryLoading]);
 
   // Direct fetch fallback (when SW not available)
   const loadInsightsDirectly = useCallback(async (
@@ -360,8 +373,13 @@ export function useInsightsData() {
   }, [profile?.id]);
 
   useEffect(() => {
-    loadInsights();
-  }, [loadInsights]);
+    // Only load insights when dependencies are ready
+    // Wait for muscle recovery to finish AND ensure we have at least attempted to load workouts
+    if (!isMuscleRecoveryLoading && profile && (workouts.length > 0 || muscleStatuses.length > 0)) {
+      // Only proceed if we have some data loaded (workouts or muscle statuses indicate initialization)
+      loadInsights();
+    }
+  }, [loadInsights, isMuscleRecoveryLoading, profile, workouts.length, muscleStatuses.length]);
 
   const refreshInsights = useCallback(() => {
     loadInsights();

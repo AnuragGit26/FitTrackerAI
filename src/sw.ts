@@ -269,7 +269,7 @@ async function showMuscleRecoveryNotification(notification: any): Promise<void> 
         data: {
             type: 'muscle_recovery',
             muscle: notification.data.muscle,
-            url: '/anatomy',
+            url: '/rest',
         },
     };
 
@@ -482,7 +482,7 @@ CRITICAL OUTPUT REQUIREMENTS:
 - Ensure all strings are properly formatted and grammatically correct
 - Return only the JSON object, nothing else.`;
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -623,7 +623,7 @@ CRITICAL OUTPUT REQUIREMENTS:
 - Ensure all strings are properly formatted and grammatically correct
 - Return only the JSON object, nothing else.`;
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -741,7 +741,7 @@ CRITICAL OUTPUT REQUIREMENTS:
 - Ensure all strings are properly formatted and grammatically correct
 - Return only the JSON object, nothing else.`;
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -773,6 +773,7 @@ CRITICAL OUTPUT REQUIREMENTS:
             };
             
             return {
+                readinessScore,
                 readinessStatus: parsed.readinessStatus || 'Moderate',
                 recommendedWorkout: parsed.recommendedWorkout ? {
                     name: cleanString(parsed.recommendedWorkout.name || ''),
@@ -927,6 +928,7 @@ function generateMockWorkoutRecommendationsInSW(
     focusDistribution: { legs: number; push: number; pull: number }
 ): WorkoutRecommendations {
     return {
+        readinessScore,
         readinessStatus: readinessScore >= 80 ? 'Go Heavy' : readinessScore >= 60 ? 'Moderate' : 'Rest',
         recommendedWorkout: null,
         muscleBalance: {

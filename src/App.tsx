@@ -30,7 +30,6 @@ const LogWorkout = lazy(() => import('@/pages/LogWorkout').then(m => ({ default:
 const CreateCustomExercise = lazy(() => import('@/pages/CreateCustomExercise').then(m => ({ default: m.CreateCustomExercise })));
 const WorkoutTemplates = lazy(() => import('@/pages/WorkoutTemplates').then(m => ({ default: m.WorkoutTemplates })));
 const CreateTemplate = lazy(() => import('@/pages/CreateTemplate').then(m => ({ default: m.CreateTemplate })));
-const Anatomy = lazy(() => import('@/pages/Anatomy').then(m => ({ default: m.Anatomy })));
 const Analytics = lazy(() => import('@/pages/Analytics').then(m => ({ default: m.Analytics })));
 const Insights = lazy(() => import('@/pages/Insights').then(m => ({ default: m.Insights })));
 const Rest = lazy(() => import('@/pages/Rest').then(m => ({ default: m.Rest })));
@@ -574,20 +573,6 @@ function AppRoutes() {
                     <ErrorBoundary>
                       <Suspense fallback={<RouteLoader />}>
                         <CreateTemplate />
-                      </Suspense>
-                    </ErrorBoundary>
-                  </AnimatedPage>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/anatomy"
-              element={
-                <ProtectedRoute>
-                  <AnimatedPage>
-                    <ErrorBoundary>
-                      <Suspense fallback={<RouteLoader />}>
-                        <Anatomy />
                       </Suspense>
                     </ErrorBoundary>
                   </AnimatedPage>

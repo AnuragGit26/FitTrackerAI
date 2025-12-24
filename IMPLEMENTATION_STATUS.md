@@ -81,12 +81,6 @@
 - [ ] Superset/circuit support
 - [ ] Auto-save every 10 seconds
 
-### 2.3 Detailed Muscle Anatomy ⚠️
-
-- [x] Basic Three.js structure
-- [ ] Complete muscle group mapping (20+ muscles)
-- [ ] Detailed muscle selection in 3D model
-- [ ] Muscle detail panel with full information
 
 ### 2.4 Recovery Calculation System ✅
 
@@ -231,7 +225,6 @@
 
 ## Known Issues / TODOs
 
-- Three.js muscle map needs a proper 3D model (currently using placeholder)
 - Exercise library needs expansion to 100+ exercises
 - Rest timer component needs to be created
 - Voice input hook needs implementation

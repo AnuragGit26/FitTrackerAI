@@ -3,8 +3,7 @@ import { motion } from 'framer-motion';
 import { MuscleGroup } from '@/types/muscle';
 import { aggregateVolumeByMuscleGroup } from '@/utils/analyticsHelpers';
 import { Workout } from '@/types/workout';
-import { Link } from 'react-router-dom';
-import { pulse, prefersReducedMotion } from '@/utils/animations';
+import { prefersReducedMotion } from '@/utils/animations';
 
 interface MuscleActivationMapProps {
   workouts: Workout[];
@@ -50,7 +49,7 @@ export function MuscleActivationMap({ workouts }: MuscleActivationMapProps) {
   return (
     <div className="@container">
       <div className="flex flex-col items-stretch justify-start rounded-xl shadow-sm bg-white dark:bg-surface-dark overflow-hidden border border-gray-100 dark:border-[#316847]">
-        <Link to="/anatomy" className="relative h-64 w-full bg-slate-900 cursor-pointer group">
+        <div className="relative h-64 w-full bg-slate-900">
           <div className="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-900 opacity-80 group-hover:opacity-90 transition-opacity"></div>
           <div className="absolute inset-0 bg-gradient-to-t from-surface-dark via-transparent to-transparent opacity-90"></div>
           {topMuscles.map((muscle, index) => {
@@ -101,7 +100,7 @@ export function MuscleActivationMap({ workouts }: MuscleActivationMapProps) {
                 : 'Start logging workouts to see muscle activation.'}
             </p>
           </div>
-        </Link>
+        </div>
       </div>
     </div>
   );
