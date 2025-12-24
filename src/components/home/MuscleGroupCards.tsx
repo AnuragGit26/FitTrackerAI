@@ -23,9 +23,9 @@ function MuscleGroupCard({
   onClick,
 }: MuscleGroupCardProps) {
   const validPercentage = Math.max(0, Math.min(100, isNaN(recoveryPercentage) ? 0 : recoveryPercentage));
-  const isReady = recoveryStatus === 'ready' || validPercentage >= 100;
-  const isRecovering = recoveryStatus === 'recovering' || recoveryStatus === 'fresh';
   const isOverworked = recoveryStatus === 'overworked' || recoveryStatus === 'sore';
+  const isReady = (recoveryStatus === 'ready' || validPercentage >= 100) && !isOverworked;
+  const isRecovering = recoveryStatus === 'recovering' || (recoveryStatus === 'fresh' && validPercentage < 100);
 
   let statusColor = 'text-primary';
   let statusText = 'Ready';
@@ -33,8 +33,12 @@ function MuscleGroupCard({
 
   if (isOverworked) {
     statusColor = 'text-warning';
-    statusText = remainingHours ? `${Math.ceil(remainingHours / 24)}h` : 'Rest';
+    statusText = remainingHours ? `${Math.ceil(remainingHours / 24)}d` : 'Rest';
     borderColor = 'border-slate-200 dark:border-white/5';
+  } else if (isReady) {
+    statusColor = 'text-primary';
+    statusText = 'Ready';
+    borderColor = 'border-primary/30';
   } else if (isRecovering) {
     statusColor = 'text-caution';
     statusText = remainingHours ? `${Math.ceil(remainingHours)}h` : 'Recovering';

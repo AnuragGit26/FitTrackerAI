@@ -226,7 +226,7 @@ export function calculateRecoveryTrendData(
   const now = new Date();
 
   if (muscleStatuses.length === 0) {
-    for (let i = daysToShow; i >= 0; i--) {
+    for (let i = daysToShow - 1; i >= 0; i--) {
       const targetDate = subDays(now, i);
       dataPoints.push({
         date: targetDate.toISOString().split('T')[0],
@@ -237,7 +237,7 @@ export function calculateRecoveryTrendData(
     return dataPoints;
   }
 
-  for (let i = daysToShow; i >= 0; i--) {
+  for (let i = daysToShow - 1; i >= 0; i--) {
     const targetDate = subDays(now, i);
     const dayLabel = targetDate.toLocaleDateString('en-US', { weekday: 'short' });
 
