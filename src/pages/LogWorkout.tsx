@@ -1,37 +1,29 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Plus, Check, Edit, ChevronDown, Trash2, Loader2, BookOpen, Save, CheckCircle2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, Plus, Check, Edit, Trash2, Loader2, BookOpen, Save, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWorkoutStore } from '@/store/workoutStore';
 import { useUserStore } from '@/store/userStore';
-import { ExerciseSelectorDropdown } from '@/components/exercise/ExerciseSelectorDropdown';
 import { ExerciseFilters } from '@/components/exercise/ExerciseFilters';
-import { ExerciseInfoCard } from '@/components/exercise/ExerciseInfoCard';
-import { SetRow } from '@/components/exercise/SetRow';
-import { RestTimerToggle } from '@/components/exercise/RestTimerToggle';
-import { RestTimer } from '@/components/exercise/RestTimer';
 import { WorkoutTimerCard } from '@/components/exercise/WorkoutTimerCard';
 import { ToastContainer } from '@/components/common/Toast';
 import { Modal } from '@/components/common/Modal';
-import { Exercise, WorkoutExercise, WorkoutSet, ExerciseCategory } from '@/types/exercise';
+import { WorkoutExercise, ExerciseCategory, WorkoutSet } from '@/types/exercise';
 import { MuscleGroupCategory } from '@/utils/muscleGroupCategories';
-import { getMuscleMapping } from '@/services/muscleMapping';
-import { calculateVolume } from '@/utils/calculations';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { exerciseLibrary } from '@/services/exerciseLibrary';
 import { cn } from '@/utils/cn';
 import { useToast } from '@/hooks/useToast';
-import { validateNotes, validateSet, validateReps, validateWeight } from '@/utils/validators';
-import { sanitizeNotes, sanitizeString } from '@/utils/sanitize';
-import { staggerContainer, slideUp, slideLeft, checkmarkAnimation, prefersReducedMotion } from '@/utils/animations';
+import { staggerContainer, slideUp, prefersReducedMotion } from '@/utils/animations';
 import { templateService } from '@/services/templateService';
 import { TemplateCategory } from '@/types/workout';
 import { Workout } from '@/types/workout';
 import { useWorkoutDuration } from '@/hooks/useWorkoutDuration';
-import { useSetDuration } from '@/hooks/useSetDuration';
-import { useSettingsStore } from '@/store/settingsStore';
-import { saveLogWorkoutState, loadLogWorkoutState, clearWorkoutState, loadWorkoutState } from '@/utils/workoutStatePersistence';
+import { clearWorkoutState, loadWorkoutState } from '@/utils/workoutStatePersistence';
 import { saveFailedWorkout } from '@/utils/workoutErrorRecovery';
 import { WorkoutErrorRecoveryModal } from '@/components/workout/WorkoutErrorRecoveryModal';
+import { LogExercise } from '@/components/workout/LogExercise';
+import { calculateVolume } from '@/utils/calculations';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 
 // Helper function to format date for datetime-local input (local time, not UTC)
 function formatDateTimeLocal(date: Date): string {
@@ -46,21 +38,16 @@ function formatDateTimeLocal(date: Date): string {
 export function LogWorkout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentWorkout, startWorkout, addExercise, updateExercise, removeExercise, finishWorkout, cancelWorkout, templateId, loadWorkouts } =
+  const { currentWorkout, startWorkout, addExercise, removeExercise, finishWorkout, cancelWorkout, templateId, loadWorkouts } =
     useWorkoutStore();
   const { profile } = useUserStore();
   const { toasts, removeToast, success, error: showError } = useToast();
 
-  const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
-  const [sets, setSets] = useState<WorkoutSet[]>([]);
-  const [restTimerEnabled, setRestTimerEnabled] = useState(false);
-  const [workoutDate, setWorkoutDate] = useState<Date>(new Date());
-  const [notes, setNotes] = useState('');
-  const [showAdditionalDetails, setShowAdditionalDetails] = useState(false);
+  // Modal state for LogExercise
+  const [showExerciseModal, setShowExerciseModal] = useState(false);
   const [editingExerciseId, setEditingExerciseId] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
-  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
+
+  // Workout-level modals
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
   const [showClearWorkoutModal, setShowClearWorkoutModal] = useState(false);
   const [showCancelWorkoutModal, setShowCancelWorkoutModal] = useState(false);
@@ -78,137 +65,30 @@ export function LogWorkout() {
   const [manualDurationMinutes, setManualDurationMinutes] = useState<number | ''>('');
   const [selectedCategory, setSelectedCategory] = useState<ExerciseCategory | null>(null);
   const [selectedMuscleGroups, setSelectedMuscleGroups] = useState<MuscleGroupCategory[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
   const repeatWorkoutProcessedRef = useRef<string | null>(null);
   const shouldReduceMotion = prefersReducedMotion();
-  const isRestoringStateRef = useRef(true);
 
-  // Rest timer state
-  const [restTimerVisible, setRestTimerVisible] = useState(false);
-  const [restTimerRemaining, setRestTimerRemaining] = useState(() => profile?.defaultRestTime || 60);
-  const [restTimerStartTime, setRestTimerStartTime] = useState<Date | null>(null);
-  const [restTimerPaused, setRestTimerPaused] = useState(false);
-  const [restTimerOriginalDuration, setRestTimerOriginalDuration] = useState<number | null>(null);
-  const { settings } = useSettingsStore();
-  // Use profile's defaultRestTime, fallback to 60 seconds if not set
-  const defaultRestDuration = profile?.defaultRestTime || 60;
-
-  // Workout duration tracking - starts when first exercise is selected
+  // Workout duration tracking - starts when first exercise is added
   const [workoutTimerStartTime, setWorkoutTimerStartTime] = useState<Date | null>(null);
   const { formattedTime: workoutDuration, elapsedTime: workoutElapsedSeconds, isRunning: workoutTimerRunning, pause: pauseWorkoutTimer, resume: resumeWorkoutTimer, reset: resetWorkoutTimer } = useWorkoutDuration(workoutTimerStartTime);
 
-  // Set duration tracking
-  const { startSet, completeSet, reset: resetSetDuration } = useSetDuration();
-  const currentSetStartTimeRef = useRef<Date | null>(null);
-  // Track workout timer state before rest timer pause to restore it later
-  const workoutTimerWasRunningBeforeRestPauseRef = useRef<boolean | null>(null);
-  // Track which set number triggered the rest timer (so we can store rest time in the correct set)
-  const restTimerSetNumberRef = useRef<number | null>(null);
-
-  // Restore persisted state on mount
+  // Restore workout timer state on mount
   useEffect(() => {
-    const restoreState = async () => {
-      isRestoringStateRef.current = true;
+    const persistedState = loadWorkoutState();
+    if (persistedState?.currentWorkout?.startTime) {
+      const startTime = persistedState.currentWorkout.startTime instanceof Date
+        ? persistedState.currentWorkout.startTime
+        : new Date(persistedState.currentWorkout.startTime);
+      const now = new Date();
+      const hoursDiff = (now.getTime() - startTime.getTime()) / (1000 * 60 * 60);
       
-      try {
-        const persistedState = loadLogWorkoutState();
-        if (!persistedState) {
-          isRestoringStateRef.current = false;
-          return;
-        }
-
-        // Restore component state
-        setRestTimerEnabled(persistedState.restTimerEnabled);
-        setWorkoutDate(new Date(persistedState.workoutDate));
-        setNotes(persistedState.notes);
-        setEditingExerciseId(persistedState.editingExerciseId);
-        setSelectedCategory(persistedState.selectedCategory);
-        setSelectedMuscleGroups(persistedState.selectedMuscleGroups);
-        setShowAdditionalDetails(persistedState.showAdditionalDetails);
-        setRestTimerVisible(persistedState.restTimerVisible);
-        setRestTimerPaused(persistedState.restTimerPaused);
-
-        // Restore rest timer with elapsed time calculation
-        if (persistedState.restTimerStartTime && persistedState.restTimerVisible) {
-          const restStartTime = new Date(persistedState.restTimerStartTime);
-          const now = new Date();
-          
-          // Calculate remaining time accounting for elapsed time (only if not paused)
-          let remainingTime = persistedState.restTimerRemaining;
-          const originalDuration = persistedState.restTimerOriginalDuration;
-          
-          if (!persistedState.restTimerPaused) {
-            // Calculate total elapsed time since the timer started
-            const totalElapsedSeconds = Math.floor((now.getTime() - restStartTime.getTime()) / 1000);
-            
-            // Use original duration if available to correctly calculate remaining time
-            if (originalDuration !== null && originalDuration !== undefined) {
-              // Validate: original duration should be >= remaining time
-              if (originalDuration < remainingTime) {
-                console.warn('Invalid timer state: original duration < remaining time, resetting');
-                remainingTime = defaultRestDuration;
-              } else {
-                // Calculate remaining time from original duration minus total elapsed time
-                remainingTime = Math.max(0, originalDuration - totalElapsedSeconds);
-              }
-            } else {
-              // Fallback for old saved states without originalDuration
-              remainingTime = persistedState.restTimerRemaining;
-            }
-          } else {
-            // Timer was paused - use the persisted remaining time directly
-            remainingTime = persistedState.restTimerRemaining;
-          }
-          
-          setRestTimerStartTime(restStartTime);
-          setRestTimerRemaining(remainingTime);
-          setRestTimerOriginalDuration(originalDuration || null);
-        } else {
-          setRestTimerRemaining(persistedState.restTimerRemaining);
-          setRestTimerStartTime(persistedState.restTimerStartTime ? new Date(persistedState.restTimerStartTime) : null);
-          setRestTimerOriginalDuration(persistedState.restTimerOriginalDuration || null);
-        }
-
-        // Restore workout timer start time with validation
-        if (persistedState.workoutTimerStartTime) {
-          const startTime = new Date(persistedState.workoutTimerStartTime);
-          const now = new Date();
-          const hoursDiff = (now.getTime() - startTime.getTime()) / (1000 * 60 * 60);
-          
-          // Only restore if within reasonable time (24 hours)
-          if (hoursDiff >= 0 && hoursDiff < 24) {
-            setWorkoutTimerStartTime(startTime);
-          } else {
-            // Timer is too old or invalid, start fresh
-            console.warn('Workout timer start time is too old or invalid, resetting');
-            setWorkoutTimerStartTime(null);
-          }
-        }
-
-        // Restore selected exercise and sets if editing
-        if (persistedState.selectedExerciseId) {
-          try {
-            const exercise = await exerciseLibrary.getExerciseById(persistedState.selectedExerciseId);
-            if (exercise) {
-              setSelectedExercise(exercise);
-              if (persistedState.editingExerciseId) {
-                // If editing, restore sets
-                setSets(persistedState.sets);
-              }
-            }
-          } catch (error) {
-            // Exercise not found, ignore
-            console.warn('Failed to restore exercise:', error);
-          }
-        }
-      } finally {
-        // Mark restoration as complete only after all async operations finish
-        isRestoringStateRef.current = false;
+      // Only restore if within reasonable time (24 hours)
+      if (hoursDiff >= 0 && hoursDiff < 24) {
+        setWorkoutTimerStartTime(startTime);
       }
-    };
-
-    restoreState();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run on mount - defaultRestDuration is stable and doesn't need to be in deps
+    }
+  }, []);
 
   useEffect(() => {
     if (!currentWorkout && profile) {
@@ -216,14 +96,18 @@ export function LogWorkout() {
       const persistedWorkoutState = loadWorkoutState();
       if (!persistedWorkoutState?.currentWorkout) {
         // Only start new workout if no persisted state exists
-        const persistedLogState = loadLogWorkoutState();
-        if (!persistedLogState) {
-          startWorkout(profile.id);
-        }
+        startWorkout(profile.id);
       }
       // If persisted state exists, it will be loaded by the store initialization
     }
   }, [currentWorkout, profile, startWorkout]);
+
+  // Start workout timer when first exercise is added
+  useEffect(() => {
+    if (currentWorkout && currentWorkout.exercises.length > 0 && !workoutTimerStartTime) {
+      setWorkoutTimerStartTime(new Date());
+    }
+  }, [currentWorkout, workoutTimerStartTime]);
 
   // Handle repeat workout from navigation state
   useEffect(() => {
@@ -394,192 +278,6 @@ export function LogWorkout() {
     }
   }, [templateId, currentTemplateName]);
 
-  useEffect(() => {
-  }, [currentWorkout]);
-
-  // Helper function to save all state
-  const saveAllState = useCallback(() => {
-    // Don't save during initial state restoration
-    if (isRestoringStateRef.current) {
-      return;
-    }
-
-    // Read set duration state from localStorage (managed by useSetDuration hook)
-    let setDurationStartTime: string | null = null;
-    let setDurationElapsed = 0;
-    try {
-      const setStartTimeStr = localStorage.getItem('fittrackai_set_duration_startTime');
-      const isTracking = localStorage.getItem('fittrackai_set_duration_isTracking') === 'true';
-      if (setStartTimeStr && isTracking) {
-        setDurationStartTime = setStartTimeStr;
-        const startTime = new Date(setStartTimeStr);
-        const now = new Date();
-        setDurationElapsed = Math.floor((now.getTime() - startTime.getTime()) / 1000);
-      }
-    } catch (error) {
-      console.error('Failed to read set duration state:', error);
-    }
-
-    if (selectedExercise || sets.length > 0 || notes || editingExerciseId || selectedCategory || selectedMuscleGroups.length > 0 || restTimerEnabled || workoutTimerStartTime || showAdditionalDetails) {
-      saveLogWorkoutState({
-        selectedExerciseId: selectedExercise?.id || null,
-        sets,
-        restTimerEnabled,
-        workoutDate: workoutDate.toISOString(),
-        notes,
-        editingExerciseId,
-        selectedCategory,
-        selectedMuscleGroups,
-        restTimerVisible,
-        restTimerRemaining,
-        restTimerStartTime: restTimerStartTime?.toISOString() || null,
-        restTimerPaused,
-        restTimerOriginalDuration,
-        workoutTimerStartTime: workoutTimerStartTime?.toISOString() || null,
-        showAdditionalDetails,
-        setDurationStartTime,
-        setDurationElapsed,
-      });
-    }
-  }, [selectedExercise, sets, restTimerEnabled, workoutDate, notes, editingExerciseId, selectedCategory, selectedMuscleGroups, restTimerVisible, restTimerRemaining, restTimerStartTime, restTimerPaused, restTimerOriginalDuration, workoutTimerStartTime, showAdditionalDetails]);
-
-  // Auto-save component state whenever relevant state changes (with debouncing)
-  useEffect(() => {
-    // Skip auto-save during state restoration
-    if (isRestoringStateRef.current) {
-      return;
-    }
-
-    const timeoutId = setTimeout(() => {
-      // Double-check restoration is complete before saving
-      if (!isRestoringStateRef.current) {
-        saveAllState();
-      }
-    }, 500); // Debounce by 500ms
-
-    return () => clearTimeout(timeoutId);
-  }, [saveAllState]);
-
-  // Save state on navigation/background events
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      saveAllState();
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        // App going to background - save state
-        saveAllState();
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [saveAllState]);
-
-  useEffect(() => {
-    if (selectedExercise && !editingExerciseId) {
-      const trackingType = selectedExercise.trackingType;
-      let initialSet: WorkoutSet;
-
-      switch (trackingType) {
-        case 'weight_reps':
-          initialSet = {
-            setNumber: 1,
-            reps: 10,
-            weight: 0,
-            unit: profile?.preferredUnit || 'kg',
-            completed: false,
-          };
-          break;
-        case 'reps_only':
-          initialSet = {
-            setNumber: 1,
-            reps: 10,
-            completed: false,
-          };
-          break;
-        case 'cardio':
-          initialSet = {
-            setNumber: 1,
-            distance: 0,
-            distanceUnit: 'km',
-            time: 0,
-            calories: undefined,
-            completed: false,
-          };
-          break;
-        case 'duration':
-          initialSet = {
-            setNumber: 1,
-            duration: 0,
-            completed: false,
-          };
-          break;
-        default:
-          initialSet = {
-            setNumber: 1,
-            reps: 10,
-            weight: 0,
-            unit: profile?.preferredUnit || 'kg',
-            completed: false,
-          };
-      }
-      setSets([initialSet]);
-      setNotes('');
-      setWorkoutDate(new Date());
-      setValidationErrors({});
-
-      // Start tracking first set
-      resetSetDuration();
-      currentSetStartTimeRef.current = new Date();
-      startSet();
-    } else if (!selectedExercise) {
-      setSets([]);
-      setNotes('');
-      setValidationErrors({});
-      resetSetDuration();
-      currentSetStartTimeRef.current = null;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedExercise, editingExerciseId, profile?.preferredUnit]);
-
-  const handleSelectExercise = (exercise: Exercise) => {
-    setSelectedExercise(exercise);
-    setEditingExerciseId(null);
-    setValidationErrors({});
-
-    // Start workout timer when first exercise is selected
-    if (!workoutTimerStartTime) {
-      setWorkoutTimerStartTime(new Date());
-    }
-
-    // Save state
-    saveLogWorkoutState({
-      selectedExerciseId: exercise.id,
-      sets,
-      restTimerEnabled,
-      workoutDate: workoutDate.toISOString(),
-      notes,
-      editingExerciseId: null,
-      selectedCategory,
-      selectedMuscleGroups,
-      restTimerVisible,
-      restTimerRemaining,
-      restTimerStartTime: restTimerStartTime?.toISOString() || null,
-      restTimerPaused,
-      restTimerOriginalDuration,
-      workoutTimerStartTime: workoutTimerStartTime?.toISOString() || null,
-      showAdditionalDetails,
-      setDurationStartTime: null,
-      setDurationElapsed: 0,
-    });
-  };
 
   const handleCategoryChange = (category: ExerciseCategory | null) => {
     setSelectedCategory(category);
@@ -591,446 +289,25 @@ export function LogWorkout() {
     setSelectedMuscleGroups(groups);
   };
 
-  // Rest timer handlers
-  const handleRestComplete = () => {
-    const actualRestTime = restTimerStartTime
-      ? Math.floor((new Date().getTime() - restTimerStartTime.getTime()) / 1000)
-      : defaultRestDuration;
-
-    // Store rest time in the set that triggered the rest timer (the set completed before rest started)
-    if (restTimerSetNumberRef.current !== null) {
-      handleUpdateSet(restTimerSetNumberRef.current, { restTime: actualRestTime });
-      restTimerSetNumberRef.current = null;
-    } else {
-      // Fallback: if we don't have the set number, use the last completed set
-      if (sets.length > 0) {
-        const lastCompletedSet = [...sets].reverse().find(s => s.completed);
-        if (lastCompletedSet) {
-          handleUpdateSet(lastCompletedSet.setNumber, { restTime: actualRestTime });
-        }
-      }
-    }
-
-    setRestTimerVisible(false);
-    setRestTimerRemaining(defaultRestDuration);
-    setRestTimerStartTime(null);
-    setRestTimerPaused(false);
-    // Clear the rest timer set number reference
-    restTimerSetNumberRef.current = null;
-
-    // Restore workout timer if it was running before rest timer
-    if (workoutTimerWasRunningBeforeRestPauseRef.current === true && workoutTimerStartTime && !workoutTimerRunning) {
-      resumeWorkoutTimer();
-    }
-    workoutTimerWasRunningBeforeRestPauseRef.current = null;
-
-    // Start tracking next set
-    currentSetStartTimeRef.current = new Date();
-    startSet();
-  };
-
-  const handleRestSkip = () => {
-    const actualRestTime = restTimerStartTime
-      ? Math.floor((new Date().getTime() - restTimerStartTime.getTime()) / 1000)
-      : 0;
-
-    // Store rest time in the set that triggered the rest timer (the set completed before rest started)
-    if (restTimerSetNumberRef.current !== null) {
-      handleUpdateSet(restTimerSetNumberRef.current, { restTime: actualRestTime });
-      restTimerSetNumberRef.current = null;
-    } else {
-      // Fallback: if we don't have the set number, use the last completed set
-      if (sets.length > 0) {
-        const lastCompletedSet = [...sets].reverse().find(s => s.completed);
-        if (lastCompletedSet) {
-          handleUpdateSet(lastCompletedSet.setNumber, { restTime: actualRestTime });
-        }
-      }
-    }
-
-    setRestTimerVisible(false);
-    setRestTimerRemaining(defaultRestDuration);
-    setRestTimerStartTime(null);
-    setRestTimerPaused(false);
-    // Clear the rest timer set number reference
-    restTimerSetNumberRef.current = null;
-
-    // Restore workout timer if it was running before rest timer
-    if (workoutTimerWasRunningBeforeRestPauseRef.current === true && workoutTimerStartTime && !workoutTimerRunning) {
-      resumeWorkoutTimer();
-    }
-    workoutTimerWasRunningBeforeRestPauseRef.current = null;
-
-    // Start tracking next set
-    currentSetStartTimeRef.current = new Date();
-    startSet();
-  };
-
-  const handleRestTimeAdjust = (seconds: number) => {
-    setRestTimerRemaining((prev) => Math.max(0, prev + seconds));
-  };
-
-  const handleRestRemainingTimeChange = (remainingTime: number) => {
-    // Sync the parent state with the RestTimer's current remaining time
-    // This is especially important when the timer is paused
-    setRestTimerRemaining(remainingTime);
-  };
-
-  const handleRestPause = (paused: boolean) => {
-    setRestTimerPaused(paused);
-    
-    // Sync workout timer with rest timer pause/resume
-    if (paused) {
-      // Rest timer is being paused - pause workout timer if it's running
-      if (workoutTimerRunning && workoutTimerStartTime) {
-        workoutTimerWasRunningBeforeRestPauseRef.current = true;
-        pauseWorkoutTimer();
-      } else {
-        workoutTimerWasRunningBeforeRestPauseRef.current = false;
-      }
-    } else {
-      // Rest timer is being resumed - resume workout timer if it was running before
-      if (workoutTimerWasRunningBeforeRestPauseRef.current === true && workoutTimerStartTime) {
-        resumeWorkoutTimer();
-      }
-      workoutTimerWasRunningBeforeRestPauseRef.current = null;
-    }
-  };
-
-  const handleEditExercise = async (exercise: WorkoutExercise) => {
-    try {
-      const exerciseData = await exerciseLibrary.getExerciseById(exercise.exerciseId);
-      if (exerciseData) {
-        setSelectedExercise(exerciseData);
-        setSets(exercise.sets.map((set, index) => ({
-          ...set,
-          setNumber: index + 1,
-        })));
-        setNotes(exercise.notes || '');
-        setWorkoutDate(exercise.timestamp);
-        setEditingExerciseId(exercise.id);
-        setShowAdditionalDetails(false);
-        setValidationErrors({});
-      } else {
-        showError('Exercise not found');
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load exercise';
-      showError(errorMessage);
-      console.error('Error loading exercise:', err);
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setSelectedExercise(null);
-    setSets([]);
-    setNotes('');
-    setWorkoutDate(new Date());
+  // Modal handlers
+  const handleAddExercise = () => {
     setEditingExerciseId(null);
-    setValidationErrors({});
-
-    // Save state after cancel
-    saveLogWorkoutState({
-      selectedExerciseId: null,
-      sets: [],
-      restTimerEnabled,
-      workoutDate: new Date().toISOString(),
-      notes: '',
-      editingExerciseId: null,
-      selectedCategory,
-      selectedMuscleGroups,
-      restTimerVisible,
-      restTimerRemaining,
-      restTimerStartTime: restTimerStartTime?.toISOString() || null,
-      restTimerPaused,
-      restTimerOriginalDuration: null,
-      workoutTimerStartTime: workoutTimerStartTime?.toISOString() || null,
-      showAdditionalDetails,
-      setDurationStartTime: null,
-      setDurationElapsed: 0,
-    });
+    setShowExerciseModal(true);
   };
 
-  const handleAddSet = () => {
-    if (!selectedExercise) return;
-
-    const trackingType = selectedExercise.trackingType;
-    const newSetNumber = sets.length + 1;
-    const lastSet = sets[sets.length - 1];
-    let newSet: WorkoutSet;
-
-    switch (trackingType) {
-      case 'weight_reps':
-        newSet = {
-          setNumber: newSetNumber,
-          reps: lastSet?.reps ?? 10,
-          weight: lastSet?.weight ?? 0,
-          unit: lastSet?.unit || profile?.preferredUnit || 'kg',
-          completed: false,
-        };
-        break;
-      case 'reps_only':
-        newSet = {
-          setNumber: newSetNumber,
-          reps: lastSet?.reps ?? 10,
-          completed: false,
-        };
-        break;
-      case 'cardio':
-        newSet = {
-          setNumber: newSetNumber,
-          distance: lastSet?.distance ?? 0,
-          distanceUnit: lastSet?.distanceUnit || 'km',
-          time: lastSet?.time ?? 0,
-          calories: lastSet?.calories,
-          completed: false,
-        };
-        break;
-      case 'duration':
-        newSet = {
-          setNumber: newSetNumber,
-          duration: lastSet?.duration ?? 0,
-          completed: false,
-        };
-        break;
-      default:
-        newSet = {
-          setNumber: newSetNumber,
-          reps: lastSet?.reps ?? 10,
-          weight: lastSet?.weight ?? 0,
-          unit: lastSet?.unit || profile?.preferredUnit || 'kg',
-          completed: false,
-        };
-    }
-
-    setSets([...sets, newSet]);
-    setValidationErrors((prev) => ({ ...prev, sets: '' }));
-
-    // If previous set was completed, start tracking new set
-    if (lastSet?.completed) {
-      currentSetStartTimeRef.current = new Date();
-      startSet();
-    }
+  const handleEditExercise = (exercise: WorkoutExercise) => {
+    setEditingExerciseId(exercise.id);
+    setShowExerciseModal(true);
   };
 
-  const handleDeleteSet = (setNumber: number) => {
-    if (sets.length <= 1) {
-      showError('At least one set is required');
-      return;
-    }
-
-    const updatedSets = sets
-      .filter((set) => set.setNumber !== setNumber)
-      .map((set, index) => ({
-        ...set,
-        setNumber: index + 1,
-      }));
-    setSets(updatedSets);
-    setValidationErrors((prev) => ({ ...prev, sets: '' }));
+  const handleCloseExerciseModal = () => {
+    setShowExerciseModal(false);
+    setEditingExerciseId(null);
   };
 
-  const handleUpdateSet = (setNumber: number, updates: Partial<WorkoutSet>) => {
-    setSets((prevSets) => {
-      const updated = prevSets.map((set) => {
-        if (set.setNumber === setNumber) {
-          const wasCompleted = set.completed;
-          const updatedSet = { ...set, ...updates };
-
-          // If set is being completed, track duration and start rest timer
-          if (!wasCompleted && updatedSet.completed) {
-            const setDuration = completeSet();
-            const setEndTime = new Date();
-            updatedSet.setDuration = setDuration;
-            updatedSet.setEndTime = setEndTime;
-            if (currentSetStartTimeRef.current) {
-              updatedSet.setStartTime = currentSetStartTimeRef.current;
-            }
-
-            // Start rest timer if enabled
-            if (restTimerEnabled && settings.autoStartRestTimer) {
-              setRestTimerRemaining(defaultRestDuration);
-              setRestTimerStartTime(new Date());
-              setRestTimerOriginalDuration(defaultRestDuration);
-              setRestTimerVisible(true);
-              // Track which set triggered the rest timer
-              restTimerSetNumberRef.current = setNumber;
-            }
-          }
-
-          // If set is being uncompleted, reset duration tracking
-          if (wasCompleted && !updatedSet.completed) {
-            resetSetDuration();
-            currentSetStartTimeRef.current = new Date();
-            startSet();
-            updatedSet.setDuration = undefined;
-            updatedSet.setStartTime = undefined;
-            updatedSet.setEndTime = undefined;
-            updatedSet.restTime = undefined;
-          }
-
-          // Validate reps in real-time and clear errors when corrected
-          if (updates.reps !== undefined && selectedExercise) {
-            const trackingType = selectedExercise.trackingType;
-            if (trackingType === 'weight_reps' || trackingType === 'reps_only') {
-              const repsValidation = validateReps(updates.reps);
-              setValidationErrors((prev) => {
-                const newErrors = { ...prev };
-                if (repsValidation.valid) {
-                  delete newErrors[`set-${setNumber}-reps`];
-                } else {
-                  newErrors[`set-${setNumber}-reps`] = repsValidation.error || 'Invalid reps';
-                }
-                return newErrors;
-              });
-            }
-          }
-
-          // Clear validation errors when set is completed (if valid)
-          if (updatedSet.completed) {
-            setValidationErrors((prev) => {
-              const newErrors = { ...prev };
-              // Only clear if the set is actually valid
-              if (selectedExercise) {
-                const setValidation = validateSet(updatedSet, selectedExercise.trackingType, profile?.preferredUnit || 'kg', 'km');
-                if (setValidation.valid) {
-                  delete newErrors[`set-${setNumber}-weight`];
-                  delete newErrors[`set-${setNumber}-reps`];
-                  delete newErrors[`set-${setNumber}-distance`];
-                  delete newErrors[`set-${setNumber}-duration`];
-                }
-              }
-              return newErrors;
-            });
-          }
-
-          return updatedSet;
-        }
-        return set;
-      });
-      return updated;
-    });
-  };
-
-  const validateForm = (): boolean => {
-    const errors: Record<string, string> = {};
-
-    if (!selectedExercise) {
-      errors.exercise = 'Please select an exercise';
-    }
-
-    if (selectedExercise) {
-      // Validate each set individually to show per-set errors
-      const trackingType = selectedExercise.trackingType;
-      const unit = profile?.preferredUnit || 'kg';
-      const distanceUnit = 'km' as const;
-
-      // First check if at least one set exists
-      if (sets.length === 0) {
-        errors.sets = 'At least one set is required';
-      } else {
-        // REQUIRE ALL SETS TO BE COMPLETED
-        const completedSets = sets.filter(s => s.completed);
-        const incompleteSets = sets.filter(s => !s.completed);
-        
-        if (completedSets.length === 0) {
-          errors.sets = 'At least one set must be completed';
-        } else if (incompleteSets.length > 0) {
-          // Show which sets are incomplete
-          const incompleteSetNumbers = incompleteSets.map(s => s.setNumber).join(', ');
-          errors.sets = `All sets must be completed. Set${incompleteSets.length > 1 ? 's' : ''} ${incompleteSetNumbers} ${incompleteSets.length > 1 ? 'are' : 'is'} incomplete.`;
-        } else {
-          // All sets are completed - validate each set
-          for (const set of sets) {
-            const setValidation = validateSet(set, trackingType, unit, distanceUnit);
-            if (!setValidation.valid) {
-              // Set per-set errors based on tracking type
-              if (trackingType === 'weight_reps' || trackingType === 'reps_only') {
-                if (set.reps !== undefined) {
-                  const repsValidation = validateReps(set.reps);
-                  if (!repsValidation.valid) {
-                    errors[`set-${set.setNumber}-reps`] = repsValidation.error || 'Invalid reps';
-                  }
-                }
-                if (trackingType === 'weight_reps' && set.weight !== undefined) {
-                  const weightValidation = validateWeight(set.weight, unit);
-                  if (!weightValidation.valid) {
-                    errors[`set-${set.setNumber}-weight`] = weightValidation.error || 'Invalid weight';
-                  }
-                }
-              }
-              // If no specific error was set, use general error
-              if (!errors[`set-${set.setNumber}-reps`] && !errors[`set-${set.setNumber}-weight`]) {
-                errors.sets = setValidation.error || 'Invalid sets';
-              }
-            }
-          }
-        }
-      }
-    } else {
-      errors.sets = 'Please select an exercise';
-    }
-
-    if (notes && !validateNotes(notes)) {
-      errors.notes = 'Notes must be 1000 characters or less';
-    }
-
-    setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const handleSave = async () => {
-    if (!selectedExercise || !currentWorkout) {
-      showError('Please select an exercise');
-      return;
-    }
-
-    if (!validateForm()) {
-      showError('Please fix validation errors before saving');
-      return;
-    }
-
-    setIsSaving(true);
-    setValidationErrors({});
-
-    try {
-      const muscleMapping = getMuscleMapping(selectedExercise.name);
-      const musclesWorked = muscleMapping
-        ? [...muscleMapping.primary, ...muscleMapping.secondary]
-        : selectedExercise.primaryMuscles;
-
-      const totalVolume = calculateVolume(sets, selectedExercise.trackingType);
-
-      const workoutExercise: WorkoutExercise = {
-        id: editingExerciseId || `exercise-${Date.now()}`,
-        exerciseId: selectedExercise.id,
-        exerciseName: selectedExercise.name,
-        sets: sets,
-        totalVolume,
-        musclesWorked,
-        timestamp: workoutDate,
-        notes: notes.trim() ? sanitizeNotes(notes.trim()) : undefined,
-      };
-
-      if (editingExerciseId) {
-        updateExercise(editingExerciseId, workoutExercise);
-        setShowSuccessAnimation(true);
-        setTimeout(() => setShowSuccessAnimation(false), 2000);
-        success('Exercise updated successfully');
-      } else {
-        addExercise(workoutExercise);
-        setShowSuccessAnimation(true);
-        setTimeout(() => setShowSuccessAnimation(false), 2000);
-        success('Exercise added successfully');
-      }
-
-      handleCancelEdit();
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to save exercise';
-      showError(errorMessage);
-      console.error('Error saving exercise:', err);
-    } finally {
-      setIsSaving(false);
-    }
+  const handleExerciseSaved = () => {
+    // Exercise was saved, modal will close automatically
+    // This callback can be used for any post-save actions if needed
   };
 
   const handleDeleteExercise = (exerciseId: string) => {
@@ -1039,7 +316,9 @@ export function LogWorkout() {
         removeExercise(exerciseId);
         success('Exercise removed successfully');
         if (editingExerciseId === exerciseId) {
-          handleCancelEdit();
+          // Close modal if we're editing the deleted exercise
+          setShowExerciseModal(false);
+          setEditingExerciseId(null);
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to remove exercise';
@@ -1106,21 +385,12 @@ export function LogWorkout() {
     clearWorkoutState();
     setShowClearWorkoutModal(false);
     // Reset component state
-    setSelectedExercise(null);
-    setSets([]);
-    setNotes('');
-    setWorkoutDate(new Date());
     setEditingExerciseId(null);
     setSelectedCategory(null);
     setSelectedMuscleGroups([]);
-    setRestTimerEnabled(false);
-    setRestTimerVisible(false);
-    setRestTimerRemaining(defaultRestDuration);
-    setRestTimerStartTime(null);
-    setRestTimerPaused(false);
     setWorkoutTimerStartTime(null);
+    setShowExerciseModal(false);
     resetWorkoutTimer();
-    resetSetDuration();
     success('Workout cleared');
     if (profile) {
       startWorkout(profile.id);
@@ -1128,12 +398,11 @@ export function LogWorkout() {
   };
 
   const handleCancelLogWorkout = () => {
-    // Check if there's anything to cancel (exercises, selected exercise, or timers running)
+    // Check if there's anything to cancel (exercises or timers running)
     const hasExercises = currentWorkout && currentWorkout.exercises.length > 0;
-    const hasSelectedExercise = selectedExercise !== null;
-    const hasTimers = workoutTimerStartTime !== null || restTimerVisible;
+    const hasTimers = workoutTimerStartTime !== null;
 
-    if (hasExercises || hasSelectedExercise || hasTimers) {
+    if (hasExercises || hasTimers) {
       setShowCancelWorkoutModal(true);
     } else {
       // Nothing to cancel, just navigate away
@@ -1148,25 +417,15 @@ export function LogWorkout() {
     // Clear persisted state
     clearWorkoutState();
 
-    // Reset all component state
-    setSelectedExercise(null);
-    setSets([]);
-    setNotes('');
-    setWorkoutDate(new Date());
+    // Reset component state
     setEditingExerciseId(null);
     setSelectedCategory(null);
     setSelectedMuscleGroups([]);
-    setRestTimerEnabled(false);
-    setRestTimerVisible(false);
-    setRestTimerRemaining(defaultRestDuration);
-    setRestTimerStartTime(null);
-    setRestTimerPaused(false);
     setWorkoutTimerStartTime(null);
+    setShowExerciseModal(false);
 
-    // Reset all timers
+    // Reset timer
     resetWorkoutTimer();
-    resetSetDuration();
-    currentSetStartTimeRef.current = null;
 
     setShowCancelWorkoutModal(false);
     success('Workout cancelled');
@@ -1287,19 +546,11 @@ export function LogWorkout() {
       // Clear persisted state (already cleared in finishWorkout, but ensure it's cleared)
       clearWorkoutState();
       // Reset component state
-      setSelectedExercise(null);
-      setSets([]);
-      setNotes('');
-      setWorkoutDate(new Date());
       setEditingExerciseId(null);
       setSelectedCategory(null);
       setSelectedMuscleGroups([]);
-      setRestTimerEnabled(false);
-      setRestTimerVisible(false);
-      setRestTimerRemaining(defaultRestDuration);
-      setRestTimerStartTime(null);
-      setRestTimerPaused(false);
       setWorkoutTimerStartTime(null);
+      setShowExerciseModal(false);
       setWorkoutCalories('');
       setManualStartTime('');
       setManualEndTime('');
@@ -1362,12 +613,7 @@ export function LogWorkout() {
     }
   };
 
-  const activeSetNumber =
-    sets.find((set) => !set.completed)?.setNumber || sets.length;
-
   const existingExercises = currentWorkout?.exercises || [];
-
-  const isSaveButtonDisabled = !selectedExercise || sets.length === 0 || isSaving;
 
   return (
     <div className="relative flex min-h-screen w-full flex-col mx-auto max-w-md bg-background-light dark:bg-background-dark overflow-hidden">
@@ -1384,9 +630,9 @@ export function LogWorkout() {
         </button>
         <div className="flex-1 text-center">
           <h2 className="text-gray-900 dark:text-white text-lg font-bold leading-tight tracking-[-0.015em]">
-            {editingExerciseId ? 'Edit Exercise' : 'Log Workout'}
+            Log Workout
           </h2>
-          {currentTemplateName && !editingExerciseId && (
+          {currentTemplateName && (
             <p className="text-xs text-primary mt-0.5 flex items-center justify-center gap-1">
               <BookOpen className="w-3 h-3" />
               {currentTemplateName}
@@ -1394,7 +640,7 @@ export function LogWorkout() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          {!editingExerciseId && existingExercises.length === 0 && (
+          {existingExercises.length === 0 && (
             <button
               onClick={handleUseTemplate}
               className="flex h-10 px-3 items-center justify-center rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
@@ -1403,7 +649,7 @@ export function LogWorkout() {
               <BookOpen className="w-4 h-4" />
             </button>
           )}
-          {!editingExerciseId && existingExercises.length > 0 && (
+          {existingExercises.length > 0 && (
             <>
               <button
                 onClick={handleClearWorkout}
@@ -1421,57 +667,12 @@ export function LogWorkout() {
               </button>
             </>
           )}
-          {editingExerciseId && (
-            <button
-              onClick={handleCancelEdit}
-              className="flex h-10 px-4 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-            >
-              <span className="text-sm font-bold leading-normal tracking-[0.015em]">
-                Cancel
-              </span>
-            </button>
-          )}
-          <motion.button
-            onClick={handleSave}
-            disabled={isSaveButtonDisabled}
-            className={cn(
-              'flex h-10 px-4 items-center justify-center rounded-full transition-colors gap-2 relative overflow-hidden',
-              !isSaveButtonDisabled
-                ? 'bg-primary/10 text-primary hover:bg-primary/20'
-                : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-            )}
-            whileHover={!isSaveButtonDisabled && !shouldReduceMotion ? { scale: 1.05 } : {}}
-            whileTap={!isSaveButtonDisabled && !shouldReduceMotion ? { scale: 0.95 } : {}}
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span className="text-sm font-bold leading-normal tracking-[0.015em]">
-                  Saving...
-                </span>
-              </>
-            ) : showSuccessAnimation ? (
-              <motion.span
-                variants={shouldReduceMotion ? {} : checkmarkAnimation}
-                initial="initial"
-                animate="animate"
-                className="text-sm font-bold leading-normal tracking-[0.015em] flex items-center gap-2"
-              >
-                <Check className="w-4 h-4" />
-                Saved!
-              </motion.span>
-            ) : (
-              <span className="text-sm font-bold leading-normal tracking-[0.015em]">
-                {editingExerciseId ? 'Update' : 'Save'}
-              </span>
-            )}
-          </motion.button>
         </div>
       </header>
 
       <main className="flex-1 overflow-y-auto pb-24">
         {/* Existing Exercises List */}
-        {existingExercises.length > 0 && !editingExerciseId && (
+        {existingExercises.length > 0 && (
           <div className="px-4 py-4 border-b border-gray-200 dark:border-[#316847]">
             <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
               Exercises in Workout ({existingExercises.length})
@@ -1606,284 +807,64 @@ export function LogWorkout() {
         {/* Workout Timer Card */}
         <WorkoutTimerCard
           formattedTime={workoutDuration}
-          isVisible={!!workoutTimerStartTime && !editingExerciseId}
+          isVisible={!!workoutTimerStartTime}
           isRunning={workoutTimerRunning}
           onPause={pauseWorkoutTimer}
           onResume={resumeWorkoutTimer}
           onReset={resetWorkoutTimer}
         />
 
+        {/* Add Exercise Button */}
         <div className="px-4 py-6">
-          {/* Exercise Selector */}
-          <ExerciseSelectorDropdown
-            selectedExercise={selectedExercise}
-            onSelect={handleSelectExercise}
-            onCreateCustom={handleCreateCustom}
-            selectedCategory={selectedCategory}
-            selectedMuscleGroups={selectedMuscleGroups}
-          />
-          {validationErrors.exercise && (
-            <p className="text-xs text-error mt-1">{validationErrors.exercise}</p>
-          )}
+          <motion.button
+            onClick={handleAddExercise}
+            className="w-full py-4 flex items-center justify-center gap-2 rounded-xl bg-primary/10 text-primary font-bold hover:bg-primary/20 active:bg-primary/30 transition-colors border-2 border-dashed border-primary/50"
+            whileHover={!shouldReduceMotion ? { scale: 1.02 } : {}}
+            whileTap={!shouldReduceMotion ? { scale: 0.98 } : {}}
+          >
+            <Plus className="w-5 h-5" />
+            Add Exercise
+          </motion.button>
         </div>
-
-        {/* Exercise Info Card */}
-        {selectedExercise && (
-          <div className="px-4 mb-6">
-            <ExerciseInfoCard exercise={selectedExercise} />
-          </div>
-        )}
-
-        {/* Sets Section */}
-        {selectedExercise && (
-          <>
-            <div className="sticky top-[72px] z-10 bg-background-light dark:bg-background-dark py-2 px-4 flex items-center justify-between border-b border-gray-200 dark:border-[#316847]/50">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                Sets
-              </h3>
-              <RestTimerToggle
-                enabled={restTimerEnabled}
-                onChange={setRestTimerEnabled}
-              />
-            </div>
-
-            <div className="px-4 py-4 space-y-3">
-              {/* Column headers */}
-              {(() => {
-                const trackingType = selectedExercise?.trackingType || 'weight_reps';
-                const getGridCols = () => {
-                  switch (trackingType) {
-                    case 'weight_reps':
-                      return 'grid-cols-[30px_1fr_1fr_60px_44px]'; // Added RPE column
-                    case 'reps_only':
-                      return 'grid-cols-[30px_1fr_60px_44px]'; // Added RPE column
-                    case 'cardio':
-                      return 'grid-cols-[30px_1fr_1fr_1fr_44px]';
-                    case 'duration':
-                      return 'grid-cols-[30px_1fr_44px]';
-                    default:
-                      return 'grid-cols-[30px_1fr_1fr_44px]';
-                  }
-                };
-
-                return (
-                  <div className={`grid ${getGridCols()} gap-3 px-2 mb-1`}>
-                    <div className="text-xs font-bold text-gray-400 text-center self-end">
-                      SET
-                    </div>
-                    {trackingType === 'weight_reps' && (
-                      <>
-                        <div className="text-xs font-bold text-gray-400 text-center self-end">
-                          {profile?.preferredUnit === 'lbs' ? 'LBS' : 'KG'}
-                        </div>
-                        <div className="text-xs font-bold text-gray-400 text-center self-end">
-                          REPS
-                        </div>
-                        <div className="text-xs font-bold text-gray-400 text-center self-end">
-                          RPE
-                        </div>
-                      </>
-                    )}
-                    {trackingType === 'reps_only' && (
-                      <>
-                        <div className="text-xs font-bold text-gray-400 text-center self-end">
-                          REPS
-                        </div>
-                        <div className="text-xs font-bold text-gray-400 text-center self-end">
-                          RPE
-                        </div>
-                      </>
-                    )}
-                    {trackingType === 'cardio' && (
-                      <>
-                        <div className="text-xs font-bold text-gray-400 text-center self-end">
-                          DISTANCE
-                        </div>
-                        <div className="text-xs font-bold text-gray-400 text-center self-end">
-                          TIME
-                        </div>
-                        <div className="text-xs font-bold text-gray-400 text-center self-end">
-                          CAL
-                        </div>
-                      </>
-                    )}
-                    {trackingType === 'duration' && (
-                      <div className="text-xs font-bold text-gray-400 text-center self-end">
-                        DURATION
-                      </div>
-                    )}
-                    <div className="text-xs font-bold text-gray-400 text-center self-end">
-                      <Check className="w-3 h-3 mx-auto" />
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Set rows */}
-              <AnimatePresence>
-                {sets.map((set) => {
-                  const setNumber = set.setNumber; // Capture setNumber to avoid closure issues
-                  return (
-                    <motion.div
-                      key={setNumber}
-                      className="relative pr-12"
-                      initial="hidden"
-                      animate="visible"
-                      exit="exit"
-                      variants={shouldReduceMotion ? {} : slideLeft}
-                      layout
-                    >
-                      <SetRow
-                        key={`set-row-${setNumber}`}
-                        set={set}
-                        onUpdate={(updates) => handleUpdateSet(setNumber, updates)}
-                        unit={profile?.preferredUnit || 'kg'}
-                        trackingType={selectedExercise?.trackingType || 'weight_reps'}
-                        distanceUnit={set.distanceUnit || 'km'}
-                        isActive={setNumber === activeSetNumber}
-                      />
-                      {sets.length > 1 && (
-                        <motion.button
-                          onClick={() => handleDeleteSet(setNumber)}
-                          className="absolute right-0 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-error/10 text-error transition-colors"
-                          aria-label="Delete set"
-                          whileHover={shouldReduceMotion ? {} : { scale: 1.1 }}
-                          whileTap={shouldReduceMotion ? {} : { scale: 0.9 }}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </motion.button>
-                      )}
-                      {validationErrors[`set-${setNumber}-weight`] && (
-                        <motion.p
-                          className="text-xs text-error mt-1 ml-2"
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                        >
-                          {validationErrors[`set-${setNumber}-weight`]}
-                        </motion.p>
-                      )}
-                      {validationErrors[`set-${setNumber}-reps`] && (
-                        <motion.p
-                          className="text-xs text-error mt-1 ml-2"
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                        >
-                          {validationErrors[`set-${setNumber}-reps`]}
-                        </motion.p>
-                      )}
-                    </motion.div>
-                  );
-                })}
-              </AnimatePresence>
-
-              {validationErrors.sets && (
-                <p className="text-xs text-error mt-1">{validationErrors.sets}</p>
-              )}
-
-              {/* Add Set button */}
-              <button
-                onClick={handleAddSet}
-                disabled={isSaving}
-                className="w-full py-3 mt-2 flex items-center justify-center gap-2 rounded-xl border border-dashed border-primary/50 text-primary font-bold hover:bg-primary/5 active:bg-primary/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Plus className="w-5 h-5" />
-                Add Set
-              </button>
-            </div>
-
-            {/* Additional Details */}
-            <div className="px-4 mt-4">
-              <details
-                className="group bg-surface-light dark:bg-surface-dark rounded-xl border border-gray-200 dark:border-[#316847] overflow-hidden"
-                open={showAdditionalDetails}
-                onToggle={(e) =>
-                  setShowAdditionalDetails((e.target as HTMLDetailsElement).open)
-                }
-              >
-                <summary className="flex items-center justify-between p-4 cursor-pointer list-none select-none">
-                  <span className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                    <Edit className="w-5 h-5 text-gray-400" />
-                    Additional Details
-                  </span>
-                  <ChevronDown className="w-5 h-5 text-gray-400 transition-transform group-open:rotate-180" />
-                </summary>
-                <div className="px-4 pb-4 border-t border-gray-200 dark:border-[#316847] pt-4 space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-                      Date & Time
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={formatDateTimeLocal(workoutDate)}
-                      onChange={(e) => {
-                        const newDate = new Date(e.target.value);
-                        if (!isNaN(newDate.getTime())) {
-                          setWorkoutDate(newDate);
-                        }
-                      }}
-                      disabled={isSaving}
-                      className="w-full rounded-lg bg-background-light dark:bg-background-dark border border-gray-200 dark:border-[#316847] text-gray-900 dark:text-white focus:border-primary focus:ring-primary h-12 px-3 disabled:opacity-50 disabled:cursor-not-allowed"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-                      Notes
-                    </label>
-                    <textarea
-                      value={notes}
-                      onChange={(e) => {
-                        const sanitized = sanitizeString(e.target.value);
-                        setNotes(sanitized);
-                        if (validationErrors.notes) {
-                          setValidationErrors((prev) => {
-                            const newErrors = { ...prev };
-                            delete newErrors.notes;
-                            return newErrors;
-                          });
-                        }
-                      }}
-                      placeholder="How did this exercise feel?"
-                      rows={3}
-                      maxLength={1000}
-                      disabled={isSaving}
-                      className={cn(
-                        'w-full rounded-lg bg-background-light dark:bg-background-dark border text-gray-900 dark:text-white placeholder-gray-500 focus:border-primary focus:ring-primary resize-none p-3',
-                        validationErrors.notes
-                          ? 'border-error focus:border-error focus:ring-error'
-                          : 'border-gray-200 dark:border-[#316847]',
-                        'disabled:opacity-50 disabled:cursor-not-allowed'
-                      )}
-                    />
-                    <div className="flex items-center justify-between mt-1">
-                      {validationErrors.notes && (
-                        <p className="text-xs text-error">{validationErrors.notes}</p>
-                      )}
-                      <p className="text-xs text-gray-500 ml-auto">
-                        {notes.length}/1000
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </details>
-            </div>
-          </>
-        )}
 
         <div className="h-24"></div>
       </main>
 
-      {/* Rest Timer */}
-      <RestTimer
-        duration={restTimerRemaining}
-        onComplete={handleRestComplete}
-        onSkip={handleRestSkip}
-        onPause={handleRestPause}
-        onTimeAdjust={handleRestTimeAdjust}
-        onRemainingTimeChange={handleRestRemainingTimeChange}
-        isVisible={restTimerVisible && restTimerEnabled}
-        initialPaused={restTimerPaused}
-        initialRemainingTime={restTimerVisible ? restTimerRemaining : undefined}
-      />
+      {/* LogExercise Modal with Error Boundary */}
+      <ErrorBoundary
+        fallback={
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background-light dark:bg-background-dark p-4">
+            <div className="max-w-md w-full bg-surface-light dark:bg-surface-dark rounded-xl p-6 text-center">
+              <p className="text-error mb-4">An error occurred while loading the exercise editor.</p>
+              <button
+                onClick={handleCloseExerciseModal}
+                className="px-4 py-2 bg-primary text-background-dark rounded-lg font-semibold hover:bg-primary/90 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        }
+        onError={(error, errorInfo) => {
+          console.error('LogExercise error:', error, errorInfo);
+        }}
+      >
+        <LogExercise
+          isOpen={showExerciseModal}
+          onClose={handleCloseExerciseModal}
+          exerciseId={editingExerciseId}
+          selectedCategory={selectedCategory}
+          selectedMuscleGroups={selectedMuscleGroups}
+          onCategoryChange={handleCategoryChange}
+          onMuscleGroupsChange={handleMuscleGroupsChange}
+          onExerciseSaved={handleExerciseSaved}
+          onStartWorkoutTimer={() => {
+            if (!workoutTimerStartTime) {
+              setWorkoutTimerStartTime(new Date());
+            }
+          }}
+        />
+      </ErrorBoundary>
 
       {/* Clear Workout Confirmation Modal */}
       <Modal
@@ -1930,19 +911,12 @@ export function LogWorkout() {
           <p className="text-gray-700 dark:text-gray-300">
             Are you sure you want to cancel this workout? This will clear all selected exercises, reset all timers, and discard any unsaved changes.
           </p>
-          {(existingExercises.length > 0 || selectedExercise) && (
+          {existingExercises.length > 0 && (
             <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 space-y-2">
-              {existingExercises.length > 0 && (
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  <span className="font-bold">{existingExercises.length}</span> exercise{existingExercises.length !== 1 ? 's' : ''} will be removed.
-                </p>
-              )}
-              {selectedExercise && (
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Current exercise selection will be cleared.
-                </p>
-              )}
-              {(workoutTimerStartTime || restTimerVisible) && (
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                <span className="font-bold">{existingExercises.length}</span> exercise{existingExercises.length !== 1 ? 's' : ''} will be removed.
+              </p>
+              {workoutTimerStartTime && (
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   All timers will be reset.
                 </p>
@@ -2221,7 +1195,7 @@ export function LogWorkout() {
       />
 
       {/* Finish Workout Button - Fixed at bottom when exercises exist */}
-      {existingExercises.length > 0 && !editingExerciseId && (
+      {existingExercises.length > 0 && (
         <div className="fixed bottom-20 left-0 right-0 bg-gradient-to-t from-background-light via-background-light to-transparent dark:from-background-dark dark:via-background-dark dark:to-transparent pt-6 pb-6 px-4 z-20">
           <div className="max-w-md mx-auto">
             <motion.button
