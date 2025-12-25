@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useLocation, Navigate, useNavigate } from
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth, useUser, AuthenticateWithRedirectCallback, useSignIn, useSignUp } from '@clerk/clerk-react';
 import { Analytics as VercelAnalytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Layout } from '@/components/layout/Layout';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useUserStore } from '@/store/userStore';
@@ -425,6 +426,7 @@ function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <VercelAnalytics />
+        <SpeedInsights />
         <MobileOnlyModal />
         <OfflineIndicator />
         <InstallPrompt />
