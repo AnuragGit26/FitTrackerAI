@@ -349,7 +349,19 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         : new Date(currentWorkout.startTime);
       
       const durationMs = endTime.getTime() - startTime.getTime();
-      const totalDurationMinutes = Math.floor(durationMs / (1000 * 60));
+      
+      // Ensure duration is non-negative and convert to minutes
+      if (durationMs < 0) {
+        throw new Error('Workout end time cannot be before start time');
+      }
+      
+      // Convert milliseconds to minutes, rounding to nearest integer
+      const totalDurationMinutes = Math.round(durationMs / (1000 * 60));
+      
+      // Ensure duration is within valid range (0 to 1440 minutes = 24 hours)
+      if (totalDurationMinutes < 0 || totalDurationMinutes > 1440) {
+        throw new Error(`Workout duration (${totalDurationMinutes} minutes) must be between 0 and 1440 minutes (24 hours)`);
+      }
 
       const completedWorkout: Workout = {
         ...currentWorkout,

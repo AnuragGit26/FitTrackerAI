@@ -242,8 +242,17 @@ class DataService {
     
     // Validate totalDuration if present
     if (workout.totalDuration !== undefined) {
-      if (typeof workout.totalDuration !== 'number' || workout.totalDuration < 0 || workout.totalDuration > 1440) {
-        throw new Error('Workout totalDuration must be between 0 and 1440 minutes (24 hours)');
+      // Check if it's a valid number
+      if (typeof workout.totalDuration !== 'number' || !Number.isFinite(workout.totalDuration)) {
+        throw new Error('Workout totalDuration must be a valid number');
+      }
+      
+      // Round to nearest integer to handle any floating point precision issues
+      const durationMinutes = Math.round(workout.totalDuration);
+      
+      // Validate range: 0 to 1440 minutes (24 hours)
+      if (durationMinutes < 0 || durationMinutes > 1440) {
+        throw new Error(`Workout duration (${durationMinutes} minutes) must be between 0 and 1440 minutes (24 hours)`);
       }
     }
     
@@ -321,9 +330,13 @@ class DataService {
   async createWorkout(workout: Omit<Workout, 'id'>): Promise<number> {
     this.validateWorkout(workout);
     
-    // Sanitize user inputs to prevent XSS
+    // Sanitize user inputs to prevent XSS and normalize duration
     const sanitizedWorkout: Omit<Workout, 'id'> = {
       ...workout,
+      // Normalize totalDuration to integer minutes to handle floating point precision
+      totalDuration: workout.totalDuration !== undefined 
+        ? Math.round(workout.totalDuration) 
+        : workout.totalDuration,
       notes: workout.notes ? sanitizeString(workout.notes) : undefined,
       exercises: workout.exercises.map(ex => ({
         ...ex,
