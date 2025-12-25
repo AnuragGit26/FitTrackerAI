@@ -3,6 +3,7 @@ import { User, LogOut, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useClerk, useUser } from '@clerk/clerk-react';
 import { useUserStore } from '@/store/userStore';
+import { userContextManager } from '@/services/userContextManager';
 import { cn } from '@/utils/cn';
 
 export function UserMenu() {
@@ -48,6 +49,8 @@ export function UserMenu() {
       onClick: async () => {
         setIsOpen(false);
         try {
+          // Clear user context before signing out
+          userContextManager.clear();
           await signOut();
           navigate('/login');
         } catch (error) {

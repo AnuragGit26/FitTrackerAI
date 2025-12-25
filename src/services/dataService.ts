@@ -8,6 +8,8 @@ import { versionManager } from './versionManager';
 import { userContextManager } from './userContextManager';
 import { errorRecovery } from './errorRecovery';
 import { sanitizeString } from '@/utils/sanitize';
+import { Transaction } from 'dexie';
+import { validateReps, validateWeight, validateDuration, validateCalories, validateRPE } from '@/utils/validators';
 
 interface UserProfile {
   id: string;
@@ -133,10 +135,12 @@ class DataService {
       throw new Error('Workout must have a date');
     }
     
-    // Validate date is not in the future
+    // Validate date is not in the future (with tolerance for clock skew)
     const workoutDate = new Date(workout.date);
     const now = new Date();
-    if (workoutDate > now) {
+    const toleranceMs = 5000; // 5 seconds tolerance for clock skew
+    
+    if (workoutDate.getTime() > now.getTime() + toleranceMs) {
       throw new Error('Workout date cannot be in the future');
     }
     
@@ -151,9 +155,9 @@ class DataService {
       throw new Error('Workout must have a startTime');
     }
     
-    // Validate startTime is not in the future
+    // Validate startTime is not in the future (with tolerance)
     const startTime = new Date(workout.startTime);
-    if (startTime > now) {
+    if (startTime.getTime() > now.getTime() + toleranceMs) {
       throw new Error('Workout startTime cannot be in the future');
     }
     
@@ -163,7 +167,7 @@ class DataService {
       if (endTime < startTime) {
         throw new Error('Workout endTime must be after startTime');
       }
-      if (endTime > now) {
+      if (endTime.getTime() > now.getTime() + toleranceMs) {
         throw new Error('Workout endTime cannot be in the future');
       }
     }
@@ -191,29 +195,41 @@ class DataService {
         throw new Error(`Exercise at index ${index} must have at least one set`);
       }
       
-      // Validate each set
+      // Validate each set using centralized validators
+      // Get exercise tracking type from exercise library if available
       exercise.sets.forEach((set, setIndex) => {
-        // Validate reps (if present)
+        // Validate reps (if present) - allow 0 for incomplete sets
         if (set.reps !== undefined) {
-          if (!Number.isInteger(set.reps) || set.reps < 0 || set.reps > 1000) {
+          if (set.reps === 0 && !set.completed) {
+            // Allow 0 reps for incomplete sets
+          } else if (set.reps > 0) {
+            const repsValidation = validateReps(set.reps);
+            if (!repsValidation.valid) {
+              throw new Error(
+                `Exercise at index ${index}, set ${setIndex + 1}: ${repsValidation.error}`
+              );
+            }
+          } else if (set.completed && set.reps <= 0) {
             throw new Error(
-              `Exercise at index ${index}, set ${setIndex + 1}: reps must be between 0 and 1000`
+              `Exercise at index ${index}, set ${setIndex + 1}: completed sets must have reps > 0`
             );
           }
         }
         
-        // Validate weight (if present)
-        if (set.weight !== undefined) {
-          if (typeof set.weight !== 'number' || set.weight < 0 || set.weight > 1000) {
+        // Validate weight (if present) - use exercise unit or default to kg
+        if (set.weight !== undefined && set.weight > 0) {
+          const unit = set.unit || 'kg';
+          const weightValidation = validateWeight(set.weight, unit);
+          if (!weightValidation.valid) {
             throw new Error(
-              `Exercise at index ${index}, set ${setIndex + 1}: weight must be between 0 and 1000 kg`
+              `Exercise at index ${index}, set ${setIndex + 1}: ${weightValidation.error}`
             );
           }
         }
         
         // Validate RPE (if present)
         if (set.rpe !== undefined) {
-          if (typeof set.rpe !== 'number' || set.rpe < 1 || set.rpe > 10) {
+          if (!validateRPE(set.rpe)) {
             throw new Error(
               `Exercise at index ${index}, set ${setIndex + 1}: RPE must be between 1 and 10`
             );
@@ -221,15 +237,16 @@ class DataService {
         }
         
         // Validate duration (if present)
-        if (set.duration !== undefined) {
-          if (typeof set.duration !== 'number' || set.duration < 0 || set.duration > 3600) {
+        if (set.duration !== undefined && set.duration > 0) {
+          const durationValidation = validateDuration(set.duration);
+          if (!durationValidation.valid) {
             throw new Error(
-              `Exercise at index ${index}, set ${setIndex + 1}: duration must be between 0 and 3600 seconds`
+              `Exercise at index ${index}, set ${setIndex + 1}: ${durationValidation.error}`
             );
           }
         }
         
-        // Validate restTime (if present)
+        // Validate restTime (if present) - allow up to 1 hour
         if (set.restTime !== undefined) {
           if (typeof set.restTime !== 'number' || set.restTime < 0 || set.restTime > 3600) {
             throw new Error(
@@ -263,10 +280,11 @@ class DataService {
       }
     }
     
-    // Validate calories if present
+    // Validate calories if present using centralized validator
     if (workout.calories !== undefined) {
-      if (typeof workout.calories !== 'number' || workout.calories < 0 || workout.calories > 10000) {
-        throw new Error('Workout calories must be between 0 and 10000');
+      const caloriesValidation = validateCalories(workout.calories);
+      if (!caloriesValidation.valid) {
+        throw new Error(`Workout calories: ${caloriesValidation.error}`);
       }
     }
   }
@@ -673,7 +691,7 @@ class DataService {
   async batch<T>(
     storeName: string,
     items: T[],
-    operation: (item: T) => Promise<void>,
+    operation: (tx: Transaction, item: T) => Promise<void>,
     batchSize: number = 100
   ): Promise<void> {
     userContextManager.requireUserId();

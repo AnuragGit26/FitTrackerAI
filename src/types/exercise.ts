@@ -62,6 +62,8 @@ export interface WorkoutSet {
   setEndTime?: Date; // When the set completed
 }
 
+export type ExerciseGroupType = 'single' | 'superset' | 'circuit';
+
 export interface WorkoutExercise {
   id: string;
   exerciseId: string;
@@ -71,5 +73,9 @@ export interface WorkoutExercise {
   musclesWorked: MuscleGroup[];
   timestamp: Date;
   notes?: string;
+  // Superset/Circuit grouping
+  groupType?: ExerciseGroupType; // Type of grouping (single, superset, circuit)
+  groupId?: string; // ID to group exercises together (exercises with same groupId are grouped)
+  groupOrder?: number; // Order within the group (0 = first exercise in group)
 }
 

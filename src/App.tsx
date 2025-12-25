@@ -50,136 +50,137 @@ function SsoCallbackHandler() {
 
   // Handle OAuth callback completion - check both signIn and signUp
   useEffect(() => {
-    let isAsyncPollingActive = false; // Flag to prevent setInterval from redirecting while async polling is active
-    
-    async function handleCallback() {
-      if (!isLoaded) return;
+    if (!isLoaded) return;
 
-      // Check if signIn has a completed session
-      if (signIn?.status === 'complete' && signIn.createdSessionId) {
-        try {
-          if (setActiveSignIn) {
-            await setActiveSignIn({ session: signIn.createdSessionId });
-          }
-          navigate('/', { replace: true });
-          return;
-        } catch (error) {
-          // Error handled silently
-        }
+    let isMounted = true;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    let hasNavigated = false; // Prevent multiple navigations
+
+    const navigateOnce = (path: string) => {
+      if (!hasNavigated && isMounted) {
+        hasNavigated = true;
+        navigate(path, { replace: true });
       }
+    };
 
-      // Check if signUp has a completed session
-      if (signUp?.status === 'complete' && signUp.createdSessionId) {
-        try {
-          if (setActiveSignUp) {
-            await setActiveSignUp({ session: signUp.createdSessionId });
-          }
-          navigate('/', { replace: true });
-          return;
-        } catch (error) {
-          // Error handled silently
+    const activateSession = async (sessionId: string, setActive: typeof setActiveSignIn | typeof setActiveSignUp) => {
+      if (!isMounted || hasNavigated) return;
+      try {
+        if (setActive) {
+          await setActive({ session: sessionId });
         }
+        navigateOnce('/');
+      } catch (error) {
+        logger.error('Failed to activate session:', error);
+        // Don't navigate on error, let polling handle it
       }
+    };
 
-      // Check if signUp has missing requirements - this could be from OAuth
-      // Even if externalAccount is null, we should wait for AuthenticateWithRedirectCallback to process
-      if (signUp?.status === 'missing_requirements') {
-        const externalAccount = signUp.verifications?.externalAccount;
-        const externalAccountStatus = externalAccount?.status;
-        const hasExternalAccount = externalAccount !== null && externalAccount !== undefined;
-
-        // If we're on /sso-callback and external account is null/unverified, wait for AuthenticateWithRedirectCallback to process it
-        // Also check if we're coming from OAuth by checking URL params or if email is missing (which suggests OAuth)
-        const isOnSsoCallback = window.location.pathname === '/sso-callback';
-        const isLikelyOAuth = isOnSsoCallback || (signUp.missingFields?.includes('email_address') && !signUp.emailAddress);
-        
-        if (isLikelyOAuth && (externalAccountStatus === 'unverified' || externalAccountStatus === null || !hasExternalAccount)) {
-          // Set flag to prevent setInterval from redirecting while async polling is active
-          isAsyncPollingActive = true;
-          // Wait for AuthenticateWithRedirectCallback to process the OAuth callback
-          // Poll for up to 3 seconds for the status to change or email to be extracted
-          let pollAttempts = 0;
-          const maxPollAttempts = 30; // Reduced from 50 to 30 (3 seconds instead of 5)
-          
-          while (pollAttempts < maxPollAttempts) {
-            await new Promise(resolve => setTimeout(resolve, 200)); // Reduced frequency from 100ms to 200ms
-            pollAttempts++;
-            
-            // Check if status changed - re-read from signUp to get latest state
-            const currentEmail = signUp.emailAddress;
-            const currentSignUpStatus = signUp.status as string;
-            const currentMissingFields = signUp.missingFields;
-            
-            // If signup is complete, activate session immediately
-            if (currentSignUpStatus === 'complete' && signUp.createdSessionId && setActiveSignUp) {
-              await setActiveSignUp({ session: signUp.createdSessionId });
-              navigate('/', { replace: true });
-              return;
-            }
-            
-            // If email is persisted (not in missingFields), redirect to signup page
-            if (currentEmail && currentEmail !== null && currentMissingFields && !currentMissingFields.includes('email_address') && currentSignUpStatus === 'missing_requirements') {
-              isAsyncPollingActive = false;
-              navigate('/signup#/continue', { replace: true });
-              return;
-            }
-          }
-          
-          // Clear flag after polling completes
-          isAsyncPollingActive = false;
-        }
-
-        // If external account is verified or transferable, wait a bit for Clerk to process and check status again
-        if (externalAccount && (externalAccount.status === 'verified' || externalAccount.status === 'transferable')) {
-          // Wait for Clerk to process the verified external account
-          await new Promise(resolve => setTimeout(resolve, 1000));
-
-          // If signup is now complete, activate the session
-          // Re-check signUp to get updated status (TypeScript needs this to narrow the type)
-          const updatedSignUp = signUp;
-          if (updatedSignUp && updatedSignUp.status === 'complete' && updatedSignUp.createdSessionId && setActiveSignUp) {
-            await setActiveSignUp({ session: updatedSignUp.createdSessionId });
-            navigate('/', { replace: true });
-            return;
-          }
-        }
-      }
-
-      // Monitor for status changes (poll for up to 2 seconds, reduced frequency)
-      let attempts = 0;
-      const maxAttempts = 10; // Reduced from 30 to 10 (2 seconds instead of 3)
-      const checkInterval = setInterval(() => {
-        attempts++;
-
-        if (signIn?.status === 'complete' && signIn.createdSessionId && setActiveSignIn) {
-          clearInterval(checkInterval);
-          setActiveSignIn({ session: signIn.createdSessionId }).then(() => {
-            navigate('/', { replace: true });
-          });
-        } else if (signUp?.status === 'complete' && signUp.createdSessionId && setActiveSignUp) {
-          clearInterval(checkInterval);
-          setActiveSignUp({ session: signUp.createdSessionId }).then(() => {
-            navigate('/', { replace: true });
-          });
-        } else if (attempts >= maxAttempts) {
-          clearInterval(checkInterval);
-          // If async polling is still active, don't redirect yet - let it complete
-          if (isAsyncPollingActive) {
-            return; // Don't redirect, let async polling handle it
-          }
-          // If signUp has missing_requirements, redirect to signup page
-          if (signUp?.status === 'missing_requirements') {
-            navigate('/signup#/continue', { replace: true });
-          } else {
-            navigate('/login', { replace: true });
-          }
-        }
-      }, 200); // Reduced frequency from 100ms to 200ms
-
-      return () => clearInterval(checkInterval);
+    // Check initial state immediately
+    if (signIn?.status === 'complete' && signIn.createdSessionId) {
+      activateSession(signIn.createdSessionId, setActiveSignIn);
+      return;
     }
 
-    handleCallback();
+    if (signUp?.status === 'complete' && signUp.createdSessionId) {
+      activateSession(signUp.createdSessionId, setActiveSignUp);
+      return;
+    }
+
+    // Handle OAuth signup with missing requirements
+    if (signUp?.status === 'missing_requirements') {
+      const externalAccount = signUp.verifications?.externalAccount;
+      const externalAccountStatus = externalAccount?.status;
+      const hasExternalAccount = externalAccount !== null && externalAccount !== undefined;
+      const isOnSsoCallback = window.location.pathname === '/sso-callback';
+      const isLikelyOAuth = isOnSsoCallback || (signUp.missingFields?.includes('email_address') && !signUp.emailAddress);
+
+      // If OAuth and external account is unverified, wait for processing
+      if (isLikelyOAuth && (externalAccountStatus === 'unverified' || externalAccountStatus === null || !hasExternalAccount)) {
+        // Wait for AuthenticateWithRedirectCallback to process (up to 3 seconds)
+        let pollAttempts = 0;
+        const maxPollAttempts = 30; // 3 seconds at 200ms intervals
+
+        const pollStatus = async () => {
+          if (!isMounted || hasNavigated) return;
+
+          pollAttempts++;
+          await new Promise(resolve => setTimeout(resolve, 200));
+
+          if (!isMounted || hasNavigated) return;
+
+          const currentEmail = signUp.emailAddress;
+          const currentSignUpStatus = signUp.status as string;
+          const currentMissingFields = signUp.missingFields;
+
+          // If signup is complete, activate session immediately
+          if (currentSignUpStatus === 'complete' && signUp.createdSessionId && setActiveSignUp) {
+            await activateSession(signUp.createdSessionId, setActiveSignUp);
+            return;
+          }
+
+          // If email is persisted, redirect to signup page
+          if (currentEmail && currentEmail !== null && currentMissingFields && !currentMissingFields.includes('email_address') && currentSignUpStatus === 'missing_requirements') {
+            navigateOnce('/signup#/continue');
+            return;
+          }
+
+          // Continue polling if not done
+          if (pollAttempts < maxPollAttempts && !hasNavigated) {
+            pollStatus();
+          } else if (!hasNavigated) {
+            // Polling exhausted, check verified external account
+            if (externalAccount && (externalAccount.status === 'verified' || externalAccount.status === 'transferable')) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              if (signUp?.status === 'complete' && signUp.createdSessionId && setActiveSignUp && !hasNavigated) {
+                await activateSession(signUp.createdSessionId, setActiveSignUp);
+              }
+            }
+          }
+        };
+
+        pollStatus();
+      } else if (externalAccount && (externalAccount.status === 'verified' || externalAccount.status === 'transferable')) {
+        // External account is verified, wait for Clerk to process
+        setTimeout(async () => {
+          if (!isMounted || hasNavigated) return;
+          if (signUp?.status === 'complete' && signUp.createdSessionId && setActiveSignUp) {
+            await activateSession(signUp.createdSessionId, setActiveSignUp);
+          }
+        }, 1000);
+      }
+    }
+
+    // Single polling mechanism for status changes (fallback)
+    intervalId = setInterval(() => {
+      if (!isMounted || hasNavigated) {
+        if (intervalId) clearInterval(intervalId);
+        return;
+      }
+
+      if (signIn?.status === 'complete' && signIn.createdSessionId && setActiveSignIn) {
+        clearInterval(intervalId!);
+        activateSession(signIn.createdSessionId, setActiveSignIn);
+      } else if (signUp?.status === 'complete' && signUp.createdSessionId && setActiveSignUp) {
+        clearInterval(intervalId!);
+        activateSession(signUp.createdSessionId, setActiveSignUp);
+      } else if (signUp?.status === 'missing_requirements' && !hasNavigated) {
+        // Don't navigate here if we're already handling OAuth flow
+        const isOnSsoCallback = window.location.pathname === '/sso-callback';
+        if (!isOnSsoCallback) {
+          clearInterval(intervalId!);
+          navigateOnce('/signup#/continue');
+        }
+      }
+    }, 200);
+
+    return () => {
+      isMounted = false;
+      hasNavigated = true; // Prevent any pending navigations
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
   }, [isLoaded, signIn, signUp, setActiveSignIn, setActiveSignUp, navigate]);
 
   // Monitor auth state changes

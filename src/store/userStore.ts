@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { dataService } from '@/services/dataService';
+import { userContextManager } from '@/services/userContextManager';
 
 export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
 export type Goal = 'build_muscle' | 'gain_strength' | 'lose_fat' | 'improve_endurance' | 'general_fitness';
@@ -120,6 +121,9 @@ export const useUserStore = create<UserState>((set, get) => ({
         savedProfile = DEFAULT_PROFILE;
       }
       
+      // Set user ID in context manager for data operations
+      userContextManager.setUserId(savedProfile.id);
+      
       set({ profile: savedProfile, isLoading: false });
     } catch (error) {
       set({
@@ -157,6 +161,10 @@ export const useUserStore = create<UserState>((set, get) => ({
 
     try {
       await dataService.updateUserProfile(updatedProfile);
+      // Update user ID in context manager if it changed
+      if (updatedProfile.id) {
+        userContextManager.setUserId(updatedProfile.id);
+      }
       set({ profile: updatedProfile, isLoading: false });
     } catch (error) {
       set({

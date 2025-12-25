@@ -95,9 +95,42 @@ export function saveWorkoutState(state: WorkoutStateSnapshot): void {
       templateId: state.templateId,
       plannedWorkoutId: state.plannedWorkoutId,
     };
-    localStorage.setItem(STORAGE_KEYS.workoutState, JSON.stringify(serialized));
+    
+    const serializedString = JSON.stringify(serialized);
+    
+    // Check size (localStorage typically has 5-10MB limit, use 4MB threshold)
+    const MAX_SIZE = 4 * 1024 * 1024; // 4MB
+    if (serializedString.length > MAX_SIZE) {
+      console.warn('Workout state too large, clearing old state and retrying');
+      // Clear old state and retry
+      clearWorkoutState();
+      // If still too large, truncate exercises (last resort)
+      if (serializedString.length > MAX_SIZE) {
+        console.error('Workout state still too large after clearing, cannot save');
+        return;
+      }
+    }
+    
+    localStorage.setItem(STORAGE_KEYS.workoutState, serializedString);
   } catch (error) {
-    console.error('Failed to save workout state:', error);
+    if (error instanceof DOMException && (error.code === 22 || error.name === 'QuotaExceededError')) {
+      // Quota exceeded - try to clear old state and retry once
+      console.warn('localStorage quota exceeded, attempting cleanup');
+      try {
+        clearWorkoutState();
+        // Retry once after cleanup
+        const serialized = {
+          currentWorkout: serializeWorkout(state.currentWorkout),
+          templateId: state.templateId,
+          plannedWorkoutId: state.plannedWorkoutId,
+        };
+        localStorage.setItem(STORAGE_KEYS.workoutState, JSON.stringify(serialized));
+      } catch (retryError) {
+        console.error('Failed to save workout state after cleanup:', retryError);
+      }
+    } else {
+      console.error('Failed to save workout state:', error);
+    }
   }
 }
 
@@ -126,9 +159,36 @@ export function loadWorkoutState(): WorkoutStateSnapshot | null {
  */
 export function saveLogWorkoutState(state: LogWorkoutStateSnapshot): void {
   try {
-    localStorage.setItem(STORAGE_KEYS.logWorkoutState, JSON.stringify(state));
+    const serializedString = JSON.stringify(state);
+    
+    // Check size (localStorage typically has 5-10MB limit, use 4MB threshold)
+    const MAX_SIZE = 4 * 1024 * 1024; // 4MB
+    if (serializedString.length > MAX_SIZE) {
+      console.warn('Log workout state too large, clearing old state and retrying');
+      // Clear old state and retry
+      localStorage.removeItem(STORAGE_KEYS.logWorkoutState);
+      // If still too large, cannot save
+      if (serializedString.length > MAX_SIZE) {
+        console.error('Log workout state still too large after clearing, cannot save');
+        return;
+      }
+    }
+    
+    localStorage.setItem(STORAGE_KEYS.logWorkoutState, serializedString);
   } catch (error) {
-    console.error('Failed to save log workout state:', error);
+    if (error instanceof DOMException && (error.code === 22 || error.name === 'QuotaExceededError')) {
+      // Quota exceeded - try to clear old state and retry once
+      console.warn('localStorage quota exceeded, attempting cleanup');
+      try {
+        localStorage.removeItem(STORAGE_KEYS.logWorkoutState);
+        // Retry once after cleanup
+        localStorage.setItem(STORAGE_KEYS.logWorkoutState, JSON.stringify(state));
+      } catch (retryError) {
+        console.error('Failed to save log workout state after cleanup:', retryError);
+      }
+    } else {
+      console.error('Failed to save log workout state:', error);
+    }
   }
 }
 

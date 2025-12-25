@@ -49,6 +49,7 @@ export interface WorkoutTemplate {
       time?: number;
       calories?: number;
       duration?: number;
+      rpe?: number; // Rate of Perceived Exertion (1-10)
     }>;
   }>;
   estimatedDuration: number;

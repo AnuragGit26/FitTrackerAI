@@ -35,6 +35,7 @@ export function SetRow({ set, onUpdate, unit, trackingType, distanceUnit = 'km',
     }
     return '0:00';
   });
+  const [rpe, setRpe] = useState(() => (set.rpe ?? '').toString());
   const [isCompleted, setIsCompleted] = useState(() => set.completed);
 
   useEffect(() => {
@@ -53,7 +54,8 @@ export function SetRow({ set, onUpdate, unit, trackingType, distanceUnit = 'km',
       setDuration(`${minutes}:${seconds.toString().padStart(2, '0')}`);
     }
     setIsCompleted(set.completed);
-  }, [set.setNumber, set.weight, set.reps, set.distance, set.time, set.calories, set.duration, set.completed]);
+    setRpe((set.rpe ?? '').toString());
+  }, [set.setNumber, set.weight, set.reps, set.distance, set.time, set.calories, set.duration, set.completed, set.rpe]);
 
   const handleWeightChange = (value: string) => {
     setWeight(value);
@@ -116,6 +118,21 @@ export function SetRow({ set, onUpdate, unit, trackingType, distanceUnit = 'km',
     onUpdate({ duration: totalSeconds });
   };
 
+  const handleRpeChange = (value: string) => {
+    setRpe(value);
+    if (value === '') {
+      onUpdate({ rpe: undefined });
+      return;
+    }
+    const numValue = parseFloat(value);
+    if (!isNaN(numValue) && numValue >= 1 && numValue <= 10) {
+      onUpdate({ rpe: numValue });
+    } else if (value !== '') {
+      // Keep the value for user feedback but don't update
+      setRpe(value);
+    }
+  };
+
   const handleComplete = () => {
     const newCompleted = !isCompleted;
     setIsCompleted(newCompleted);
@@ -138,9 +155,9 @@ export function SetRow({ set, onUpdate, unit, trackingType, distanceUnit = 'km',
   const getGridCols = () => {
     switch (trackingType) {
       case 'weight_reps':
-        return 'grid-cols-[30px_1fr_1fr_44px]';
+        return 'grid-cols-[30px_1fr_1fr_60px_44px]'; // Added RPE column
       case 'reps_only':
-        return 'grid-cols-[30px_1fr_44px]';
+        return 'grid-cols-[30px_1fr_60px_44px]'; // Added RPE column
       case 'cardio':
         return 'grid-cols-[30px_1fr_1fr_1fr_44px]';
       case 'duration':
@@ -224,23 +241,71 @@ export function SetRow({ set, onUpdate, unit, trackingType, distanceUnit = 'km',
               aria-label={`Reps for set ${set.setNumber}`}
             />
           </div>
+          {/* RPE input */}
+          <div className="relative">
+            <label htmlFor={`rpe-${set.setNumber}`} className="sr-only">
+              RPE for set {set.setNumber}
+            </label>
+            <input
+              id={`rpe-${set.setNumber}`}
+              type="number"
+              inputMode="decimal"
+              min="1"
+              max="10"
+              step="0.5"
+              value={rpe}
+              onChange={(e) => handleRpeChange(e.target.value)}
+              disabled={isDisabled}
+              placeholder="RPE"
+              className={cn(
+                inputClassName(isCompleted),
+                'text-sm'
+              )}
+              aria-label={`RPE (1-10) for set ${set.setNumber}`}
+            />
+          </div>
         </>
       )}
 
       {trackingType === 'reps_only' && (
-        <div className="relative">
-          <input
-            type="number"
-            inputMode="numeric"
-            min="0"
-            max="100"
-            value={reps}
-            onChange={(e) => handleRepsChange(e.target.value)}
-            disabled={isDisabled}
-            placeholder={isDisabled ? '-' : '10'}
-            className={inputClassName(isCompleted)}
-          />
-        </div>
+        <>
+          <div className="relative">
+            <input
+              type="number"
+              inputMode="numeric"
+              min="0"
+              max="100"
+              value={reps}
+              onChange={(e) => handleRepsChange(e.target.value)}
+              disabled={isDisabled}
+              placeholder={isDisabled ? '-' : '10'}
+              className={inputClassName(isCompleted)}
+            />
+          </div>
+          {/* RPE input */}
+          <div className="relative">
+            <label htmlFor={`rpe-${set.setNumber}`} className="sr-only">
+              RPE for set {set.setNumber}
+            </label>
+            <input
+              id={`rpe-${set.setNumber}`}
+              type="number"
+              inputMode="decimal"
+              min="1"
+              max="10"
+              step="0.5"
+              value={rpe}
+              onChange={(e) => handleRpeChange(e.target.value)}
+              disabled={isDisabled}
+              placeholder="RPE"
+              className={cn(
+                inputClassName(isCompleted),
+                'text-sm'
+              )}
+              aria-label={`RPE (1-10) for set ${set.setNumber}`}
+            />
+          </div>
+        </>
       )}
 
       {trackingType === 'cardio' && (

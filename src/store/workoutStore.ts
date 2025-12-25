@@ -6,6 +6,7 @@ import { templateService } from '@/services/templateService';
 import { muscleRecoveryService } from '@/services/muscleRecoveryService';
 import { plannedWorkoutService } from '@/services/plannedWorkoutService';
 import { saveWorkoutState, loadWorkoutState, clearWorkoutState } from '@/utils/workoutStatePersistence';
+import { calculateVolume } from '@/utils/calculations';
 
 interface WorkoutState {
   currentWorkout: Workout | null;
@@ -116,7 +117,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
             // Try to get exercise details from library to get muscle groups
             let musclesWorked = plannedWorkout.musclesTargeted;
             try {
-              const exerciseDetails = await exerciseLibrary.getExercise(ex.exerciseId);
+              const exerciseDetails = await exerciseLibrary.getExerciseById(ex.exerciseId);
               if (exerciseDetails) {
                 musclesWorked = [
                   ...exerciseDetails.primaryMuscles,
@@ -246,26 +247,9 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     const exercises = currentWorkout.exercises.map((ex) => {
       if (ex.id === exerciseId) {
         const newSets = [...ex.sets, workoutSet];
-        // Volume is calculated in LogWorkout before saving, so we preserve it
-        // or recalculate if needed (though this is a fallback)
-        const totalVolume = newSets.reduce((sum, s) => {
-          if (!s.completed) return sum;
-          // Handle different tracking types
-          if (s.weight !== undefined && s.reps !== undefined) {
-            return sum + s.reps * s.weight;
-          }
-          if (s.reps !== undefined) {
-            return sum + s.reps; // reps_only
-          }
-          if (s.distance !== undefined) {
-            const distanceKm = s.distanceUnit === 'miles' ? s.distance * 1.60934 : s.distance;
-            return sum + distanceKm; // cardio
-          }
-          if (s.duration !== undefined) {
-            return sum + s.duration; // duration
-          }
-          return sum;
-        }, 0);
+        // Use centralized volume calculation utility
+        // Infer tracking type from sets if not available
+        const totalVolume = calculateVolume(newSets);
         return {
           ...ex,
           sets: newSets,
@@ -294,26 +278,9 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         const sets = ex.sets.map((s) =>
           s.setNumber === setNumber ? { ...s, ...updates } : s
         );
-        // Volume is calculated in LogWorkout before saving, so we preserve it
-        // or recalculate if needed (though this is a fallback)
-        const totalVolume = sets.reduce((sum, s) => {
-          if (!s.completed) return sum;
-          // Handle different tracking types
-          if (s.weight !== undefined && s.reps !== undefined) {
-            return sum + s.reps * s.weight;
-          }
-          if (s.reps !== undefined) {
-            return sum + s.reps; // reps_only
-          }
-          if (s.distance !== undefined) {
-            const distanceKm = s.distanceUnit === 'miles' ? s.distance * 1.60934 : s.distance;
-            return sum + distanceKm; // cardio
-          }
-          if (s.duration !== undefined) {
-            return sum + s.duration; // duration
-          }
-          return sum;
-        }, 0);
+        // Use centralized volume calculation utility
+        // Infer tracking type from sets if not available
+        const totalVolume = calculateVolume(sets);
         return {
           ...ex,
           sets,
@@ -342,12 +309,43 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
-      const endTime = new Date();
+      // Use manual endTime if set in workout, otherwise use current time
+      const endTime = currentWorkout.endTime instanceof Date 
+        ? currentWorkout.endTime 
+        : currentWorkout.endTime 
+        ? new Date(currentWorkout.endTime)
+        : new Date();
       let startTime: Date;
       let totalDurationMinutes: number;
       
-      // PRIORITY 1: Use currentDurationSeconds from timer if available (most reliable)
-      if (currentDurationSeconds !== undefined && currentDurationSeconds > 0) {
+      // PRIORITY 1: Use manual startTime if set in workout (for template workouts)
+      if (currentWorkout.startTime instanceof Date || (typeof currentWorkout.startTime === 'string' && currentWorkout.startTime)) {
+        startTime = currentWorkout.startTime instanceof Date 
+          ? currentWorkout.startTime 
+          : new Date(currentWorkout.startTime);
+        
+        // If we have both manual start and end times, calculate duration from them
+        if (currentWorkout.endTime) {
+          const durationMs = endTime.getTime() - startTime.getTime();
+          totalDurationMinutes = Math.max(0, Math.min(1440, Math.round(durationMs / 60000)));
+        } else if (currentDurationSeconds !== undefined && currentDurationSeconds > 0) {
+          // Use provided duration seconds
+          totalDurationMinutes = Math.round(currentDurationSeconds / 60);
+          // Ensure duration is within valid range
+          if (totalDurationMinutes < 0) {
+            totalDurationMinutes = 0;
+          }
+          if (totalDurationMinutes > 1440) {
+            console.warn(`Duration ${totalDurationMinutes} minutes exceeds 24 hours, capping at 1440 minutes`);
+            totalDurationMinutes = 1440;
+          }
+        } else {
+          // Calculate from startTime to endTime
+          const durationMs = endTime.getTime() - startTime.getTime();
+          totalDurationMinutes = Math.max(0, Math.min(1440, Math.round(durationMs / 60000)));
+        }
+      } else if (currentDurationSeconds !== undefined && currentDurationSeconds > 0) {
+        // PRIORITY 2: Use currentDurationSeconds from timer if available (most reliable)
         // Convert seconds to minutes
         totalDurationMinutes = Math.round(currentDurationSeconds / 60);
         
@@ -364,13 +362,17 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         const durationMs = totalDurationMinutes * 60000;
         startTime = new Date(endTime.getTime() - durationMs);
       } else {
-        // PRIORITY 2: Calculate from startTime to endTime (fallback)
+        // PRIORITY 3: Calculate from startTime to endTime (fallback)
         // Ensure startTime is a valid Date object
-        if (currentWorkout.startTime instanceof Date) {
-          startTime = currentWorkout.startTime;
-        } else if (typeof currentWorkout.startTime === 'string') {
-          startTime = new Date(currentWorkout.startTime);
-        } else {
+        try {
+          if (currentWorkout.startTime && typeof currentWorkout.startTime === 'object' && 'getTime' in currentWorkout.startTime) {
+            startTime = currentWorkout.startTime as Date;
+          } else if (currentWorkout.startTime && typeof currentWorkout.startTime === 'string') {
+            startTime = new Date(currentWorkout.startTime);
+          } else {
+            throw new Error('Invalid startTime');
+          }
+        } catch {
           // Fallback: use current time if startTime is invalid
           console.warn('Invalid startTime, using current time as fallback');
           startTime = endTime;

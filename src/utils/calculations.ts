@@ -1,10 +1,32 @@
 import { WorkoutSet, ExerciseTrackingType } from '@/types/exercise';
 
-export function calculateVolume(sets: WorkoutSet[], trackingType: ExerciseTrackingType): number {
+/**
+ * Infer tracking type from set data
+ */
+function inferTrackingType(set: WorkoutSet): ExerciseTrackingType {
+  if (set.weight !== undefined || (set.reps !== undefined && set.weight !== undefined)) {
+    return 'weight_reps';
+  }
+  if (set.distance !== undefined) {
+    return 'cardio';
+  }
+  if (set.duration !== undefined) {
+    return 'duration';
+  }
+  if (set.reps !== undefined) {
+    return 'reps_only';
+  }
+  return 'weight_reps'; // Default fallback
+}
+
+export function calculateVolume(sets: WorkoutSet[], trackingType?: ExerciseTrackingType): number {
   return sets.reduce((total, set) => {
     if (!set.completed) return total;
 
-    switch (trackingType) {
+    // If tracking type not provided, infer from set data
+    const type = trackingType || inferTrackingType(set);
+
+    switch (type) {
       case 'weight_reps':
         if (set.weight !== undefined && set.reps !== undefined) {
           return total + set.reps * set.weight;
@@ -117,5 +139,65 @@ export function estimateEnergy(workouts: Array<{ totalVolume: number; totalDurat
   const timeCalories = totalDuration * 8;
 
   return Math.round(volumeCalories + timeCalories);
+}
+
+/**
+ * Calculate volume by exercise type for normalized analytics
+ * Returns separate metrics for different exercise types to avoid unit mixing
+ */
+export interface VolumeMetrics {
+  weightRepsVolume: number; // kg × reps (standard volume)
+  repsOnlyVolume: number; // total reps
+  cardioVolume: number; // distance in km
+  durationVolume: number; // duration in seconds
+  totalNormalizedVolume: number; // Normalized total (weight_reps only for now)
+}
+
+export function calculateVolumeByType(sets: WorkoutSet[], trackingType: ExerciseTrackingType): VolumeMetrics {
+  const metrics: VolumeMetrics = {
+    weightRepsVolume: 0,
+    repsOnlyVolume: 0,
+    cardioVolume: 0,
+    durationVolume: 0,
+    totalNormalizedVolume: 0,
+  };
+
+  sets.forEach((set) => {
+    if (!set.completed) return;
+
+    switch (trackingType) {
+      case 'weight_reps':
+        if (set.weight !== undefined && set.reps !== undefined) {
+          const volume = set.reps * set.weight;
+          metrics.weightRepsVolume += volume;
+          metrics.totalNormalizedVolume += volume;
+        }
+        break;
+      case 'reps_only':
+        if (set.reps !== undefined) {
+          metrics.repsOnlyVolume += set.reps;
+          // Note: reps_only volume is not added to totalNormalizedVolume
+          // to avoid mixing units. Use repsOnlyVolume separately for analytics.
+        }
+        break;
+      case 'cardio':
+        if (set.distance !== undefined) {
+          const distanceKm = set.distanceUnit === 'miles' ? set.distance * 1.60934 : set.distance;
+          metrics.cardioVolume += distanceKm;
+          // Note: cardio volume is not added to totalNormalizedVolume
+          // to avoid mixing units. Use cardioVolume separately for analytics.
+        }
+        break;
+      case 'duration':
+        if (set.duration !== undefined) {
+          metrics.durationVolume += set.duration;
+          // Note: duration volume is not added to totalNormalizedVolume
+          // to avoid mixing units. Use durationVolume separately for analytics.
+        }
+        break;
+    }
+  });
+
+  return metrics;
 }
 

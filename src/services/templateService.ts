@@ -136,6 +136,7 @@ class TemplateService {
                 time: set.time,
                 calories: set.calories,
                 duration: set.duration,
+                rpe: set.rpe, // Preserve RPE in template
             }));
 
             return {
@@ -182,6 +183,7 @@ class TemplateService {
                     time: setData.time,
                     calories: setData.calories,
                     duration: setData.duration,
+                    rpe: setData.rpe, // Preserve RPE if present
                     completed: false,
                 }));
             } else {
