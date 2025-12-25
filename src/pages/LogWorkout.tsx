@@ -1736,14 +1736,14 @@ export function LogWorkout() {
                 </p>
                 <div className="mb-6 text-left">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Calories Burned <span className="text-gray-500 dark:text-gray-400">(optional)</span>
+                    Calories <span className="text-gray-500 dark:text-gray-400">(optional)</span>
                   </label>
                   <input
                     type="number"
                     min="0"
                     value={workoutCalories}
                     onChange={(e) => setWorkoutCalories(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
-                    placeholder="Enter calories"
+                    placeholder="Enter Calories"
                     className="w-full rounded-lg bg-white dark:bg-[#224932] border border-gray-300 dark:border-[#316847] text-gray-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-[#1c2e24] h-10 px-3 text-sm"
                   />
                 </div>

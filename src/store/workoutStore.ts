@@ -344,23 +344,55 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     try {
       // Calculate total duration from startTime to endTime
       const endTime = new Date();
-      const startTime = currentWorkout.startTime instanceof Date
-        ? currentWorkout.startTime
-        : new Date(currentWorkout.startTime);
+      
+      // Ensure startTime is a valid Date object
+      let startTime: Date;
+      if (currentWorkout.startTime instanceof Date) {
+        startTime = currentWorkout.startTime;
+      } else if (typeof currentWorkout.startTime === 'string') {
+        startTime = new Date(currentWorkout.startTime);
+      } else {
+        // Fallback: use current time if startTime is invalid
+        console.warn('Invalid startTime, using current time as fallback');
+        startTime = endTime;
+      }
+      
+      // Validate startTime is a valid date
+      if (isNaN(startTime.getTime())) {
+        throw new Error('Invalid workout start time');
+      }
       
       const durationMs = endTime.getTime() - startTime.getTime();
       
-      // Ensure duration is non-negative and convert to minutes
+      // Ensure duration is non-negative
       if (durationMs < 0) {
         throw new Error('Workout end time cannot be before start time');
       }
       
-      // Convert milliseconds to minutes, rounding to nearest integer
-      const totalDurationMinutes = Math.round(durationMs / (1000 * 60));
+      // Convert milliseconds to minutes: ms / (1000 ms/s * 60 s/min) = ms / 60000
+      const totalDurationMinutes = Math.round(durationMs / 60000);
+      
+      // Debug logging to help identify issues
+      if (totalDurationMinutes > 1440) {
+        console.error('Duration calculation issue detected:', {
+          startTime: startTime.toISOString(),
+          endTime: endTime.toISOString(),
+          durationMs,
+          totalDurationMinutes,
+          expectedMax: 1440,
+        });
+      }
       
       // Ensure duration is within valid range (0 to 1440 minutes = 24 hours)
-      if (totalDurationMinutes < 0 || totalDurationMinutes > 1440) {
-        throw new Error(`Workout duration (${totalDurationMinutes} minutes) must be between 0 and 1440 minutes (24 hours)`);
+      if (totalDurationMinutes < 0) {
+        throw new Error(`Invalid workout duration: ${totalDurationMinutes} minutes (negative value)`);
+      }
+      
+      if (totalDurationMinutes > 1440) {
+        throw new Error(
+          `Workout duration (${totalDurationMinutes} minutes = ${(totalDurationMinutes / 60).toFixed(2)} hours) exceeds maximum of 1440 minutes (24 hours). ` +
+          `Start: ${startTime.toISOString()}, End: ${endTime.toISOString()}`
+        );
       }
 
       const completedWorkout: Workout = {
