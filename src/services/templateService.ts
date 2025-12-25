@@ -124,14 +124,30 @@ class TemplateService {
             throw new Error('Workout must have at least one exercise to create a template');
         }
 
-        const exercises = workout.exercises.map((exercise: WorkoutExercise) => ({
-            exerciseId: exercise.exerciseId,
-            exerciseName: exercise.exerciseName,
-            sets: exercise.sets.length,
-            reps: exercise.sets[0]?.reps || 10,
-            weight: exercise.sets[0]?.weight,
-            restTime: undefined, // Can be added later
-        }));
+        const exercises = workout.exercises.map((exercise: WorkoutExercise) => {
+            // Preserve all set data by storing the full set array
+            // This allows templates to maintain different reps/weight per set
+            const setData = exercise.sets.map((set) => ({
+                reps: set.reps,
+                weight: set.weight,
+                unit: set.unit,
+                distance: set.distance,
+                distanceUnit: set.distanceUnit,
+                time: set.time,
+                calories: set.calories,
+                duration: set.duration,
+            }));
+
+            return {
+                exerciseId: exercise.exerciseId,
+                exerciseName: exercise.exerciseName,
+                sets: exercise.sets.length,
+                reps: exercise.sets[0]?.reps || 10, // Keep for backward compatibility
+                weight: exercise.sets[0]?.weight, // Keep for backward compatibility
+                restTime: undefined, // Can be added later
+                setData, // Store full set data array
+            };
+        });
 
         const estimatedDuration = workout.totalDuration || 60; // Default to 60 minutes if not set
 
@@ -149,20 +165,42 @@ class TemplateService {
     // Convert template to workout exercises
     convertTemplateToWorkoutExercises(template: WorkoutTemplate): WorkoutExercise[] {
         return template.exercises.map((templateExercise, index) => {
-            const sets: WorkoutSet[] = Array.from({ length: templateExercise.sets }, (_, i) => ({
-                setNumber: i + 1,
-                reps: templateExercise.reps,
-                weight: templateExercise.weight || 0,
-                unit: 'kg', // Default unit, can be overridden
-                completed: false,
-            }));
+            // Check if template has setData (preserved from workout)
+            const hasSetData = templateExercise.setData && Array.isArray(templateExercise.setData);
+
+            let sets: WorkoutSet[];
+            
+            if (hasSetData && templateExercise.setData.length === templateExercise.sets) {
+                // Use preserved set data from original workout
+                sets = templateExercise.setData.map((setData, i) => ({
+                    setNumber: i + 1,
+                    reps: setData.reps ?? templateExercise.reps ?? 10,
+                    weight: setData.weight ?? templateExercise.weight ?? 0,
+                    unit: setData.unit ?? 'kg',
+                    distance: setData.distance,
+                    distanceUnit: setData.distanceUnit,
+                    time: setData.time,
+                    calories: setData.calories,
+                    duration: setData.duration,
+                    completed: false,
+                }));
+            } else {
+                // Fallback to legacy behavior (all sets same reps/weight)
+                sets = Array.from({ length: templateExercise.sets }, (_, i) => ({
+                    setNumber: i + 1,
+                    reps: templateExercise.reps,
+                    weight: templateExercise.weight || 0,
+                    unit: 'kg', // Default unit, can be overridden
+                    completed: false,
+                }));
+            }
 
             return {
                 id: `exercise-${Date.now()}-${index}`,
                 exerciseId: templateExercise.exerciseId,
                 exerciseName: templateExercise.exerciseName,
                 sets,
-                totalVolume: sets.reduce((sum, set) => sum + (set.reps * set.weight), 0),
+                totalVolume: sets.reduce((sum, set) => sum + ((set.reps || 0) * (set.weight || 0)), 0),
                 musclesWorked: template.musclesTargeted,
                 timestamp: new Date(),
             };

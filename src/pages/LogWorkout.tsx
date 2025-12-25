@@ -20,7 +20,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { exerciseLibrary } from '@/services/exerciseLibrary';
 import { cn } from '@/utils/cn';
 import { useToast } from '@/hooks/useToast';
-import { validateExerciseSets, validateNotes } from '@/utils/validators';
+import { validateNotes, validateSet, validateReps, validateWeight } from '@/utils/validators';
 import { sanitizeNotes, sanitizeString } from '@/utils/sanitize';
 import { staggerContainer, slideUp, slideLeft, checkmarkAnimation, prefersReducedMotion } from '@/utils/animations';
 import { templateService } from '@/services/templateService';
@@ -804,15 +804,37 @@ export function LogWorkout() {
             updatedSet.restTime = undefined;
           }
 
-          // Validation is now handled by validateExerciseSets in validateForm
-          // Clear any previous validation errors for this set
+          // Validate reps in real-time and clear errors when corrected
+          if (updates.reps !== undefined && selectedExercise) {
+            const trackingType = selectedExercise.trackingType;
+            if (trackingType === 'weight_reps' || trackingType === 'reps_only') {
+              const repsValidation = validateReps(updates.reps);
+              setValidationErrors((prev) => {
+                const newErrors = { ...prev };
+                if (repsValidation.valid) {
+                  delete newErrors[`set-${setNumber}-reps`];
+                } else {
+                  newErrors[`set-${setNumber}-reps`] = repsValidation.error || 'Invalid reps';
+                }
+                return newErrors;
+              });
+            }
+          }
+
+          // Clear validation errors when set is completed (if valid)
           if (updatedSet.completed) {
             setValidationErrors((prev) => {
               const newErrors = { ...prev };
-              delete newErrors[`set-${setNumber}-weight`];
-              delete newErrors[`set-${setNumber}-reps`];
-              delete newErrors[`set-${setNumber}-distance`];
-              delete newErrors[`set-${setNumber}-duration`];
+              // Only clear if the set is actually valid
+              if (selectedExercise) {
+                const setValidation = validateSet(updatedSet, selectedExercise.trackingType, profile?.preferredUnit || 'kg', 'km');
+                if (setValidation.valid) {
+                  delete newErrors[`set-${setNumber}-weight`];
+                  delete newErrors[`set-${setNumber}-reps`];
+                  delete newErrors[`set-${setNumber}-distance`];
+                  delete newErrors[`set-${setNumber}-duration`];
+                }
+              }
               return newErrors;
             });
           }
@@ -832,11 +854,50 @@ export function LogWorkout() {
       errors.exercise = 'Please select an exercise';
     }
 
-    const setsValidation = selectedExercise
-      ? validateExerciseSets(sets, selectedExercise.trackingType, profile?.preferredUnit || 'kg', 'km')
-      : { valid: false, error: 'Please select an exercise' };
-    if (!setsValidation.valid) {
-      errors.sets = setsValidation.error || 'Invalid sets';
+    if (selectedExercise) {
+      // Validate each set individually to show per-set errors
+      const trackingType = selectedExercise.trackingType;
+      const unit = profile?.preferredUnit || 'kg';
+      const distanceUnit = 'km' as const;
+
+      // First check if at least one set exists
+      if (sets.length === 0) {
+        errors.sets = 'At least one set is required';
+      } else {
+        // Check each completed set individually
+        const completedSets = sets.filter(s => s.completed);
+        if (completedSets.length === 0) {
+          errors.sets = 'At least one set must be completed';
+        } else {
+          // Validate each completed set
+          for (const set of completedSets) {
+            const setValidation = validateSet(set, trackingType, unit, distanceUnit);
+            if (!setValidation.valid) {
+              // Set per-set errors based on tracking type
+              if (trackingType === 'weight_reps' || trackingType === 'reps_only') {
+                if (set.reps !== undefined) {
+                  const repsValidation = validateReps(set.reps);
+                  if (!repsValidation.valid) {
+                    errors[`set-${set.setNumber}-reps`] = repsValidation.error || 'Invalid reps';
+                  }
+                }
+                if (trackingType === 'weight_reps' && set.weight !== undefined) {
+                  const weightValidation = validateWeight(set.weight, unit);
+                  if (!weightValidation.valid) {
+                    errors[`set-${set.setNumber}-weight`] = weightValidation.error || 'Invalid weight';
+                  }
+                }
+              }
+              // If no specific error was set, use general error
+              if (!errors[`set-${set.setNumber}-reps`] && !errors[`set-${set.setNumber}-weight`]) {
+                errors.sets = setValidation.error || 'Invalid sets';
+              }
+            }
+          }
+        }
+      }
+    } else {
+      errors.sets = 'Please select an exercise';
     }
 
     if (notes && !validateNotes(notes)) {

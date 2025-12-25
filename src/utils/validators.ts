@@ -14,11 +14,14 @@ export function validateWeight(weight: number, unit: 'kg' | 'lbs'): { valid: boo
 }
 
 export function validateReps(reps: number): { valid: boolean; error?: string } {
-  if (reps <= 0) {
+  if (reps < 0) {
+    return { valid: false, error: 'Reps cannot be negative' };
+  }
+  if (reps === 0) {
     return { valid: false, error: 'Reps must be greater than 0' };
   }
-  if (reps > 1000) {
-    return { valid: false, error: 'Reps cannot exceed 1000' };
+  if (reps > 100) {
+    return { valid: false, error: 'For reps >100 add another set' };
   }
   return { valid: true };
 }

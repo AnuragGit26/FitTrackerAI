@@ -62,8 +62,29 @@ export function SetRow({ set, onUpdate, unit, trackingType, distanceUnit = 'km',
   };
 
   const handleRepsChange = (value: string) => {
-    setReps(value);
+    // Allow empty string for better UX while typing
+    if (value === '') {
+      setReps('');
+      onUpdate({ reps: 0 });
+      return;
+    }
+    
     const numValue = parseInt(value) || 0;
+    
+    // Validate range: 0-100
+    if (numValue < 0) {
+      return; // Don't update if negative
+    }
+    
+    if (numValue > 100) {
+      // Don't allow values > 100, but show the input for user feedback
+      setReps(value);
+      // Still update with max value to trigger validation error
+      onUpdate({ reps: numValue });
+      return;
+    }
+    
+    setReps(value);
     onUpdate({ reps: numValue });
   };
 
@@ -193,6 +214,8 @@ export function SetRow({ set, onUpdate, unit, trackingType, distanceUnit = 'km',
               id={`reps-${set.setNumber}`}
               type="number"
               inputMode="numeric"
+              min="0"
+              max="100"
               value={reps}
               onChange={(e) => handleRepsChange(e.target.value)}
               disabled={isDisabled}
@@ -209,6 +232,8 @@ export function SetRow({ set, onUpdate, unit, trackingType, distanceUnit = 'km',
           <input
             type="number"
             inputMode="numeric"
+            min="0"
+            max="100"
             value={reps}
             onChange={(e) => handleRepsChange(e.target.value)}
             disabled={isDisabled}

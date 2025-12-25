@@ -40,6 +40,16 @@ export interface WorkoutTemplate {
     reps: number;
     weight?: number;
     restTime?: number;
+    setData?: Array<{
+      reps?: number;
+      weight?: number;
+      unit?: 'kg' | 'lbs';
+      distance?: number;
+      distanceUnit?: 'km' | 'miles';
+      time?: number;
+      calories?: number;
+      duration?: number;
+    }>;
   }>;
   estimatedDuration: number;
   musclesTargeted: MuscleGroup[];
