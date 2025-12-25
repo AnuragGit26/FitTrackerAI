@@ -24,7 +24,7 @@ interface WorkoutState {
   removeExercise: (exerciseId: string) => void;
   addSet: (exerciseId: string, set: WorkoutSet) => void;
   updateSet: (exerciseId: string, setNumber: number, updates: Partial<WorkoutSet>) => void;
-  finishWorkout: (calories?: number) => Promise<void>;
+  finishWorkout: (calories?: number, currentDurationSeconds?: number) => Promise<void>;
   cancelWorkout: () => void;
   loadWorkouts: (userId: string) => Promise<void>;
   getWorkout: (id: number) => Promise<Workout | undefined>;
@@ -333,7 +333,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     saveWorkoutState({ currentWorkout: updatedWorkout, templateId: get().templateId, plannedWorkoutId: get().plannedWorkoutId });
   },
 
-  finishWorkout: async (calories?: number) => {
+  finishWorkout: async (calories?: number, currentDurationSeconds?: number) => {
     const { currentWorkout } = get();
     if (!currentWorkout) {
       throw new Error('No active workout to finish');
@@ -342,61 +342,87 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
-      // Calculate total duration from startTime to endTime
       const endTime = new Date();
-      
-      // Ensure startTime is a valid Date object
       let startTime: Date;
-      if (currentWorkout.startTime instanceof Date) {
-        startTime = currentWorkout.startTime;
-      } else if (typeof currentWorkout.startTime === 'string') {
-        startTime = new Date(currentWorkout.startTime);
+      let totalDurationMinutes: number;
+      
+      // PRIORITY 1: Use currentDurationSeconds from timer if available (most reliable)
+      if (currentDurationSeconds !== undefined && currentDurationSeconds > 0) {
+        // Convert seconds to minutes
+        totalDurationMinutes = Math.round(currentDurationSeconds / 60);
+        
+        // Ensure duration is within valid range
+        if (totalDurationMinutes < 0) {
+          totalDurationMinutes = 0;
+        }
+        if (totalDurationMinutes > 1440) {
+          console.warn(`Duration ${totalDurationMinutes} minutes exceeds 24 hours, capping at 1440 minutes`);
+          totalDurationMinutes = 1440;
+        }
+        
+        // Calculate startTime from endTime - duration to ensure consistency
+        const durationMs = totalDurationMinutes * 60000;
+        startTime = new Date(endTime.getTime() - durationMs);
       } else {
-        // Fallback: use current time if startTime is invalid
-        console.warn('Invalid startTime, using current time as fallback');
+        // PRIORITY 2: Calculate from startTime to endTime (fallback)
+        // Ensure startTime is a valid Date object
+        if (currentWorkout.startTime instanceof Date) {
+          startTime = currentWorkout.startTime;
+        } else if (typeof currentWorkout.startTime === 'string') {
+          startTime = new Date(currentWorkout.startTime);
+        } else {
+          // Fallback: use current time if startTime is invalid
+          console.warn('Invalid startTime, using current time as fallback');
+          startTime = endTime;
+        }
+        
+        // Validate startTime is a valid date
+        if (isNaN(startTime.getTime())) {
+          console.warn('Corrupted startTime detected, using current time as fallback');
+          startTime = endTime;
+        }
+        
+        const durationMs = endTime.getTime() - startTime.getTime();
+        
+        // Ensure duration is non-negative
+        if (durationMs < 0) {
+          console.warn('Negative duration detected, using current time as both start and end');
+          startTime = endTime;
+          totalDurationMinutes = 0;
+        } else {
+          // Convert milliseconds to minutes
+          totalDurationMinutes = Math.round(durationMs / 60000);
+        }
+        
+        // Ensure duration is within valid range
+        if (totalDurationMinutes < 0) {
+          totalDurationMinutes = 0;
+        }
+        if (totalDurationMinutes > 1440) {
+          console.warn(`Duration ${totalDurationMinutes} minutes exceeds 24 hours, capping at 1440 minutes`);
+          totalDurationMinutes = 1440;
+          // Recalculate startTime to match capped duration
+          const durationMs = totalDurationMinutes * 60000;
+          startTime = new Date(endTime.getTime() - durationMs);
+        }
+      }
+
+      // Final validation - ensure we have valid values
+      if (isNaN(startTime.getTime())) {
+        console.warn('StartTime is still invalid, using current time');
         startTime = endTime;
       }
       
-      // Validate startTime is a valid date
-      if (isNaN(startTime.getTime())) {
-        throw new Error('Invalid workout start time');
-      }
-      
-      const durationMs = endTime.getTime() - startTime.getTime();
-      
-      // Ensure duration is non-negative
-      if (durationMs < 0) {
-        throw new Error('Workout end time cannot be before start time');
-      }
-      
-      // Convert milliseconds to minutes: ms / (1000 ms/s * 60 s/min) = ms / 60000
-      const totalDurationMinutes = Math.round(durationMs / 60000);
-      
-      // Debug logging to help identify issues
-      if (totalDurationMinutes > 1440) {
-        console.error('Duration calculation issue detected:', {
-          startTime: startTime.toISOString(),
-          endTime: endTime.toISOString(),
-          durationMs,
-          totalDurationMinutes,
-          expectedMax: 1440,
-        });
-      }
-      
-      // Ensure duration is within valid range (0 to 1440 minutes = 24 hours)
-      if (totalDurationMinutes < 0) {
-        throw new Error(`Invalid workout duration: ${totalDurationMinutes} minutes (negative value)`);
-      }
-      
-      if (totalDurationMinutes > 1440) {
-        throw new Error(
-          `Workout duration (${totalDurationMinutes} minutes = ${(totalDurationMinutes / 60).toFixed(2)} hours) exceeds maximum of 1440 minutes (24 hours). ` +
-          `Start: ${startTime.toISOString()}, End: ${endTime.toISOString()}`
-        );
+      if (totalDurationMinutes < 0 || totalDurationMinutes > 1440) {
+        console.warn('Duration out of range, using safe defaults');
+        totalDurationMinutes = Math.max(0, Math.min(1440, totalDurationMinutes));
+        const durationMs = totalDurationMinutes * 60000;
+        startTime = new Date(endTime.getTime() - durationMs);
       }
 
       const completedWorkout: Workout = {
         ...currentWorkout,
+        startTime, // Use calculated/corrected startTime
         endTime,
         totalDuration: totalDurationMinutes,
         calories: calories !== undefined ? calories : currentWorkout.calories,
@@ -430,7 +456,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
 
       const currentWorkouts = get().workouts;
       set({
-        currentWorkout: null,
+        currentWorkout: null, // Clear current workout to prevent corrupted startTime
         workouts: [savedWorkout, ...currentWorkouts],
         isLoading: false,
         templateId: null,
@@ -439,10 +465,14 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
       // Clear persisted state after successful save
       clearWorkoutState();
     } catch (error) {
+      // On error, clear current workout to prevent corrupted startTime from persisting
       set({
+        currentWorkout: null,
         error: error instanceof Error ? error.message : 'Failed to save workout',
         isLoading: false,
       });
+      // Clear persisted state on error to prevent corrupted data
+      clearWorkoutState();
       throw error;
     }
   },

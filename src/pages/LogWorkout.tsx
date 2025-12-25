@@ -86,7 +86,7 @@ export function LogWorkout() {
 
   // Workout duration tracking - starts when first exercise is selected
   const [workoutTimerStartTime, setWorkoutTimerStartTime] = useState<Date | null>(null);
-  const { formattedTime: workoutDuration, isRunning: workoutTimerRunning, pause: pauseWorkoutTimer, resume: resumeWorkoutTimer, reset: resetWorkoutTimer } = useWorkoutDuration(workoutTimerStartTime);
+  const { formattedTime: workoutDuration, elapsedTime: workoutElapsedSeconds, isRunning: workoutTimerRunning, pause: pauseWorkoutTimer, resume: resumeWorkoutTimer, reset: resetWorkoutTimer } = useWorkoutDuration(workoutTimerStartTime);
 
   // Set duration tracking
   const { startSet, completeSet, reset: resetSetDuration } = useSetDuration();
@@ -1058,7 +1058,9 @@ export function LogWorkout() {
     setIsSaving(true);
     try {
       const calories = workoutCalories !== '' ? Number(workoutCalories) : undefined;
-      await finishWorkout(calories);
+      // PRIORITY: Always pass current elapsed time from timer (most reliable source)
+      // This ensures workout is saved with accurate duration even if startTime is corrupted
+      await finishWorkout(calories, workoutElapsedSeconds);
       // Reset timer when workout is finished
       resetWorkoutTimer();
       // Clear persisted state (already cleared in finishWorkout, but ensure it's cleared)
@@ -1083,8 +1085,61 @@ export function LogWorkout() {
       navigate('/home');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to save workout';
-      showError(errorMessage);
       console.error('Error finishing workout:', err);
+      
+      // Final fallback: Try to save with minimal valid data
+      // This ensures workout is never lost, even if there are timing issues
+      try {
+        console.warn('Attempting final fallback save with safe defaults');
+        const calories = workoutCalories !== '' ? Number(workoutCalories) : undefined;
+        const now = new Date();
+        
+        // Use timer duration if available, otherwise 0
+        const fallbackDuration = workoutElapsedSeconds > 0 
+          ? Math.min(1440, Math.round(workoutElapsedSeconds / 60))
+          : 0;
+        
+        // Create workout with safe defaults
+        const fallbackWorkout: Workout = {
+          ...currentWorkout,
+          startTime: new Date(now.getTime() - fallbackDuration * 60000),
+          endTime: now,
+          totalDuration: fallbackDuration,
+          calories: calories !== undefined ? calories : currentWorkout.calories,
+        };
+        
+        // Try to save directly via dataService
+        const { dataService } = await import('@/services/dataService');
+        await dataService.createWorkout(fallbackWorkout);
+        
+        // If successful, clear state and navigate
+        resetWorkoutTimer();
+        clearWorkoutState();
+        setSelectedExercise(null);
+        setSets([]);
+        setNotes('');
+        setWorkoutDate(new Date());
+        setEditingExerciseId(null);
+        setSelectedCategory(null);
+        setSelectedMuscleGroups([]);
+        setRestTimerEnabled(false);
+        setRestTimerVisible(false);
+        setRestTimerRemaining(60);
+        setRestTimerStartTime(null);
+        setRestTimerPaused(false);
+        setWorkoutTimerStartTime(null);
+        setWorkoutCalories('');
+        setShowFinishWorkoutModal(false);
+        
+        success('Workout saved successfully (with corrected timing)! You can edit the start/end times later if needed.');
+        navigate('/home');
+      } catch (fallbackErr) {
+        console.error('Fallback save also failed:', fallbackErr);
+        showError(
+          `Failed to save workout: ${errorMessage}. ` +
+          `Please try again or contact support if the issue persists.`
+        );
+      }
     } finally {
       setIsSaving(false);
     }
