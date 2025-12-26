@@ -15,7 +15,7 @@ import { AIInsightPill } from '@/components/exercise/AIInsightPill';
 import { Exercise, WorkoutExercise, WorkoutSet, ExerciseCategory } from '@/types/exercise';
 import { MuscleGroupCategory } from '@/utils/muscleGroupCategories';
 import { getMuscleMapping } from '@/services/muscleMapping';
-import { calculateVolume } from '@/utils/calculations';
+import { calculateVolume, calculateNextSetByVolume } from '@/utils/calculations';
 import { useNavigate } from 'react-router-dom';
 import { exerciseLibrary } from '@/services/exerciseLibrary';
 import { useToast } from '@/hooks/useToast';
@@ -69,7 +69,7 @@ export function LogExercise({
   onNavigateToExercise,
 }: LogExerciseProps) {
   const navigate = useNavigate();
-  const { currentWorkout, addExercise, updateExercise } = useWorkoutStore();
+  const { currentWorkout, addExercise, updateExercise, startWorkout } = useWorkoutStore();
   const { profile } = useUserStore();
   const { success, error: showError } = useToast();
   const { settings } = useSettingsStore();
@@ -86,6 +86,7 @@ export function LogExercise({
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showSaveConfirmModal, setShowSaveConfirmModal] = useState(false);
+  const [justCompletedSetNumber, setJustCompletedSetNumber] = useState<number | null>(null);
 
   // Rest timer state
   const [restTimerVisible, setRestTimerVisible] = useState(false);
@@ -285,6 +286,7 @@ export function LogExercise({
             reps: 10,
             weight: 0,
             unit: profile?.preferredUnit || 'kg',
+            rpe: 7.5,
             completed: false,
           };
           break;
@@ -561,59 +563,77 @@ export function LogExercise({
     if (!selectedExercise) return;
 
     const trackingType = selectedExercise.trackingType;
-    const newSetNumber = sets.length + 1;
-    const lastSet = sets[sets.length - 1];
-    let newSet: WorkoutSet;
+    
+    setSets((prevSets) => {
+      const newSetNumber = prevSets.length + 1;
+      // Get the last COMPLETED set to inherit values from it (prefer completed over incomplete)
+      const lastCompletedSet = [...prevSets].reverse().find((s) => s.completed);
+      const lastSet = prevSets[prevSets.length - 1];
+      
+      let newSet: WorkoutSet;
+      switch (trackingType) {
+        case 'weight_reps': {
+          const previousSet = lastCompletedSet ?? lastSet;
+          const unit = (previousSet?.unit ?? (profile?.preferredUnit || 'kg')) as 'kg' | 'lbs';
+          const { weight, reps } = calculateNextSetByVolume(previousSet, unit);
+          newSet = {
+            setNumber: newSetNumber,
+            reps,
+            weight,
+            unit,
+            rpe: previousSet?.rpe ?? 7.5,
+            completed: false,
+          };
+          break;
+        }
+        case 'reps_only':
+          newSet = {
+            setNumber: newSetNumber,
+            reps: lastCompletedSet?.reps ?? lastSet?.reps ?? 10,
+            rpe: lastCompletedSet?.rpe ?? lastSet?.rpe ?? 7.5,
+            completed: false,
+          };
+          break;
+        case 'cardio':
+          newSet = {
+            setNumber: newSetNumber,
+            distance: lastCompletedSet?.distance ?? lastSet?.distance ?? 0,
+            distanceUnit: lastCompletedSet?.distanceUnit ?? lastSet?.distanceUnit ?? 'km',
+            time: lastCompletedSet?.time ?? lastSet?.time ?? 0,
+            calories: lastCompletedSet?.calories,
+            completed: false,
+          };
+          break;
+        case 'duration':
+          newSet = {
+            setNumber: newSetNumber,
+            duration: lastCompletedSet?.duration ?? lastSet?.duration ?? 0,
+            completed: false,
+          };
+          break;
+        default: {
+          const previousSet = lastCompletedSet ?? lastSet;
+          const unit = (previousSet?.unit ?? (profile?.preferredUnit || 'kg')) as 'kg' | 'lbs';
+          const { weight, reps } = calculateNextSetByVolume(previousSet, unit);
+          newSet = {
+            setNumber: newSetNumber,
+            reps,
+            weight,
+            unit,
+            rpe: previousSet?.rpe ?? 7.5,
+            completed: false,
+          };
+        }
+      }
+      
+      return [...prevSets, newSet];
+    });
 
-    switch (trackingType) {
-      case 'weight_reps':
-        newSet = {
-          setNumber: newSetNumber,
-          reps: lastSet?.reps ?? 10,
-          weight: lastSet?.weight ?? 0,
-          unit: lastSet?.unit || profile?.preferredUnit || 'kg',
-          completed: false,
-        };
-        break;
-      case 'reps_only':
-        newSet = {
-          setNumber: newSetNumber,
-          reps: lastSet?.reps ?? 10,
-          completed: false,
-        };
-        break;
-      case 'cardio':
-        newSet = {
-          setNumber: newSetNumber,
-          distance: lastSet?.distance ?? 0,
-          distanceUnit: lastSet?.distanceUnit || 'km',
-          time: lastSet?.time ?? 0,
-          calories: lastSet?.calories,
-          completed: false,
-        };
-        break;
-      case 'duration':
-        newSet = {
-          setNumber: newSetNumber,
-          duration: lastSet?.duration ?? 0,
-          completed: false,
-        };
-        break;
-      default:
-        newSet = {
-          setNumber: newSetNumber,
-          reps: lastSet?.reps ?? 10,
-          weight: lastSet?.weight ?? 0,
-          unit: lastSet?.unit || profile?.preferredUnit || 'kg',
-          completed: false,
-        };
-    }
-
-    setSets([...sets, newSet]);
     setValidationErrors((prev) => ({ ...prev, sets: '' }));
 
-    // If previous set was completed, start tracking new set
-    if (lastSet?.completed) {
+    // Start tracking the new set (if previous set was completed, or if this is the first set)
+    const lastSet = sets[sets.length - 1];
+    if (!lastSet || lastSet.completed) {
       currentSetStartTimeRef.current = new Date();
       startSet();
     }
@@ -716,11 +736,16 @@ export function LogExercise({
         }
         return set;
       });
+
       return updated;
     });
   };
 
-  const validateForm = (): boolean => {
+  const validateForm = (): { isValid: boolean; errorMessage: string | null } => {
+    // #region agent log
+    fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:726',message:'validateForm entry',data:{selectedExercise:selectedExercise?.id||null,setsLength:sets.length,completedSetsCount:sets.filter(s=>s.completed).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
+    
     const errors: Record<string, string> = {};
 
     if (!selectedExercise) {
@@ -777,22 +802,74 @@ export function LogExercise({
     }
 
     setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
+    const isValid = Object.keys(errors).length === 0;
+    
+    // Get the first error message (prioritize sets, then exercise, then notes)
+    const errorMessage = errors.sets || errors.exercise || errors.notes || null;
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:783',message:'validateForm exit',data:{isValid,errorCount:Object.keys(errors).length,errors:Object.keys(errors),errorMessage},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
+    
+    return { isValid, errorMessage };
   };
 
   const handleSave = async (): Promise<void> => {
-    if (!selectedExercise || !currentWorkout) {
+    // #region agent log
+    fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:786',message:'handleSave called',data:{selectedExercise:selectedExercise?.id||null,selectedExerciseName:selectedExercise?.name||null,setsLength:sets.length,isSaving,exerciseId:exerciseId||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+    // #endregion
+    
+    if (!selectedExercise) {
+      // #region agent log
+      fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:787',message:'handleSave early return - no selectedExercise',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       showError('Please select an exercise');
       return;
     }
 
-    if (!validateForm()) {
-      showError('Please fix validation errors before saving');
+    // #region agent log
+    const validationResult = validateForm();
+    fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:792',message:'validateForm result',data:{validationResult,validationErrors:Object.keys(validationErrors).length,selectedExercise:selectedExercise?.id||null,setsLength:sets.length,completedSetsCount:sets.filter(s=>s.completed).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
+    
+    if (!validationResult.isValid) {
+      // #region agent log
+      fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:793',message:'handleSave early return - validation failed',data:{validationErrors,errorMessage:validationResult.errorMessage},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
+      // Show specific validation error message if available, otherwise show generic message
+      const errorMessage = validationResult.errorMessage || 'Please fix validation errors before saving';
+      showError(errorMessage);
       return;
+    }
+
+    // Ensure workout exists - start one if it doesn't
+    let workout = currentWorkout;
+    if (!workout) {
+      if (!profile) {
+        showError('Please log in to save exercises');
+        return;
+      }
+      try {
+        await startWorkout(profile.id);
+        // Get the updated workout from the store
+        workout = useWorkoutStore.getState().currentWorkout;
+        if (!workout) {
+          showError('Failed to start workout. Please try again.');
+          return;
+        }
+      } catch (error) {
+        showError('Failed to start workout. Please try again.');
+        console.error('Error starting workout:', error);
+        return;
+      }
     }
 
     setIsSaving(true);
     setValidationErrors({});
+
+    // #region agent log
+    fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:819',message:'handleSave starting save process',data:{selectedExercise:selectedExercise?.id||null,setsLength:sets.length,exerciseId:exerciseId||null,hasCurrentWorkout:!!currentWorkout},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+    // #endregion
 
     try {
       const muscleMapping = getMuscleMapping(selectedExercise.name);
@@ -812,6 +889,12 @@ export function LogExercise({
         timestamp: workoutDate,
         notes: notes.trim() ? sanitizeNotes(notes.trim()) : undefined,
       };
+
+      // Ensure we have the latest workout state
+      const latestWorkout = useWorkoutStore.getState().currentWorkout;
+      if (!latestWorkout) {
+        throw new Error('Workout not available');
+      }
 
       if (exerciseId) {
         updateExercise(exerciseId, workoutExercise);
@@ -847,10 +930,16 @@ export function LogExercise({
         handleForceClose();
       }, MODAL_CLOSE_DELAY);
     } catch (err) {
+      // #region agent log
+      fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:880',message:'handleSave error caught',data:{errorMessage:err instanceof Error?err.message:'Unknown error',errorType:err?.constructor?.name||'Unknown'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
       const errorMessage = err instanceof Error ? err.message : 'Failed to save exercise';
       showError(errorMessage);
       console.error('Error saving exercise:', err);
     } finally {
+      // #region agent log
+      fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:885',message:'handleSave finally - setting isSaving to false',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       setIsSaving(false);
     }
   };
@@ -945,49 +1034,28 @@ export function LogExercise({
     setRestTimerPaused(paused);
   };
 
-  // Handle logging current set
+  // Handle logging current set - ONLY completes the current set
   const handleLogCurrentSet = async () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:1020',message:'handleLogCurrentSet called',data:{currentSet:currentSet?.setNumber||null,currentSetCompleted:currentSet?.completed||false,setsLength:sets.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'separation'})}).catch(()=>{});
+    // #endregion
+    
     if (!selectedExercise) return;
 
-    let setToComplete = currentSet;
+    const setToComplete = currentSet;
     
-    // If no current set, create a new one
-    if (!setToComplete) {
-      const newSetNumber = sets.length + 1;
-      const lastSet = sets[sets.length - 1];
-      const trackingType = selectedExercise.trackingType;
-      
-      let newSet: WorkoutSet;
-      switch (trackingType) {
-        case 'weight_reps':
-          newSet = {
-            setNumber: newSetNumber,
-            reps: lastSet?.reps ?? 10,
-            weight: lastSet?.weight ?? 0,
-            unit: profile?.preferredUnit || 'kg',
-            completed: false,
-          };
-          break;
-        case 'reps_only':
-          newSet = {
-            setNumber: newSetNumber,
-            reps: lastSet?.reps ?? 10,
-            completed: false,
-          };
-          break;
-        default:
-          newSet = {
-            setNumber: newSetNumber,
-            reps: lastSet?.reps ?? 10,
-            weight: lastSet?.weight ?? 0,
-            unit: profile?.preferredUnit || 'kg',
-            completed: false,
-          };
-      }
-      
-      setSets([...sets, newSet]);
-      setToComplete = newSet;
+    // Ensure we have a set to complete
+    if (!setToComplete || setToComplete.completed) {
+      // #region agent log
+      fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:1025',message:'handleLogCurrentSet - no set to complete',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'separation'})}).catch(()=>{});
+      // #endregion
+      console.error('No set to complete');
+      return;
     }
+
+    // #region agent log
+    fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:1030',message:'handleLogCurrentSet - completing set',data:{setNumber:setToComplete.setNumber},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'separation'})}).catch(()=>{});
+    // #endregion
 
     // Mark set as completed
     const setUpdates: Partial<WorkoutSet> = {
@@ -1004,6 +1072,16 @@ export function LogExercise({
     }
 
     handleUpdateSet(setToComplete.setNumber, setUpdates);
+    
+    // Trigger completion animation
+    setJustCompletedSetNumber(setToComplete.setNumber);
+    setTimeout(() => {
+      setJustCompletedSetNumber(null);
+    }, 1000);
+
+    // #region agent log
+    fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:1132',message:'handleLogCurrentSet - set completed',data:{completedSetNumber:setToComplete.setNumber},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'separation'})}).catch(()=>{});
+    // #endregion
 
     // If in superset and has next exercise, show group rest timer
     if (isInSuperset && nextExercise && !isLastInSuperset) {
@@ -1060,7 +1138,16 @@ export function LogExercise({
   };
 
   const activeSetNumber = sets.find((set) => !set.completed)?.setNumber || sets.length;
-  const isSaveButtonDisabled = !selectedExercise || sets.length === 0 || isSaving;
+  const hasIncompleteSets = sets.length > 0 && sets.some((set) => !set.completed);
+  const isSaveButtonDisabled = !selectedExercise || sets.length === 0 || isSaving || hasIncompleteSets;
+  
+  // #region agent log
+  useEffect(() => {
+    if (isOpen) {
+      fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:1233',message:'isSaveButtonDisabled calculation',data:{selectedExercise:selectedExercise?.id||null,selectedExerciseName:selectedExercise?.name||null,setsLength:sets.length,completedSetsCount:sets.filter(s=>s.completed).length,hasIncompleteSets,isSaving,isSaveButtonDisabled,exerciseId:exerciseId||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'A,B,C'})}).catch(()=>{});
+    }
+  }, [isOpen, selectedExercise, sets, hasIncompleteSets, isSaving, isSaveButtonDisabled, exerciseId]);
+  // #endregion
 
   // Superset detection and navigation
   const currentExercise = useMemo(() => {
@@ -1100,12 +1187,9 @@ export function LogExercise({
   // Workout timer access
   const workoutTimerStartTime = useWorkoutStore((state) => state.workoutTimerStartTime);
 
-  // Current set (first incomplete set or next set to add)
+  // Current set (first incomplete set only - don't return completed sets)
   const currentSet = useMemo(() => {
-    const incompleteSet = sets.find((set) => !set.completed);
-    if (incompleteSet) return incompleteSet;
-    // If all sets are completed, return the last set for reference
-    return sets[sets.length - 1] || null;
+    return sets.find((set) => !set.completed) || null;
   }, [sets]);
 
   const currentSetNumber = useMemo(() => {
@@ -1212,7 +1296,14 @@ export function LogExercise({
           </div>
           <div className="flex w-16 items-center justify-end">
             <button
-              onClick={handleSave}
+              onClick={() => {
+                // #region agent log
+                fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:1342',message:'Finish button clicked',data:{isSaveButtonDisabled,selectedExercise:selectedExercise?.id||null,setsLength:sets.length,isSaving},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+                // #endregion
+                if (!isSaveButtonDisabled) {
+                  handleSave();
+                }
+              }}
               disabled={isSaveButtonDisabled}
               className="text-primary text-base font-bold leading-normal tracking-[0.015em] shrink-0 hover:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -1290,10 +1381,25 @@ export function LogExercise({
                 }
                 onUpdate={(updates) => handleUpdateSet(currentSet.setNumber, updates)}
                 onLogSet={handleLogCurrentSet}
+                onAddSet={handleAddSet}
                 nextExerciseName={nextExercise?.exerciseName}
                 isLastInSuperset={isLastInSuperset}
                 showGroupRestMessage={isInSuperset && !!nextExercise && !isLastInSuperset}
               />
+            )}
+
+            {/* Add Set Button - Show when all sets are completed */}
+            {selectedExercise && !currentSet && completedSets.length > 0 && (
+              <div className="py-4">
+                <motion.button
+                  onClick={handleAddSet}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl h-12 border-2 border-primary/30 bg-primary/5 hover:bg-primary/10 text-primary font-semibold transition-all active:scale-[0.98]"
+                  whileHover={!shouldReduceMotion ? { scale: 1.02 } : {}}
+                  whileTap={!shouldReduceMotion ? { scale: 0.98 } : {}}
+                >
+                  <span className="text-sm font-semibold tracking-wide">Add Set</span>
+                </motion.button>
+              </div>
             )}
 
             {/* Group Rest Timer */}
@@ -1323,8 +1429,16 @@ export function LogExercise({
                     <motion.div
                       key={set.setNumber}
                       initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
+                      animate={{ 
+                        opacity: 1, 
+                        y: 0,
+                        scale: justCompletedSetNumber === set.setNumber && !shouldReduceMotion ? [1, 1.05, 1] : 1,
+                      }}
                       exit={{ opacity: 0, y: -10 }}
+                      transition={{ 
+                        duration: justCompletedSetNumber === set.setNumber ? 0.4 : 0.2,
+                        ease: 'easeOut'
+                      }}
                     >
                       <CompletedSetItem
                         set={set}

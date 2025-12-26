@@ -32,3 +32,4 @@ dist-ssr
 build
 .cache
 
+test-results/*

@@ -1,6 +1,7 @@
 ---
 alwaysApply: true
 ---
+
 ## 1. End-to-End Integration
 
 - Implement UI + business logic + DB changes cohesively.
@@ -82,6 +83,40 @@ For any non-trivial feature:
 
 ---
 
+## 8. Technical Documentation Reference
+
+**CRITICAL**: Before implementing features or making architectural decisions, consult the comprehensive technical documentation:
+
+- **Location**: `TECHNICAL_DOCUMENTATION.md` (root directory)
+- **Purpose**: Complete reference for business requirements, system architecture, data models, and implementation details
+
+### Key Sections to Reference
+
+- **Business Requirements & Objectives**: Understand the "why" behind features
+- **Core Features & Business Logic**: Detailed algorithms, calculations, and business rules
+- **Data Architecture**: Database schemas, relationships, and indexing strategies
+- **System Architecture**: Architecture patterns, data flow, and integration points
+- **API & Integration Points**: External service integrations and authentication flows
+
+### When to Consult
+
+- **Before starting new features**: Understand business requirements and success metrics
+- **When modifying data models**: Check schema documentation and migration strategies
+- **When integrating APIs**: Review integration patterns and authentication flows
+- **When optimizing performance**: Reference performance targets and optimization strategies
+- **When resolving conflicts**: Understand business rules and data flow patterns
+
+### Documentation Maintenance
+
+- Update `TECHNICAL_DOCUMENTATION.md` when:
+  - Adding new features or major functionality
+  - Changing data models or schemas
+  - Modifying business logic or algorithms
+  - Adding new integrations or APIs
+  - Changing architecture patterns
+
+---
+
 ## Summary
 
 | Area | Must Be Completed |
@@ -92,7 +127,8 @@ For any non-trivial feature:
 | IndexedDB | ✔ Offline state maintained |
 | Tests | ✔ Added/updated |
 | Review | ✔ Mandatory approval |
-| Documentation | ✔ Updated |
+| Documentation | ✔ Updated (including TECHNICAL_DOCUMENTATION.md) |
+| Technical Reference | ✔ Consulted before implementation |
 
 ---
 

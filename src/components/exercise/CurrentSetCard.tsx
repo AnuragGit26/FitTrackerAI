@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { CheckCircle, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { RPESlider } from './RPESlider';
@@ -16,6 +16,7 @@ interface CurrentSetCardProps {
   previousWeight?: number;
   onUpdate: (updates: Partial<WorkoutSet>) => void;
   onLogSet: () => void;
+  onAddSet?: () => void;
   disabled?: boolean;
   nextExerciseName?: string;
   isLastInSuperset?: boolean;
@@ -30,6 +31,7 @@ export function CurrentSetCard({
   previousWeight,
   onUpdate,
   onLogSet,
+  onAddSet,
   disabled = false,
   nextExerciseName,
   isLastInSuperset = false,
@@ -38,6 +40,41 @@ export function CurrentSetCard({
   const [weight, setWeight] = useState(() => (set.weight ?? 0).toString());
   const [reps, setReps] = useState(() => (set.reps ?? 0).toString());
   const [rpe, setRpe] = useState(() => set.rpe ?? 7.5);
+  const [isNewSet, setIsNewSet] = useState(false);
+  const [showButtonAnimation, setShowButtonAnimation] = useState(false);
+  const [showParticles, setShowParticles] = useState(false);
+  const previousSetNumberRef = useRef(setNumber);
+
+  // Sync local state with prop changes (e.g., when moving to a new set)
+  useEffect(() => {
+    // Update when set number changes (new set) or when prop values differ from local state
+    const propWeight = (set.weight ?? 0).toString();
+    const propReps = (set.reps ?? 0).toString();
+    
+    // Detect new set - trigger animation
+    if (setNumber !== previousSetNumberRef.current) {
+      setIsNewSet(true);
+      setShowButtonAnimation(true);
+      setShowParticles(true);
+      previousSetNumberRef.current = setNumber;
+      // Reset animation flags after animation completes
+      setTimeout(() => {
+        setIsNewSet(false);
+        setShowButtonAnimation(false);
+        setShowParticles(false);
+      }, 1200);
+    }
+    
+    if (set.setNumber !== setNumber || weight !== propWeight) {
+      setWeight(propWeight);
+    }
+    if (set.setNumber !== setNumber || reps !== propReps) {
+      setReps(propReps);
+    }
+    if (set.rpe !== undefined && set.rpe !== rpe) {
+      setRpe(set.rpe);
+    }
+  }, [set.setNumber, set.weight, set.reps, set.rpe, setNumber, weight, reps, rpe]);
 
   const weightChangeBadge = calculateWeightChangeBadge(
     parseFloat(weight) || 0,
@@ -68,10 +105,89 @@ export function CurrentSetCard({
   return (
     <div className="relative mt-2 flex flex-col rounded-2xl bg-surface-light dark:bg-surface-dark p-1 shadow-lg border border-slate-100 dark:border-white/5">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 pt-4 pb-2">
-        <h2 className="text-slate-900 dark:text-white tracking-tight text-xl font-bold">
+      <div className="flex items-center justify-between px-4 pt-4 pb-2 relative">
+        {/* Particle/Sparkle Effects */}
+        {showParticles && !shouldReduceMotion && (
+          <>
+            {[...Array(8)].map((_, i) => {
+              const angle = (i * 360) / 8;
+              const radius = 40;
+              const x = Math.cos((angle * Math.PI) / 180) * radius;
+              const y = Math.sin((angle * Math.PI) / 180) * radius;
+              return (
+                <motion.div
+                  key={`sparkle-${i}`}
+                  className="absolute w-2 h-2 rounded-full bg-primary"
+                  style={{
+                    left: '50%',
+                    top: '50%',
+                    x: 0,
+                    y: 0,
+                  }}
+                  initial={{
+                    scale: 0,
+                    opacity: 0,
+                    x: 0,
+                    y: 0,
+                  }}
+                  animate={{
+                    scale: [0, 1.5, 0],
+                    opacity: [0, 1, 0],
+                    x: [0, x, x * 1.5],
+                    y: [0, y, y * 1.5],
+                    rotate: [0, 180, 360],
+                  }}
+                  transition={{
+                    duration: 1.0,
+                    times: [0, 0.5, 1],
+                    ease: 'easeOut',
+                    delay: i * 0.05,
+                  }}
+                />
+              );
+            })}
+          </>
+        )}
+        
+        <motion.h2
+          key={setNumber}
+          className="text-slate-900 dark:text-white tracking-tight text-xl font-bold relative z-10"
+          initial={false}
+          animate={isNewSet && !shouldReduceMotion ? {
+            scale: [1, 0.8, 1.3, 0.95, 1.02, 1],
+            opacity: [1, 0.4, 1, 1, 1, 1],
+            rotate: [0, -12, 8, -2, 1, 0],
+            y: [0, -15, 5, -1, 0, 0],
+            color: ['currentColor', '#0df269', '#0df269', '#0df269', 'currentColor', 'currentColor'],
+            filter: [
+              'drop-shadow(0 0 0px rgba(13, 242, 105, 0))',
+              'drop-shadow(0 0 15px rgba(13, 242, 105, 0.6))',
+              'drop-shadow(0 0 30px rgba(13, 242, 105, 0.9)) drop-shadow(0 0 50px rgba(13, 242, 105, 0.6)) drop-shadow(0 0 80px rgba(13, 242, 105, 0.3))',
+              'drop-shadow(0 0 20px rgba(13, 242, 105, 0.4))',
+              'drop-shadow(0 0 10px rgba(13, 242, 105, 0.2))',
+              'drop-shadow(0 0 0px rgba(13, 242, 105, 0))',
+            ],
+          } : {
+            scale: 1,
+            opacity: 1,
+            rotate: 0,
+            y: 0,
+            color: 'currentColor',
+            filter: 'drop-shadow(0 0 0px rgba(13, 242, 105, 0))',
+          }}
+          transition={isNewSet && !shouldReduceMotion ? {
+            duration: 1.0,
+            times: [0, 0.2, 0.4, 0.6, 0.8, 1],
+            ease: [0.34, 1.56, 0.64, 1],
+          } : {}}
+          onAnimationComplete={() => {
+            if (isNewSet) {
+              setIsNewSet(false);
+            }
+          }}
+        >
           SET {setNumber}
-        </h2>
+        </motion.h2>
         {targetReps && (
           <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
             Target: {targetReps} Reps
@@ -137,28 +253,169 @@ export function CurrentSetCard({
       </div>
 
       {/* Log Button */}
-      <div className="p-2">
+      <div className="p-2 relative">
+        {/* Button Particle Effects */}
+        {showParticles && !shouldReduceMotion && (
+          <>
+            {[...Array(6)].map((_, i) => {
+              const angle = (i * 360) / 6;
+              const radius = 50;
+              const x = Math.cos((angle * Math.PI) / 180) * radius;
+              const y = Math.sin((angle * Math.PI) / 180) * radius;
+              return (
+                <motion.div
+                  key={`button-sparkle-${i}`}
+                  className="absolute w-1.5 h-1.5 rounded-full bg-primary"
+                  style={{
+                    left: '50%',
+                    top: '50%',
+                    x: 0,
+                    y: 0,
+                  }}
+                  initial={{
+                    scale: 0,
+                    opacity: 0,
+                    x: 0,
+                    y: 0,
+                  }}
+                  animate={{
+                    scale: [0, 2, 0],
+                    opacity: [0, 0.9, 0],
+                    x: [0, x, x * 1.3],
+                    y: [0, y, y * 1.3],
+                    rotate: [0, 180, 360],
+                  }}
+                  transition={{
+                    duration: 0.9,
+                    times: [0, 0.5, 1],
+                    ease: 'easeOut',
+                    delay: 0.25 + (i * 0.05),
+                  }}
+                />
+              );
+            })}
+          </>
+        )}
+        
         <motion.button
+          key={`button-${setNumber}`}
           onClick={onLogSet}
           disabled={!canLogSet || disabled}
           className={cn(
-            'flex w-full items-center justify-center gap-2 rounded-xl h-14 shadow-[0_0_20px_rgba(13,242,105,0.15)] transition-all',
+            'flex w-full items-center justify-center gap-2 rounded-xl h-14 shadow-[0_0_20px_rgba(13,242,105,0.15)] transition-all relative z-10',
             canLogSet && !disabled
               ? 'bg-primary hover:bg-[#0be060] text-[#102217] active:scale-[0.98]'
               : 'bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
           )}
+          initial={false}
+          animate={showButtonAnimation && !shouldReduceMotion ? {
+            scale: [1, 0.85, 1.08, 0.98, 1],
+            opacity: [1, 0.5, 1, 1, 1],
+            y: [0, 12, -4, 1, 0],
+            boxShadow: [
+              '0 0 20px rgba(13,242,105,0.15)',
+              '0 0 15px rgba(13,242,105,0.2)',
+              '0 0 50px rgba(13,242,105,0.6), 0 0 80px rgba(13,242,105,0.4), 0 0 120px rgba(13,242,105,0.2)',
+              '0 0 30px rgba(13,242,105,0.3)',
+              '0 0 20px rgba(13,242,105,0.15)',
+            ],
+          } : {
+            scale: 1,
+            opacity: 1,
+            y: 0,
+            boxShadow: '0 0 20px rgba(13,242,105,0.15)',
+          }}
+          transition={showButtonAnimation && !shouldReduceMotion ? {
+            duration: 0.9,
+            times: [0, 0.25, 0.5, 0.75, 1],
+            ease: [0.34, 1.56, 0.64, 1],
+            delay: 0.25,
+          } : {}}
           whileHover={canLogSet && !disabled && !shouldReduceMotion ? { scale: 1.02 } : {}}
           whileTap={canLogSet && !disabled && !shouldReduceMotion ? { scale: 0.98 } : {}}
+          onAnimationComplete={() => {
+            if (showButtonAnimation) {
+              setShowButtonAnimation(false);
+            }
+          }}
         >
           {nextExerciseName && !isLastInSuperset ? (
             <>
-              <span className="text-lg font-bold tracking-wide uppercase">Next: {nextExerciseName}</span>
-              <ArrowRight className="w-6 h-6 font-bold" />
+              <motion.span 
+                className="text-lg font-bold tracking-wide uppercase"
+                animate={showButtonAnimation && !shouldReduceMotion ? {
+                  scale: [1, 1.15, 1.05, 1],
+                  x: [0, 2, 0, 0],
+                } : {
+                  scale: 1,
+                  x: 0,
+                }}
+                transition={{ 
+                  duration: 0.9, 
+                  times: [0, 0.3, 0.7, 1],
+                  delay: 0.4,
+                  ease: [0.34, 1.56, 0.64, 1],
+                }}
+              >
+                Next: {nextExerciseName}
+              </motion.span>
+              <motion.div
+                animate={showButtonAnimation && !shouldReduceMotion ? {
+                  x: [0, 8, -2, 0],
+                  scale: [1, 1.2, 1.1, 1],
+                  rotate: [0, 15, -5, 0],
+                } : {
+                  x: 0,
+                  scale: 1,
+                  rotate: 0,
+                }}
+                transition={{ 
+                  duration: 0.9, 
+                  times: [0, 0.3, 0.7, 1],
+                  delay: 0.4,
+                  ease: [0.34, 1.56, 0.64, 1],
+                }}
+              >
+                <ArrowRight className="w-6 h-6 font-bold" />
+              </motion.div>
             </>
           ) : (
             <>
-              <CheckCircle className="w-6 h-6 font-bold" />
-              <span className="text-lg font-bold tracking-wide uppercase">Log Set</span>
+              <motion.div
+                animate={showButtonAnimation && !shouldReduceMotion ? {
+                  scale: [1, 1.4, 1.1, 1],
+                  rotate: [0, 20, -8, 0],
+                } : {
+                  scale: 1,
+                  rotate: 0,
+                }}
+                transition={{ 
+                  duration: 0.9, 
+                  times: [0, 0.3, 0.7, 1],
+                  delay: 0.4,
+                  ease: [0.34, 1.56, 0.64, 1],
+                }}
+              >
+                <CheckCircle className="w-6 h-6 font-bold" />
+              </motion.div>
+              <motion.span 
+                className="text-lg font-bold tracking-wide uppercase"
+                animate={showButtonAnimation && !shouldReduceMotion ? {
+                  scale: [1, 1.12, 1.03, 1],
+                  x: [0, 1, 0, 0],
+                } : {
+                  scale: 1,
+                  x: 0,
+                }}
+                transition={{ 
+                  duration: 0.9, 
+                  times: [0, 0.3, 0.7, 1],
+                  delay: 0.4,
+                  ease: [0.34, 1.56, 0.64, 1],
+                }}
+              >
+                Log Set
+              </motion.span>
             </>
           )}
         </motion.button>
@@ -166,6 +423,22 @@ export function CurrentSetCard({
           <p className="text-center text-[10px] text-slate-400 mt-2">
             Logging will start group rest timer
           </p>
+        )}
+        {onAddSet && (
+          <motion.button
+            onClick={onAddSet}
+            disabled={disabled}
+            className={cn(
+              'flex w-full items-center justify-center gap-2 rounded-xl h-12 mt-3 border-2 transition-all',
+              !disabled
+                ? 'border-primary/30 bg-primary/5 hover:bg-primary/10 text-primary active:scale-[0.98]'
+                : 'border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
+            )}
+            whileHover={!disabled && !shouldReduceMotion ? { scale: 1.02 } : {}}
+            whileTap={!disabled && !shouldReduceMotion ? { scale: 0.98 } : {}}
+          >
+            <span className="text-sm font-semibold tracking-wide">Add Set</span>
+          </motion.button>
         )}
       </div>
     </div>

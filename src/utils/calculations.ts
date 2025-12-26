@@ -201,3 +201,41 @@ export function calculateVolumeByType(sets: WorkoutSet[], trackingType: Exercise
   return metrics;
 }
 
+/**
+ * Calculate next set values based on volume progression
+ * Increases volume by prioritizing weight increase (2.5kg/5lbs), ensuring volume always increases
+ */
+export function calculateNextSetByVolume(
+  previousSet: WorkoutSet | null | undefined,
+  unit: 'kg' | 'lbs' = 'kg'
+): { weight: number; reps: number } {
+  if (!previousSet || previousSet.weight === undefined || previousSet.reps === undefined) {
+    return { weight: 0, reps: 10 };
+  }
+
+  const previousWeight = previousSet.weight;
+  const previousReps = previousSet.reps;
+  const previousVolume = previousWeight * previousReps;
+
+  // Weight increment based on unit (2.5kg or 5lbs)
+  const weightIncrement = unit === 'kg' ? 2.5 : 5;
+  
+  let newWeight: number;
+  let newReps: number;
+
+  if (previousWeight === 0) {
+    // If previous weight was 0, start with base weight and same reps
+    newWeight = weightIncrement;
+    newReps = previousReps;
+  } else {
+    // Increase weight first (this will always increase volume)
+    newWeight = previousWeight + weightIncrement;
+    newReps = previousReps;
+  }
+
+  // Round weight to nearest increment
+  newWeight = roundToNearest(newWeight, weightIncrement);
+
+  return { weight: Math.max(0, newWeight), reps: Math.max(1, newReps) };
+}
+

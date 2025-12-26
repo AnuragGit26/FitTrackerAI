@@ -34,6 +34,11 @@ export function ExerciseFilters({
   };
 
   const handleMuscleGroupClick = (category: MuscleGroupCategory) => {
+    // Only allow muscle group selection when Strength category is selected
+    if (selectedCategory !== 'strength') {
+      return;
+    }
+    
     if (selectedMuscleGroups.includes(category)) {
       // Remove from selection
       onMuscleGroupsChange(selectedMuscleGroups.filter(g => g !== category));
@@ -46,6 +51,8 @@ export function ExerciseFilters({
   const handleResetMuscleGroups = () => {
     onMuscleGroupsChange([]);
   };
+
+  const isMuscleGroupFilterEnabled = selectedCategory === 'strength';
 
   return (
     <div className="px-4 mb-5 space-y-4">
@@ -80,13 +87,24 @@ export function ExerciseFilters({
       </div>
 
       {/* Muscle Group Filter */}
-      <div className="bg-surface-light dark:bg-surface-dark p-3 rounded-2xl border border-gray-200 dark:border-[#316847]">
+      <div className={cn(
+        "bg-surface-light dark:bg-surface-dark p-3 rounded-2xl border border-gray-200 dark:border-[#316847]",
+        !isMuscleGroupFilterEnabled && "opacity-50"
+      )}>
         <div className="flex items-center justify-between mb-3">
-          <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+          <label className={cn(
+            "text-xs font-bold uppercase tracking-wider flex items-center gap-1.5",
+            isMuscleGroupFilterEnabled 
+              ? "text-gray-500 dark:text-gray-400" 
+              : "text-gray-400 dark:text-gray-500"
+          )}>
             <span className="material-symbols-outlined text-sm">accessibility_new</span>
             Muscle Group
+            {!isMuscleGroupFilterEnabled && (
+              <span className="text-[10px] font-normal normal-case ml-1">(Strength only)</span>
+            )}
           </label>
-          {selectedMuscleGroups.length > 0 && (
+          {selectedMuscleGroups.length > 0 && isMuscleGroupFilterEnabled && (
             <button
               onClick={handleResetMuscleGroups}
               className="text-[10px] font-semibold text-primary hover:underline bg-primary/10 px-2 py-1 rounded-md"
@@ -102,14 +120,18 @@ export function ExerciseFilters({
               <button
                 key={category}
                 onClick={() => handleMuscleGroupClick(category)}
+                disabled={!isMuscleGroupFilterEnabled}
                 className={cn(
                   'shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg font-medium text-xs transition-colors',
-                  isSelected
+                  !isMuscleGroupFilterEnabled && 'cursor-not-allowed',
+                  isSelected && isMuscleGroupFilterEnabled
                     ? 'bg-primary/10 border border-primary text-primary font-bold'
-                    : 'bg-background-light dark:bg-background-dark border border-gray-200 dark:border-[#316847] text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#1a3b2b] hover:border-primary/50'
+                    : isMuscleGroupFilterEnabled
+                    ? 'bg-background-light dark:bg-background-dark border border-gray-200 dark:border-[#316847] text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#1a3b2b] hover:border-primary/50'
+                    : 'bg-background-light dark:bg-background-dark border border-gray-200 dark:border-[#316847] text-gray-400 dark:text-gray-600'
                 )}
               >
-                {isSelected && (
+                {isSelected && isMuscleGroupFilterEnabled && (
                   <span className="material-symbols-outlined text-[16px]">check</span>
                 )}
                 {category}
