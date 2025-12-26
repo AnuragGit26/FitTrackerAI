@@ -1,28 +1,33 @@
-import { useState, useEffect, useRef } from 'react';
-import { X, Plus, Check, ChevronDown, Trash2, Loader2 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { Loader2, ArrowLeft } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useWorkoutStore } from '@/store/workoutStore';
 import { useUserStore } from '@/store/userStore';
 import { ExerciseSelectorDropdown } from '@/components/exercise/ExerciseSelectorDropdown';
-import { ExerciseInfoCard } from '@/components/exercise/ExerciseInfoCard';
-import { SetRow } from '@/components/exercise/SetRow';
-import { RestTimerToggle } from '@/components/exercise/RestTimerToggle';
 import { RestTimer } from '@/components/exercise/RestTimer';
+import { CurrentSetCard } from '@/components/exercise/CurrentSetCard';
+import { CompletedSetItem } from '@/components/exercise/CompletedSetItem';
+import { SupersetNavigationCards } from '@/components/exercise/SupersetNavigationCards';
+import { GroupRestTimer } from '@/components/exercise/GroupRestTimer';
+import { PreviousWorkoutTable } from '@/components/exercise/PreviousWorkoutTable';
+import { WorkoutTimerDisplay } from '@/components/exercise/WorkoutTimerDisplay';
+import { AIInsightPill } from '@/components/exercise/AIInsightPill';
 import { Exercise, WorkoutExercise, WorkoutSet, ExerciseCategory } from '@/types/exercise';
 import { MuscleGroupCategory } from '@/utils/muscleGroupCategories';
 import { getMuscleMapping } from '@/services/muscleMapping';
 import { calculateVolume } from '@/utils/calculations';
 import { useNavigate } from 'react-router-dom';
 import { exerciseLibrary } from '@/services/exerciseLibrary';
-import { cn } from '@/utils/cn';
 import { useToast } from '@/hooks/useToast';
 import { validateNotes, validateSet, validateReps, validateWeight } from '@/utils/validators';
-import { sanitizeNotes, sanitizeString } from '@/utils/sanitize';
-import { slideLeft, checkmarkAnimation, prefersReducedMotion } from '@/utils/animations';
+import { sanitizeNotes } from '@/utils/sanitize';
+import { prefersReducedMotion } from '@/utils/animations';
 import { useSetDuration } from '@/hooks/useSetDuration';
 import { useSettingsStore } from '@/store/settingsStore';
-import { saveLogWorkoutState } from '@/utils/workoutStatePersistence';
+import { saveLogWorkoutState, saveLogExerciseState, loadLogExerciseState, clearLogExerciseState } from '@/utils/workoutStatePersistence';
 import { trapFocus, restoreFocus } from '@/utils/accessibility';
+import { supersetService, SupersetGroup } from '@/services/supersetService';
+import { Modal } from '@/components/common/Modal';
 
 // Constants
 const SAVE_ANIMATION_DURATION = 2000; // ms
@@ -48,6 +53,7 @@ interface LogExerciseProps {
   onMuscleGroupsChange?: (groups: MuscleGroupCategory[]) => void;
   onExerciseSaved?: () => void; // Callback when exercise is saved
   onStartWorkoutTimer?: () => void; // Callback to start workout timer on parent
+  onNavigateToExercise?: (exerciseId: string) => void; // Callback to navigate to next exercise in superset
 }
 
 export function LogExercise({
@@ -60,6 +66,7 @@ export function LogExercise({
   onMuscleGroupsChange: _onMuscleGroupsChange,
   onExerciseSaved,
   onStartWorkoutTimer,
+  onNavigateToExercise,
 }: LogExerciseProps) {
   const navigate = useNavigate();
   const { currentWorkout, addExercise, updateExercise } = useWorkoutStore();
@@ -77,6 +84,8 @@ export function LogExercise({
   const [isLoadingExercise, setIsLoadingExercise] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showSaveConfirmModal, setShowSaveConfirmModal] = useState(false);
 
   // Rest timer state
   const [restTimerVisible, setRestTimerVisible] = useState(false);
@@ -112,6 +121,55 @@ export function LogExercise({
       return;
     }
 
+    // Try to restore persisted state from sessionStorage
+    const persistedState = loadLogExerciseState();
+    if (persistedState) {
+      // Only restore if it matches current context (same exerciseId or both are new)
+      const matchesContext = 
+        (persistedState.exerciseId === null && exerciseId === null) ||
+        (persistedState.exerciseId === exerciseId);
+      
+      if (matchesContext && (persistedState.selectedExerciseId || persistedState.sets.length > 0)) {
+        // Restore exercise if we have an ID
+        if (persistedState.selectedExerciseId) {
+          exerciseLibrary.getExerciseById(persistedState.selectedExerciseId)
+            .then((exercise) => {
+              if (exercise) {
+                setSelectedExercise(exercise);
+                setSets(persistedState.sets);
+                setNotes(persistedState.notes);
+                setWorkoutDate(new Date(persistedState.workoutDate));
+                
+                // Set initial state to restored state (so no changes detected initially)
+                initialStateRef.current = {
+                  selectedExerciseId: exercise.id,
+                  sets: persistedState.sets,
+                  notes: persistedState.notes,
+                  workoutDate: new Date(persistedState.workoutDate),
+                };
+                setHasUnsavedChanges(false);
+              }
+            })
+            .catch((err) => {
+              console.error('Failed to restore exercise from persisted state:', err);
+            });
+        } else if (persistedState.sets.length > 0) {
+          // Restore sets even without exercise (user might have been in middle of selecting)
+          setSets(persistedState.sets);
+          setNotes(persistedState.notes);
+          setWorkoutDate(new Date(persistedState.workoutDate));
+          
+          initialStateRef.current = {
+            selectedExerciseId: null,
+            sets: persistedState.sets,
+            notes: persistedState.notes,
+            workoutDate: new Date(persistedState.workoutDate),
+          };
+          setHasUnsavedChanges(false);
+        }
+      }
+    }
+
     if (exerciseId && currentWorkoutRef.current) {
       // Reset ref when exerciseId changes to allow reload
       if (loadedExerciseIdRef.current !== exerciseId) {
@@ -132,33 +190,42 @@ export function LogExercise({
           const workoutExercise = workout.exercises.find((ex) => ex.id === exerciseId);
           if (!workoutExercise) {
             showError('Exercise no longer exists in workout');
-            onClose();
+            handleForceClose();
             return;
           }
 
           const exerciseData = await exerciseLibrary.getExerciseById(workoutExercise.exerciseId);
           if (exerciseData) {
+            const loadedSets = workoutExercise.sets.map((set, index) => ({
+              ...set,
+              setNumber: index + 1,
+            }));
             setSelectedExercise(exerciseData);
-            setSets(
-              workoutExercise.sets.map((set, index) => ({
-                ...set,
-                setNumber: index + 1,
-              }))
-            );
+            setSets(loadedSets);
             setNotes(workoutExercise.notes || '');
             setWorkoutDate(workoutExercise.timestamp);
             setShowAdditionalDetails(false);
             setValidationErrors({});
+            
+            // Set initial state for change detection
+            initialStateRef.current = {
+              selectedExerciseId: exerciseData.id,
+              sets: loadedSets,
+              notes: workoutExercise.notes || '',
+              workoutDate: workoutExercise.timestamp,
+            };
+            setHasUnsavedChanges(false);
+            
             loadedExerciseIdRef.current = exerciseId;
           } else {
             showError('Exercise not found');
-            onClose();
+            handleForceClose();
           }
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : 'Failed to load exercise';
           showError(errorMessage);
           console.error('Error loading exercise:', err);
-          onClose();
+          handleForceClose();
         } finally {
           setIsLoadingExercise(false);
         }
@@ -179,6 +246,15 @@ export function LogExercise({
         setRestTimerPaused(false);
         resetSetDuration();
         currentSetStartTimeRef.current = null;
+        
+        // Reset initial state
+        initialStateRef.current = {
+          selectedExerciseId: null,
+          sets: [],
+          notes: '',
+          workoutDate: new Date(),
+        };
+        setHasUnsavedChanges(false);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -247,9 +323,19 @@ export function LogExercise({
       }
       setSets([initialSet]);
       setNotes('');
-      setWorkoutDate(new Date());
+      const newDate = new Date();
+      setWorkoutDate(newDate);
       setValidationErrors({});
       initializedExerciseIdRef.current = selectedExercise.id;
+      
+      // Set initial state for change detection
+      initialStateRef.current = {
+        selectedExerciseId: selectedExercise.id,
+        sets: [initialSet],
+        notes: '',
+        workoutDate: newDate,
+      };
+      setHasUnsavedChanges(false);
 
       // Start tracking first set
       resetSetDuration();
@@ -287,6 +373,19 @@ export function LogExercise({
     showAdditionalDetails: false,
   });
 
+  // Track initial state to detect unsaved changes
+  const initialStateRef = useRef<{
+    selectedExerciseId: string | null;
+    sets: WorkoutSet[];
+    notes: string;
+    workoutDate: Date;
+  }>({
+    selectedExerciseId: null,
+    sets: [],
+    notes: '',
+    workoutDate: new Date(),
+  });
+
   // Update ref when state changes (no dependency on arrays to avoid loops)
   useEffect(() => {
     stateSnapshotRef.current = {
@@ -306,6 +405,84 @@ export function LogExercise({
       showAdditionalDetails,
     };
   });
+
+  // Helper function to compare states for unsaved changes
+  const hasStateChanged = useCallback((): boolean => {
+    const current = {
+      selectedExerciseId: selectedExercise?.id || null,
+      sets,
+      notes,
+      workoutDate,
+    };
+    const initial = initialStateRef.current;
+
+    // Compare exercise selection
+    if (current.selectedExerciseId !== initial.selectedExerciseId) {
+      return true;
+    }
+
+    // Compare notes
+    if (current.notes !== initial.notes) {
+      return true;
+    }
+
+    // Compare workout date (compare ISO strings to avoid time precision issues)
+    if (current.workoutDate.toISOString() !== initial.workoutDate.toISOString()) {
+      return true;
+    }
+
+    // Compare sets (deep comparison)
+    if (current.sets.length !== initial.sets.length) {
+      return true;
+    }
+
+    for (let i = 0; i < current.sets.length; i++) {
+      const currentSet = current.sets[i];
+      const initialSet = initial.sets[i];
+      
+      if (
+        currentSet.setNumber !== initialSet.setNumber ||
+        currentSet.reps !== initialSet.reps ||
+        currentSet.weight !== initialSet.weight ||
+        currentSet.unit !== initialSet.unit ||
+        currentSet.duration !== initialSet.duration ||
+        currentSet.distance !== initialSet.distance ||
+        currentSet.distanceUnit !== initialSet.distanceUnit ||
+        currentSet.time !== initialSet.time ||
+        currentSet.calories !== initialSet.calories ||
+        currentSet.completed !== initialSet.completed ||
+        currentSet.rpe !== initialSet.rpe
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  }, [selectedExercise?.id, sets, notes, workoutDate]);
+
+  // Detect unsaved changes
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const changed = hasStateChanged();
+    setHasUnsavedChanges(changed);
+  }, [isOpen, hasStateChanged]);
+
+  // Auto-persist to sessionStorage when state changes
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    // Only persist if there are actual changes (exercise selected and/or sets exist)
+    if (selectedExercise || sets.length > 0 || notes.trim() !== '') {
+      saveLogExerciseState({
+        selectedExerciseId: selectedExercise?.id || null,
+        sets,
+        notes,
+        workoutDate: workoutDate.toISOString(),
+        exerciseId: exerciseId || null,
+      });
+    }
+  }, [selectedExercise, sets, notes, workoutDate, exerciseId, isOpen]);
 
   // Save state on visibility change or before unload - avoid auto-save to prevent infinite loops
   useEffect(() => {
@@ -603,7 +780,7 @@ export function LogExercise({
     return Object.keys(errors).length === 0;
   };
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     if (!selectedExercise || !currentWorkout) {
       showError('Please select an exercise');
       return;
@@ -663,8 +840,11 @@ export function LogExercise({
 
       // Call callback and close modal
       onExerciseSaved?.();
+      // Clear persisted state after successful save
+      clearLogExerciseState();
+      setHasUnsavedChanges(false);
       setTimeout(() => {
-        onClose();
+        handleForceClose();
       }, MODAL_CLOSE_DELAY);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to save exercise';
@@ -675,21 +855,26 @@ export function LogExercise({
     }
   };
 
-  const handleCancel = () => {
-    // Reset state
-    setSelectedExercise(null);
-    setSets([]);
-    setNotes('');
-    setWorkoutDate(new Date());
-    setValidationErrors({});
-    setRestTimerVisible(false);
-    setRestTimerRemaining(defaultRestDuration);
-    setRestTimerStartTime(null);
-    setRestTimerPaused(false);
-    resetSetDuration();
-    currentSetStartTimeRef.current = null;
+  // Handle close request - check for unsaved changes
+  const handleCloseRequest = useCallback(() => {
+    if (hasUnsavedChanges) {
+      setShowSaveConfirmModal(true);
+    } else {
+      // No unsaved changes, close immediately
+      clearLogExerciseState();
+      onClose();
+    }
+  }, [hasUnsavedChanges, onClose]);
+
+  // Force close without confirmation (for error cases, successful saves)
+  const handleForceClose = useCallback(() => {
+    clearLogExerciseState();
     onClose();
-  };
+  }, [onClose]);
+
+  const handleCancel = useCallback(() => {
+    handleCloseRequest();
+  }, [handleCloseRequest]);
 
   // Rest timer handlers
   const handleRestComplete = () => {
@@ -760,8 +945,184 @@ export function LogExercise({
     setRestTimerPaused(paused);
   };
 
+  // Handle logging current set
+  const handleLogCurrentSet = async () => {
+    if (!selectedExercise) return;
+
+    let setToComplete = currentSet;
+    
+    // If no current set, create a new one
+    if (!setToComplete) {
+      const newSetNumber = sets.length + 1;
+      const lastSet = sets[sets.length - 1];
+      const trackingType = selectedExercise.trackingType;
+      
+      let newSet: WorkoutSet;
+      switch (trackingType) {
+        case 'weight_reps':
+          newSet = {
+            setNumber: newSetNumber,
+            reps: lastSet?.reps ?? 10,
+            weight: lastSet?.weight ?? 0,
+            unit: profile?.preferredUnit || 'kg',
+            completed: false,
+          };
+          break;
+        case 'reps_only':
+          newSet = {
+            setNumber: newSetNumber,
+            reps: lastSet?.reps ?? 10,
+            completed: false,
+          };
+          break;
+        default:
+          newSet = {
+            setNumber: newSetNumber,
+            reps: lastSet?.reps ?? 10,
+            weight: lastSet?.weight ?? 0,
+            unit: profile?.preferredUnit || 'kg',
+            completed: false,
+          };
+      }
+      
+      setSets([...sets, newSet]);
+      setToComplete = newSet;
+    }
+
+    // Mark set as completed
+    const setUpdates: Partial<WorkoutSet> = {
+      completed: true,
+    };
+
+    // Track duration
+    const setDuration = completeSet();
+    const setEndTime = new Date();
+    setUpdates.setDuration = setDuration;
+    setUpdates.setEndTime = setEndTime;
+    if (currentSetStartTimeRef.current) {
+      setUpdates.setStartTime = currentSetStartTimeRef.current;
+    }
+
+    handleUpdateSet(setToComplete.setNumber, setUpdates);
+
+    // If in superset and has next exercise, show group rest timer
+    if (isInSuperset && nextExercise && !isLastInSuperset) {
+      setGroupRestTimerVisible(true);
+      // Don't navigate yet - wait for timer to complete
+    } else if (isInSuperset && isLastInSuperset) {
+      // Last exercise in superset - show regular rest timer
+      if (restTimerEnabled && settings.autoStartRestTimer) {
+        setRestTimerRemaining(defaultRestDuration);
+        setRestTimerStartTime(new Date());
+        setRestTimerOriginalDuration(defaultRestDuration);
+        setRestTimerVisible(true);
+      }
+    } else {
+      // Not in superset - show regular rest timer
+      if (restTimerEnabled && settings.autoStartRestTimer) {
+        setRestTimerRemaining(defaultRestDuration);
+        setRestTimerStartTime(new Date());
+        setRestTimerOriginalDuration(defaultRestDuration);
+        setRestTimerVisible(true);
+      }
+    }
+  };
+
+  // Handle group rest timer completion - navigate to next exercise
+  const handleGroupRestComplete = async () => {
+    if (!nextExercise) return;
+
+    setGroupRestTimerVisible(false);
+    
+    // Save current exercise first if there are changes
+    if (sets.some((s) => s.completed)) {
+      try {
+        await handleSave();
+      } catch (error) {
+        // If save fails, don't navigate
+        console.error('Failed to save exercise before navigation:', error);
+        return;
+      }
+    }
+    
+    // Navigate to next exercise
+    if (onNavigateToExercise) {
+      onNavigateToExercise(nextExercise.id);
+    } else {
+      // Fallback: close and let parent handle
+      handleCloseRequest();
+    }
+  };
+
+  // Handle group rest timer skip
+  const handleGroupRestSkip = () => {
+    handleGroupRestComplete();
+  };
+
   const activeSetNumber = sets.find((set) => !set.completed)?.setNumber || sets.length;
   const isSaveButtonDisabled = !selectedExercise || sets.length === 0 || isSaving;
+
+  // Superset detection and navigation
+  const currentExercise = useMemo(() => {
+    if (!exerciseId || !currentWorkout) return null;
+    return currentWorkout.exercises.find((ex) => ex.id === exerciseId);
+  }, [exerciseId, currentWorkout]);
+
+  const isInSuperset = useMemo(() => {
+    return !!(currentExercise?.groupId && currentExercise?.groupType);
+  }, [currentExercise]);
+
+  const groupExercises = useMemo(() => {
+    if (!isInSuperset || !currentExercise || !currentWorkout || !currentExercise.groupId) return [];
+    return supersetService.getGroupExercises(currentWorkout.exercises, currentExercise.groupId);
+  }, [isInSuperset, currentExercise, currentWorkout]);
+
+  const nextExercise = useMemo(() => {
+    if (!isInSuperset || !currentExercise || groupExercises.length === 0) return null;
+    const group: SupersetGroup = {
+      groupId: currentExercise.groupId!,
+      groupType: currentExercise.groupType!,
+      exercises: groupExercises,
+    };
+    return supersetService.getNextExercise(group, currentExercise.id);
+  }, [isInSuperset, currentExercise, groupExercises]);
+
+  const isLastInSuperset = useMemo(() => {
+    if (!isInSuperset || !currentExercise || groupExercises.length === 0) return false;
+    const currentIndex = groupExercises.findIndex((ex) => ex.id === currentExercise.id);
+    return currentIndex === groupExercises.length - 1;
+  }, [isInSuperset, currentExercise, groupExercises]);
+
+  // Group rest timer state
+  const [groupRestTimerVisible, setGroupRestTimerVisible] = useState(false);
+  const [groupRestTimerDuration, setGroupRestTimerDuration] = useState(45); // Default 45s
+
+  // Workout timer access
+  const workoutTimerStartTime = useWorkoutStore((state) => state.workoutTimerStartTime);
+
+  // Current set (first incomplete set or next set to add)
+  const currentSet = useMemo(() => {
+    const incompleteSet = sets.find((set) => !set.completed);
+    if (incompleteSet) return incompleteSet;
+    // If all sets are completed, return the last set for reference
+    return sets[sets.length - 1] || null;
+  }, [sets]);
+
+  const currentSetNumber = useMemo(() => {
+    if (currentSet) return currentSet.setNumber;
+    return sets.length + 1;
+  }, [currentSet, sets.length]);
+
+  const completedSets = useMemo(() => {
+    return sets.filter((set) => set.completed);
+  }, [sets]);
+
+  // Get previous workout data for current set
+  const previousSetData = useMemo(() => {
+    if (!currentSet || !currentExercise) return null;
+    // This will be loaded by PreviousWorkoutTable component
+    return null;
+  }, [currentSet, currentExercise]);
 
   // Lock body scroll and manage focus when modal is open
   useEffect(() => {
@@ -810,13 +1171,13 @@ export function LogExercise({
         setRestTimerPaused(false);
         resetSetDuration();
         currentSetStartTimeRef.current = null;
-        onClose();
+        handleCloseRequest();
       }
     };
 
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [isOpen, isSaving, defaultRestDuration, onClose, resetSetDuration]);
+  }, [isOpen, isSaving, defaultRestDuration, handleCloseRequest, resetSetDuration]);
 
   if (!isOpen) return null;
 
@@ -830,63 +1191,54 @@ export function LogExercise({
       tabIndex={-1}
     >
       {/* Header */}
-      <header className="sticky top-0 z-10 flex items-center bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md p-4 pb-2 justify-between border-b border-gray-200 dark:border-[#316847]">
-        <button
-          onClick={handleCancel}
-          className="flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-          aria-label="Cancel"
-        >
-          <X className="w-5 h-5 text-gray-800 dark:text-white" />
-        </button>
-        <div className="flex-1 text-center">
-          <h2 id="log-exercise-title" className="text-gray-900 dark:text-white text-lg font-bold leading-tight tracking-[-0.015em]">
-            {exerciseId ? 'Edit Exercise' : 'Add Exercise'}
-          </h2>
-        </div>
-        <div className="flex items-center gap-2">
+      <header className="sticky top-0 z-20 flex flex-col gap-2 bg-background-light dark:bg-background-dark pt-4 pb-2 shadow-sm dark:shadow-none border-b border-transparent dark:border-white/5">
+        <div className="px-4 flex items-center h-12 justify-between">
           <button
             onClick={handleCancel}
-            className="flex h-10 px-4 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            className="text-slate-900 dark:text-white flex size-12 shrink-0 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors -ml-2"
+            aria-label="Back"
           >
-            <span className="text-sm font-bold leading-normal tracking-[0.015em]">Cancel</span>
+            <ArrowLeft className="w-6 h-6" />
           </button>
-          <motion.button
-            onClick={handleSave}
-            disabled={isSaveButtonDisabled}
-            className={cn(
-              'flex h-10 px-4 items-center justify-center rounded-full transition-colors gap-2 relative overflow-hidden',
-              !isSaveButtonDisabled
-                ? 'bg-primary/10 text-primary hover:bg-primary/20'
-                : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-            )}
-            whileHover={!isSaveButtonDisabled && !shouldReduceMotion ? { scale: 1.05 } : {}}
-            whileTap={!isSaveButtonDisabled && !shouldReduceMotion ? { scale: 0.95 } : {}}
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span className="text-sm font-bold leading-normal tracking-[0.015em]">Saving...</span>
-              </>
-            ) : showSuccessAnimation ? (
-              <motion.span
-                variants={shouldReduceMotion ? {} : checkmarkAnimation}
-                initial="initial"
-                animate="animate"
-                className="text-sm font-bold leading-normal tracking-[0.015em] flex items-center gap-2"
-              >
-                <Check className="w-4 h-4" />
-                Saved!
-              </motion.span>
-            ) : (
-              <span className="text-sm font-bold leading-normal tracking-[0.015em]">
-                {exerciseId ? 'Update' : 'Save'}
+          <div className="flex items-center gap-2">
+            {isInSuperset && currentExercise && (
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/20">
+                {currentExercise.groupType === 'superset' ? 'Superset' : 'Circuit'} {String.fromCharCode(65 + (groupExercises.findIndex((ex) => ex.id === currentExercise.id) || 0))}
               </span>
             )}
-          </motion.button>
+            {workoutTimerStartTime && (
+              <WorkoutTimerDisplay />
+            )}
+          </div>
+          <div className="flex w-16 items-center justify-end">
+            <button
+              onClick={handleSave}
+              disabled={isSaveButtonDisabled}
+              className="text-primary text-base font-bold leading-normal tracking-[0.015em] shrink-0 hover:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSaving ? 'Saving...' : 'Finish'}
+            </button>
+          </div>
         </div>
+        {selectedExercise && (
+          <div className="px-4 pb-2">
+            <h1 className="text-slate-900 dark:text-white tracking-tight text-[24px] font-bold leading-tight">
+              {selectedExercise.name}
+            </h1>
+          </div>
+        )}
+        {/* Superset Navigation Cards */}
+            {isInSuperset && currentExercise && groupExercises.length > 0 && currentExercise.groupType && currentExercise.groupType !== 'single' && (
+              <SupersetNavigationCards
+                currentExerciseId={currentExercise.id}
+                groupExercises={groupExercises}
+                groupType={currentExercise.groupType}
+                onExerciseClick={onNavigateToExercise}
+              />
+            )}
       </header>
 
-      <main className="flex-1 overflow-y-auto pb-24">
+      <main className="flex flex-col gap-4 px-4 pt-2 flex-1 overflow-y-auto pb-24">
         {isLoadingExercise ? (
           <div className="flex items-center justify-center min-h-[400px]">
             <div className="flex flex-col items-center gap-4">
@@ -896,252 +1248,168 @@ export function LogExercise({
           </div>
         ) : (
           <>
-            <div className="px-4 py-6">
-              {/* Exercise Selector */}
-              <ExerciseSelectorDropdown
-                selectedExercise={selectedExercise}
-                onSelect={handleSelectExercise}
-                onCreateCustom={handleCreateCustom}
-                selectedCategory={selectedCategory}
-                selectedMuscleGroups={selectedMuscleGroups}
-              />
-              {validationErrors.exercise && (
-                <p className="text-xs text-error mt-1">{validationErrors.exercise}</p>
-              )}
-            </div>
-
-            {/* Exercise Info Card */}
-            {selectedExercise && (
-              <div className="px-4 mb-6">
-                <ExerciseInfoCard exercise={selectedExercise} />
+            {/* Exercise Selector - Only show when adding new exercise */}
+            {!exerciseId && (
+              <div className="py-6">
+                <ExerciseSelectorDropdown
+                  selectedExercise={selectedExercise}
+                  onSelect={handleSelectExercise}
+                  onCreateCustom={handleCreateCustom}
+                  selectedCategory={selectedCategory}
+                  selectedMuscleGroups={selectedMuscleGroups || []}
+                />
+                {validationErrors.exercise && (
+                  <p className="text-xs text-error mt-1">{validationErrors.exercise}</p>
+                )}
               </div>
             )}
 
-            {/* Sets Section */}
-            {selectedExercise && (
-              <>
-            <div className="sticky top-[72px] z-10 bg-background-light dark:bg-background-dark py-2 px-4 flex items-center justify-between border-b border-gray-200 dark:border-[#316847]/50">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Sets</h3>
-              <RestTimerToggle enabled={restTimerEnabled} onChange={setRestTimerEnabled} />
-            </div>
+            {/* Previous Workout Table */}
+            {selectedExercise && exerciseId && selectedExercise.id ? (
+              <PreviousWorkoutTable exerciseId={selectedExercise.id} />
+            ) : null}
 
-            <div className="px-4 py-4 space-y-3">
-              {/* Column headers */}
-              {(() => {
-                const trackingType = selectedExercise?.trackingType || 'weight_reps';
-                const getGridCols = () => {
-                  switch (trackingType) {
-                    case 'weight_reps':
-                      return 'grid-cols-[30px_1fr_1fr_60px_44px]';
-                    case 'reps_only':
-                      return 'grid-cols-[30px_1fr_60px_44px]';
-                    case 'cardio':
-                      return 'grid-cols-[30px_1fr_1fr_1fr_44px]';
-                    case 'duration':
-                      return 'grid-cols-[30px_1fr_44px]';
-                    default:
-                      return 'grid-cols-[30px_1fr_1fr_44px]';
-                  }
-                };
+            {/* AI Insight Pill */}
+            {selectedExercise && currentSet && (
+              <div className="flex flex-wrap">
+                <AIInsightPill insight="Try increasing weight by 2.5kg today" />
+              </div>
+            )}
 
-                return (
-                  <div className={`grid ${getGridCols()} gap-3 px-2 mb-1`}>
-                    <div className="text-xs font-bold text-gray-400 text-center self-end">SET</div>
-                    {trackingType === 'weight_reps' && (
-                      <>
-                        <div className="text-xs font-bold text-gray-400 text-center self-end">
-                          {profile?.preferredUnit === 'lbs' ? 'LBS' : 'KG'}
-                        </div>
-                        <div className="text-xs font-bold text-gray-400 text-center self-end">REPS</div>
-                        <div className="text-xs font-bold text-gray-400 text-center self-end">RPE</div>
-                      </>
-                    )}
-                    {trackingType === 'reps_only' && (
-                      <>
-                        <div className="text-xs font-bold text-gray-400 text-center self-end">REPS</div>
-                        <div className="text-xs font-bold text-gray-400 text-center self-end">RPE</div>
-                      </>
-                    )}
-                    {trackingType === 'cardio' && (
-                      <>
-                        <div className="text-xs font-bold text-gray-400 text-center self-end">DISTANCE</div>
-                        <div className="text-xs font-bold text-gray-400 text-center self-end">TIME</div>
-                        <div className="text-xs font-bold text-gray-400 text-center self-end">CAL</div>
-                      </>
-                    )}
-                    {trackingType === 'duration' && (
-                      <div className="text-xs font-bold text-gray-400 text-center self-end">DURATION</div>
-                    )}
-                    <div className="text-xs font-bold text-gray-400 text-center self-end">
-                      <Check className="w-3 h-3 mx-auto" />
-                    </div>
-                  </div>
-                );
-              })()}
+            {/* Current Set Card */}
+            {selectedExercise && currentSet && (
+              <CurrentSetCard
+                setNumber={currentSetNumber}
+                set={currentSet}
+                unit={profile?.preferredUnit || 'kg'}
+                targetReps={undefined}
+                previousWeight={
+                  completedSets.length > 0
+                    ? completedSets[completedSets.length - 1]?.weight
+                    : undefined
+                }
+                onUpdate={(updates) => handleUpdateSet(currentSet.setNumber, updates)}
+                onLogSet={handleLogCurrentSet}
+                nextExerciseName={nextExercise?.exerciseName}
+                isLastInSuperset={isLastInSuperset}
+                showGroupRestMessage={isInSuperset && !!nextExercise && !isLastInSuperset}
+              />
+            )}
 
-              {/* Set rows */}
-              <AnimatePresence>
-                {sets.map((set) => {
-                  const setNumber = set.setNumber;
-                  return (
+            {/* Group Rest Timer */}
+            {isInSuperset && groupRestTimerVisible && (
+              <GroupRestTimer
+                duration={groupRestTimerDuration}
+                onComplete={handleGroupRestComplete}
+                onSkip={handleGroupRestSkip}
+                isVisible={groupRestTimerVisible}
+                groupType={currentExercise?.groupType && currentExercise.groupType !== 'single' ? currentExercise.groupType : 'superset'}
+              />
+            )}
+
+            {/* Divider */}
+            {completedSets.length > 0 && (
+              <div className="h-px w-full bg-slate-200 dark:bg-white/10 my-2"></div>
+            )}
+
+            {/* Completed Sets List */}
+            {selectedExercise && completedSets.length > 0 && (
+              <div className="flex flex-col gap-3 pb-8">
+                <h3 className="text-slate-500 dark:text-slate-400 text-sm font-bold uppercase tracking-wider px-2">
+                  Completed Today ({selectedExercise.name})
+                </h3>
+                <AnimatePresence>
+                  {completedSets.map((set) => (
                     <motion.div
-                      key={setNumber}
-                      className="relative pr-12"
-                      initial="hidden"
-                      animate="visible"
-                      exit="exit"
-                      variants={shouldReduceMotion ? {} : slideLeft}
-                      layout
+                      key={set.setNumber}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
                     >
-                      <SetRow
-                        key={`set-row-${setNumber}`}
+                      <CompletedSetItem
                         set={set}
-                        onUpdate={(updates) => handleUpdateSet(setNumber, updates)}
                         unit={profile?.preferredUnit || 'kg'}
-                        trackingType={selectedExercise?.trackingType || 'weight_reps'}
-                        distanceUnit={set.distanceUnit || 'km'}
-                        isActive={setNumber === activeSetNumber}
+                        onEdit={() => {
+                          // Uncomplete set to edit
+                          handleUpdateSet(set.setNumber, { completed: false });
+                        }}
                       />
-                      {sets.length > 1 && (
-                        <motion.button
-                          onClick={() => handleDeleteSet(setNumber)}
-                          className="absolute right-0 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-error/10 text-error transition-colors"
-                          aria-label="Delete set"
-                          whileHover={shouldReduceMotion ? {} : { scale: 1.1 }}
-                          whileTap={shouldReduceMotion ? {} : { scale: 0.9 }}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </motion.button>
-                      )}
-                      {validationErrors[`set-${setNumber}-weight`] && (
-                        <motion.p
-                          className="text-xs text-error mt-1 ml-2"
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                        >
-                          {validationErrors[`set-${setNumber}-weight`]}
-                        </motion.p>
-                      )}
-                      {validationErrors[`set-${setNumber}-reps`] && (
-                        <motion.p
-                          className="text-xs text-error mt-1 ml-2"
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                        >
-                          {validationErrors[`set-${setNumber}-reps`]}
-                        </motion.p>
-                      )}
                     </motion.div>
-                  );
-                })}
-              </AnimatePresence>
+                  ))}
+                </AnimatePresence>
+              </div>
+            )}
 
-              {validationErrors.sets && (
-                <p className="text-xs text-error mt-1">{validationErrors.sets}</p>
-              )}
-
-              {/* Add Set button */}
-              <button
-                onClick={handleAddSet}
-                disabled={isSaving}
-                className="w-full py-3 mt-2 flex items-center justify-center gap-2 rounded-xl border border-dashed border-primary/50 text-primary font-bold hover:bg-primary/5 active:bg-primary/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Plus className="w-5 h-5" />
-                Add Set
-              </button>
-            </div>
-
-            {/* Additional Details */}
-            <div className="px-4 mt-4">
-              <details
-                className="group bg-surface-light dark:bg-surface-dark rounded-xl border border-gray-200 dark:border-[#316847] overflow-hidden"
-                open={showAdditionalDetails}
-                onToggle={(e) => setShowAdditionalDetails((e.target as HTMLDetailsElement).open)}
-              >
-                <summary className="flex items-center justify-between p-4 cursor-pointer list-none select-none">
-                  <span className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                    <ChevronDown className="w-5 h-5 text-gray-400" />
-                    Additional Details
-                  </span>
-                  <ChevronDown className="w-5 h-5 text-gray-400 transition-transform group-open:rotate-180" />
-                </summary>
-                <div className="px-4 pb-4 border-t border-gray-200 dark:border-[#316847] pt-4 space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-                      Date & Time
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={formatDateTimeLocal(workoutDate)}
-                      onChange={(e) => {
-                        const newDate = new Date(e.target.value);
-                        if (!isNaN(newDate.getTime())) {
-                          setWorkoutDate(newDate);
-                        }
-                      }}
-                      disabled={isSaving}
-                      className="w-full rounded-lg bg-background-light dark:bg-background-dark border border-gray-200 dark:border-[#316847] text-gray-900 dark:text-white focus:border-primary focus:ring-primary h-12 px-3 disabled:opacity-50 disabled:cursor-not-allowed"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-                      Notes
-                    </label>
-                    <textarea
-                      value={notes}
-                      onChange={(e) => {
-                        const sanitized = sanitizeString(e.target.value);
-                        setNotes(sanitized);
-                        if (validationErrors.notes) {
-                          setValidationErrors((prev) => {
-                            const newErrors = { ...prev };
-                            delete newErrors.notes;
-                            return newErrors;
-                          });
-                        }
-                      }}
-                      placeholder="How did this exercise feel?"
-                      rows={3}
-                      maxLength={1000}
-                      disabled={isSaving}
-                      className={cn(
-                        'w-full rounded-lg bg-background-light dark:bg-background-dark border text-gray-900 dark:text-white placeholder-gray-500 focus:border-primary focus:ring-primary resize-none p-3',
-                        validationErrors.notes
-                          ? 'border-error focus:border-error focus:ring-error'
-                          : 'border-gray-200 dark:border-[#316847]',
-                        'disabled:opacity-50 disabled:cursor-not-allowed'
-                      )}
-                    />
-                    <div className="flex items-center justify-between mt-1">
-                      {validationErrors.notes && (
-                        <p className="text-xs text-error">{validationErrors.notes}</p>
-                      )}
-                      <p className="text-xs text-gray-500 ml-auto">{notes.length}/1000</p>
-                    </div>
-                  </div>
-                </div>
-              </details>
-            </div>
-
-            <div className="h-24"></div>
-          </>
-        )}
           </>
         )}
       </main>
 
-      {/* Rest Timer */}
-      <RestTimer
-        duration={restTimerRemaining}
-        onComplete={handleRestComplete}
-        onSkip={handleRestSkip}
-        onPause={handleRestPause}
-        onTimeAdjust={handleRestTimeAdjust}
-        onRemainingTimeChange={handleRestRemainingTimeChange}
-        isVisible={restTimerVisible && restTimerEnabled}
-        initialPaused={restTimerPaused}
-        initialRemainingTime={restTimerVisible ? restTimerRemaining : undefined}
-      />
+      {/* Rest Timer - Only show when not in superset or last exercise in superset */}
+      {(!isInSuperset || isLastInSuperset) && (
+        <RestTimer
+          duration={restTimerRemaining}
+          onComplete={handleRestComplete}
+          onSkip={handleRestSkip}
+          onPause={handleRestPause}
+          onTimeAdjust={handleRestTimeAdjust}
+          onRemainingTimeChange={handleRestRemainingTimeChange}
+          isVisible={restTimerVisible && restTimerEnabled && !groupRestTimerVisible}
+          initialPaused={restTimerPaused}
+          initialRemainingTime={restTimerVisible ? restTimerRemaining : undefined}
+        />
+      )}
+
+      {/* Save Confirmation Modal */}
+      <Modal
+        isOpen={showSaveConfirmModal}
+        onClose={() => setShowSaveConfirmModal(false)}
+        title="Unsaved Changes"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-700 dark:text-gray-300">
+            You have unsaved changes. What would you like to do?
+          </p>
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={() => setShowSaveConfirmModal(false)}
+              className="flex-1 h-12 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                clearLogExerciseState();
+                setSelectedExercise(null);
+                setSets([]);
+                setNotes('');
+                setWorkoutDate(new Date());
+                setValidationErrors({});
+                setRestTimerVisible(false);
+                setRestTimerRemaining(defaultRestDuration);
+                setRestTimerStartTime(null);
+                setRestTimerPaused(false);
+                resetSetDuration();
+                currentSetStartTimeRef.current = null;
+                setHasUnsavedChanges(false);
+                setShowSaveConfirmModal(false);
+                onClose();
+              }}
+              className="flex-1 h-12 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            >
+              Discard
+            </button>
+            <button
+              onClick={async () => {
+                setShowSaveConfirmModal(false);
+                await handleSave();
+              }}
+              className="flex-1 h-12 rounded-lg bg-primary text-white font-bold hover:bg-primary/90 transition-colors"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

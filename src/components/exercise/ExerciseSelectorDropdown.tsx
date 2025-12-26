@@ -100,7 +100,8 @@ export function ExerciseSelectorDropdown({
     try {
       const allExercises = await exerciseLibrary.getAllExercises();
       setExercises(allExercises);
-      setFilteredExercises(allExercises);
+      // Don't set filteredExercises here - let the filter effect handle it
+      // This ensures filters are applied even on initial load
     } catch (error) {
       console.error('Failed to load exercises:', error);
     } finally {

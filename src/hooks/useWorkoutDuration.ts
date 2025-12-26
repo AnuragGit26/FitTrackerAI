@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 interface UseWorkoutDurationReturn {
     elapsedTime: number; // Total seconds elapsed
@@ -7,252 +7,130 @@ interface UseWorkoutDurationReturn {
     pause: () => void;
     resume: () => void;
     reset: () => void;
+    start: () => void; // Explicit start function
 }
 
-const STORAGE_KEYS = {
-    startTime: 'fittrackai_workout_timer_startTime',
-    pausedTime: 'fittrackai_workout_timer_pausedTime',
-    pauseStartTime: 'fittrackai_workout_timer_pauseStartTime',
-    isRunning: 'fittrackai_workout_timer_isRunning',
-    wasReset: 'fittrackai_workout_timer_wasReset',
-};
+const STORAGE_KEY = 'fittrackai_workout_timer_state';
 
-function loadFromStorage(): {
-    startTime: Date | null;
-    pausedTime: number;
-    pauseStartTime: Date | null;
+interface TimerState {
+    startTime: string | null; // ISO string
+    pausedTime: number; // Total paused time in seconds
+    pauseStartTime: string | null; // ISO string when paused
     isRunning: boolean;
-} {
-    try {
-        const startTimeStr = localStorage.getItem(STORAGE_KEYS.startTime);
-        const pausedTimeStr = localStorage.getItem(STORAGE_KEYS.pausedTime);
-        const pauseStartTimeStr = localStorage.getItem(STORAGE_KEYS.pauseStartTime);
-        const isRunningStr = localStorage.getItem(STORAGE_KEYS.isRunning);
+    lastUpdateTime: string; // ISO string of last update
+}
 
-        return {
-            startTime: startTimeStr ? new Date(startTimeStr) : null,
-            pausedTime: pausedTimeStr ? parseFloat(pausedTimeStr) : 0,
-            pauseStartTime: pauseStartTimeStr ? new Date(pauseStartTimeStr) : null,
-            isRunning: isRunningStr === 'true',
-        };
+function loadTimerState(): TimerState | null {
+    try {
+        const stored = sessionStorage.getItem(STORAGE_KEY);
+        if (!stored) return null;
+        return JSON.parse(stored);
     } catch (error) {
-        console.error('Failed to load timer state from localStorage:', error);
-        return {
-            startTime: null,
-            pausedTime: 0,
-            pauseStartTime: null,
-            isRunning: false,
-        };
+        console.error('Failed to load timer state:', error);
+        return null;
     }
 }
 
-function saveToStorage(
-    startTime: Date | null,
-    pausedTime: number,
-    pauseStartTime: Date | null,
-    isRunning: boolean
-): void {
+function saveTimerState(state: TimerState): void {
     try {
-        if (startTime) {
-            localStorage.setItem(STORAGE_KEYS.startTime, startTime.toISOString());
-        } else {
-            localStorage.removeItem(STORAGE_KEYS.startTime);
-        }
-        localStorage.setItem(STORAGE_KEYS.pausedTime, pausedTime.toString());
-        if (pauseStartTime) {
-            localStorage.setItem(STORAGE_KEYS.pauseStartTime, pauseStartTime.toISOString());
-        } else {
-            localStorage.removeItem(STORAGE_KEYS.pauseStartTime);
-        }
-        localStorage.setItem(STORAGE_KEYS.isRunning, isRunning.toString());
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch (error) {
-        console.error('Failed to save timer state to localStorage:', error);
+        console.error('Failed to save timer state:', error);
     }
 }
 
-function clearStorage(): void {
+function clearTimerState(): void {
     try {
-        Object.values(STORAGE_KEYS).forEach((key) => {
-            localStorage.removeItem(key);
-        });
-        // Set reset flag to prevent restoration
-        localStorage.setItem(STORAGE_KEYS.wasReset, 'true');
+        sessionStorage.removeItem(STORAGE_KEY);
     } catch (error) {
-        console.error('Failed to clear timer state from localStorage:', error);
+        console.error('Failed to clear timer state:', error);
     }
 }
 
-function wasReset(): boolean {
-    try {
-        return localStorage.getItem(STORAGE_KEYS.wasReset) === 'true';
-    } catch {
-        return false;
+export function getTimerStartTime(): Date | null {
+    const state = loadTimerState();
+    if (state && state.startTime) {
+        return new Date(state.startTime);
     }
+    return null;
 }
 
-function clearResetFlag(): void {
-    try {
-        localStorage.removeItem(STORAGE_KEYS.wasReset);
-    } catch (error) {
-        console.error('Failed to clear reset flag:', error);
-    }
-}
-
-export function useWorkoutDuration(startTime: Date | null): UseWorkoutDurationReturn {
+export function useWorkoutDuration(shouldStart: boolean = false): UseWorkoutDurationReturn {
     const [elapsedTime, setElapsedTime] = useState(0);
     const [isRunning, setIsRunning] = useState(false);
-    const [pausedTime, setPausedTime] = useState(0);
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
     const startTimeRef = useRef<Date | null>(null);
-    const pauseStartRef = useRef<Date | null>(null);
+    const pausedTimeRef = useRef<number>(0);
+    const pauseStartTimeRef = useRef<Date | null>(null);
     const lastUpdateRef = useRef<Date>(new Date());
-    const isVisibleRef = useRef(true);
 
     // Load persisted state on mount
     useEffect(() => {
-        // Check if timer was reset - if so, don't restore state
-        if (wasReset()) {
-            clearResetFlag();
-            // If startTime prop is provided, use it instead
-            if (startTime) {
-                startTimeRef.current = startTime;
-                setIsRunning(true);
-                setPausedTime(0);
-                setElapsedTime(0);
-                saveToStorage(startTime, 0, null, true);
-            }
-            return;
-        }
-
-        const persisted = loadFromStorage();
-
-        // If we have a persisted start time, use it
-        if (persisted.startTime) {
-            startTimeRef.current = persisted.startTime;
-            setPausedTime(persisted.pausedTime);
+        const persisted = loadTimerState();
+        if (persisted && persisted.startTime) {
+            const startTime = new Date(persisted.startTime);
+            startTimeRef.current = startTime;
+            pausedTimeRef.current = persisted.pausedTime || 0;
             setIsRunning(persisted.isRunning);
-
+            
             if (persisted.pauseStartTime) {
-                pauseStartRef.current = persisted.pauseStartTime;
+                pauseStartTimeRef.current = new Date(persisted.pauseStartTime);
             }
 
-            // Calculate initial elapsed time
+            // Calculate elapsed time
             const now = new Date();
-            const baseElapsed = Math.floor((now.getTime() - persisted.startTime.getTime()) / 1000);
-            let totalPaused = persisted.pausedTime;
+            const baseElapsed = Math.floor((now.getTime() - startTime.getTime()) / 1000);
+            let totalPaused = pausedTimeRef.current;
 
-            // If currently paused, add time since pause started
-            if (persisted.isRunning === false && persisted.pauseStartTime) {
+            if (!persisted.isRunning && pauseStartTimeRef.current) {
                 const pauseDuration = Math.floor(
-                    (now.getTime() - persisted.pauseStartTime.getTime()) / 1000
+                    (now.getTime() - pauseStartTimeRef.current.getTime()) / 1000
                 );
                 totalPaused += pauseDuration;
             }
 
             setElapsedTime(Math.max(0, baseElapsed - totalPaused));
-        } else if (startTime) {
-            // New timer started
-            startTimeRef.current = startTime;
-            setIsRunning(true);
-            setPausedTime(0);
-            saveToStorage(startTime, 0, null, true);
+            lastUpdateRef.current = now;
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // Only run on mount - startTime is handled in separate effect
+    }, []);
 
-    // Handle new startTime prop (when exercise is selected)
-    useEffect(() => {
-        if (startTime && !startTimeRef.current) {
-            // Only start if we don't have a persisted timer
-            const persisted = loadFromStorage();
-            if (!persisted.startTime) {
-                startTimeRef.current = startTime;
-                setIsRunning(true);
-                setPausedTime(0);
-                setElapsedTime(0);
-                saveToStorage(startTime, 0, null, true);
-            }
+    // Update timer state in sessionStorage on every change
+    const updateStorage = useCallback(() => {
+        if (startTimeRef.current) {
+            const state: TimerState = {
+                startTime: startTimeRef.current.toISOString(),
+                pausedTime: pausedTimeRef.current,
+                pauseStartTime: pauseStartTimeRef.current?.toISOString() || null,
+                isRunning: isRunning,
+                lastUpdateTime: new Date().toISOString(),
+            };
+            saveTimerState(state);
         }
-    }, [startTime]); // startTime is intentionally included - we want to react to it
+    }, [isRunning]);
 
-    // Page Visibility API - handle background/foreground
+    // Timer interval - updates every second
     useEffect(() => {
-        const handleVisibilityChange = () => {
-            const wasVisible = isVisibleRef.current;
-            isVisibleRef.current = !document.hidden;
-
-            if (!document.hidden && startTimeRef.current) {
-                // Tab became visible - recalculate elapsed time immediately
+        if (startTimeRef.current && isRunning) {
+            const updateTimer = () => {
                 const now = new Date();
-                const baseElapsed = Math.floor((now.getTime() - startTimeRef.current.getTime()) / 1000);
-                let totalPaused = pausedTime;
+                const baseElapsed = Math.floor((now.getTime() - startTimeRef.current!.getTime()) / 1000);
+                let totalPaused = pausedTimeRef.current;
 
-                if (!isRunning && pauseStartRef.current) {
+                if (pauseStartTimeRef.current) {
                     const pauseDuration = Math.floor(
-                        (now.getTime() - pauseStartRef.current.getTime()) / 1000
+                        (now.getTime() - pauseStartTimeRef.current.getTime()) / 1000
                     );
                     totalPaused += pauseDuration;
                 }
 
-                setElapsedTime(Math.max(0, baseElapsed - totalPaused));
-                lastUpdateRef.current = now;
-                
-                // If visibility changed from hidden to visible, restart interval with correct frequency
-                if (wasVisible === false && intervalRef.current) {
-                    clearInterval(intervalRef.current);
-                    intervalRef.current = setInterval(() => {
-                        const updateNow = new Date();
-                        const updateBaseElapsed = Math.floor((updateNow.getTime() - startTimeRef.current!.getTime()) / 1000);
-                        let updateTotalPaused = pausedTime;
-                        
-                        if (!isRunning && pauseStartRef.current) {
-                            const updatePauseDuration = Math.floor(
-                                (updateNow.getTime() - pauseStartRef.current.getTime()) / 1000
-                            );
-                            updateTotalPaused += updatePauseDuration;
-                        }
-                        
-                        setElapsedTime(Math.max(0, updateBaseElapsed - updateTotalPaused));
-                        lastUpdateRef.current = updateNow;
-                    }, 1000);
-                }
-            }
-        };
-
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        return () => {
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-        };
-    }, [isRunning, pausedTime]);
-
-    // Timer interval - always update when we have a start time, even when paused
-    useEffect(() => {
-        if (startTimeRef.current) {
-            const updateTimer = () => {
-                const now = new Date();
-                const baseElapsed = Math.floor((now.getTime() - startTimeRef.current!.getTime()) / 1000);
-                let totalPaused = pausedTime;
-                
-                // If currently paused, add the current pause duration
-                if (!isRunning && pauseStartRef.current) {
-                    const currentPauseDuration = Math.floor(
-                        (now.getTime() - pauseStartRef.current.getTime()) / 1000
-                    );
-                    totalPaused += currentPauseDuration;
-                }
-                
                 const elapsed = Math.max(0, baseElapsed - totalPaused);
                 setElapsedTime(elapsed);
                 lastUpdateRef.current = now;
+                updateStorage();
             };
 
-            // Initial update
             updateTimer();
-
-            // Always update every second when visible, every 5 seconds when hidden
-            // This ensures accurate display even when paused
-            const interval = isVisibleRef.current ? 1000 : 5000;
-            intervalRef.current = setInterval(updateTimer, interval);
+            intervalRef.current = setInterval(updateTimer, 1000);
         } else {
             if (intervalRef.current) {
                 clearInterval(intervalRef.current);
@@ -266,55 +144,72 @@ export function useWorkoutDuration(startTime: Date | null): UseWorkoutDurationRe
                 intervalRef.current = null;
             }
         };
-    }, [isRunning, pausedTime]);
+    }, [isRunning, updateStorage]);
 
-    const pause = () => {
+    // Handle shouldStart prop - only start if explicitly requested and not already started
+    useEffect(() => {
+        if (shouldStart && !startTimeRef.current) {
+            const now = new Date();
+            startTimeRef.current = now;
+            pausedTimeRef.current = 0;
+            pauseStartTimeRef.current = null;
+            setIsRunning(true);
+            setElapsedTime(0);
+            updateStorage();
+        }
+    }, [shouldStart, updateStorage]);
+
+    const start = useCallback(() => {
+        if (!startTimeRef.current) {
+            const now = new Date();
+            startTimeRef.current = now;
+            pausedTimeRef.current = 0;
+            pauseStartTimeRef.current = null;
+            setIsRunning(true);
+            setElapsedTime(0);
+            updateStorage();
+        }
+    }, [updateStorage]);
+
+    const pause = useCallback(() => {
         if (isRunning && startTimeRef.current) {
             const now = new Date();
-            pauseStartRef.current = now;
+            pauseStartTimeRef.current = now;
             setIsRunning(false);
-            saveToStorage(startTimeRef.current, pausedTime, now, false);
+            updateStorage();
         }
-    };
+    }, [isRunning, updateStorage]);
 
-    const resume = () => {
-        // Only resume if timer is not running and we have a start time
+    const resume = useCallback(() => {
         if (!isRunning && startTimeRef.current) {
             const now = new Date();
             
-            // If pauseStartRef exists, calculate pause duration and add to pausedTime
-            if (pauseStartRef.current) {
-                const pauseDuration = Math.floor((now.getTime() - pauseStartRef.current.getTime()) / 1000);
-                const newPausedTime = pausedTime + pauseDuration;
-                setPausedTime(newPausedTime);
-                pauseStartRef.current = null;
-                setIsRunning(true);
-                saveToStorage(startTimeRef.current, newPausedTime, null, true);
-            } else {
-                // If pauseStartRef doesn't exist but timer is paused,
-                // it means we're resuming from a state where pauseStartRef was lost.
-                // We can't calculate the exact pause duration, but we can still resume.
-                // This handles edge cases where state might have been lost.
-                pauseStartRef.current = null;
-                setIsRunning(true);
-                saveToStorage(startTimeRef.current, pausedTime, null, true);
+            if (pauseStartTimeRef.current) {
+                const pauseDuration = Math.floor(
+                    (now.getTime() - pauseStartTimeRef.current.getTime()) / 1000
+                );
+                pausedTimeRef.current += pauseDuration;
             }
+            
+            pauseStartTimeRef.current = null;
+            setIsRunning(true);
+            updateStorage();
         }
-    };
+    }, [isRunning, updateStorage]);
 
-    const reset = () => {
+    const reset = useCallback(() => {
         setIsRunning(false);
         setElapsedTime(0);
-        setPausedTime(0);
-        pauseStartRef.current = null;
+        pausedTimeRef.current = 0;
+        pauseStartTimeRef.current = null;
         startTimeRef.current = null;
-        clearStorage(); // This sets the reset flag
+        clearTimerState();
 
         if (intervalRef.current) {
             clearInterval(intervalRef.current);
             intervalRef.current = null;
         }
-    };
+    }, []);
 
     const formatTime = (seconds: number): string => {
         const hours = Math.floor(seconds / 3600);
@@ -334,5 +229,6 @@ export function useWorkoutDuration(startTime: Date | null): UseWorkoutDurationRe
         pause,
         resume,
         reset,
+        start,
     };
 }

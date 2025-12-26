@@ -1,0 +1,99 @@
+---
+alwaysApply: true
+---
+## 1. End-to-End Integration
+
+- Implement UI + business logic + DB changes cohesively.
+- Validate full flow from user action to persisted state & back.
+- Ensure new components do not degrade existing UX.
+- Handle loading, error states, and offline fallbacks.
+
+---
+
+## 2. Architectural Planning Before Coding
+
+Before writing code, prepare a short design outline including:
+
+- Feature scope & expected user journey
+- Data flow (UI → Logic → DB → IndexedDB → UI)
+- Impact on existing modules and shared services
+- API endpoints, schema updates, and caching approach
+- Risks, scalability concerns, performance expectations
+
+---
+
+## 3. Supabase + IndexedDB Data Management
+
+- Update schema/tables safely with version awareness.
+- Keep IndexedDB in sync with Supabase for offline-first behavior.
+- Document new columns, indexes, or migrations.
+- Ensure efficient querying and indexing.
+
+---
+
+## 4. UI/UX Implementation Standards
+
+- Follow the existing design language & component patterns.
+- Maintain accessibility and responsiveness across devices.
+- Implement loading, success, failure, empty state behaviors.
+- No UI change without confirming user impact.
+
+---
+
+## 5. Code Review & Quality Gate
+
+Every feature must undergo a senior-level review with mindset of:
+
+- **Architect** — scalable design decisions
+- **Senior Engineer** — performance & maintainability
+- **Product Manager** — user value and flow completeness
+
+Review checklist:
+
+- Readability & modularity
+- Efficient DB queries and caching
+- IndexedDB sync logic where applicable
+- Error handling and security boundaries
+- No dead code or unnecessary complexity
+- Test coverage exists for core logic
+
+Merge only after approval.
+
+---
+
+## 6. Testing Requirements
+
+Test coverage must include:
+
+- End-to-end scenario walkthrough
+- Regression testing for old flows
+- Happy-path + edge cases + failure handling
+- Network-down/offline scenarios if data sync involved
+
+---
+
+## 7. Documentation Expectations
+
+For any non-trivial feature:
+
+- Update README / Architecture notes / DB Schema docs
+- Keep comments minimal, explaining logic rather than code
+- Record decisions that future developers should know
+
+---
+
+## Summary
+
+| Area | Must Be Completed |
+|---|---|
+| UI updates | ✔ Fully integrated |
+| App logic | ✔ Connected to UI & data |
+| Supabase | ✔ Schema & queries updated |
+| IndexedDB | ✔ Offline state maintained |
+| Tests | ✔ Added/updated |
+| Review | ✔ Mandatory approval |
+| Documentation | ✔ Updated |
+
+---
+
+By following this document consistently, we maintain a clean, scalable codebase with smooth feature development and production-ready delivery.

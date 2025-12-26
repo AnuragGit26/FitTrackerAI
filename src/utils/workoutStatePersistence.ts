@@ -6,6 +6,7 @@ import { MuscleGroupCategory } from '@/utils/muscleGroupCategories';
 const STORAGE_KEYS = {
   workoutState: 'fittrackai_current_workout_state',
   logWorkoutState: 'fittrackai_log_workout_state',
+  logExerciseState: 'fittrackai_log_exercise_state',
 };
 
 export interface LogWorkoutStateSnapshot {
@@ -32,6 +33,14 @@ export interface WorkoutStateSnapshot {
   currentWorkout: Workout | null;
   templateId: string | null;
   plannedWorkoutId: string | null;
+}
+
+export interface LogExerciseStateSnapshot {
+  selectedExerciseId: string | null;
+  sets: WorkoutSet[];
+  notes: string;
+  workoutDate: string; // ISO string
+  exerciseId: string | null; // For editing existing exercise
 }
 
 /**
@@ -243,6 +252,81 @@ export function clearWorkoutState(): void {
     localStorage.removeItem(STORAGE_KEYS.logWorkoutState);
   } catch (error) {
     console.error('Failed to clear workout state:', error);
+  }
+}
+
+/**
+ * Save LogExercise component state to sessionStorage
+ */
+export function saveLogExerciseState(state: LogExerciseStateSnapshot): void {
+  try {
+    const serializedString = JSON.stringify(state);
+    
+    // Check size (sessionStorage typically has 5-10MB limit, use 4MB threshold)
+    const MAX_SIZE = 4 * 1024 * 1024; // 4MB
+    if (serializedString.length > MAX_SIZE) {
+      console.warn('Log exercise state too large, clearing old state and retrying');
+      sessionStorage.removeItem(STORAGE_KEYS.logExerciseState);
+      if (serializedString.length > MAX_SIZE) {
+        console.error('Log exercise state still too large after clearing, cannot save');
+        return;
+      }
+    }
+    
+    sessionStorage.setItem(STORAGE_KEYS.logExerciseState, serializedString);
+  } catch (error) {
+    if (error instanceof DOMException && (error.code === 22 || error.name === 'QuotaExceededError')) {
+      console.warn('sessionStorage quota exceeded, attempting cleanup');
+      try {
+        sessionStorage.removeItem(STORAGE_KEYS.logExerciseState);
+        sessionStorage.setItem(STORAGE_KEYS.logExerciseState, JSON.stringify(state));
+      } catch (retryError) {
+        console.error('Failed to save log exercise state after cleanup:', retryError);
+      }
+    } else {
+      console.error('Failed to save log exercise state:', error);
+    }
+  }
+}
+
+/**
+ * Load LogExercise component state from sessionStorage
+ */
+export function loadLogExerciseState(): LogExerciseStateSnapshot | null {
+  try {
+    const stored = sessionStorage.getItem(STORAGE_KEYS.logExerciseState);
+    if (!stored) return null;
+
+    const parsed = JSON.parse(stored);
+    
+    // Deserialize sets with Date objects
+    const sets = (parsed.sets as Array<Record<string, unknown>>)?.map((set) => ({
+      ...set,
+      setStartTime: set.setStartTime ? new Date(set.setStartTime as string) : undefined,
+      setEndTime: set.setEndTime ? new Date(set.setEndTime as string) : undefined,
+    })) || [];
+
+    return {
+      selectedExerciseId: parsed.selectedExerciseId || null,
+      sets,
+      notes: parsed.notes || '',
+      workoutDate: parsed.workoutDate || new Date().toISOString(),
+      exerciseId: parsed.exerciseId || null,
+    };
+  } catch (error) {
+    console.error('Failed to load log exercise state:', error);
+    return null;
+  }
+}
+
+/**
+ * Clear persisted LogExercise state from sessionStorage
+ */
+export function clearLogExerciseState(): void {
+  try {
+    sessionStorage.removeItem(STORAGE_KEYS.logExerciseState);
+  } catch (error) {
+    console.error('Failed to clear log exercise state:', error);
   }
 }
 

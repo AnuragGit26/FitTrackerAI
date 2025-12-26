@@ -1,4 +1,4 @@
-import { Home, Dumbbell, Moon, TrendingUp, Sparkles } from 'lucide-react';
+import { Home, Dumbbell, Moon, TrendingUp, Sparkles, Bed } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
@@ -9,6 +9,7 @@ const navItems = [
   { path: '/', icon: Home, label: 'Home' },
   { path: '/log-workout', icon: Dumbbell, label: 'Log' },
   { path: '/rest', icon: Moon, label: 'Rest' },
+  { path: '/sleep-recovery', icon: Bed, label: 'Sleep' },
   { path: '/analytics', icon: TrendingUp, label: 'Analytics' },
   { path: '/insights', icon: Sparkles, label: 'AI' },
 ];

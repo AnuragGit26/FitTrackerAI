@@ -15,6 +15,7 @@ interface WorkoutState {
   error: string | null;
   templateId: string | null; // Track if workout started from template
   plannedWorkoutId: string | null; // Track if workout started from planned workout
+  workoutTimerStartTime: Date | null; // Workout timer start time
 
   // Actions
   startWorkout: (userId: string) => Promise<void>;
@@ -29,6 +30,7 @@ interface WorkoutState {
   cancelWorkout: () => void;
   loadWorkouts: (userId: string) => Promise<void>;
   getWorkout: (id: number) => Promise<Workout | undefined>;
+  setWorkoutTimerStartTime: (startTime: Date | null) => void;
 }
 
 // Load persisted state on initialization
@@ -47,6 +49,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
   error: null,
   templateId: persistedState?.templateId || null,
   plannedWorkoutId: persistedState?.plannedWorkoutId || null,
+  workoutTimerStartTime: null,
 
   startWorkout: async (userId: string) => {
     const now = new Date();
@@ -480,9 +483,13 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
   },
 
   cancelWorkout: () => {
-    set({ currentWorkout: null, error: null, templateId: null, plannedWorkoutId: null });
+    set({ currentWorkout: null, error: null, templateId: null, plannedWorkoutId: null, workoutTimerStartTime: null });
     // Clear persisted state when cancelled
     clearWorkoutState();
+  },
+
+  setWorkoutTimerStartTime: (startTime: Date | null) => {
+    set({ workoutTimerStartTime: startTime });
   },
 
   loadWorkouts: async (userId: string) => {

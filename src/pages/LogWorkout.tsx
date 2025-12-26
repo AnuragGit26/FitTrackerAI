@@ -17,7 +17,7 @@ import { staggerContainer, slideUp, prefersReducedMotion } from '@/utils/animati
 import { templateService } from '@/services/templateService';
 import { TemplateCategory } from '@/types/workout';
 import { Workout } from '@/types/workout';
-import { useWorkoutDuration } from '@/hooks/useWorkoutDuration';
+import { useWorkoutDuration, getTimerStartTime } from '@/hooks/useWorkoutDuration';
 import { clearWorkoutState, loadWorkoutState } from '@/utils/workoutStatePersistence';
 import { saveFailedWorkout } from '@/utils/workoutErrorRecovery';
 import { WorkoutErrorRecoveryModal } from '@/components/workout/WorkoutErrorRecoveryModal';
@@ -69,26 +69,8 @@ export function LogWorkout() {
   const repeatWorkoutProcessedRef = useRef<string | null>(null);
   const shouldReduceMotion = prefersReducedMotion();
 
-  // Workout duration tracking - starts when first exercise is added
-  const [workoutTimerStartTime, setWorkoutTimerStartTime] = useState<Date | null>(null);
-  const { formattedTime: workoutDuration, elapsedTime: workoutElapsedSeconds, isRunning: workoutTimerRunning, pause: pauseWorkoutTimer, resume: resumeWorkoutTimer, reset: resetWorkoutTimer } = useWorkoutDuration(workoutTimerStartTime);
-
-  // Restore workout timer state on mount
-  useEffect(() => {
-    const persistedState = loadWorkoutState();
-    if (persistedState?.currentWorkout?.startTime) {
-      const startTime = persistedState.currentWorkout.startTime instanceof Date
-        ? persistedState.currentWorkout.startTime
-        : new Date(persistedState.currentWorkout.startTime);
-      const now = new Date();
-      const hoursDiff = (now.getTime() - startTime.getTime()) / (1000 * 60 * 60);
-      
-      // Only restore if within reasonable time (24 hours)
-      if (hoursDiff >= 0 && hoursDiff < 24) {
-        setWorkoutTimerStartTime(startTime);
-      }
-    }
-  }, []);
+  // Workout duration tracking - timer state is managed internally and persisted to sessionStorage
+  const { formattedTime: workoutDuration, elapsedTime: workoutElapsedSeconds, isRunning: workoutTimerRunning, pause: pauseWorkoutTimer, resume: resumeWorkoutTimer, reset: resetWorkoutTimer, start: startWorkoutTimer } = useWorkoutDuration(false);
 
   useEffect(() => {
     if (!currentWorkout && profile) {
@@ -102,12 +84,7 @@ export function LogWorkout() {
     }
   }, [currentWorkout, profile, startWorkout]);
 
-  // Start workout timer when first exercise is added
-  useEffect(() => {
-    if (currentWorkout && currentWorkout.exercises.length > 0 && !workoutTimerStartTime) {
-      setWorkoutTimerStartTime(new Date());
-    }
-  }, [currentWorkout, workoutTimerStartTime]);
+  // Timer will start when "Add Exercise" is clicked, not automatically
 
   // Handle repeat workout from navigation state
   useEffect(() => {
@@ -291,6 +268,8 @@ export function LogWorkout() {
 
   // Modal handlers
   const handleAddExercise = () => {
+    // Start workout timer when "Add Exercise" is clicked (explicit start)
+    startWorkoutTimer();
     setEditingExerciseId(null);
     setShowExerciseModal(true);
   };
@@ -388,7 +367,6 @@ export function LogWorkout() {
     setEditingExerciseId(null);
     setSelectedCategory(null);
     setSelectedMuscleGroups([]);
-    setWorkoutTimerStartTime(null);
     setShowExerciseModal(false);
     resetWorkoutTimer();
     success('Workout cleared');
@@ -400,7 +378,7 @@ export function LogWorkout() {
   const handleCancelLogWorkout = () => {
     // Check if there's anything to cancel (exercises or timers running)
     const hasExercises = currentWorkout && currentWorkout.exercises.length > 0;
-    const hasTimers = workoutTimerStartTime !== null;
+    const hasTimers = workoutTimerRunning || getTimerStartTime() !== null;
 
     if (hasExercises || hasTimers) {
       setShowCancelWorkoutModal(true);
@@ -421,7 +399,6 @@ export function LogWorkout() {
     setEditingExerciseId(null);
     setSelectedCategory(null);
     setSelectedMuscleGroups([]);
-    setWorkoutTimerStartTime(null);
     setShowExerciseModal(false);
 
     // Reset timer
@@ -537,19 +514,48 @@ export function LogWorkout() {
         useWorkoutStore.setState({ currentWorkout: updatedWorkout });
       }
       
+      // Calculate start/end times from timer if not manually provided
+      let workoutStartTime: Date | undefined = undefined;
+      let workoutEndTime: Date = new Date();
+      
+      if (manualStartTimeDate && manualEndTimeDate) {
+        // Use manual times if provided
+        workoutStartTime = manualStartTimeDate;
+        workoutEndTime = manualEndTimeDate;
+      } else {
+        // Calculate from timer state
+        const timerStartTime = getTimerStartTime();
+        if (timerStartTime) {
+          workoutStartTime = timerStartTime;
+          workoutEndTime = new Date();
+        }
+      }
+      
+      // Update workout with calculated start/end times
+      if (workoutStartTime && currentWorkout) {
+        const updatedWorkout = {
+          ...currentWorkout,
+          startTime: workoutStartTime,
+          endTime: workoutEndTime,
+        };
+        useWorkoutStore.setState({ currentWorkout: updatedWorkout });
+      }
+      
       // PRIORITY: Use manual duration for template workouts, otherwise use timer
       // This ensures workout is saved with accurate duration
       const finalDurationSeconds = durationSeconds !== undefined ? durationSeconds : workoutElapsedSeconds;
       await finishWorkout(calories, finalDurationSeconds > 0 ? finalDurationSeconds : undefined);
+      
       // Reset timer when workout is finished
       resetWorkoutTimer();
+      
       // Clear persisted state (already cleared in finishWorkout, but ensure it's cleared)
       clearWorkoutState();
+      
       // Reset component state
       setEditingExerciseId(null);
       setSelectedCategory(null);
       setSelectedMuscleGroups([]);
-      setWorkoutTimerStartTime(null);
       setShowExerciseModal(false);
       setWorkoutCalories('');
       setManualStartTime('');
@@ -807,7 +813,7 @@ export function LogWorkout() {
         {/* Workout Timer Card */}
         <WorkoutTimerCard
           formattedTime={workoutDuration}
-          isVisible={!!workoutTimerStartTime}
+          isVisible={workoutTimerRunning || getTimerStartTime() !== null}
           isRunning={workoutTimerRunning}
           onPause={pauseWorkoutTimer}
           onResume={resumeWorkoutTimer}
@@ -858,10 +864,14 @@ export function LogWorkout() {
           onCategoryChange={handleCategoryChange}
           onMuscleGroupsChange={handleMuscleGroupsChange}
           onExerciseSaved={handleExerciseSaved}
-          onStartWorkoutTimer={() => {
-            if (!workoutTimerStartTime) {
-              setWorkoutTimerStartTime(new Date());
-            }
+          onStartWorkoutTimer={startWorkoutTimer}
+          onNavigateToExercise={(exerciseId) => {
+            // Close current modal and open next exercise
+            setShowExerciseModal(false);
+            setTimeout(() => {
+              setEditingExerciseId(exerciseId);
+              setShowExerciseModal(true);
+            }, 100);
           }}
         />
       </ErrorBoundary>
@@ -916,7 +926,7 @@ export function LogWorkout() {
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 <span className="font-bold">{existingExercises.length}</span> exercise{existingExercises.length !== 1 ? 's' : ''} will be removed.
               </p>
-              {workoutTimerStartTime && (
+              {(workoutTimerRunning || getTimerStartTime() !== null) && (
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   All timers will be reset.
                 </p>

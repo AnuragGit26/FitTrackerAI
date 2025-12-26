@@ -38,6 +38,7 @@ const Insights = lazy(() => import('@/pages/Insights').then(m => ({ default: m.I
 const Rest = lazy(() => import('@/pages/Rest').then(m => ({ default: m.Rest })));
 const Profile = lazy(() => import('@/pages/Profile').then(m => ({ default: m.Profile })));
 const Planner = lazy(() => import('@/pages/Planner').then(m => ({ default: m.Planner })));
+const SleepRecovery = lazy(() => import('@/pages/SleepRecovery').then(m => ({ default: m.SleepRecovery })));
 const Login = lazy(() => import('@/pages/Login').then(m => ({ default: m.Login })));
 const SignUp = lazy(() => import('@/pages/SignUp').then(m => ({ default: m.SignUp })));
 
@@ -642,6 +643,20 @@ function AppRoutes() {
                     <ErrorBoundary>
                       <Suspense fallback={<RouteLoader />}>
                         <Planner />
+                      </Suspense>
+                    </ErrorBoundary>
+                  </AnimatedPage>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/sleep-recovery"
+              element={
+                <ProtectedRoute>
+                  <AnimatedPage>
+                    <ErrorBoundary>
+                      <Suspense fallback={<RouteLoader />}>
+                        <SleepRecovery />
                       </Suspense>
                     </ErrorBoundary>
                   </AnimatedPage>
