@@ -1,24 +1,13 @@
 import { motion } from 'framer-motion';
-import { TemplateCategory } from '@/types/workout';
 import { cn } from '@/utils/cn';
 
 interface CategoryChipProps {
-    category: TemplateCategory | 'all';
     label: string;
     isActive: boolean;
     onClick: () => void;
 }
 
-const categoryLabels: Record<TemplateCategory | 'all', string> = {
-    all: 'All',
-    strength: 'Strength',
-    hypertrophy: 'Hypertrophy',
-    cardio: 'Cardio',
-    home: 'Home Workout',
-    flexibility: 'Flexibility',
-};
-
-export function CategoryChip({ category, label, isActive, onClick }: CategoryChipProps) {
+export function CategoryChip({ label, isActive, onClick }: CategoryChipProps) {
     return (
         <motion.button
             onClick={onClick}
@@ -35,4 +24,3 @@ export function CategoryChip({ category, label, isActive, onClick }: CategoryChi
         </motion.button>
     );
 }
-

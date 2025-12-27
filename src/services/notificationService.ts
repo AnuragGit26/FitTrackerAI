@@ -1,5 +1,8 @@
 import { PlannedWorkout } from '@/types/workout';
 import { MuscleStatus } from '@/types/muscle';
+import type { Notification, NotificationCreateInput, NotificationFilters, NotificationType } from '@/types/notification';
+import { dbHelpers } from './database';
+import { getSupabaseClientWithAuth } from './supabaseClient';
 
 interface ScheduledNotification {
   id: string;
@@ -171,9 +174,9 @@ class NotificationService {
     try {
       const { dbHelpers } = await import('./database');
       const stored = await dbHelpers.getSetting('last_notified_recovery');
-      return stored || {};
+      return (stored as Record<string, { recoveryPercentage: number; recoveryStatus: string; notifiedAt: number }>) || {};
     } catch (error) {
-      return {};
+      return {} as Record<string, { recoveryPercentage: number; recoveryStatus: string; notifiedAt: number }>;
     }
   }
 
@@ -265,6 +268,226 @@ class NotificationService {
       }
     } catch (error) {
       console.error('[NotificationService] Failed to clear notifications:', error);
+    }
+  }
+
+  // ============================================================================
+  // In-App Notification CRUD Operations
+  // ============================================================================
+
+  /**
+   * Generate a UUID v4
+   */
+  private generateUUID(): string {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    // Fallback for older browsers
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+
+  /**
+   * Create a new notification and store it in IndexedDB and Supabase
+   */
+  async createNotification(input: NotificationCreateInput): Promise<Notification> {
+    const notification: Notification = {
+      id: this.generateUUID(),
+      userId: input.userId,
+      type: input.type,
+      title: input.title,
+      message: input.message,
+      data: input.data || {},
+      isRead: false,
+      readAt: null,
+      createdAt: Date.now(),
+      version: 1,
+      deletedAt: null,
+    };
+
+    // Save to IndexedDB
+    await dbHelpers.saveNotification(notification);
+
+    // Try to sync to Supabase (non-blocking)
+    this.syncToSupabase(notification).catch(error => {
+      console.error('[NotificationService] Failed to sync notification to Supabase:', error);
+    });
+
+    return notification;
+  }
+
+  /**
+   * Get notifications with optional filters
+   */
+  async getNotifications(filters: NotificationFilters): Promise<Notification[]> {
+    return await dbHelpers.getAllNotifications(filters.userId, {
+      isRead: filters.isRead,
+      limit: filters.limit,
+    });
+  }
+
+  /**
+   * Get a single notification by ID
+   */
+  async getNotification(id: string): Promise<Notification | undefined> {
+    return await dbHelpers.getNotification(id);
+  }
+
+  /**
+   * Get count of unread notifications
+   */
+  async getUnreadCount(userId: string): Promise<number> {
+    // #region agent log
+    fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'notificationService.ts:342',message:'getUnreadCount called',data:{userId,userIdType:typeof userId,isValid:!!userId && typeof userId === 'string' && userId.length > 0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+    if (!userId || typeof userId !== 'string' || userId.length === 0) {
+      // #region agent log
+      fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'notificationService.ts:345',message:'Invalid userId in getUnreadCount, returning 0',data:{userId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
+      return 0;
+    }
+    return await dbHelpers.getUnreadNotificationsCount(userId);
+  }
+
+  /**
+   * Mark a notification as read
+   */
+  async markAsRead(id: string): Promise<void> {
+    await dbHelpers.markNotificationAsRead(id);
+
+    // Get the notification to sync to Supabase
+    const notification = await dbHelpers.getNotification(id);
+    if (notification) {
+      this.syncToSupabase(notification).catch(error => {
+        console.error('[NotificationService] Failed to sync notification update to Supabase:', error);
+      });
+    }
+  }
+
+  /**
+   * Mark all notifications as read for a user
+   */
+  async markAllAsRead(userId: string): Promise<number> {
+    const count = await dbHelpers.markAllNotificationsAsRead(userId);
+
+    // Sync all updated notifications to Supabase
+    const notifications = await dbHelpers.getAllNotifications(userId, { isRead: false });
+    await Promise.all(
+      notifications.map(n => this.syncToSupabase(n).catch(error => {
+        console.error('[NotificationService] Failed to sync notification update to Supabase:', error);
+      }))
+    );
+
+    return count;
+  }
+
+  /**
+   * Delete a notification (soft delete)
+   */
+  async deleteNotification(id: string): Promise<void> {
+    await dbHelpers.deleteNotification(id);
+
+    // Get the notification to sync to Supabase
+    const notification = await dbHelpers.getNotification(id);
+    if (notification) {
+      this.syncToSupabase(notification).catch(error => {
+        console.error('[NotificationService] Failed to sync notification delete to Supabase:', error);
+      });
+    }
+  }
+
+  /**
+   * Permanently delete a notification
+   */
+  async deleteNotificationPermanently(id: string): Promise<void> {
+    await dbHelpers.deleteNotificationPermanently(id);
+  }
+
+  /**
+   * Sync notification to Supabase (internal helper)
+   */
+  private async syncToSupabase(notification: Notification): Promise<void> {
+    try {
+      const supabase = await getSupabaseClientWithAuth(notification.userId);
+
+      const supabaseNotification = {
+        id: notification.id,
+        user_id: notification.userId,
+        type: notification.type,
+        title: notification.title,
+        message: notification.message,
+        data: notification.data || {},
+        is_read: notification.isRead,
+        read_at: notification.readAt ? new Date(notification.readAt).toISOString() : null,
+        version: notification.version || 1,
+        deleted_at: notification.deletedAt ? new Date(notification.deletedAt).toISOString() : null,
+        created_at: new Date(notification.createdAt).toISOString(),
+      };
+
+      // Upsert to Supabase
+      const { error } = await supabase
+        .from('notifications')
+        .upsert(supabaseNotification, {
+          onConflict: 'id',
+        });
+
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      // Log error but don't throw - sync failures shouldn't break the app
+      console.error('[NotificationService] Failed to sync notification to Supabase:', error);
+    }
+  }
+
+  /**
+   * Pull notifications from Supabase and merge with local
+   */
+  async pullFromSupabase(userId: string): Promise<void> {
+    try {
+      const supabase = await getSupabaseClientWithAuth(userId);
+
+      // Get all notifications from Supabase
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', userId)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data) {
+        return;
+      }
+
+      // Convert Supabase format to local format and save
+      const notifications: Notification[] = data.map((n) => ({
+        id: n.id,
+        userId: n.user_id,
+        type: n.type as NotificationType,
+        title: n.title,
+        message: n.message,
+        data: n.data || {},
+        isRead: n.is_read,
+        readAt: n.read_at ? new Date(n.read_at).getTime() : null,
+        createdAt: new Date(n.created_at).getTime(),
+        version: n.version || 1,
+        deletedAt: n.deleted_at ? new Date(n.deleted_at).getTime() : null,
+      }));
+
+      // Save all notifications to IndexedDB
+      await Promise.all(
+        notifications.map(n => dbHelpers.saveNotification(n))
+      );
+    } catch (error) {
+      console.error('[NotificationService] Failed to pull notifications from Supabase:', error);
+      throw error;
     }
   }
 }

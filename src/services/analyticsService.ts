@@ -1,6 +1,7 @@
 import { Workout } from '@/types/workout';
-import { PersonalRecord, VolumeData, StrengthProgression, MuscleBalance } from '@/types/analytics';
+import { PersonalRecord, VolumeData, StrengthProgression, AnalyticsMetrics } from '@/types/analytics';
 import { MuscleGroup } from '@/types/muscle';
+import { sleepRecoveryService } from './sleepRecoveryService';
 import {
   getDateRange,
   filterWorkoutsByDateRange,
@@ -8,32 +9,10 @@ import {
   categorizeMuscleGroup,
   aggregateVolumeByMuscleGroup,
   calculateConsistencyScore,
-  getWeeklyWorkoutDays,
   hasEnoughWorkoutsForAverages,
   DateRange,
 } from '@/utils/analyticsHelpers';
 import { calculateEstimatedOneRepMax } from '@/utils/calculations';
-import { exerciseMuscleMap } from '@/services/muscleMapping';
-
-export interface AnalyticsMetrics {
-  totalVolume: number;
-  workoutCount: number;
-  currentStreak: number;
-  consistencyScore: number;
-  volumeTrend: VolumeData[];
-  personalRecords: PersonalRecord[];
-  strengthProgression: StrengthProgression[];
-  muscleVolume: Map<MuscleGroup, number>;
-  focusDistribution: {
-    legs: number;
-    push: number;
-    pull: number;
-  };
-  symmetryScore: number;
-  totalCalories?: number;
-  averageCalories?: number;
-  caloriesTrend?: Array<{ date: string; calories: number }>;
-}
 
 export const analyticsService = {
   calculateTotalVolume(workouts: Workout[]): number {
@@ -123,11 +102,13 @@ export const analyticsService = {
 
       exerciseWorkouts.forEach(({ workout, exercise }) => {
         const maxSet = exercise.sets
-          .filter((s) => s.completed)
+          .filter((s) => s.completed && s.weight !== undefined && s.reps !== undefined)
           .reduce(
             (max, set) => {
-              const estimated1RM = calculateEstimatedOneRepMax(set.weight, set.reps);
-              return estimated1RM > max.estimated1RM ? { ...set, estimated1RM } : max;
+              const weight = set.weight || 0;
+              const reps = set.reps || 0;
+              const estimated1RM = calculateEstimatedOneRepMax(weight, reps);
+              return estimated1RM > max.estimated1RM ? { estimated1RM, weight, reps } : max;
             },
             { estimated1RM: 0, weight: 0, reps: 0 }
           );
@@ -304,8 +285,24 @@ export const analyticsService = {
     }));
   },
 
-  getAllMetrics(workouts: Workout[], range: DateRange = '30d'): AnalyticsMetrics {
+  async getAllMetrics(
+    workouts: Workout[], 
+    range: DateRange = '30d',
+    userId?: string
+  ): Promise<AnalyticsMetrics> {
     const filtered = filterWorkoutsByDateRange(workouts, range);
+
+    let sleepMetrics;
+    let recoveryMetrics;
+
+    if (userId) {
+      const { start, end } = getDateRange(range);
+      const sleepLogs = await sleepRecoveryService.getSleepLogsByRange(userId, start, end);
+      const recoveryLogs = await sleepRecoveryService.getRecoveryLogsByRange(userId, start, end);
+      
+      sleepMetrics = sleepRecoveryService.calculateSleepMetrics(sleepLogs);
+      recoveryMetrics = sleepRecoveryService.calculateRecoveryMetrics(recoveryLogs, sleepLogs);
+    }
 
     return {
       totalVolume: this.calculateTotalVolume(filtered),
@@ -321,6 +318,8 @@ export const analyticsService = {
       totalCalories: this.calculateTotalCalories(filtered),
       averageCalories: this.calculateAverageCalories(filtered),
       caloriesTrend: this.calculateCaloriesTrend(filtered, range),
+      sleepMetrics,
+      recoveryMetrics,
     };
   },
 };

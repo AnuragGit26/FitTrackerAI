@@ -17,6 +17,15 @@ export function UserMenu() {
   // Prefer Clerk user data, fallback to store profile
   const userName = clerkUser?.firstName || clerkUser?.username || profile?.name || 'User';
   const userEmail = clerkUser?.emailAddresses?.[0]?.emailAddress;
+  
+  // Determine which profile picture to use (prioritize Supabase profile picture)
+  const profilePictureUrl = profile?.profilePicture || clerkUser?.imageUrl;
+  
+  // #region agent log
+  useEffect(() => {
+    fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserMenu.tsx:21',message:'UserMenu rendered',data:{hasProfile:!!profile,profilePicture:profile?.profilePicture,clerkImageUrl:clerkUser?.imageUrl,usingProfilePicture:!!profile?.profilePicture,profilePictureUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+  }, [profile?.profilePicture, clerkUser?.imageUrl, profile, clerkUser]);
+  // #endregion
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -72,17 +81,15 @@ export function UserMenu() {
           <div
             className={cn(
               'bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 ring-2 ring-primary/20 flex items-center justify-center',
-              !profile?.profilePicture && 'bg-gradient-to-br from-primary/20 to-primary/40'
+              !profilePictureUrl && 'bg-gradient-to-br from-primary/20 to-primary/40'
             )}
             style={
-              clerkUser?.imageUrl
-                ? { backgroundImage: `url(${clerkUser.imageUrl})` }
-                : profile?.profilePicture
-                ? { backgroundImage: `url(${profile.profilePicture})` }
+              profilePictureUrl
+                ? { backgroundImage: `url("${profilePictureUrl}")` }
                 : undefined
             }
           >
-            {!clerkUser?.imageUrl && !profile?.profilePicture && (
+            {!profilePictureUrl && (
               <span className="text-primary font-bold text-lg">
                 {userName.charAt(0).toUpperCase()}
               </span>

@@ -29,7 +29,7 @@ interface UserProfile {
   deletedAt?: Date | null;
 }
 
-type EventType = 'workout' | 'user' | 'settings' | 'muscle' | 'exercise';
+type EventType = 'workout' | 'user' | 'settings' | 'muscle' | 'exercise' | 'sleep' | 'recovery';
 type EventCallback = () => void;
 
 class DataService {
@@ -50,6 +50,14 @@ class DataService {
     };
   }
 
+  notifySleepUpdate(): void {
+    this.emit('sleep');
+  }
+
+  public notifyRecoveryUpdate(): void {
+    this.emit('recovery');
+  }
+
   private emit(event: EventType): void {
     this.listeners.get(event)?.forEach(callback => callback());
     this.queueSyncForEvent(event);
@@ -64,6 +72,8 @@ class DataService {
       user: 'user_profiles',
       settings: 'settings',
       muscle: 'muscle_statuses',
+      sleep: 'sleep_logs',
+      recovery: 'recovery_logs',
     };
 
     const table = tableMap[event];

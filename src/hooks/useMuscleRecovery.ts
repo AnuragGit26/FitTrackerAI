@@ -6,6 +6,8 @@ import { useUserStore } from '@/store/userStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { calculateRecoveryStatus } from '@/services/recoveryCalculator';
 import { muscleRecoveryService } from '@/services/muscleRecoveryService';
+import { sleepRecoveryService } from '@/services/sleepRecoveryService';
+import { SleepLog } from '@/types/sleep';
 import { notificationService } from '@/services/notificationService';
 
 export function useMuscleRecovery() {
@@ -81,6 +83,17 @@ export function useMuscleRecovery() {
     setIsLoading(true);
     try {
       const savedStatuses = await dbHelpers.getAllMuscleStatuses();
+      
+      // Fetch recent sleep logs for recovery calculation
+      let recentSleepLog: SleepLog | undefined;
+      try {
+        if (profile?.id) {
+          const sleepLogs = await sleepRecoveryService.getAllSleepLogs(profile.id);
+          recentSleepLog = sleepLogs.length > 0 ? sleepLogs[0] : undefined;
+        }
+      } catch (error) {
+        console.error('Failed to fetch sleep logs:', error);
+      }
 
       // Deduplicate muscle groups - keep the most recent entry for each muscle
       const uniqueStatuses = savedStatuses.reduce((acc, status) => {
@@ -132,6 +145,7 @@ export function useMuscleRecovery() {
           totalVolumeLast7Days: status.totalVolumeLast7Days,
           trainingFrequency: status.trainingFrequency,
           baseRestInterval,
+          recentSleep: recentSleepLog,
         });
       });
 

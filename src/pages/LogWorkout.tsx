@@ -307,10 +307,6 @@ export function LogWorkout() {
     }
   };
 
-  const handleCreateCustom = () => {
-    navigate('/create-exercise');
-  };
-
   const handleSaveAsTemplate = async () => {
     if (!currentWorkout || !profile) {
       showError('No workout to save');

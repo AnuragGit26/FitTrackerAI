@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -16,8 +16,13 @@ export function SleepRecovery() {
   const shouldReduceMotion = prefersReducedMotion();
 
   const [isSaving, setIsSaving] = useState(false);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  
+  // Memoize today to prevent useEffect re-running on every render
+  const today = useMemo(() => {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    return date;
+  }, []);
 
   // Sleep state
   const [bedtime, setBedtime] = useState(() => {

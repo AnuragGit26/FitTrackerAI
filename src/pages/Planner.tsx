@@ -13,7 +13,6 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { useToast } from '@/hooks/useToast';
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays } from 'date-fns';
 import { PlannedWorkout } from '@/types/workout';
-import { plannedWorkoutService } from '@/services/plannedWorkoutService';
 
 export function Planner() {
   const navigate = useNavigate();
@@ -28,7 +27,6 @@ export function Planner() {
     setViewMode,
     deletePlannedWorkout,
   } = usePlannedWorkoutStore();
-  const { startWorkoutFromTemplate } = useWorkoutStore();
   const { success, error: showError } = useToast();
 
   const [currentDate, setCurrentDate] = useState(new Date());

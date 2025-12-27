@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronRight, CheckCircle2, Dumbbell, Zap, Home, Activity } from 'lucide-react';
 import { WorkoutTemplate, TemplateCategory } from '@/types/workout';
-import { cn } from '@/utils/cn';
 
 interface TemplateListCardProps {
     template: WorkoutTemplate;

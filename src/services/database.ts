@@ -5,6 +5,7 @@ import { MuscleStatus } from '@/types/muscle';
 import { MuscleImageCache } from './muscleImageCache';
 import { SyncableTable } from '@/types/sync';
 import { SleepLog, RecoveryLog } from '@/types/sleep';
+import type { Notification } from '@/types/notification';
 
 export type InsightType = 'insights' | 'recommendations' | 'progress' | 'smart-coach';
 
@@ -54,6 +55,7 @@ class FitTrackAIDB extends Dexie {
   syncMetadata!: Table<LocalSyncMetadata, number>;
   sleepLogs!: Table<SleepLog, number>;
   recoveryLogs!: Table<RecoveryLog, number>;
+  notifications!: Table<Notification, string>;
 
   constructor() {
     super('FitTrackAIDB');
@@ -186,6 +188,23 @@ class FitTrackAIDB extends Dexie {
       syncMetadata: '++id, tableName, userId, [userId+tableName], syncStatus, lastSyncAt',
       sleepLogs: '++id, userId, date, version, [userId+date], [userId+updatedAt]',
       recoveryLogs: '++id, userId, date, version, [userId+date], [userId+updatedAt]',
+    });
+
+    // Version 10: Add notifications table
+    this.version(10).stores({
+      workouts: '++id, userId, date, version, [userId+date], [userId+updatedAt], *musclesTargeted',
+      exercises: 'id, name, category, userId, version, [userId+isCustom], [userId+updatedAt], *primaryMuscles, *secondaryMuscles',
+      muscleStatuses: '++id, muscle, userId, version, [userId+muscle], [userId+updatedAt], lastWorked',
+      settings: 'key, userId, version, [userId+key]',
+      workoutTemplates: 'id, userId, category, name, version, [userId+category], [userId+updatedAt], *musclesTargeted',
+      aiCacheMetadata: '++id, insightType, userId, [insightType+userId], lastFetchTimestamp',
+      plannedWorkouts: 'id, userId, scheduledDate, version, [userId+scheduledDate], [userId+updatedAt]',
+      exerciseDetailsCache: '++id, exerciseSlug, cachedAt',
+      muscleImageCache: '++id, muscle, cachedAt',
+      syncMetadata: '++id, tableName, userId, [userId+tableName], syncStatus, lastSyncAt',
+      sleepLogs: '++id, userId, date, version, [userId+date], [userId+updatedAt]',
+      recoveryLogs: '++id, userId, date, version, [userId+date], [userId+updatedAt]',
+      notifications: 'id, userId, isRead, createdAt, [userId+isRead], [userId+createdAt], type',
     });
   }
 }
@@ -620,6 +639,160 @@ export const dbHelpers = {
     if (existing) {
       await db.syncMetadata.delete(existing.id!);
     }
+  },
+
+  // Notification operations
+  async saveNotification(notification: Notification): Promise<string> {
+    return await db.notifications.put(notification);
+  },
+
+  async getNotification(id: string): Promise<Notification | undefined> {
+    return await db.notifications.get(id);
+  },
+
+  async getAllNotifications(userId: string, filters?: { isRead?: boolean; limit?: number }): Promise<Notification[]> {
+    // #region agent log
+    fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'database.ts:653',message:'getAllNotifications called',data:{userId,userIdType:typeof userId,isValid:!!userId && userId.length > 0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    if (!userId || typeof userId !== 'string' || userId.length === 0) {
+      // #region agent log
+      fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'database.ts:657',message:'Invalid userId in getAllNotifications, returning empty array',data:{userId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      return [];
+    }
+    let query = db.notifications.where('userId').equals(userId);
+
+    if (filters?.isRead !== undefined) {
+      query = query.filter(n => n.isRead === filters.isRead);
+    }
+
+    const notifications = await query
+      .reverse()
+      .sortBy('createdAt');
+
+    if (filters?.limit) {
+      return notifications.slice(0, filters.limit);
+    }
+
+    return notifications;
+  },
+
+  async getUnreadNotificationsCount(userId: string): Promise<number> {
+    // #region agent log
+    fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'database.ts:680',message:'getUnreadNotificationsCount called',data:{userId,userIdType:typeof userId,isValid:!!userId && userId.length > 0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    if (!userId || typeof userId !== 'string' || userId.length === 0) {
+      // #region agent log
+      fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'database.ts:684',message:'Invalid userId, returning 0',data:{userId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      return 0;
+    }
+    try {
+      const count = await db.notifications
+        .where('[userId+isRead]')
+        .equals([userId, false])
+        .count();
+      // #region agent log
+      fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'database.ts:694',message:'getUnreadNotificationsCount completed',data:{userId,count},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      return count;
+    } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'database.ts:700',message:'getUnreadNotificationsCount error',data:{userId,error:error instanceof Error?error.message:'unknown'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      throw error;
+    }
+  },
+
+  async markNotificationAsRead(id: string): Promise<void> {
+    await db.notifications.update(id, {
+      isRead: true,
+      readAt: Date.now(),
+    });
+  },
+
+  async markAllNotificationsAsRead(userId: string): Promise<number> {
+    const unreadNotifications = await db.notifications
+      .where('[userId+isRead]')
+      .equals([userId, false])
+      .toArray();
+
+    const now = Date.now();
+    await Promise.all(
+      unreadNotifications.map(n => 
+        db.notifications.update(n.id, {
+          isRead: true,
+          readAt: now,
+        })
+      )
+    );
+
+    return unreadNotifications.length;
+  },
+
+  async deleteNotification(id: string): Promise<void> {
+    await db.notifications.update(id, {
+      deletedAt: Date.now(),
+    });
+  },
+
+  async deleteNotificationPermanently(id: string): Promise<void> {
+    await db.notifications.delete(id);
+  },
+
+  // Sleep log operations
+  async saveSleepLog(sleepLog: Omit<SleepLog, 'id'>): Promise<number> {
+    return await db.sleepLogs.add(sleepLog as SleepLog);
+  },
+
+  async getSleepLog(id: number): Promise<SleepLog | undefined> {
+    return await db.sleepLogs.get(id);
+  },
+
+  async updateSleepLog(id: number, updates: Partial<SleepLog>): Promise<number> {
+    return await db.sleepLogs.update(id, updates);
+  },
+
+  async getAllSleepLogs(userId: string): Promise<SleepLog[]> {
+    return await db.sleepLogs
+      .where('userId')
+      .equals(userId)
+      .reverse()
+      .sortBy('date');
+  },
+
+  // Recovery log operations
+  async saveRecoveryLog(recoveryLog: Omit<RecoveryLog, 'id'>): Promise<number> {
+    return await db.recoveryLogs.add(recoveryLog as RecoveryLog);
+  },
+
+  async getRecoveryLog(id: number): Promise<RecoveryLog | undefined> {
+    return await db.recoveryLogs.get(id);
+  },
+
+  async getRecoveryLogByDate(userId: string, date: Date | string): Promise<RecoveryLog | undefined> {
+    const dateStr = date instanceof Date ? date.toISOString().split('T')[0] : date;
+    const logs = await db.recoveryLogs
+      .where('userId')
+      .equals(userId)
+      .filter((log) => {
+        const logDate = new Date(log.date).toISOString().split('T')[0];
+        return logDate === dateStr;
+      })
+      .toArray();
+    return logs[0];
+  },
+
+  async updateRecoveryLog(id: number, updates: Partial<RecoveryLog>): Promise<number> {
+    return await db.recoveryLogs.update(id, updates);
+  },
+
+  async getAllRecoveryLogs(userId: string): Promise<RecoveryLog[]> {
+    return await db.recoveryLogs
+      .where('userId')
+      .equals(userId)
+      .reverse()
+      .sortBy('date');
   },
 };
 

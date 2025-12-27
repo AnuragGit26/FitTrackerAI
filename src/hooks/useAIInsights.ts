@@ -77,7 +77,7 @@ export function useAIInsights() {
       setIsLoading(false);
       isGeneratingRef.current = false;
     }
-  }, [workouts.length, profile?.id, muscleStatusesKey]);
+  }, [workouts, profile, muscleStatuses, muscleStatusesKey]);
 
   return { insights, isLoading, generateInsights };
 }

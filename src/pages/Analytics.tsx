@@ -13,6 +13,8 @@ import { WorkoutStatsCards } from '@/components/analytics/WorkoutStatsCards';
 import { AIInsightCard } from '@/components/analytics/AIInsightCard';
 import { VolumeTrendChart } from '@/components/analytics/VolumeTrendChart';
 import { CaloriesChart } from '@/components/analytics/CaloriesChart';
+import { SleepTrendChart } from '@/components/analytics/SleepTrendChart';
+import { RecoveryMetricsCard } from '@/components/analytics/RecoveryMetricsCard';
 import { ConsistencyHeatmap } from '@/components/analytics/ConsistencyHeatmap';
 import { MuscleFocusCard } from '@/components/analytics/MuscleFocusCard';
 import { StrengthProgressionChart } from '@/components/analytics/StrengthProgressionChart';
@@ -23,8 +25,8 @@ import { AICoachInsightCard } from '@/components/analytics/AICoachInsightCard';
 import { FocusDistributionChart } from '@/components/analytics/FocusDistributionChart';
 import { VolumeByMuscleChart } from '@/components/analytics/VolumeByMuscleChart';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { prefersReducedMotion } from '@/utils/animations';
 import { CustomDateRangePicker } from '@/components/analytics/CustomDateRangePicker';
+import { AnalyticsMetrics } from '@/types/analytics';
 
 type View = 'progress' | 'muscle';
 type TimePeriod = 'Week' | 'Month' | 'Year';
@@ -38,6 +40,7 @@ export function Analytics() {
   const [progressInsight, setProgressInsight] = useState<string>('');
   const [muscleInsight, setMuscleInsight] = useState<string>('');
   const [isLoadingInsights, setIsLoadingInsights] = useState(false);
+  const [metrics, setMetrics] = useState<AnalyticsMetrics | null>(null); // Use state for async metrics loading
   const previousMetricsRef = useRef<{
     totalVolume: number;
     workoutCount: number;
@@ -68,9 +71,15 @@ export function Analytics() {
     return filterWorkoutsByDateRange(workouts, dateRange);
   }, [workouts, dateRange, customDateRange]);
 
-  const metrics = useMemo(() => {
-    return analyticsService.getAllMetrics(filteredWorkouts, dateRange);
-  }, [filteredWorkouts, dateRange]);
+  // Load metrics asynchronously to include sleep/recovery data
+  useEffect(() => {
+    async function fetchMetrics() {
+      if (!profile) return;
+      const data = await analyticsService.getAllMetrics(filteredWorkouts, dateRange, profile.id);
+      setMetrics(data);
+    }
+    fetchMetrics();
+  }, [filteredWorkouts, dateRange, profile]);
 
   const hasEnoughWorkouts = useMemo(() => {
     return hasEnoughWorkoutsForAverages(workouts);
@@ -93,9 +102,9 @@ export function Analytics() {
   }, [workouts]);
 
   const trendPercentage = useMemo(() => {
-    if (previousMonthVolume === 0) return 0;
+    if (!metrics || previousMonthVolume === 0) return 0;
     return Math.round(((metrics.totalVolume - previousMonthVolume) / previousMonthVolume) * 100);
-  }, [metrics.totalVolume, previousMonthVolume]);
+  }, [metrics, previousMonthVolume]);
 
   const topMuscle = useMemo(() => {
     const topMuscleNames = analyticsService.getMostActiveMuscleNames(workouts, 1);
@@ -103,7 +112,7 @@ export function Analytics() {
   }, [workouts]);
 
   useEffect(() => {
-    if (view === 'progress' && metrics.totalVolume > 0) {
+    if (view === 'progress' && metrics && metrics.totalVolume > 0) {
       const currentMetrics = {
         totalVolume: metrics.totalVolume,
         workoutCount: metrics.workoutCount,
@@ -151,10 +160,10 @@ export function Analytics() {
           previousMetricsRef.current = currentMetrics;
         });
     }
-  }, [view, metrics.totalVolume, metrics.workoutCount, trendPercentage, topMuscle]);
+  }, [view, metrics, trendPercentage, topMuscle, profile]);
 
   useEffect(() => {
-    if (view === 'muscle' && metrics.focusDistribution) {
+    if (view === 'muscle' && metrics && metrics.focusDistribution) {
       const topMuscleNames = analyticsService.getMostActiveMuscleNames(workouts, 2);
       const currentMetrics = {
         focusDistribution: metrics.focusDistribution,
@@ -216,11 +225,11 @@ export function Analytics() {
           }
         });
     }
-  }, [view, metrics.focusDistribution, metrics.symmetryScore, workouts]);
+  }, [view, metrics, workouts]);
 
   const unit = profile?.preferredUnit || 'kg';
 
-  if (!profile) {
+  if (!profile || !metrics) {
     return (
       <div className="flex items-center justify-center h-screen">
         <LoadingSpinner />
@@ -309,6 +318,16 @@ export function Analytics() {
               )}
 
               <VolumeTrendChart data={metrics.volumeTrend} />
+
+              {/* Sleep & Recovery Section */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {metrics.sleepMetrics && metrics.sleepMetrics.sleepTrend.length > 0 && (
+                  <SleepTrendChart data={metrics.sleepMetrics.sleepTrend} />
+                )}
+                {metrics.recoveryMetrics && metrics.recoveryMetrics.recoveryTrend.length > 0 && (
+                  <RecoveryMetricsCard metrics={metrics.recoveryMetrics} />
+                )}
+              </div>
 
               {metrics.caloriesTrend && metrics.caloriesTrend.length > 0 && (
                 <CaloriesChart data={metrics.caloriesTrend} />

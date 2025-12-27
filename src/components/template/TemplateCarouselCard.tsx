@@ -11,7 +11,6 @@ interface TemplateCarouselCardProps {
 
 export function TemplateCarouselCard({ template, onClick }: TemplateCarouselCardProps) {
     const [imageError, setImageError] = useState(false);
-    const [imageLoading, setImageLoading] = useState(true);
     const difficultyLabel = template.difficulty
         ? template.difficulty.charAt(0).toUpperCase() + template.difficulty.slice(1)
         : 'All Levels';
@@ -37,11 +36,6 @@ export function TemplateCarouselCard({ template, onClick }: TemplateCarouselCard
                         onError={(e) => {
                             logger.error(`Failed to load image for "${template.name}":`, e, { imageUrl: template.imageUrl });
                             setImageError(true);
-                            setImageLoading(false);
-                        }}
-                        onLoad={() => {
-                            logger.debug(`Successfully loaded image for "${template.name}"`);
-                            setImageLoading(false);
                         }}
                         crossOrigin="anonymous"
                     />

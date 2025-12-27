@@ -1,4 +1,5 @@
 import { MuscleGroup } from './muscle';
+import { SleepMetrics, RecoveryMetrics } from './sleep';
 
 export interface PersonalRecord {
   exerciseId: string;
@@ -47,5 +48,27 @@ export interface PerformanceMetrics {
   consistencyScore: number;
   currentStreak: number;
   longestStreak: number;
+}
+
+export interface AnalyticsMetrics {
+  totalVolume: number;
+  workoutCount: number;
+  currentStreak: number;
+  consistencyScore: number;
+  volumeTrend: VolumeData[];
+  personalRecords: PersonalRecord[];
+  strengthProgression: StrengthProgression[];
+  muscleVolume: Map<MuscleGroup, number>;
+  focusDistribution: {
+    legs: number;
+    push: number;
+    pull: number;
+  };
+  symmetryScore: number;
+  totalCalories?: number;
+  averageCalories?: number;
+  caloriesTrend?: Array<{ date: string; calories: number }>;
+  sleepMetrics?: SleepMetrics;
+  recoveryMetrics?: RecoveryMetrics;
 }
 

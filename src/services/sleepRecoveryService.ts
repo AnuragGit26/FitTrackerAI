@@ -1,6 +1,6 @@
 import { SleepLog, RecoveryLog, SleepMetrics, RecoveryMetrics } from '@/types/sleep';
 import { db } from './database';
-import { DateRange, filterByDateRange } from '@/utils/analyticsHelpers';
+import { dataService } from './dataService';
 
 export const sleepRecoveryService = {
   /**
@@ -14,13 +14,20 @@ export const sleepRecoveryService = {
       version: (sleepLog.version || 0) + 1,
     };
 
+    let id: number;
     if (sleepLog.id) {
       await db.sleepLogs.update(sleepLog.id, logToSave);
-      return sleepLog.id;
+      id = sleepLog.id;
     } else {
       logToSave.createdAt = now;
-      return await db.sleepLogs.add(logToSave as SleepLog);
+      id = await db.sleepLogs.add(logToSave as SleepLog);
     }
+    
+    // Trigger sync
+    // We emit 'sleep' event which dataService maps to 'sleep_logs' table sync
+    dataService.notifySleepUpdate();
+    
+    return id;
   },
 
   /**
@@ -34,13 +41,19 @@ export const sleepRecoveryService = {
       version: (recoveryLog.version || 0) + 1,
     };
 
+    let id: number;
     if (recoveryLog.id) {
       await db.recoveryLogs.update(recoveryLog.id, logToSave);
-      return recoveryLog.id;
+      id = recoveryLog.id;
     } else {
       logToSave.createdAt = now;
-      return await db.recoveryLogs.add(logToSave as RecoveryLog);
+      id = await db.recoveryLogs.add(logToSave as RecoveryLog);
     }
+
+    // Trigger sync
+    dataService.notifyRecoveryUpdate();
+
+    return id;
   },
 
   /**
@@ -192,7 +205,7 @@ export const sleepRecoveryService = {
   /**
    * Calculate recovery metrics
    */
-  calculateRecoveryMetrics(recoveryLogs: RecoveryLog[]): RecoveryMetrics {
+  calculateRecoveryMetrics(recoveryLogs: RecoveryLog[], sleepLogs?: SleepLog[]): RecoveryMetrics {
     if (recoveryLogs.length === 0) {
       return {
         averageRecovery: 0,
@@ -235,8 +248,11 @@ export const sleepRecoveryService = {
       recovery: log.overallRecovery,
     }));
 
-    // Correlation with sleep (simplified - would need sleep data)
-    const correlationWithSleep = 0; // TODO: Calculate actual correlation
+    // Calculate correlation with sleep if sufficient data
+    let correlationWithSleep = 0;
+    if (sleepLogs && sleepLogs.length > 0) {
+      correlationWithSleep = this.calculateSleepRecoveryCorrelation(sleepLogs, recoveryLogs);
+    }
 
     return {
       averageRecovery,
@@ -247,6 +263,76 @@ export const sleepRecoveryService = {
       recoveryTrend,
       correlationWithSleep,
     };
+  },
+
+  /**
+   * Calculate correlation between sleep and recovery
+   */
+  calculateSleepRecoveryCorrelation(sleepLogs: SleepLog[], recoveryLogs: RecoveryLog[]): number {
+    if (sleepLogs.length < 3 || recoveryLogs.length < 3) return 0;
+
+    // Match logs by date
+    const pairs: { sleepQuality: number; recoveryScore: number }[] = [];
+    
+    recoveryLogs.forEach(rLog => {
+      // Find sleep log for the previous night (recovery is usually logged in morning for previous night's sleep)
+      // OR same date if the date represents "night of".
+      // Assuming date represents the day the log was made (morning), so it corresponds to sleep from previous night.
+      // But SleepLog date: "Date of the sleep (night of)".
+      // RecoveryLog date: "Date of the recovery check-in".
+      // Usually you wake up on Day X and log recovery for Day X, based on sleep from Night of Day X-1.
+      // So if SleepLog date is Day X-1 (bedtime), and RecoveryLog date is Day X.
+      
+      // Let's assume simplest case: matching by date string if they are aligned by the user.
+      // Or verify logic:
+      // SleepLog.date = "Date of the sleep (night of)" e.g., Jan 1st night.
+      // RecoveryLog.date = "Date of the recovery check-in" e.g., Jan 2nd morning.
+      // So we should match SleepLog(Jan 1) with RecoveryLog(Jan 2).
+      
+      const recoveryDate = new Date(rLog.date);
+      const sleepDate = new Date(recoveryDate);
+      sleepDate.setDate(sleepDate.getDate() - 1); // Previous day
+      const sleepDateStr = sleepDate.toISOString().split('T')[0];
+      
+      // Also try same date just in case user logs differently
+      const sameDateStr = new Date(rLog.date).toISOString().split('T')[0];
+
+      const sLog = sleepLogs.find(s => {
+        const sDate = new Date(s.date).toISOString().split('T')[0];
+        return sDate === sleepDateStr || sDate === sameDateStr;
+      });
+
+      if (sLog) {
+        // Composite sleep score: duration factor * quality
+        // Or just use quality? The prompt says "between sleep quality/duration and recovery scores"
+        // Let's use a weighted score of quality and duration
+        // optimal duration 8h = 480m. 
+        const durationScore = Math.min(10, (sLog.duration / 480) * 10);
+        const sleepScore = (sLog.quality + durationScore) / 2;
+        
+        pairs.push({
+          sleepQuality: sleepScore,
+          recoveryScore: rLog.overallRecovery
+        });
+      }
+    });
+
+    if (pairs.length < 3) return 0;
+
+    // Pearson correlation
+    const n = pairs.length;
+    const sumX = pairs.reduce((sum, p) => sum + p.sleepQuality, 0);
+    const sumY = pairs.reduce((sum, p) => sum + p.recoveryScore, 0);
+    const sumXY = pairs.reduce((sum, p) => sum + (p.sleepQuality * p.recoveryScore), 0);
+    const sumX2 = pairs.reduce((sum, p) => sum + (p.sleepQuality * p.sleepQuality), 0);
+    const sumY2 = pairs.reduce((sum, p) => sum + (p.recoveryScore * p.recoveryScore), 0);
+
+    const numerator = (n * sumXY) - (sumX * sumY);
+    const denominator = Math.sqrt(((n * sumX2) - (sumX * sumX)) * ((n * sumY2) - (sumY * sumY)));
+
+    if (denominator === 0) return 0;
+    
+    return Math.round((numerator / denominator) * 100) / 100;
   },
 
   /**

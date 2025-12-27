@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { AlertCircle, X, RefreshCw, Trash2, Calendar, Clock } from 'lucide-react';
 import { Modal } from '@/components/common/Modal';
 import { FailedWorkout, getFailedWorkouts, removeFailedWorkout, incrementRetryCount, updateFailedWorkout } from '@/utils/workoutErrorRecovery';
@@ -20,19 +20,19 @@ export function WorkoutErrorRecoveryModal({ isOpen, onClose, onWorkoutRecovered 
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const { success, error: showError } = useToast();
 
-  useEffect(() => {
-    if (isOpen) {
-      loadFailedWorkouts();
-    }
-  }, [isOpen]);
-
-  const loadFailedWorkouts = () => {
+  const loadFailedWorkouts = useCallback(() => {
     const failed = getFailedWorkouts();
     setFailedWorkouts(failed);
     if (failed.length > 0 && !selectedWorkout) {
       setSelectedWorkout(failed[0]);
     }
-  };
+  }, [selectedWorkout]);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadFailedWorkouts();
+    }
+  }, [isOpen, loadFailedWorkouts]);
 
   const handleRetry = async (failedWorkout: FailedWorkout) => {
     setIsRetrying(true);

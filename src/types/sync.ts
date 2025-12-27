@@ -9,7 +9,10 @@ export type SyncableTable =
     | 'planned_workouts'
     | 'muscle_statuses'
     | 'user_profiles'
-    | 'settings';
+    | 'settings'
+    | 'notifications'
+    | 'sleep_logs'
+    | 'recovery_logs';
 
 export interface SyncMetadata {
     id?: number;

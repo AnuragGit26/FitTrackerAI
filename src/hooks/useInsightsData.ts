@@ -187,6 +187,114 @@ export function useInsightsData() {
     };
   }, []);
 
+  // Direct fetch fallback (when SW not available)
+  const loadInsightsDirectly = useCallback(async (
+    currentMonthWorkouts: Workout[],
+    _previousMonthWorkouts: Workout[],
+    muscleStatuses: MuscleStatus[],
+    personalRecords: PersonalRecord[],
+    strengthProgression: StrengthProgression[],
+    volumeTrend: Array<{ date: string; totalVolume: number }>,
+    metrics: { consistencyScore: number; workoutCount: number; symmetryScore: number; focusDistribution: { legs: number; push: number; pull: number } },
+    previousMetrics: { consistencyScore: number; workoutCount: number },
+    readinessScore: number,
+    fingerprint: string
+  ) => {
+    try {
+      // Helper function to add timeout to individual promises
+      const withTimeout = <T,>(promise: Promise<T | null>, timeoutMs: number, fallback: T | null): Promise<T | null> => {
+        return Promise.race([
+          promise.catch((error) => {
+            console.error('AI insight request failed:', error);
+            return fallback;
+          }),
+          new Promise<T | null>((resolve) => {
+            setTimeout(() => {
+              console.warn(`AI insight request timeout after ${timeoutMs}ms, using fallback`);
+              resolve(fallback);
+            }, timeoutMs);
+          }),
+        ]);
+      };
+
+      // Generate insights using refresh service (handles 24hr rule and new workout detection)
+      const progressPromise = aiRefreshService.refreshIfNeeded(
+        'progress',
+        fingerprint,
+        () => aiService.generateProgressAnalysis(
+          currentMonthWorkouts,
+          personalRecords,
+          strengthProgression,
+          volumeTrend,
+          metrics.consistencyScore,
+          previousMetrics.consistencyScore,
+          metrics.workoutCount,
+          previousMetrics.workoutCount
+        ),
+        profile?.id,
+        1
+      ).catch((error) => {
+        console.error('Failed to load progress analysis:', error);
+        return null;
+      });
+
+      const alertsPromise = aiRefreshService.refreshIfNeeded(
+        'insights',
+        fingerprint,
+        () => aiService.generateSmartAlerts(currentMonthWorkouts, muscleStatuses, readinessScore),
+        profile?.id,
+        1
+      ).catch((error) => {
+        console.error('Failed to load smart alerts:', error);
+        return null;
+      });
+
+      const recommendationsPromise = aiRefreshService.refreshIfNeeded(
+        'recommendations',
+        fingerprint,
+        () => aiService.generateWorkoutRecommendations(
+          currentMonthWorkouts,
+          muscleStatuses,
+          readinessScore,
+          metrics.symmetryScore,
+          metrics.focusDistribution,
+          profile?.experienceLevel || 'intermediate',
+          settings.baseRestInterval || 48
+        ),
+        profile?.id,
+        1
+      ).catch((error) => {
+        console.error('Failed to load workout recommendations:', error);
+        return null;
+      });
+
+      // Wait for all with individual 120-second timeouts
+      const [progress, alerts, recommendations] = await Promise.all([
+        withTimeout(progressPromise, 120000, null),
+        withTimeout(alertsPromise, 120000, null),
+        withTimeout(recommendationsPromise, 120000, null),
+      ]);
+
+      setProgressAnalysis(progress);
+      setSmartAlerts(alerts);
+      setWorkoutRecommendations(recommendations);
+      setLastUpdated(new Date());
+    } catch (error) {
+      console.error('Failed to load insights directly:', error);
+      setProgressAnalysis(null);
+      setSmartAlerts(null);
+      setWorkoutRecommendations(null);
+    } finally {
+      setIsLoading(false);
+      setIsBackgroundFetching(false);
+      isLoadingRef.current = false;
+    }
+  }, [
+    profile?.id, 
+    profile?.experienceLevel, 
+    settings.baseRestInterval
+  ]);
+
   const loadInsights = useCallback(async () => {
     if (!profile || isLoadingRef.current) {
       if (!profile) setIsLoading(false);
@@ -301,111 +409,17 @@ export function useInsightsData() {
       setIsBackgroundFetching(false);
       isLoadingRef.current = false;
     }
-  }, [profile?.id, profile?.experienceLevel, settings.baseRestInterval, workouts.length, muscleStatusesKey, loadWorkouts, isMuscleRecoveryLoading]);
-
-  // Direct fetch fallback (when SW not available)
-  const loadInsightsDirectly = useCallback(async (
-    currentMonthWorkouts: Workout[],
-    _previousMonthWorkouts: Workout[],
-    muscleStatuses: MuscleStatus[],
-    personalRecords: PersonalRecord[],
-    strengthProgression: StrengthProgression[],
-    volumeTrend: Array<{ date: string; totalVolume: number }>,
-    metrics: { consistencyScore: number; workoutCount: number; symmetryScore: number; focusDistribution: { legs: number; push: number; pull: number } },
-    previousMetrics: { consistencyScore: number; workoutCount: number },
-    readinessScore: number,
-    fingerprint: string
-  ) => {
-    try {
-      // Helper function to add timeout to individual promises
-      const withTimeout = <T,>(promise: Promise<T | null>, timeoutMs: number, fallback: T | null): Promise<T | null> => {
-        return Promise.race([
-          promise.catch((error) => {
-            console.error('AI insight request failed:', error);
-            return fallback;
-          }),
-          new Promise<T | null>((resolve) => {
-            setTimeout(() => {
-              console.warn(`AI insight request timeout after ${timeoutMs}ms, using fallback`);
-              resolve(fallback);
-            }, timeoutMs);
-          }),
-        ]);
-      };
-
-      // Generate insights using refresh service (handles 24hr rule and new workout detection)
-      const progressPromise = aiRefreshService.refreshIfNeeded(
-        'progress',
-        fingerprint,
-        () => aiService.generateProgressAnalysis(
-          currentMonthWorkouts,
-          personalRecords,
-          strengthProgression,
-          volumeTrend,
-          metrics.consistencyScore,
-          previousMetrics.consistencyScore,
-          metrics.workoutCount,
-          previousMetrics.workoutCount
-        ),
-        profile?.id,
-        1
-      ).catch((error) => {
-        console.error('Failed to load progress analysis:', error);
-        return null;
-      });
-
-      const alertsPromise = aiRefreshService.refreshIfNeeded(
-        'insights',
-        fingerprint,
-        () => aiService.generateSmartAlerts(currentMonthWorkouts, muscleStatuses, readinessScore),
-        profile?.id,
-        1
-      ).catch((error) => {
-        console.error('Failed to load smart alerts:', error);
-        return null;
-      });
-
-      const recommendationsPromise = aiRefreshService.refreshIfNeeded(
-        'recommendations',
-        fingerprint,
-        () => aiService.generateWorkoutRecommendations(
-          currentMonthWorkouts,
-          muscleStatuses,
-          readinessScore,
-          metrics.symmetryScore,
-          metrics.focusDistribution,
-          profile?.experienceLevel || 'intermediate',
-          settings.baseRestInterval || 48
-        ),
-        profile?.id,
-        1
-      ).catch((error) => {
-        console.error('Failed to load workout recommendations:', error);
-        return null;
-      });
-
-      // Wait for all with individual 120-second timeouts
-      const [progress, alerts, recommendations] = await Promise.all([
-        withTimeout(progressPromise, 120000, null),
-        withTimeout(alertsPromise, 120000, null),
-        withTimeout(recommendationsPromise, 120000, null),
-      ]);
-
-      setProgressAnalysis(progress);
-      setSmartAlerts(alerts);
-      setWorkoutRecommendations(recommendations);
-      setLastUpdated(new Date());
-    } catch (error) {
-      console.error('Failed to load insights directly:', error);
-      setProgressAnalysis(null);
-      setSmartAlerts(null);
-      setWorkoutRecommendations(null);
-    } finally {
-      setIsLoading(false);
-      setIsBackgroundFetching(false);
-      isLoadingRef.current = false;
-    }
-  }, [profile?.id]);
+  }, [
+    profile,
+    settings.baseRestInterval,
+    muscleStatuses,
+    loadWorkouts,
+    isMuscleRecoveryLoading,
+    loadInsightsDirectly,
+    progressAnalysis,
+    smartAlerts,
+    workoutRecommendations
+  ]);
 
   useEffect(() => {
     // Only load insights when dependencies are ready

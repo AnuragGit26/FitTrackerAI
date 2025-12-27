@@ -16,6 +16,8 @@ import { Workout } from '@/types/workout';
 import { Exercise } from '@/types/exercise';
 import { WorkoutTemplate, PlannedWorkout } from '@/types/workout';
 import { MuscleStatus } from '@/types/muscle';
+import type { Notification } from '@/types/notification';
+import type { SleepLog, RecoveryLog } from '@/types/sleep';
 // UserProfile type is defined in userStore but not exported, using inline type
 type UserProfile = {
   id: string;
@@ -26,6 +28,7 @@ import { versionManager } from './versionManager';
 import { errorRecovery } from './errorRecovery';
 import { userContextManager } from './userContextManager';
 import { db } from './database';
+import { sleepRecoveryService } from './sleepRecoveryService';
 
 const BATCH_SIZE = 100;
 
@@ -87,6 +90,9 @@ class SupabaseSyncService {
             'muscle_statuses',
             'user_profiles',
             'settings',
+            'notifications',
+            'sleep_logs',
+            'recovery_logs',
         ];
 
         this.currentProgress = {
@@ -502,6 +508,33 @@ class SupabaseSyncService {
                 }));
             }
 
+            case 'notifications': {
+                const notifications = await dbHelpers.getAllNotifications(userId);
+                return since
+                    ? notifications.filter(n => n.createdAt >= since.getTime())
+                    : notifications;
+            }
+
+            case 'sleep_logs': {
+                const logs = await dbHelpers.getAllSleepLogs(userId);
+                return since
+                    ? logs.filter(l => {
+                        const updatedAt = l.updatedAt || l.createdAt;
+                        return updatedAt && updatedAt >= since;
+                    })
+                    : logs;
+            }
+
+            case 'recovery_logs': {
+                const logs = await dbHelpers.getAllRecoveryLogs(userId);
+                return since
+                    ? logs.filter(l => {
+                        const updatedAt = l.updatedAt || l.createdAt;
+                        return updatedAt && updatedAt >= since;
+                    })
+                    : logs;
+            }
+
             default:
                 return [];
         }
@@ -560,6 +593,28 @@ class SupabaseSyncService {
                     : String(recordId);
                 const setting = await dbHelpers.getSetting(key);
                 return setting ? { key, value: setting } : null;
+            }
+            case 'notifications':
+                return (await dbHelpers.getNotification(String(recordId))) ?? null;
+            case 'sleep_logs': {
+                // For sleep_logs, recordId is composite "userId:date"
+                if (typeof recordId === 'string' && recordId.includes(':')) {
+                    const [recordUserId, dateStr] = recordId.split(':');
+                    const date = new Date(dateStr);
+                    return (await sleepRecoveryService.getSleepLog(recordUserId, date)) ?? null;
+                }
+                // Fallback to id lookup if recordId is a number
+                return (await dbHelpers.getSleepLog(Number(recordId))) ?? null;
+            }
+            case 'recovery_logs': {
+                // For recovery_logs, recordId is composite "userId:date"
+                if (typeof recordId === 'string' && recordId.includes(':')) {
+                    const [recordUserId, dateStr] = recordId.split(':');
+                    const date = new Date(dateStr);
+                    return (await dbHelpers.getRecoveryLogByDate(recordUserId, date)) ?? null;
+                }
+                // Fallback to id lookup if recordId is a number
+                return (await dbHelpers.getRecoveryLog(Number(recordId))) ?? null;
             }
             default:
                 return null;
@@ -633,6 +688,17 @@ class SupabaseSyncService {
                 await dbHelpers.setSetting(settingsRecord.key, settingsRecord.value);
                 break;
             }
+            case 'notifications':
+                await dbHelpers.saveNotification(converted as unknown as Notification);
+                break;
+            case 'sleep_logs': {
+                await sleepRecoveryService.saveSleepLog(converted as unknown as SleepLog);
+                break;
+            }
+            case 'recovery_logs': {
+                await sleepRecoveryService.saveRecoveryLog(converted as unknown as RecoveryLog);
+                break;
+            }
         }
     }
 
@@ -677,6 +743,31 @@ class SupabaseSyncService {
                 await dbHelpers.setSetting(settingsRecord.key, settingsRecord.value);
                 break;
             }
+            case 'notifications':
+                await dbHelpers.saveNotification(converted as unknown as Notification);
+                break;
+            case 'sleep_logs': {
+                // For sleep_logs, recordId is composite "userId:date", need to find by date
+                const sleepLog = converted as unknown as SleepLog;
+                const existing = await sleepRecoveryService.getSleepLog(sleepLog.userId, sleepLog.date);
+                if (existing?.id) {
+                    await dbHelpers.updateSleepLog(existing.id, sleepLog);
+                } else {
+                    await sleepRecoveryService.saveSleepLog(sleepLog);
+                }
+                break;
+            }
+            case 'recovery_logs': {
+                // For recovery_logs, recordId is composite "userId:date", need to find by date
+                const recoveryLog = converted as unknown as RecoveryLog;
+                const existing = await sleepRecoveryService.getRecoveryLog(recoveryLog.userId, recoveryLog.date);
+                if (existing?.id) {
+                    await dbHelpers.updateRecoveryLog(existing.id, recoveryLog);
+                } else {
+                    await sleepRecoveryService.saveRecoveryLog(recoveryLog);
+                }
+                break;
+            }
         }
     }
 
@@ -705,11 +796,18 @@ class SupabaseSyncService {
                 const supabaseRecord = this.convertToSupabaseFormat(tableName, localRecord, userId);
                 const recordId = this.getRecordId(supabaseRecord, tableName);
 
-                // Build query - exercises, muscle_statuses, and settings need special handling
-                let query = client.from(tableName).select('id, updated_at, version');
+                // Build query - exercises, muscle_statuses, settings, sleep_logs, recovery_logs, and user_profiles need special handling
+                // For user_profiles: use user_id instead of id in select
+                const selectFields = tableName === 'user_profiles' 
+                    ? 'user_id, updated_at, version'
+                    : 'id, updated_at, version';
+                let query = client.from(tableName).select(selectFields);
 
-                // For muscle_statuses: use (user_id, muscle) unique constraint instead of id
-                if (tableName === 'muscle_statuses') {
+                // For user_profiles: use user_id as primary key (no id column)
+                if (tableName === 'user_profiles') {
+                    query = query.eq('user_id', userId);
+                } else if (tableName === 'muscle_statuses') {
+                    // For muscle_statuses: use (user_id, muscle) unique constraint instead of id
                     query = query
                         .eq('user_id', userId)
                         .eq('muscle', supabaseRecord.muscle as string);
@@ -718,6 +816,26 @@ class SupabaseSyncService {
                     query = query
                         .eq('user_id', userId)
                         .eq('key', supabaseRecord.key as string);
+                } else if (tableName === 'sleep_logs') {
+                    // For sleep_logs: use (user_id, date) unique constraint instead of id
+                    const dateStr = supabaseRecord.date instanceof Date 
+                        ? supabaseRecord.date.toISOString().split('T')[0]
+                        : typeof supabaseRecord.date === 'string'
+                        ? supabaseRecord.date.split('T')[0]
+                        : supabaseRecord.date;
+                    query = query
+                        .eq('user_id', userId)
+                        .eq('date', dateStr);
+                } else if (tableName === 'recovery_logs') {
+                    // For recovery_logs: use (user_id, date) unique constraint instead of id
+                    const dateStr = supabaseRecord.date instanceof Date 
+                        ? supabaseRecord.date.toISOString().split('T')[0]
+                        : typeof supabaseRecord.date === 'string'
+                        ? supabaseRecord.date.split('T')[0]
+                        : supabaseRecord.date;
+                    query = query
+                        .eq('user_id', userId)
+                        .eq('date', dateStr);
                 } else if (tableName === 'exercises') {
                     // For exercises: library exercises don't have user_id, custom exercises do
                     const isCustom = supabaseRecord.is_custom === true;
@@ -760,8 +878,11 @@ class SupabaseSyncService {
                         // Build update query with proper filtering
                         let updateQuery = client.from(tableName).update(resolvedRecord);
 
-                        // For muscle_statuses: use (user_id, muscle) unique constraint
-                        if (tableName === 'muscle_statuses') {
+                        // For user_profiles: use user_id as primary key (no id column)
+                        if (tableName === 'user_profiles') {
+                            updateQuery = updateQuery.eq('user_id', userId);
+                        } else if (tableName === 'muscle_statuses') {
+                            // For muscle_statuses: use (user_id, muscle) unique constraint
                             updateQuery = updateQuery
                                 .eq('user_id', userId)
                                 .eq('muscle', resolvedRecord.muscle as string);
@@ -770,6 +891,26 @@ class SupabaseSyncService {
                             updateQuery = updateQuery
                                 .eq('user_id', userId)
                                 .eq('key', resolvedRecord.key as string);
+                        } else if (tableName === 'sleep_logs') {
+                            // For sleep_logs: use (user_id, date) unique constraint
+                            const dateStr = resolvedRecord.date instanceof Date 
+                                ? resolvedRecord.date.toISOString().split('T')[0]
+                                : typeof resolvedRecord.date === 'string'
+                                ? resolvedRecord.date.split('T')[0]
+                                : resolvedRecord.date;
+                            updateQuery = updateQuery
+                                .eq('user_id', userId)
+                                .eq('date', dateStr);
+                        } else if (tableName === 'recovery_logs') {
+                            // For recovery_logs: use (user_id, date) unique constraint
+                            const dateStr = resolvedRecord.date instanceof Date 
+                                ? resolvedRecord.date.toISOString().split('T')[0]
+                                : typeof resolvedRecord.date === 'string'
+                                ? resolvedRecord.date.split('T')[0]
+                                : resolvedRecord.date;
+                            updateQuery = updateQuery
+                                .eq('user_id', userId)
+                                .eq('date', dateStr);
                         } else if (tableName === 'exercises' && !supabaseRecord.is_custom) {
                             // For exercises: library exercises don't have user_id filter
                             updateQuery = updateQuery.is('user_id', null).eq('id', recordId);
@@ -788,8 +929,11 @@ class SupabaseSyncService {
                         // Local is newer, update remote
                         let updateQuery = client.from(tableName).update(supabaseRecord);
 
-                        // For muscle_statuses: use (user_id, muscle) unique constraint
-                        if (tableName === 'muscle_statuses') {
+                        // For user_profiles: use user_id as primary key (no id column)
+                        if (tableName === 'user_profiles') {
+                            updateQuery = updateQuery.eq('user_id', userId);
+                        } else if (tableName === 'muscle_statuses') {
+                            // For muscle_statuses: use (user_id, muscle) unique constraint
                             updateQuery = updateQuery
                                 .eq('user_id', userId)
                                 .eq('muscle', supabaseRecord.muscle as string);
@@ -798,6 +942,26 @@ class SupabaseSyncService {
                             updateQuery = updateQuery
                                 .eq('user_id', userId)
                                 .eq('key', supabaseRecord.key as string);
+                        } else if (tableName === 'sleep_logs') {
+                            // For sleep_logs: use (user_id, date) unique constraint
+                            const dateStr = supabaseRecord.date instanceof Date 
+                                ? supabaseRecord.date.toISOString().split('T')[0]
+                                : typeof supabaseRecord.date === 'string'
+                                ? supabaseRecord.date.split('T')[0]
+                                : supabaseRecord.date;
+                            updateQuery = updateQuery
+                                .eq('user_id', userId)
+                                .eq('date', dateStr);
+                        } else if (tableName === 'recovery_logs') {
+                            // For recovery_logs: use (user_id, date) unique constraint
+                            const dateStr = supabaseRecord.date instanceof Date 
+                                ? supabaseRecord.date.toISOString().split('T')[0]
+                                : typeof supabaseRecord.date === 'string'
+                                ? supabaseRecord.date.split('T')[0]
+                                : supabaseRecord.date;
+                            updateQuery = updateQuery
+                                .eq('user_id', userId)
+                                .eq('date', dateStr);
                         } else if (tableName === 'exercises' && !supabaseRecord.is_custom) {
                             // For exercises: library exercises don't have user_id filter
                             updateQuery = updateQuery.is('user_id', null).eq('id', recordId);
@@ -975,6 +1139,44 @@ class SupabaseSyncService {
                     value: typeof record.value === 'string' ? record.value : JSON.stringify(record.value),
                 };
 
+            case 'notifications':
+                return {
+                    ...base,
+                    id: record.id,
+                    type: record.type,
+                    title: record.title,
+                    message: record.message,
+                    data: typeof record.data === 'string' ? record.data : JSON.stringify(record.data || {}),
+                    is_read: record.isRead,
+                    read_at: record.readAt ? new Date(record.readAt as number).toISOString() : null,
+                    created_at: new Date(record.createdAt as number).toISOString(),
+                };
+
+            case 'sleep_logs':
+                return {
+                    ...base,
+                    id: record.id,
+                    date: record.date instanceof Date ? record.date.toISOString().split('T')[0] : record.date,
+                    bedtime: record.bedtime instanceof Date ? (record.bedtime as Date).toISOString() : record.bedtime,
+                    wake_time: record.wakeTime instanceof Date ? (record.wakeTime as Date).toISOString() : record.wakeTime,
+                    duration: record.duration,
+                    quality: record.quality,
+                    notes: record.notes,
+                };
+
+            case 'recovery_logs':
+                return {
+                    ...base,
+                    id: record.id,
+                    date: record.date instanceof Date ? record.date.toISOString().split('T')[0] : record.date,
+                    overall_recovery: record.overallRecovery,
+                    stress_level: record.stressLevel,
+                    energy_level: record.energyLevel,
+                    soreness: record.soreness,
+                    readiness_to_train: record.readinessToTrain,
+                    notes: record.notes,
+                };
+
             default:
                 return base;
         }
@@ -1113,12 +1315,65 @@ class SupabaseSyncService {
                     userId: record.user_id as string,
                 };
 
+            case 'notifications':
+                return {
+                    id: record.id,
+                    userId: record.user_id,
+                    type: record.type,
+                    title: record.title,
+                    message: record.message,
+                    data: typeof record.data === 'string' ? JSON.parse(record.data) : (record.data || {}),
+                    isRead: record.is_read,
+                    readAt: record.read_at ? new Date(record.read_at as string | number | Date).getTime() : null,
+                    createdAt: new Date(record.created_at as string | number | Date).getTime(),
+                    version: record.version as number | undefined,
+                    deletedAt: record.deleted_at ? new Date(record.deleted_at as string | number | Date).getTime() : null,
+                };
+
+            case 'sleep_logs':
+                return {
+                    id: record.id,
+                    userId: record.user_id,
+                    date: new Date(record.date as string | number | Date),
+                    bedtime: new Date(record.bedtime as string | number | Date),
+                    wakeTime: new Date(record.wake_time as string | number | Date),
+                    duration: Number(record.duration),
+                    quality: Number(record.quality),
+                    notes: record.notes,
+                    version: record.version as number | undefined,
+                    createdAt: new Date(record.created_at as string | number | Date),
+                    updatedAt: new Date(record.updated_at as string | number | Date),
+                    deletedAt: record.deleted_at ? new Date(record.deleted_at as string | number | Date) : null,
+                };
+
+            case 'recovery_logs':
+                return {
+                    id: record.id,
+                    userId: record.user_id,
+                    date: new Date(record.date as string | number | Date),
+                    overallRecovery: Number(record.overall_recovery),
+                    stressLevel: Number(record.stress_level),
+                    energyLevel: Number(record.energy_level),
+                    soreness: Number(record.soreness),
+                    readinessToTrain: record.readiness_to_train,
+                    notes: record.notes,
+                    version: record.version as number | undefined,
+                    createdAt: new Date(record.created_at as string | number | Date),
+                    updatedAt: new Date(record.updated_at as string | number | Date),
+                    deletedAt: record.deleted_at ? new Date(record.deleted_at as string | number | Date) : null,
+                };
+
             default:
                 return record;
         }
     }
 
     private getRecordId(record: Record<string, unknown>, tableName?: SyncableTable): string | number {
+        // For user_profiles, use user_id as primary key (no id column)
+        if (tableName === 'user_profiles') {
+            return (record.user_id as string | number) || (record.userId as string | number) || (record.id as string | number) || '';
+        }
+        
         // For muscle_statuses, use composite key (user_id, muscle) since it has UNIQUE constraint
         if (tableName === 'muscle_statuses') {
             const userId = record.user_id || record.userId;
@@ -1134,6 +1389,34 @@ class SupabaseSyncService {
             const key = record.key;
             if (userId && key) {
                 return `${userId}:${key}`;
+            }
+        }
+        
+        // For sleep_logs, use composite key (user_id, date) since it has UNIQUE constraint
+        if (tableName === 'sleep_logs') {
+            const userId = record.user_id || record.userId;
+            const date = record.date;
+            if (userId && date) {
+                const dateStr = date instanceof Date 
+                    ? date.toISOString().split('T')[0]
+                    : typeof date === 'string'
+                    ? date.split('T')[0]
+                    : String(date);
+                return `${userId}:${dateStr}`;
+            }
+        }
+        
+        // For recovery_logs, use composite key (user_id, date) since it has UNIQUE constraint
+        if (tableName === 'recovery_logs') {
+            const userId = record.user_id || record.userId;
+            const date = record.date;
+            if (userId && date) {
+                const dateStr = date instanceof Date 
+                    ? date.toISOString().split('T')[0]
+                    : typeof date === 'string'
+                    ? date.split('T')[0]
+                    : String(date);
+                return `${userId}:${dateStr}`;
             }
         }
         

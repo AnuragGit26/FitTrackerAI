@@ -1,7 +1,10 @@
 import { MuscleStatus } from '@/types/muscle';
 import { subDays, differenceInHours } from 'date-fns';
 import { DEFAULT_RECOVERY_SETTINGS } from '@/types/muscle';
-import { Workout } from '@/types/workout';
+import { SleepLog } from '@/types/sleep';
+import { calculateAdjustedRecoveryHours } from '@/services/recoveryCalculator';
+import { SleepLog } from '@/types/sleep';
+import { calculateAdjustedRecoveryHours } from '@/services/recoveryCalculator';
 
 export type ReadinessStatus = 'ready' | 'recovering' | 'needs_rest';
 
@@ -219,7 +222,8 @@ export function generateRecoveryInsights(muscleStatuses: MuscleStatus[]): Recove
 export function calculateRecoveryTrendData(
   muscleStatuses: MuscleStatus[],
   userLevel: 'beginner' | 'intermediate' | 'advanced',
-  baseRestInterval: number
+  baseRestInterval: number,
+  sleepLogs?: SleepLog[]
 ): Array<{ date: string; recovery: number; day: string }> {
   const daysToShow = 7;
   const dataPoints: Array<{ date: string; recovery: number; day: string }> = [];
@@ -244,6 +248,16 @@ export function calculateRecoveryTrendData(
     let totalRecovery = 0;
     let count = 0;
 
+    // Find relevant sleep log for this date if available
+    let sleepLog: SleepLog | undefined;
+    if (sleepLogs && sleepLogs.length > 0) {
+      const targetDateStr = targetDate.toISOString().split('T')[0];
+      sleepLog = sleepLogs.find(log => {
+        const logDate = new Date(log.date).toISOString().split('T')[0];
+        return logDate === targetDateStr;
+      });
+    }
+
     muscleStatuses.forEach((status) => {
       if (!status.lastWorked) {
         totalRecovery += 100;
@@ -263,25 +277,13 @@ export function calculateRecoveryTrendData(
         return;
       }
 
-      const recoverySettings = DEFAULT_RECOVERY_SETTINGS;
-      let baseRecoveryHours = 48;
-      
-      if (userLevel === 'beginner') {
-        baseRecoveryHours = (recoverySettings.beginnerRestDays[status.muscle] || 2) * 24;
-      } else if (userLevel === 'intermediate') {
-        baseRecoveryHours = (recoverySettings.intermediateRestDays[status.muscle] || 2) * 24;
-      } else {
-        baseRecoveryHours = (recoverySettings.advancedRestDays[status.muscle] || 1) * 24;
-      }
-
-      if (baseRestInterval !== undefined) {
-        const defaultBase = 48;
-        const ratio = baseRestInterval / defaultBase;
-        baseRecoveryHours = baseRecoveryHours * ratio;
-      }
-
-      const workloadMultiplier = 1 + (status.workloadScore / 100);
-      const adjustedRecoveryHours = baseRecoveryHours * workloadMultiplier;
+      const adjustedRecoveryHours = calculateAdjustedRecoveryHours(
+        status.muscle,
+        status.workloadScore,
+        userLevel,
+        baseRestInterval,
+        sleepLog
+      );
       
       const recoveryOnDate = Math.min(
         100,

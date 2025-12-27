@@ -19,7 +19,7 @@ import { logger } from '@/utils/logger';
 
 export function Profile() {
   const navigate = useNavigate();
-  const { profile, updateProfile, isLoading, setPreferredUnit, setDefaultRestTime } = useUserStore();
+  const { profile, updateProfile, isLoading, setPreferredUnit, setDefaultRestTime, setProfilePicture: updateProfilePictureInStore } = useUserStore();
   const { 
     settings, 
     setTheme, 
@@ -415,8 +415,14 @@ export function Profile() {
       <main className="flex-1 w-full max-w-lg mx-auto flex flex-col gap-8 px-4 py-6 pb-32">
         {/* Profile Picture Upload */}
         <ProfilePictureUpload
-          picture={profilePicture}
-          onPictureChange={setProfilePicture}
+          picture={profilePicture || profile?.profilePicture}
+          onPictureChange={async (newPicture) => {
+            setProfilePicture(newPicture);
+            // Update store immediately so it shows on home page right away
+            if (profile?.id) {
+              await updateProfilePictureInStore(newPicture);
+            }
+          }}
         />
 
         {/* Personal Details */}

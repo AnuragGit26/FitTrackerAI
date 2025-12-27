@@ -20,7 +20,7 @@ interface UserProfile {
   gender?: Gender;
   weight?: number; // stored in kg
   height?: number; // stored in cm
-  profilePicture?: string; // base64 data URL
+  profilePicture?: string; // Supabase Storage URL or base64 data URL (for backward compatibility)
   version?: number; // For optimistic locking
   deletedAt?: Date | null; // Soft delete timestamp
 }

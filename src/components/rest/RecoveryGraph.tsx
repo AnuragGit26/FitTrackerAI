@@ -1,105 +1,45 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { useMuscleRecovery } from '@/hooks/useMuscleRecovery';
-import { useWorkoutStore } from '@/store/workoutStore';
 import { useUserStore } from '@/store/userStore';
 import { useSettingsStore } from '@/store/settingsStore';
-import { DEFAULT_RECOVERY_SETTINGS } from '@/types/muscle';
-import { subDays, differenceInHours, format } from 'date-fns';
+import { calculateRecoveryTrendData } from '@/utils/recoveryHelpers';
+import { sleepRecoveryService } from '@/services/sleepRecoveryService';
+import { SleepLog } from '@/types/sleep';
 
 export function RecoveryGraph() {
   const { muscleStatuses } = useMuscleRecovery();
-  const { workouts } = useWorkoutStore();
   const { profile } = useUserStore();
   const { settings } = useSettingsStore();
+  const [sleepLogs, setSleepLogs] = useState<SleepLog[]>([]);
 
-  // Calculate historical recovery data for the last 14 days
-  const chartData = useMemo(() => {
-    const daysToShow = 14;
-    const dataPoints: { date: string; recovery: number; day: string }[] = [];
-    const now = new Date();
-
-    // Generate default data if no profile or muscle statuses
-    if (!profile || muscleStatuses.length === 0) {
-      for (let i = daysToShow; i >= 0; i--) {
-        const targetDate = subDays(now, i);
-        const dayLabel = format(targetDate, 'MMM d');
-        const recovery = Math.max(60, 100 - (i * 2.5)); // Default decreasing recovery
-        dataPoints.push({
-          date: format(targetDate, 'MM/dd'),
-          recovery: Math.round(recovery),
-          day: dayLabel,
-        });
+  useEffect(() => {
+    async function fetchSleepLogs() {
+      if (profile?.id) {
+        try {
+          const logs = await sleepRecoveryService.getAllSleepLogs(profile.id);
+          setSleepLogs(logs);
+        } catch (error) {
+          console.error('Failed to fetch sleep logs for graph:', error);
+        }
       }
-      return dataPoints;
     }
+    fetchSleepLogs();
+  }, [profile?.id]);
 
-    // Calculate average recovery for each day going backwards
-    for (let i = daysToShow; i >= 0; i--) {
-      const targetDate = subDays(now, i);
-      const dayLabel = format(targetDate, 'MMM d');
+  // Calculate historical recovery data for the last 7 days using shared helper
+  const chartData = useMemo(() => {
+    if (!profile) return [];
 
-      // Calculate what recovery would have been on that date
-      let totalRecovery = 0;
-      let count = 0;
+    const baseRestInterval = settings.baseRestInterval || 48;
 
-      muscleStatuses.forEach((status) => {
-        if (!status.lastWorked) {
-          totalRecovery += 100;
-          count++;
-          return;
-        }
-
-        const lastWorked = status.lastWorked instanceof Date 
-          ? status.lastWorked 
-          : new Date(status.lastWorked);
-
-        // Calculate recovery percentage on target date
-        const hoursSinceWorkout = differenceInHours(targetDate, lastWorked);
-        
-        if (hoursSinceWorkout < 0) {
-          totalRecovery += status.recoveryPercentage;
-          count++;
-          return;
-        }
-
-        // Calculate recovery for historical date
-        const recoverySettings = DEFAULT_RECOVERY_SETTINGS;
-        let baseRecoveryHours = 48;
-        if (profile.experienceLevel === 'beginner') {
-          baseRecoveryHours = (recoverySettings.beginnerRestDays[status.muscle] || 2) * 24;
-        } else if (profile.experienceLevel === 'intermediate') {
-          baseRecoveryHours = (recoverySettings.intermediateRestDays[status.muscle] || 2) * 24;
-        } else {
-          baseRecoveryHours = (recoverySettings.advancedRestDays[status.muscle] || 1) * 24;
-        }
-
-        if (settings.baseRestInterval) {
-          const ratio = settings.baseRestInterval / 48;
-          baseRecoveryHours = baseRecoveryHours * ratio;
-        }
-
-        const workloadMultiplier = 1 + (status.workloadScore / 100);
-        const adjustedRecoveryHours = baseRecoveryHours * workloadMultiplier;
-        const recoveryOnDate = Math.min(
-          100,
-          Math.max(0, (hoursSinceWorkout / adjustedRecoveryHours) * 100)
-        );
-
-        totalRecovery += recoveryOnDate;
-        count++;
-      });
-
-      const avgRecovery = count > 0 ? totalRecovery / count : 85;
-      dataPoints.push({
-        date: format(targetDate, 'MM/dd'),
-        recovery: Math.round(avgRecovery),
-        day: dayLabel,
-      });
-    }
-
-    return dataPoints;
-  }, [muscleStatuses, workouts, profile, settings.baseRestInterval]);
+    return calculateRecoveryTrendData(
+      muscleStatuses,
+      profile.experienceLevel,
+      baseRestInterval,
+      sleepLogs
+    );
+  }, [muscleStatuses, profile, settings.baseRestInterval, sleepLogs]);
 
   return (
     <div className="w-full h-full relative">
