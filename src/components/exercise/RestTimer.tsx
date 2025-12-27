@@ -95,8 +95,8 @@ export function RestTimer({
             if (notificationPermissionRef.current === 'granted') {
               new Notification('Rest Timer Complete', {
                 body: 'Time to start your next set!',
-                icon: '/assests/img/fittrackAI.png',
-                badge: '/assests/img/fittrackAI.png',
+                icon: '/assests/img/Fittrack2.png',
+                badge: '/assests/img/Fittrack2.png',
                 tag: 'rest-timer',
               });
             }

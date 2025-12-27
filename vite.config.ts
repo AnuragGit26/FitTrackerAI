@@ -53,7 +53,7 @@ export default defineConfig(({ mode }) => {
         type: 'module',
         navigateFallback: 'index.html',
       },
-      includeAssets: ['assests/img/fittrackAI.png'],
+      includeAssets: ['assests/img/Fittrack2.png'],
       manifest: {
         name: 'FitTrackAI - Gym Exercise Tracker',
         short_name: 'FitTrackAI',
@@ -66,13 +66,13 @@ export default defineConfig(({ mode }) => {
         start_url: '/',
         icons: [
           {
-            src: 'assests/img/fittrackAI.png',
+            src: 'assests/img/Fittrack2.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any maskable'
           },
           {
-            src: 'assests/img/fittrackAI.png',
+            src: 'assests/img/Fittrack2.png',
             sizes: '512x512',
             type: 'image/png'
           }
