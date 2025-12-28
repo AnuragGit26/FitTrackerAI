@@ -651,13 +651,7 @@ export const dbHelpers = {
   },
 
   async getAllNotifications(userId: string, filters?: { isRead?: boolean; limit?: number }): Promise<Notification[]> {
-    // #region agent log
-    fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'database.ts:653',message:'getAllNotifications called',data:{userId,userIdType:typeof userId,isValid:!!userId && userId.length > 0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     if (!userId || typeof userId !== 'string' || userId.length === 0) {
-      // #region agent log
-      fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'database.ts:657',message:'Invalid userId in getAllNotifications, returning empty array',data:{userId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       return [];
     }
     let query = db.notifications.where('userId').equals(userId);
@@ -678,30 +672,15 @@ export const dbHelpers = {
   },
 
   async getUnreadNotificationsCount(userId: string): Promise<number> {
-    // #region agent log
-    fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'database.ts:680',message:'getUnreadNotificationsCount called',data:{userId,userIdType:typeof userId,isValid:!!userId && userId.length > 0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     if (!userId || typeof userId !== 'string' || userId.length === 0) {
-      // #region agent log
-      fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'database.ts:684',message:'Invalid userId, returning 0',data:{userId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       return 0;
     }
-    try {
-      const count = await db.notifications
-        .where('[userId+isRead]')
-        .equals([userId, false])
-        .count();
-      // #region agent log
-      fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'database.ts:694',message:'getUnreadNotificationsCount completed',data:{userId,count},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
-      return count;
-    } catch (error) {
-      // #region agent log
-      fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'database.ts:700',message:'getUnreadNotificationsCount error',data:{userId,error:error instanceof Error?error.message:'unknown'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
-      throw error;
-    }
+    const count = await db.notifications
+      .where('userId')
+      .equals(userId)
+      .filter(n => n.isRead === false)
+      .count();
+    return count;
   },
 
   async markNotificationAsRead(id: string): Promise<void> {
@@ -713,8 +692,9 @@ export const dbHelpers = {
 
   async markAllNotificationsAsRead(userId: string): Promise<number> {
     const unreadNotifications = await db.notifications
-      .where('[userId+isRead]')
-      .equals([userId, false])
+      .where('userId')
+      .equals(userId)
+      .filter(n => n.isRead === false)
       .toArray();
 
     const now = Date.now();

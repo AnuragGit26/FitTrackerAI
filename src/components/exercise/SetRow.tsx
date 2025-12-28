@@ -27,6 +27,7 @@ export function SetRow({ set, onUpdate, unit, trackingType, distanceUnit = 'km',
     return '0:00';
   });
   const [calories, setCalories] = useState(() => (set.calories ?? '').toString());
+  const [steps, setSteps] = useState(() => (set.steps ?? '').toString());
   const [duration, setDuration] = useState(() => {
     if (set.duration) {
       const minutes = Math.floor(set.duration / 60);
@@ -48,6 +49,7 @@ export function SetRow({ set, onUpdate, unit, trackingType, distanceUnit = 'km',
       setTime(`${minutes}:${seconds.toString().padStart(2, '0')}`);
     }
     setCalories((set.calories ?? '').toString());
+    setSteps((set.steps ?? '').toString());
     if (set.duration) {
       const minutes = Math.floor(set.duration / 60);
       const seconds = set.duration % 60;
@@ -55,7 +57,7 @@ export function SetRow({ set, onUpdate, unit, trackingType, distanceUnit = 'km',
     }
     setIsCompleted(set.completed);
     setRpe((set.rpe ?? '').toString());
-  }, [set.setNumber, set.weight, set.reps, set.distance, set.time, set.calories, set.duration, set.completed, set.rpe]);
+  }, [set.setNumber, set.weight, set.reps, set.distance, set.time, set.calories, set.steps, set.duration, set.completed, set.rpe]);
 
   const handleWeightChange = (value: string) => {
     setWeight(value);
@@ -110,6 +112,12 @@ export function SetRow({ set, onUpdate, unit, trackingType, distanceUnit = 'km',
     onUpdate({ calories: numValue });
   };
 
+  const handleStepsChange = (value: string) => {
+    setSteps(value);
+    const numValue = value ? parseInt(value) : undefined;
+    onUpdate({ steps: numValue });
+  };
+
   const handleDurationChange = (value: string) => {
     setDuration(value);
     // Parse MM:SS format
@@ -159,7 +167,7 @@ export function SetRow({ set, onUpdate, unit, trackingType, distanceUnit = 'km',
       case 'reps_only':
         return 'grid-cols-[30px_1fr_60px_44px]'; // Added RPE column
       case 'cardio':
-        return 'grid-cols-[30px_1fr_1fr_1fr_44px]';
+        return 'grid-cols-[30px_1fr_1fr_1fr_1fr_44px]'; // Added steps column
       case 'duration':
         return 'grid-cols-[30px_1fr_44px]';
       default:
@@ -352,6 +360,18 @@ export function SetRow({ set, onUpdate, unit, trackingType, distanceUnit = 'km',
               onChange={(e) => handleCaloriesChange(e.target.value)}
               disabled={isDisabled}
               placeholder="Cal"
+              className={inputClassName(isCompleted)}
+            />
+          </div>
+          {/* Steps input (optional) */}
+          <div className="relative">
+            <input
+              type="number"
+              inputMode="numeric"
+              value={steps}
+              onChange={(e) => handleStepsChange(e.target.value)}
+              disabled={isDisabled}
+              placeholder="Steps"
               className={inputClassName(isCompleted)}
             />
           </div>

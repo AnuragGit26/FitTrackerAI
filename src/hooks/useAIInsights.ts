@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useRef } from 'react';
 import { aiService } from '@/services/aiService';
 import { aiChangeDetector } from '@/services/aiChangeDetector';
 import { aiRefreshService } from '@/services/aiRefreshService';
+import { workoutAnalysisService } from '@/services/workoutAnalysisService';
 import { useWorkoutStore } from '@/store/workoutStore';
 import { useUserStore } from '@/store/userStore';
 import { useMuscleRecovery } from './useMuscleRecovery';
@@ -40,13 +41,45 @@ export function useAIInsights() {
     
     const recentWorkouts = workouts.slice(0, 10);
     
-    // Get fingerprint for caching
+    // Analyze workout patterns
+    const patternAnalysis = workoutAnalysisService.analyzeWorkoutPatterns(workouts);
+    
+    // Calculate readiness score from muscle statuses
+    const readinessScore = muscleStatuses.length > 0
+      ? Math.round(muscleStatuses.reduce((sum, m) => sum + m.recoveryPercentage, 0) / muscleStatuses.length)
+      : 85;
+    
+    // Get overworked muscles
+    const overworkedMuscles = muscleStatuses
+      .filter(m => m.recoveryStatus === 'overworked')
+      .map(m => m.muscle);
+    
+    // Get muscle recovery percentages
+    const muscleRecoveryPercentages = muscleStatuses.map(m => m.recoveryPercentage);
+    
+    // Calculate recommendation context
+    const recommendationContext = workoutAnalysisService.calculateWorkoutRecommendation({
+      hasWorkoutToday: patternAnalysis.hasWorkoutToday,
+      todayWorkout: patternAnalysis.todayWorkout,
+      patternAnalysis,
+      readinessScore,
+      muscleRecoveryPercentages,
+      overworkedMuscles,
+      userWorkoutFrequencyGoal: profile.workoutFrequency || 3,
+      userExperienceLevel: profile.experienceLevel,
+    });
+    
+    // Get fingerprint for caching (include pattern analysis in fingerprint)
+    const patternFingerprint = patternAnalysis.hasWorkoutToday 
+      ? `has-workout-today-${patternAnalysis.todayWorkout?.id || ''}`
+      : `no-workout-today-${readinessScore}`;
+    
     const fingerprint = aiChangeDetector.getFingerprint(
       recentWorkouts,
       muscleStatuses,
       0,
       []
-    );
+    ) + `-${patternFingerprint}`;
 
     isGeneratingRef.current = true;
     setIsLoading(true);
@@ -62,6 +95,9 @@ export function useAIInsights() {
           userLevel: profile.experienceLevel,
           weakPoints: [],
           progressTrends: {},
+          readinessScore,
+          patternAnalysis,
+          recommendationContext,
         }),
         profile.id,
         0

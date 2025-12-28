@@ -80,7 +80,6 @@ self.addEventListener('sync', (event: SyncEvent) => {
 async function handleAISync(): Promise<void> {
     // This would handle queued AI requests when back online
     // Implementation depends on your specific needs
-    console.log('[SW] Processing queued AI requests');
 }
 
 // Periodic background sync for AI refresh checks (every hour)
@@ -97,7 +96,6 @@ self.addEventListener('periodicsync', (event: PeriodicSyncEvent) => {
 async function checkAIRefresh(): Promise<void> {
     // Check if 24 hours have passed and trigger refresh if needed
     // This runs in the background even when app is closed
-    console.log('[SW] Checking if AI refresh is needed');
 
     // Send message to clients to check refresh status
     const clients = await self.clients.matchAll();
@@ -110,8 +108,6 @@ async function checkAIRefresh(): Promise<void> {
 }
 
 async function checkScheduledWorkoutReminders(): Promise<void> {
-    console.log('[SW] Checking scheduled workout reminders');
-
     // Send message to clients to check and trigger reminders
     const clients = await self.clients.matchAll();
     clients.forEach((client) => {
@@ -123,8 +119,6 @@ async function checkScheduledWorkoutReminders(): Promise<void> {
 }
 
 async function checkMuscleRecovery(): Promise<void> {
-    console.log('[SW] Checking muscle recovery status');
-
     // Send message to clients to check muscle recovery
     const clients = await self.clients.matchAll();
     clients.forEach((client) => {
@@ -352,22 +346,15 @@ async function getCachedAIResponse(
 
 async function clearAllServiceWorkerCaches(): Promise<void> {
     try {
-        // eslint-disable-next-line no-console
-        console.log('[SW] Clearing all caches...');
-        
         // Get all cache names
         const cacheNames = await caches.keys();
         
         // Delete all caches
         const deletePromises = cacheNames.map(cacheName => {
-            // eslint-disable-next-line no-console
-            console.log(`[SW] Deleting cache: ${cacheName}`);
             return caches.delete(cacheName);
         });
         
         await Promise.all(deletePromises);
-        // eslint-disable-next-line no-console
-        console.log('[SW] All caches cleared successfully');
     } catch (error) {
         // eslint-disable-next-line no-console
         console.error('[SW] Failed to clear caches:', error);
@@ -399,7 +386,6 @@ async function fetchAIInsightsInBackground(
     userId?: string,
     apiKey?: string
 ): Promise<void> {
-    console.log('[SW] Starting background AI fetch for:', insightTypes);
 
     const results: AIInsightsResults = {};
     const errors: AIInsightsErrors = {};
@@ -415,10 +401,10 @@ async function fetchAIInsightsInBackground(
                     context.personalRecords,
                     context.strengthProgression,
                     context.volumeTrend,
-                    context.metrics.consistencyScore,
-                    context.previousMetrics.consistencyScore,
-                    context.metrics.workoutCount,
-                    context.previousMetrics.workoutCount,
+                    context.metrics?.consistencyScore ?? 0,
+                    context.previousMetrics?.consistencyScore ?? 0,
+                    context.metrics?.workoutCount ?? 0,
+                    context.previousMetrics?.workoutCount ?? 0,
                     apiKey
                 );
             } else if (insightType === 'insights') {
@@ -433,8 +419,8 @@ async function fetchAIInsightsInBackground(
                     context.currentMonthWorkouts,
                     context.muscleStatuses,
                     context.readinessScore,
-                    context.metrics.symmetryScore || 85,
-                    context.metrics.focusDistribution || { legs: 33, push: 33, pull: 34 },
+                    context.metrics?.symmetryScore ?? 85,
+                    context.metrics?.focusDistribution ?? { legs: 33, push: 33, pull: 34 },
                     apiKey,
                     context.userLevel || 'intermediate',
                     context.baseRestInterval || 48

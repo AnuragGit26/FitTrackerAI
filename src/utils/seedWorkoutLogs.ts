@@ -506,18 +506,12 @@ export async function seedWorkoutLogs(userId: string = 'user-1'): Promise<void> 
   });
 
   // Save all workouts
-  logger.info(`Seeding ${workouts.length} workout logs...`);
-
   for (const workout of workouts) {
     try {
-      const id = await dataService.createWorkout(workout);
-      logger.debug(`✓ Created workout ${id} - ${workout.workoutType} on ${workout.date.toLocaleDateString()}`);
+      await dataService.createWorkout(workout);
     } catch (error) {
       logger.error(`✗ Failed to create workout:`, error);
     }
   }
-
-  logger.info(`\n✅ Successfully seeded ${workouts.length} workout logs!`);
-  logger.info(`Workouts span from ${workouts[workouts.length - 1].date.toLocaleDateString()} to ${workouts[0].date.toLocaleDateString()}`);
 }
 

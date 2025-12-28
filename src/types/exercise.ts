@@ -49,6 +49,7 @@ export interface WorkoutSet {
   distanceUnit?: DistanceUnit;
   time?: number; // in seconds
   calories?: number;
+  steps?: number; // optional steps count for cardio activities
   // For duration tracking
   duration?: number; // in seconds
   // Common fields
@@ -60,6 +61,16 @@ export interface WorkoutSet {
   setDuration?: number; // Duration of the set in seconds
   setStartTime?: Date; // When the set started
   setEndTime?: Date; // When the set completed
+  // For cardio/HIIT tracking
+  heartRate?: number; // Heart rate in BPM
+  pace?: number; // Calculated pace (seconds per km/mile)
+  // For HIIT tracking
+  workDuration?: number; // Work duration in seconds (for HIIT)
+  rounds?: number; // Number of rounds (for HIIT)
+  intensityLevel?: 'low' | 'moderate' | 'high' | 'max'; // Intensity level (for HIIT)
+  // For yoga/flexibility tracking
+  focusAreas?: string[]; // Focus areas (e.g., Flexibility, Strength, Balance, Meditation)
+  breathWorkType?: string; // Type of breath work (e.g., Breath holds, Pranayama)
 }
 
 export type ExerciseGroupType = 'single' | 'superset' | 'circuit';

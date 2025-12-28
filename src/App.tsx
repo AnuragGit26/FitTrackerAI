@@ -29,7 +29,7 @@ import { logger } from '@/utils/logger';
 
 // Lazy load route components for code splitting
 const Home = lazy(() => import('@/pages/Home').then(m => ({ default: m.Home })));
-const LogWorkout = lazy(() => import('@/pages/LogWorkout').then(m => ({ default: m.LogWorkout })));
+const LogWorkout = lazy(() => import('@/pages/LogWorkout'));
 const CreateCustomExercise = lazy(() => import('@/pages/CreateCustomExercise').then(m => ({ default: m.CreateCustomExercise })));
 const WorkoutTemplates = lazy(() => import('@/pages/WorkoutTemplates').then(m => ({ default: m.WorkoutTemplates })));
 const CreateTemplate = lazy(() => import('@/pages/CreateTemplate').then(m => ({ default: m.CreateTemplate })));
@@ -66,6 +66,35 @@ function App() {
   const initializeUser = useUserStore((state) => state.initializeUser);
   const loadSettings = useSettingsStore((state) => state.loadSettings);
   const settings = useSettingsStore((state) => state.settings);
+
+  // Global error handlers for Auth0 debugging
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      const errorMsg = event.message || String(event.error);
+      if (errorMsg.includes('auth0') || errorMsg.includes('400') || errorMsg.includes('Bad Request')) {
+        // #region agent log
+        fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:73',message:'Global error handler - Auth0 related',data:{errorMessage:errorMsg,errorStack:event.error?.stack?.substring(0,300),filename:event.filename,lineno:event.lineno},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+      }
+    };
+
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const errorMsg = event.reason?.message || String(event.reason);
+      if (errorMsg.includes('auth0') || errorMsg.includes('400') || errorMsg.includes('Bad Request')) {
+        // #region agent log
+        fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:81',message:'Unhandled promise rejection - Auth0 related',data:{errorMessage:errorMsg,errorString:String(event.reason),errorStack:event.reason?.stack?.substring(0,300)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+      }
+    };
+
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
+  }, []);
 
   useEffect(() => {
     async function init() {
@@ -108,14 +137,23 @@ function App() {
         // Register service worker (enabled in both dev and prod for end-to-end testing)
         if ('serviceWorker' in navigator) {
           // Determine the service worker path based on environment
-          // In dev mode with injectManifest, VitePWA serves it at /sw.js
-          // In prod, it's also at /sw.js after build
-          const swPath = '/sw.js';
+          // In dev mode with injectManifest, VitePWA serves it at /dev-sw.js?dev-sw
+          // In prod, it's at /sw.js after build
+          const isDev = import.meta.env.DEV;
+          const swPath = isDev ? '/dev-sw.js?dev-sw' : '/sw.js';
+          const swOptions = isDev 
+            ? { scope: '/' as const, type: 'module' as const }
+            : { scope: '/' as const };
           
-          navigator.serviceWorker
-            .register(swPath, { scope: '/' })
+          // Check if service worker file exists before registering
+          fetch(swPath, { method: 'HEAD' })
+            .then((response) => {
+              if (!response.ok) {
+                throw new Error(`Service worker file not found: ${swPath}`);
+              }
+              return navigator.serviceWorker.register(swPath, swOptions);
+            })
             .then(async (registration) => {
-              logger.sw(`Service Worker registered (${import.meta.env.DEV ? 'DEV' : 'PROD'}):`, registration);
               
               // Check for updates periodically
               setInterval(() => {
@@ -129,7 +167,6 @@ function App() {
                   newWorker.addEventListener('statechange', () => {
                     if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                       // New service worker available, prompt user to refresh
-                      logger.sw('New service worker available');
                     }
                   });
                 }
@@ -159,23 +196,21 @@ function App() {
               await notificationService.initialize();
             })
             .catch((error) => {
-              console.error('[SW] Service Worker registration failed:', error);
-              // In dev mode, this might fail initially - that's okay, it will work after first build
-              if (import.meta.env.DEV) {
-                logger.sw('Note: Service worker may not be available until VitePWA processes it');
+              // Only log error if it's not a 404 (file not found)
+              if (!error.message?.includes('not found') && !error.message?.includes('404')) {
+                console.error('[SW] Service Worker registration failed:', error);
               }
+              // In dev mode, this might fail initially - that's okay, it will work after VitePWA builds it
             });
           
           // Listen for service worker messages
           // Note: AI_INSIGHTS_READY messages are handled by swCommunication utility
           navigator.serviceWorker.addEventListener('message', async (event) => {
             if (event.data && event.data.type === 'AI_REFRESH_CHECK') {
-              logger.sw('AI refresh check requested');
               // The refresh service will handle this automatically
             }
             
             if (event.data && event.data.type === 'CHECK_WORKOUT_REMINDERS') {
-              logger.sw('Checking workout reminders');
               // Check and trigger any due workout reminders
               const { usePlannedWorkoutStore } = await import('@/store/plannedWorkoutStore');
               const { useUserStore } = await import('@/store/userStore');
@@ -203,7 +238,6 @@ function App() {
             }
             
             if (event.data && event.data.type === 'CHECK_MUSCLE_RECOVERY') {
-              logger.sw('Checking muscle recovery');
               // Trigger muscle recovery recalculation
               const { useUserStore } = await import('@/store/userStore');
               const { muscleRecoveryService } = await import('@/services/muscleRecoveryService');
@@ -226,10 +260,8 @@ function App() {
           (window as Window & { seedWorkoutLogs?: (userId?: string) => Promise<void> }).seedWorkoutLogs = async (userId?: string) => {
             const user = getUserStore.getState().profile;
             const targetUserId = userId || user?.id || 'user-1';
-            logger.log(`🌱 Seeding workout logs for user: ${targetUserId}`);
             await seedWorkoutLogs(targetUserId);
           };
-          logger.log('💡 Dev tip: Run seedWorkoutLogs() in console to seed test data');
         }
       } catch (error) {
         logger.error('Failed to initialize app', error, { context: 'app_initialization' });
@@ -301,18 +333,46 @@ function App() {
 
 function AppRoutes() {
   const location = useLocation();
-  const { isAuthenticated, isLoading, user: auth0User } = useAuth0();
+  const { isAuthenticated, isLoading, user: auth0User, error: auth0Error, getAccessTokenSilently } = useAuth0();
   const initializeUser = useUserStore((state) => state.initializeUser);
+
+  // #region agent log
+  useEffect(() => {
+    fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:294',message:'useAuth0 hook state',data:{isLoading,isAuthenticated,hasUser:!!auth0User,userId:auth0User?.sub?.substring(0,20),hasError:!!auth0Error,errorMessage:auth0Error?.message,errorName:auth0Error?.name},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+  }, [isLoading, isAuthenticated, auth0User, auth0Error]);
+  // #endregion
+
+  // Track token refresh attempts
+  // #region agent log
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      getAccessTokenSilently({ cacheMode: 'on' }).then((token) => {
+        fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:302',message:'Token refresh success',data:{hasToken:!!token,tokenLength:token?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      }).catch((err) => {
+        fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:305',message:'Token refresh error',data:{errorName:err?.name,errorMessage:err?.message,errorString:String(err),errorStack:err?.stack?.substring(0,300)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      });
+    }
+  }, [isLoading, isAuthenticated, getAccessTokenSilently]);
+  // #endregion
 
   // Sync user store with Auth0 user when authenticated
   useEffect(() => {
+    // #region agent log
+    fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:312',message:'Auth sync effect triggered',data:{isLoading,isAuthenticated,hasUser:!!auth0User},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
     if (!isLoading && isAuthenticated && auth0User) {
+      // #region agent log
+      fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:315',message:'Initializing user',data:{userId:auth0User.sub?.substring(0,20),email:auth0User.email?.substring(0,20)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
       initializeUser({
         id: auth0User.sub || auth0User.email || 'user-unknown',
         firstName: auth0User.given_name || auth0User.nickname || null,
         username: auth0User.nickname || auth0User.name || null,
         emailAddresses: auth0User.email ? [{ emailAddress: auth0User.email }] : [],
       }).then(() => {
+        // #region agent log
+        fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:325',message:'User initialized successfully',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+        // #endregion
         const userId = auth0User.sub || auth0User.email || 'user-unknown';
         // Initialize workout event tracker for this user
         workoutEventTracker.initialize(userId).catch((error) => {
@@ -323,9 +383,17 @@ function AppRoutes() {
         initializeDefaultTemplates(userId).catch((error) => {
           logger.error('Failed to initialize templates', error);
         });
+      }).catch((err) => {
+        // #region agent log
+        fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:335',message:'User initialization error',data:{errorName:err?.name,errorMessage:err?.message,errorString:String(err)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+        // #endregion
       });
+    } else if (!isLoading && !isAuthenticated) {
+      // #region agent log
+      fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:339',message:'User not authenticated',data:{hasError:!!auth0Error,errorMessage:auth0Error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
     }
-  }, [isLoading, isAuthenticated, auth0User, initializeUser]);
+  }, [isLoading, isAuthenticated, auth0User, initializeUser, auth0Error]);
 
   // Public routes (no auth required, no layout)
   const publicRoutes = (

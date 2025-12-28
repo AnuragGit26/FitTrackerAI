@@ -60,6 +60,17 @@ export function validateCalories(calories?: number): { valid: boolean; error?: s
   return { valid: true };
 }
 
+export function validateSteps(steps?: number): { valid: boolean; error?: string } {
+  if (steps === undefined) return { valid: true }; // Optional field
+  if (steps < 0) {
+    return { valid: false, error: 'Steps cannot be negative' };
+  }
+  if (steps > 100000) {
+    return { valid: false, error: 'Steps cannot exceed 100000' };
+  }
+  return { valid: true };
+}
+
 export function validateRPE(rpe?: number): boolean {
   if (rpe === undefined) return true;
   return rpe >= 1 && rpe <= 10;
@@ -108,6 +119,8 @@ export function validateSet(set: WorkoutSet, trackingType: ExerciseTrackingType,
       if (!timeValidation.valid) return { valid: false, error: 'Time must be between 0 and 24 hours' };
       const caloriesValidation = validateCalories(set.calories);
       if (!caloriesValidation.valid) return { valid: false, error: 'Calories must be between 0 and 10000' };
+      const stepsValidation = validateSteps(set.steps);
+      if (!stepsValidation.valid) return { valid: false, error: 'Steps must be between 0 and 100000' };
       return { valid: true };
     }
 

@@ -74,17 +74,21 @@
 - Log multiple exercises per workout
 - Track sets with reps, weight, RPE (Rate of Perceived Exertion), and rest time
 - Support multiple tracking types: weight/reps, reps-only, cardio, duration
+- Quick cardio logging: Simplified interface for logging cardio workouts (distance, time, steps, calories)
 - Auto-save workout progress every 10 seconds
 - Support supersets and circuit training
 - Track workout duration, total volume, and calories burned
+- Track steps for cardio activities (optional)
 - Add workout notes and mood tracking
 
 **Business Rules**:
 
 - Workouts must have at least one exercise
 - Sets must be marked as completed before saving
-- Volume calculation: sets × reps × weight
-- Workout type determined by primary muscle groups targeted
+- Volume calculation: sets × reps × weight (for strength), distance in km (for cardio)
+- Workout type determined by primary muscle groups targeted or exercise type
+- Steps field (optional) available for cardio exercises (0-100000 range)
+- Calories can be auto-estimated from steps if not provided (steps × 0.04)
 
 #### 2.2 Exercise Library Management
 
@@ -190,7 +194,47 @@
 - Reminders sent 30 minutes before scheduled time (configurable)
 - Templates can include estimated duration and muscle groups targeted
 
-#### 2.7 User Profile & Settings
+#### 2.7 Sleep & Recovery Tracking
+
+**Business Need**: Track sleep quality and recovery metrics to optimize training and prevent overtraining.
+
+**Functional Requirements**:
+
+- Log sleep duration and quality (1-10 scale)
+- Track bedtime and wake time
+- Log daily recovery metrics: overall recovery, stress level, energy level, soreness
+- Readiness to train assessment: full-power, light, rest-day
+- Sleep and recovery analytics
+- Integration with muscle recovery calculations
+
+**Business Rules**:
+
+- Sleep quality affects muscle recovery calculations
+- Recovery logs can be used to adjust workout recommendations
+- Sleep duration recommendations: 7-9 hours optimal
+- Recovery percentage calculated from multiple factors
+
+#### 2.8 Notification System
+
+**Business Need**: Keep users informed about workout reminders, recovery status, AI insights, and achievements.
+
+**Functional Requirements**:
+
+- Workout reminders (30 minutes before scheduled time)
+- Muscle recovery notifications (when muscles are ready or overworked)
+- AI insight notifications (when new insights are available)
+- Achievement notifications (PRs, streaks, milestones)
+- System notifications (app updates, sync status)
+- Notification preferences and settings
+
+**Business Rules**:
+
+- Notifications stored locally in IndexedDB
+- Notifications can be marked as read
+- Soft delete support for notifications
+- Notification types: workout_reminder, muscle_recovery, ai_insight, system, achievement
+
+#### 2.9 User Profile & Settings
 
 **Business Need**: Personalize the application experience for each user.
 
@@ -454,7 +498,7 @@ User Action: Start Workout
     ↓
 2. Save to IndexedDB (workoutStore)
     ↓
-3. Auto-save every 10 seconds
+3. Auto-save every 10 seconds (localStorage persistence)
     ↓
 4. On workout completion:
    - Calculate totalDuration
@@ -521,21 +565,32 @@ muscleVolume = exerciseVolume × (muscleContribution / totalMuscles)
 // 1. Calculate workload score
 workloadScore = calculateWorkloadScore(volume, intensity, rpe)
 
-// 2. Calculate recovery percentage (exponential decay)
-baseRecovery = 100
-decayRate = 0.15 per day
-daysSinceWorkout = currentDate - lastWorkedDate
-recoveryPercentage = baseRecovery × (1 - decayRate) ^ daysSinceWorkout
+// 2. Calculate base recovery hours based on muscle and experience level
+baseRecoveryHours = getBaseRecoveryHours(muscle, userLevel)
 
-// 3. Adjust for workload
-recoveryPercentage -= (workloadScore / 10)
+// 3. Adjust recovery hours for workload
+workloadMultiplier = 1 + (workloadScore / 100)
+adjustedRecoveryHours = baseRecoveryHours × workloadMultiplier
 
-// 4. Determine status
-if (recoveryPercentage >= 80) status = "fresh"
-else if (recoveryPercentage >= 60) status = "ready"
-else if (recoveryPercentage >= 40) status = "recovering"
-else if (recoveryPercentage >= 20) status = "sore"
+// 4. Adjust for sleep quality and duration (if sleep log available)
+if (sleepLog) {
+  sleepMultiplier = calculateSleepMultiplier(sleepLog)
+  adjustedRecoveryHours = adjustedRecoveryHours × sleepMultiplier
+}
+
+// 5. Calculate recovery percentage (linear based on hours)
+hoursSinceWorkout = differenceInHours(currentDate, lastWorkedDate)
+recoveryPercentage = Math.min(100, (hoursSinceWorkout / adjustedRecoveryHours) × 100)
+
+// 6. Determine status
+if (recoveryPercentage >= 100) status = "ready"
+else if (recoveryPercentage >= 75) status = "fresh"
+else if (recoveryPercentage >= 50) status = "recovering"
+else if (recoveryPercentage >= 25) status = "sore"
 else status = "overworked"
+
+// 7. Check for overtraining (high volume in last 7 days)
+if (totalVolumeLast7Days > overtrainingThreshold) status = "overworked"
 ```
 
 #### 2.2 Workload Score Calculation
@@ -561,6 +616,47 @@ workloadScore = baseScore × intensityMultiplier × rpeMultiplier
 - After workout completion
 - Daily background recalculation (service worker)
 - Manual refresh from UI
+
+#### 2.4 Cardio Workout Tracking
+
+**Quick Cardio Logging Flow:**
+
+1. User clicks "Quick Cardio Log" from Log Workout page
+2. Simple form appears with:
+   - Activity type selector (Running, Cycling, Walking, etc. or Custom)
+   - Distance input with unit selector (km/miles)
+   - Time input (MM:SS format)
+   - Steps input (optional, 0-100000)
+   - Calories input (optional, auto-estimated from steps if not provided)
+   - Date/time picker
+3. System creates workout with single cardio exercise
+4. Workout saved with `workoutType: 'cardio'`
+5. Data syncs to IndexedDB and Supabase
+
+**Cardio Calculations:**
+
+```typescript
+// Pace calculation (minutes per km or mile)
+pace = (timeInSeconds / 60) / distance
+
+// Speed calculation (km/h or mph)
+speed = distance / (timeInSeconds / 3600)
+
+// Calorie estimation from steps (if calories not provided)
+estimatedCalories = steps × 0.04
+
+// Volume calculation for cardio
+volume = distance (converted to km)
+```
+
+**Steps Field:**
+- Optional field in `WorkoutSet` interface
+- Range: 0-100000 steps
+- Used for:
+  - Calorie estimation when calories not provided
+  - Pace/speed calculations (distance/time/steps)
+  - Analytics and progress tracking
+  - AI insights generation
 
 ### 3. AI Insights System
 
@@ -616,6 +712,8 @@ User Profile:
 
 Recent Workouts (Last 30 Days):
 ${workoutSummary}
+- Cardio workouts include: distance, time, steps, pace, calories
+- Steps data included when available for better insights
 
 Muscle Recovery Status:
 ${muscleSummary}
@@ -706,12 +804,15 @@ maxPR = prs.reduce((max, pr) => {
 #### 4.3 Consistency Score
 
 ```typescript
-// Calculate based on workout frequency vs. goal
-actualFrequency = uniqueWorkoutDays / daysInPeriod
-targetFrequency = userProfile.workoutFrequency / 7  // per day
+// Calculate based on unique workout days vs. target days
+// Target is set to 70% of the period (e.g., 21 days for 30-day period)
+uniqueWorkoutDays = count of unique days with workouts in period
+targetDays = Math.min(periodDays, Math.floor(periodDays * 0.7))
 
-consistencyScore = Math.min(100, (actualFrequency / targetFrequency) * 100)
+consistencyScore = Math.min(100, Math.round((uniqueWorkoutDays / targetDays) * 100))
 ```
+
+**Note**: The implementation uses a target of 70% of the period days rather than comparing against user's workout frequency goal. This provides a consistent baseline for all users.
 
 #### 4.4 Workout Frequency Heatmap
 
@@ -987,6 +1088,51 @@ restTimer.start({
     retryCount: number
     errorMessage?: string
     syncToken?: string
+  },
+  
+  sleepLogs: {
+    id: number (auto-increment)
+    userId: string
+    date: Date
+    duration: number (minutes)
+    quality: number (1-10)
+    bedtime?: Date
+    wakeTime?: Date
+    notes?: string
+    createdAt?: Date
+    updatedAt?: Date
+    version: number
+    deletedAt?: Date
+  },
+  
+  recoveryLogs: {
+    id: number (auto-increment)
+    userId: string
+    date: Date
+    overallRecovery: number (0-100)
+    stressLevel: number (1-10)
+    energyLevel: number (1-10)
+    soreness: number (1-10)
+    readinessToTrain: 'full-power' | 'light' | 'rest-day'
+    notes?: string
+    createdAt?: Date
+    updatedAt?: Date
+    version: number
+    deletedAt?: Date
+  },
+  
+  notifications: {
+    id: string (UUID)
+    userId: string
+    type: NotificationType ('workout_reminder' | 'muscle_recovery' | 'ai_insight' | 'system' | 'achievement')
+    title: string
+    message: string
+    data?: JSON (NotificationData)
+    isRead: boolean
+    readAt?: number (timestamp)
+    createdAt: number (timestamp)
+    version?: number
+    deletedAt?: number (timestamp)
   }
 }
 ```
@@ -1012,6 +1158,9 @@ User (Auth0)
   ├── WorkoutTemplates (1:many)
   ├── PlannedWorkouts (1:many)
   ├── MuscleStatuses (1:many)
+  ├── SleepLogs (1:many)
+  ├── RecoveryLogs (1:many)
+  ├── Notifications (1:many)
   └── Settings (1:many)
 ```
 

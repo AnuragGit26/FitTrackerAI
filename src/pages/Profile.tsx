@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth0 } from '@auth0/auth0-react';
 import { ArrowLeft, ArrowRight, Scale, Ruler, Moon, Sun, Monitor, Bell, Volume2, Vibrate, Download, Upload, AlertCircle, Clock, Cloud, CloudOff, RefreshCw, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import { useUserStore, Gender, UnitSystem, unitHelpers, Goal } from '@/store/userStore';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -19,7 +20,8 @@ import { logger } from '@/utils/logger';
 
 export function Profile() {
   const navigate = useNavigate();
-  const { profile, updateProfile, isLoading, setPreferredUnit, setDefaultRestTime, setProfilePicture: updateProfilePictureInStore } = useUserStore();
+  const { user: auth0User, getAccessTokenSilently, isAuthenticated } = useAuth0();
+  const { profile, updateProfile, isLoading, setPreferredUnit, setDefaultRestTime, setProfilePicture: updateProfilePictureInStore, syncToAuth0, auth0SyncStatus, auth0SyncError } = useUserStore();
   const { 
     settings, 
     setTheme, 
@@ -64,6 +66,11 @@ export function Profile() {
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [syncMetadata, setSyncMetadata] = useState<Array<{ conflictCount?: number; syncStatus?: SyncStatus; lastSyncAt?: number | null }>>([]);
   const [lastSyncMessage, setLastSyncMessage] = useState<string | null>(null);
+  
+  // Auth0 sync state
+  const [auth0SyncEnabled, setAuth0SyncEnabled] = useState(false);
+  const [isSyncingToAuth0, setIsSyncingToAuth0] = useState(false);
+  const [lastAuth0SyncTime, setLastAuth0SyncTime] = useState<Date | null>(null);
 
   useEffect(() => {
     loadSettings();
@@ -122,6 +129,10 @@ export function Profile() {
       // Check if auto-sync is enabled (stored in settings)
       const autoSyncSetting = await dataService.getSetting('autoSyncEnabled');
       setAutoSyncEnabled(autoSyncSetting === true);
+      
+      // Check if Auth0 auto-sync is enabled
+      const auth0AutoSyncSetting = await dataService.getSetting('auth0AutoSyncEnabled');
+      setAuth0SyncEnabled(auth0AutoSyncSetting === true);
     } catch (error) {
       logger.error('Failed to load sync status', error);
     }
@@ -273,12 +284,25 @@ export function Profile() {
   const totalConflicts = syncMetadata.reduce((sum, m) => sum + (m.conflictCount || 0), 0);
   const hasErrors = syncMetadata.some(m => m.syncStatus === 'error');
 
+  // Track if we're updating profile picture to prevent loop
+  const isUpdatingPictureRef = useRef(false);
+  const lastProfileIdRef = useRef<string | null>(null);
+  
   useEffect(() => {
-    if (profile) {
+    if (!profile) return;
+    
+    // Only update if profile ID changed or we're not currently updating picture
+    const profileIdChanged = lastProfileIdRef.current !== profile.id;
+    const shouldUpdate = profileIdChanged || !isUpdatingPictureRef.current;
+    
+    if (shouldUpdate) {
       setName(profile.name || '');
       setAge(profile.age ?? '');
       setGender(profile.gender || '');
-      setProfilePicture(profile.profilePicture);
+      // Only update profilePicture from store if we're not currently updating it
+      if (!isUpdatingPictureRef.current) {
+        setProfilePicture(profile.profilePicture);
+      }
       setSelectedGoals(profile.goals || []);
       setDefaultRestTimeLocal(profile.defaultRestTime || 90);
       
@@ -295,6 +319,7 @@ export function Profile() {
       }
       
       setUnitSystem(profile.preferredUnit === 'lbs' ? 'imperial' : 'metric');
+      lastProfileIdRef.current = profile.id;
     }
   }, [profile]);
 
@@ -374,12 +399,74 @@ export function Profile() {
       await updateProfile(updates);
       await setPreferredUnit(unitSystem === 'imperial' ? 'lbs' : 'kg');
       await setDefaultRestTime(defaultRestTime);
+      
+      // Sync to Auth0 if enabled and user is authenticated
+      if (auth0SyncEnabled && isAuthenticated && auth0User) {
+        try {
+          setIsSyncingToAuth0(true);
+          const accessToken = await getAccessTokenSilently();
+          await syncToAuth0(auth0User, accessToken);
+          setLastAuth0SyncTime(new Date());
+          success('Profile synced to Auth0 successfully');
+        } catch (error) {
+          logger.error('Failed to sync to Auth0', error);
+          showError('Profile saved locally but failed to sync to Auth0. Please try syncing manually.');
+        } finally {
+          setIsSyncingToAuth0(false);
+        }
+      }
+      
       navigate(-1);
     } catch (error) {
       console.error('Failed to save profile:', error);
-      alert('Failed to save profile. Please try again.');
+      showError('Failed to save profile. Please try again.');
     } finally {
       setIsSaving(false);
+    }
+  };
+  
+  const handleAuth0Sync = async () => {
+    if (!isAuthenticated || !auth0User || !profile) return;
+    
+    setIsSyncingToAuth0(true);
+    try {
+      const accessToken = await getAccessTokenSilently();
+      await syncToAuth0(auth0User, accessToken);
+      setLastAuth0SyncTime(new Date());
+      success('Profile synced to Auth0 successfully');
+    } catch (error) {
+      logger.error('Failed to sync to Auth0', error);
+      showError(auth0SyncError || 'Failed to sync to Auth0. Please check your Auth0 configuration.');
+    } finally {
+      setIsSyncingToAuth0(false);
+    }
+  };
+  
+  const getAuth0SyncStatusIcon = () => {
+    if (isSyncingToAuth0 || auth0SyncStatus === 'syncing') {
+      return <RefreshCw className="w-5 h-5 text-blue-500 animate-spin" />;
+    }
+    switch (auth0SyncStatus) {
+      case 'success':
+        return <CheckCircle2 className="w-5 h-5 text-green-500" />;
+      case 'error':
+        return <XCircle className="w-5 h-5 text-red-500" />;
+      default:
+        return <CloudOff className="w-5 h-5 text-slate-400" />;
+    }
+  };
+  
+  const getAuth0SyncStatusText = (): string => {
+    if (isSyncingToAuth0 || auth0SyncStatus === 'syncing') {
+      return 'Syncing...';
+    }
+    switch (auth0SyncStatus) {
+      case 'success':
+        return 'Synced';
+      case 'error':
+        return 'Sync Error';
+      default:
+        return 'Not Synced';
     }
   };
 
@@ -417,10 +504,19 @@ export function Profile() {
         <ProfilePictureUpload
           picture={profilePicture || profile?.profilePicture}
           onPictureChange={async (newPicture) => {
-            setProfilePicture(newPicture);
-            // Update store immediately so it shows on home page right away
-            if (profile?.id) {
-              await updateProfilePictureInStore(newPicture);
+            // Prevent loop by setting flag
+            isUpdatingPictureRef.current = true;
+            try {
+              setProfilePicture(newPicture);
+              // Update store immediately so it shows on home page right away
+              if (profile?.id) {
+                await updateProfilePictureInStore(newPicture);
+              }
+            } finally {
+              // Reset flag after a short delay to allow store update to complete
+              setTimeout(() => {
+                isUpdatingPictureRef.current = false;
+              }, 100);
             }
           }}
         />
@@ -786,6 +882,109 @@ export function Profile() {
                 </p>
               </div>
             </div>
+            
+            {/* Auth0 Sync Section */}
+            {isAuthenticated && (
+              <>
+                <div className="pt-4 border-t border-gray-200 dark:border-surface-border">
+                  <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 px-1">
+                    Auth0 Profile Sync
+                  </h4>
+                </div>
+                
+                {/* Auth0 Sync Status Card */}
+                <div className="p-4 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      {getAuth0SyncStatusIcon()}
+                      <div>
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300 block">
+                          {getAuth0SyncStatusText()}
+                        </span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">
+                          Last sync: {formatLastSyncTime(lastAuth0SyncTime)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {auth0SyncError && auth0SyncStatus === 'error' && (
+                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-surface-border">
+                      <div className="flex items-start gap-2 text-xs text-red-600 dark:text-red-400">
+                        <XCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                        <span className="flex-1">{auth0SyncError}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Auth0 Auto Sync Toggle */}
+                <label className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border">
+                  <div className="flex items-center gap-3">
+                    <Cloud className="w-5 h-5 text-slate-400" />
+                    <div>
+                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300 block">Auto Sync to Auth0</span>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">Automatically sync profile changes to Auth0</span>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={auth0SyncEnabled}
+                    onChange={(e) => {
+                      setAuth0SyncEnabled(e.target.checked);
+                      dataService.updateSetting('auth0AutoSyncEnabled', e.target.checked);
+                      if (e.target.checked) {
+                        success('Auth0 auto-sync enabled');
+                      } else {
+                        success('Auth0 auto-sync disabled');
+                      }
+                    }}
+                    className="w-5 h-5 rounded accent-primary"
+                    disabled={isSyncingToAuth0}
+                  />
+                </label>
+                
+                {/* Manual Auth0 Sync Button */}
+                <button
+                  onClick={handleAuth0Sync}
+                  disabled={isSyncingToAuth0 || !profile}
+                  className={cn(
+                    'w-full flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border',
+                    'hover:bg-gray-50 dark:hover:bg-surface-dark-light transition-colors',
+                    'disabled:opacity-50 disabled:cursor-not-allowed'
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    {isSyncingToAuth0 ? (
+                      <RefreshCw className="w-5 h-5 text-slate-400 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-5 h-5 text-slate-400" />
+                    )}
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                      {isSyncingToAuth0 ? 'Syncing to Auth0...' : 'Sync to Auth0 Now'}
+                    </span>
+                  </div>
+                  {isSyncingToAuth0 ? (
+                    <LoadingSpinner size="sm" />
+                  ) : (
+                    <ArrowRight className="w-4 h-4 text-slate-400" />
+                  )}
+                </button>
+                
+                {/* Auth0 Sync Info */}
+                <div className="flex items-start gap-2 p-3 rounded-xl bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800">
+                  <Cloud className="w-4 h-4 text-purple-600 dark:text-purple-400 mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-xs text-purple-800 dark:text-purple-300 font-medium mb-1">
+                      Auth0 Profile Sync
+                    </p>
+                    <p className="text-xs text-purple-700 dark:text-purple-400">
+                      Sync your profile information (name, email, picture, and fitness data) directly to your Auth0 account. This keeps your Auth0 profile up to date with your FitTrackAI profile.
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </section>
 

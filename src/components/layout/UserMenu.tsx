@@ -17,14 +17,9 @@ export function UserMenu() {
   const userName = auth0User?.name || auth0User?.nickname || auth0User?.given_name || profile?.name || 'User';
   const userEmail = auth0User?.email;
   
-  // Determine which profile picture to use (prioritize Supabase profile picture)
-  const profilePictureUrl = profile?.profilePicture || auth0User?.picture;
+  // Use only user-uploaded profile picture (no Auth0 fallback)
+  const profilePictureUrl = profile?.profilePicture;
   
-  // #region agent log
-  useEffect(() => {
-    fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UserMenu.tsx:21',message:'UserMenu rendered',data:{hasProfile:!!profile,profilePicture:profile?.profilePicture,auth0ImageUrl:auth0User?.picture,usingProfilePicture:!!profile?.profilePicture,profilePictureUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-  }, [profile?.profilePicture, auth0User?.picture, profile, auth0User]);
-  // #endregion
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {

@@ -6,6 +6,7 @@ import { useSettingsStore } from '@/store/settingsStore';
 class DataSyncService {
   private initialized = false;
   private unsubscribeCallbacks: (() => void)[] = [];
+  private isInitializingUser = false;
 
   initialize() {
     if (this.initialized) return;
@@ -19,8 +20,17 @@ class DataSyncService {
     });
 
     const unsubscribeUser = dataService.on('user', async () => {
+      // Prevent infinite loop: don't call initializeUser if we're already initializing
+      if (this.isInitializingUser) {
+        return;
+      }
       const userStore = useUserStore.getState();
-      await userStore.initializeUser();
+      this.isInitializingUser = true;
+      try {
+        await userStore.initializeUser();
+      } finally {
+        this.isInitializingUser = false;
+      }
     });
 
     const unsubscribeSettings = dataService.on('settings', async () => {

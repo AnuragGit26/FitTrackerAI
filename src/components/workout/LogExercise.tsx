@@ -6,6 +6,9 @@ import { useUserStore } from '@/store/userStore';
 import { ExerciseSelectorDropdown } from '@/components/exercise/ExerciseSelectorDropdown';
 import { RestTimer } from '@/components/exercise/RestTimer';
 import { CurrentSetCard } from '@/components/exercise/CurrentSetCard';
+import { CardioSetCard } from '@/components/exercise/CardioSetCard';
+import { HIITSetCard } from '@/components/exercise/HIITSetCard';
+import { YogaSetCard } from '@/components/exercise/YogaSetCard';
 import { CompletedSetItem } from '@/components/exercise/CompletedSetItem';
 import { SupersetNavigationCards } from '@/components/exercise/SupersetNavigationCards';
 import { GroupRestTimer } from '@/components/exercise/GroupRestTimer';
@@ -28,6 +31,7 @@ import { saveLogWorkoutState, saveLogExerciseState, loadLogExerciseState, clearL
 import { trapFocus, restoreFocus } from '@/utils/accessibility';
 import { supersetService, SupersetGroup } from '@/services/supersetService';
 import { Modal } from '@/components/common/Modal';
+import { detectHIIT } from '@/utils/exerciseHelpers';
 
 // Constants
 const SAVE_ANIMATION_DURATION = 2000; // ms
@@ -742,10 +746,6 @@ export function LogExercise({
   };
 
   const validateForm = (): { isValid: boolean; errorMessage: string | null } => {
-    // #region agent log
-    fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:726',message:'validateForm entry',data:{selectedExercise:selectedExercise?.id||null,setsLength:sets.length,completedSetsCount:sets.filter(s=>s.completed).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
-    
     const errors: Record<string, string> = {};
 
     if (!selectedExercise) {
@@ -807,35 +807,18 @@ export function LogExercise({
     // Get the first error message (prioritize sets, then exercise, then notes)
     const errorMessage = errors.sets || errors.exercise || errors.notes || null;
     
-    // #region agent log
-    fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:783',message:'validateForm exit',data:{isValid,errorCount:Object.keys(errors).length,errors:Object.keys(errors),errorMessage},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
-    
     return { isValid, errorMessage };
   };
 
   const handleSave = async (): Promise<void> => {
-    // #region agent log
-    fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:786',message:'handleSave called',data:{selectedExercise:selectedExercise?.id||null,selectedExerciseName:selectedExercise?.name||null,setsLength:sets.length,isSaving,exerciseId:exerciseId||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    // #endregion
-    
     if (!selectedExercise) {
-      // #region agent log
-      fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:787',message:'handleSave early return - no selectedExercise',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       showError('Please select an exercise');
       return;
     }
 
-    // #region agent log
     const validationResult = validateForm();
-    fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:792',message:'validateForm result',data:{validationResult,validationErrors:Object.keys(validationErrors).length,selectedExercise:selectedExercise?.id||null,setsLength:sets.length,completedSetsCount:sets.filter(s=>s.completed).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
     
     if (!validationResult.isValid) {
-      // #region agent log
-      fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:793',message:'handleSave early return - validation failed',data:{validationErrors,errorMessage:validationResult.errorMessage},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
       // Show specific validation error message if available, otherwise show generic message
       const errorMessage = validationResult.errorMessage || 'Please fix validation errors before saving';
       showError(errorMessage);
@@ -866,10 +849,6 @@ export function LogExercise({
 
     setIsSaving(true);
     setValidationErrors({});
-
-    // #region agent log
-    fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:819',message:'handleSave starting save process',data:{selectedExercise:selectedExercise?.id||null,setsLength:sets.length,exerciseId:exerciseId||null,hasCurrentWorkout:!!currentWorkout},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    // #endregion
 
     try {
       const muscleMapping = getMuscleMapping(selectedExercise.name);
@@ -930,16 +909,10 @@ export function LogExercise({
         handleForceClose();
       }, MODAL_CLOSE_DELAY);
     } catch (err) {
-      // #region agent log
-      fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:880',message:'handleSave error caught',data:{errorMessage:err instanceof Error?err.message:'Unknown error',errorType:err?.constructor?.name||'Unknown'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
       const errorMessage = err instanceof Error ? err.message : 'Failed to save exercise';
       showError(errorMessage);
       console.error('Error saving exercise:', err);
     } finally {
-      // #region agent log
-      fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:885',message:'handleSave finally - setting isSaving to false',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
       setIsSaving(false);
     }
   };
@@ -1036,26 +1009,15 @@ export function LogExercise({
 
   // Handle logging current set - ONLY completes the current set
   const handleLogCurrentSet = async () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:1020',message:'handleLogCurrentSet called',data:{currentSet:currentSet?.setNumber||null,currentSetCompleted:currentSet?.completed||false,setsLength:sets.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'separation'})}).catch(()=>{});
-    // #endregion
-    
     if (!selectedExercise) return;
 
     const setToComplete = currentSet;
     
     // Ensure we have a set to complete
     if (!setToComplete || setToComplete.completed) {
-      // #region agent log
-      fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:1025',message:'handleLogCurrentSet - no set to complete',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'separation'})}).catch(()=>{});
-      // #endregion
       console.error('No set to complete');
       return;
     }
-
-    // #region agent log
-    fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:1030',message:'handleLogCurrentSet - completing set',data:{setNumber:setToComplete.setNumber},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'separation'})}).catch(()=>{});
-    // #endregion
 
     // Mark set as completed
     const setUpdates: Partial<WorkoutSet> = {
@@ -1078,10 +1040,6 @@ export function LogExercise({
     setTimeout(() => {
       setJustCompletedSetNumber(null);
     }, 1000);
-
-    // #region agent log
-    fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:1132',message:'handleLogCurrentSet - set completed',data:{completedSetNumber:setToComplete.setNumber},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'separation'})}).catch(()=>{});
-    // #endregion
 
     // If in superset and has next exercise, show group rest timer
     if (isInSuperset && nextExercise && !isLastInSuperset) {
@@ -1140,14 +1098,6 @@ export function LogExercise({
   const activeSetNumber = sets.find((set) => !set.completed)?.setNumber || sets.length;
   const hasIncompleteSets = sets.length > 0 && sets.some((set) => !set.completed);
   const isSaveButtonDisabled = !selectedExercise || sets.length === 0 || isSaving || hasIncompleteSets;
-  
-  // #region agent log
-  useEffect(() => {
-    if (isOpen) {
-      fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:1233',message:'isSaveButtonDisabled calculation',data:{selectedExercise:selectedExercise?.id||null,selectedExerciseName:selectedExercise?.name||null,setsLength:sets.length,completedSetsCount:sets.filter(s=>s.completed).length,hasIncompleteSets,isSaving,isSaveButtonDisabled,exerciseId:exerciseId||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'A,B,C'})}).catch(()=>{});
-    }
-  }, [isOpen, selectedExercise, sets, hasIncompleteSets, isSaving, isSaveButtonDisabled, exerciseId]);
-  // #endregion
 
   // Superset detection and navigation
   const currentExercise = useMemo(() => {
@@ -1273,10 +1223,15 @@ export function LogExercise({
       aria-modal="true"
       aria-labelledby="log-exercise-title"
       tabIndex={-1}
+      style={{ 
+        WebkitOverflowScrolling: 'touch',
+        height: '100dvh', // Dynamic viewport height for mobile
+        minHeight: 0, // Critical: allows flex children to shrink properly
+      }}
     >
       {/* Header */}
-      <header className="sticky top-0 z-20 flex flex-col gap-2 bg-background-light dark:bg-background-dark pt-4 pb-2 shadow-sm dark:shadow-none border-b border-transparent dark:border-white/5">
-        <div className="px-4 flex items-center h-12 justify-between">
+      <header className="sticky top-0 z-20 flex flex-col gap-2 bg-background-light dark:bg-background-dark pt-4 pb-2 shadow-sm dark:shadow-none border-b border-transparent dark:border-white/5 min-w-0">
+        <div className="px-4 flex items-center h-12 justify-between min-w-0 gap-2">
           <button
             onClick={handleCancel}
             className="text-slate-900 dark:text-white flex size-12 shrink-0 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors -ml-2"
@@ -1284,9 +1239,9 @@ export function LogExercise({
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0 flex-1 justify-center">
             {isInSuperset && currentExercise && (
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/20">
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/20 whitespace-nowrap shrink-0">
                 {currentExercise.groupType === 'superset' ? 'Superset' : 'Circuit'} {String.fromCharCode(65 + (groupExercises.findIndex((ex) => ex.id === currentExercise.id) || 0))}
               </span>
             )}
@@ -1294,26 +1249,23 @@ export function LogExercise({
               <WorkoutTimerDisplay />
             )}
           </div>
-          <div className="flex w-16 items-center justify-end">
+          <div className="flex items-center justify-end shrink-0">
             <button
               onClick={() => {
-                // #region agent log
-                fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LogExercise.tsx:1342',message:'Finish button clicked',data:{isSaveButtonDisabled,selectedExercise:selectedExercise?.id||null,setsLength:sets.length,isSaving},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-                // #endregion
                 if (!isSaveButtonDisabled) {
                   handleSave();
                 }
               }}
               disabled={isSaveButtonDisabled}
-              className="text-primary text-base font-bold leading-normal tracking-[0.015em] shrink-0 hover:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+              className="text-primary text-base font-bold leading-normal tracking-[0.015em] shrink-0 hover:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
             >
               {isSaving ? 'Saving...' : 'Finish'}
             </button>
           </div>
         </div>
         {selectedExercise && (
-          <div className="px-4 pb-2">
-            <h1 className="text-slate-900 dark:text-white tracking-tight text-[24px] font-bold leading-tight">
+          <div className="px-4 pb-2 min-w-0">
+            <h1 className="text-slate-900 dark:text-white tracking-tight text-[24px] font-bold leading-tight truncate">
               {selectedExercise.name}
             </h1>
           </div>
@@ -1329,7 +1281,15 @@ export function LogExercise({
             )}
       </header>
 
-      <main className="flex flex-col gap-4 px-4 pt-2 flex-1 overflow-y-auto pb-24">
+      <main 
+        className="flex flex-col gap-4 px-4 pt-2 flex-1 overflow-y-auto min-w-0" 
+        style={{ 
+          paddingBottom: 'max(12rem, env(safe-area-inset-bottom, 0px) + 12rem)',
+          scrollPaddingBottom: 'max(12rem, env(safe-area-inset-bottom, 0px) + 12rem)',
+          minHeight: 0, // Critical: allows flex child to shrink and enable scrolling
+        }}
+      >
+        <div className="flex flex-col gap-4" style={{ minHeight: 'max-content' }}>
         {isLoadingExercise ? (
           <div className="flex items-center justify-center min-h-[400px]">
             <div className="flex flex-col items-center gap-4">
@@ -1360,33 +1320,99 @@ export function LogExercise({
               <PreviousWorkoutTable exerciseId={selectedExercise.id} />
             ) : null}
 
-            {/* AI Insight Pill */}
-            {selectedExercise && currentSet && (
-              <div className="flex flex-wrap">
-                <AIInsightPill insight="Try increasing weight by 2.5kg today" />
-              </div>
-            )}
+            {/* AI Insight Pill - Only show for strength exercises */}
+            {selectedExercise && currentSet && (() => {
+              const isCardio = selectedExercise.category === 'cardio';
+              const isHIIT = detectHIIT(selectedExercise);
+              const isYoga = selectedExercise.category === 'flexibility';
+              
+              // Only show weight-related tip for strength exercises (not cardio, HIIT, or yoga)
+              if (isCardio || isHIIT || isYoga) {
+                return null; // Don't show weight tip for cardio/HIIT/yoga
+              }
+              
+              return (
+                <div className="flex flex-wrap">
+                  <AIInsightPill insight="Try increasing weight by 2.5kg today" />
+                </div>
+              );
+            })()}
 
-            {/* Current Set Card */}
-            {selectedExercise && currentSet && (
-              <CurrentSetCard
-                setNumber={currentSetNumber}
-                set={currentSet}
-                unit={profile?.preferredUnit || 'kg'}
-                targetReps={undefined}
-                previousWeight={
-                  completedSets.length > 0
-                    ? completedSets[completedSets.length - 1]?.weight
-                    : undefined
-                }
-                onUpdate={(updates) => handleUpdateSet(currentSet.setNumber, updates)}
-                onLogSet={handleLogCurrentSet}
-                onAddSet={handleAddSet}
-                nextExerciseName={nextExercise?.exerciseName}
-                isLastInSuperset={isLastInSuperset}
-                showGroupRestMessage={isInSuperset && !!nextExercise && !isLastInSuperset}
-              />
-            )}
+            {/* Current Set Card - Conditionally render based on exercise category */}
+            {selectedExercise && currentSet && (() => {
+              const isCardio = selectedExercise.category === 'cardio';
+              const isYoga = selectedExercise.category === 'flexibility';
+              const isHIIT = detectHIIT(selectedExercise);
+              
+              // Render HIIT card if detected
+              if (isHIIT) {
+                return (
+                  <HIITSetCard
+                    setNumber={currentSetNumber}
+                    set={currentSet}
+                    onUpdate={(updates) => handleUpdateSet(currentSet.setNumber, updates)}
+                    onLogSet={handleLogCurrentSet}
+                    onAddSet={handleAddSet}
+                    nextExerciseName={nextExercise?.exerciseName}
+                    isLastInSuperset={isLastInSuperset}
+                    showGroupRestMessage={isInSuperset && !!nextExercise && !isLastInSuperset}
+                  />
+                );
+              }
+              
+              // Render Cardio card for cardio exercises
+              if (isCardio) {
+                return (
+                  <CardioSetCard
+                    setNumber={currentSetNumber}
+                    set={currentSet}
+                    onUpdate={(updates) => handleUpdateSet(currentSet.setNumber, updates)}
+                    onLogSet={handleLogCurrentSet}
+                    onAddSet={handleAddSet}
+                    nextExerciseName={nextExercise?.exerciseName}
+                    isLastInSuperset={isLastInSuperset}
+                    showGroupRestMessage={isInSuperset && !!nextExercise && !isLastInSuperset}
+                  />
+                );
+              }
+              
+              // Render Yoga card for flexibility exercises
+              if (isYoga) {
+                return (
+                  <YogaSetCard
+                    setNumber={currentSetNumber}
+                    set={currentSet}
+                    onUpdate={(updates) => handleUpdateSet(currentSet.setNumber, updates)}
+                    onLogSet={handleLogCurrentSet}
+                    onAddSet={handleAddSet}
+                    nextExerciseName={nextExercise?.exerciseName}
+                    isLastInSuperset={isLastInSuperset}
+                    showGroupRestMessage={isInSuperset && !!nextExercise && !isLastInSuperset}
+                  />
+                );
+              }
+              
+              // Default to strength CurrentSetCard
+              return (
+                <CurrentSetCard
+                  setNumber={currentSetNumber}
+                  set={currentSet}
+                  unit={profile?.preferredUnit || 'kg'}
+                  targetReps={undefined}
+                  previousWeight={
+                    completedSets.length > 0
+                      ? completedSets[completedSets.length - 1]?.weight
+                      : undefined
+                  }
+                  onUpdate={(updates) => handleUpdateSet(currentSet.setNumber, updates)}
+                  onLogSet={handleLogCurrentSet}
+                  onAddSet={handleAddSet}
+                  nextExerciseName={nextExercise?.exerciseName}
+                  isLastInSuperset={isLastInSuperset}
+                  showGroupRestMessage={isInSuperset && !!nextExercise && !isLastInSuperset}
+                />
+              );
+            })()}
 
             {/* Add Set Button - Show when all sets are completed */}
             {selectedExercise && !currentSet && completedSets.length > 0 && (
@@ -1456,6 +1482,7 @@ export function LogExercise({
 
           </>
         )}
+        </div>
       </main>
 
       {/* Rest Timer - Only show when not in superset or last exercise in superset */}

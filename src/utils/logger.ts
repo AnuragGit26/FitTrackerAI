@@ -14,33 +14,24 @@ class Logger {
     private isProduction = import.meta.env.PROD;
 
   /**
-   * Log informational messages (only in development)
+   * Log informational messages (disabled - no-op)
    */
-  log(message: string, ...args: unknown[]): void {
-    if (this.isDevelopment) {
-      // eslint-disable-next-line no-console
-      console.log(`[LOG] ${message}`, ...args);
-    }
+  log(_message: string, ..._args: unknown[]): void {
+    // Debug logging disabled
   }
 
   /**
-   * Log debug messages (only in development)
+   * Log debug messages (disabled - no-op)
    */
-  debug(message: string, ...args: unknown[]): void {
-    if (this.isDevelopment) {
-      // eslint-disable-next-line no-console
-      console.debug(`[DEBUG] ${message}`, ...args);
-    }
+  debug(_message: string, ..._args: unknown[]): void {
+    // Debug logging disabled
   }
 
   /**
-   * Log info messages (only in development)
+   * Log info messages (disabled - no-op)
    */
-  info(message: string, ...args: unknown[]): void {
-    if (this.isDevelopment) {
-      // eslint-disable-next-line no-console
-      console.info(`[INFO] ${message}`, ...args);
-    }
+  info(_message: string, ..._args: unknown[]): void {
+    // Debug logging disabled
   }
 
   /**
@@ -74,13 +65,10 @@ class Logger {
   }
 
   /**
-   * Log service worker messages (only in development)
+   * Log service worker messages (disabled - no-op)
    */
-  sw(message: string, ...args: unknown[]): void {
-    if (this.isDevelopment) {
-      // eslint-disable-next-line no-console
-      console.log(`[SW] ${message}`, ...args);
-    }
+  sw(_message: string, ..._args: unknown[]): void {
+    // Debug logging disabled
   }
 
   /**

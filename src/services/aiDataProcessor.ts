@@ -24,6 +24,14 @@ function estimateTokens(text: string): number {
 function formatWorkoutAbbreviated(workout: Workout): string {
   const date = new Date(workout.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const caloriesInfo = workout.calories ? `, ${workout.calories} cal` : '';
+  // For cardio workouts, show distance instead of volume
+  if (workout.workoutType === 'cardio') {
+    const totalSteps = workout.exercises.reduce((sum, e) => 
+      sum + e.sets.reduce((s, set) => s + (set.steps || 0), 0), 0
+    );
+    const stepsInfo = totalSteps > 0 ? `, ${totalSteps} steps` : '';
+    return `${date}: ${workout.exercises.length}ex, ${workout.totalVolume.toFixed(1)}km${stepsInfo}${caloriesInfo}`;
+  }
   return `${date}: ${workout.exercises.length}ex, ${Math.round(workout.totalVolume)}kg${caloriesInfo}`;
 }
 
@@ -31,12 +39,26 @@ function formatWorkoutDetailed(workout: Workout, isPR: boolean = false): string 
   const date = new Date(workout.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const exercises = workout.exercises
     .slice(0, 5)
-    .map(e => `${e.exerciseName} (${e.sets.length} sets)`)
+    .map(e => {
+      // For cardio exercises, include distance, time, steps if available
+      if (workout.workoutType === 'cardio' && e.sets.length > 0) {
+        const set = e.sets[0];
+        const distance = set.distance ? `${set.distance}${set.distanceUnit || 'km'}` : '';
+        const time = set.time ? `${Math.round(set.time / 60)}min` : '';
+        const steps = set.steps ? `, ${set.steps} steps` : '';
+        const pace = set.distance && set.time ? ` (${Math.round(set.time / 60 / set.distance)}min/${set.distanceUnit || 'km'})` : '';
+        return `${e.exerciseName}: ${distance}${time ? ` in ${time}` : ''}${steps}${pace}`;
+      }
+      return `${e.exerciseName} (${e.sets.length} sets)`;
+    })
     .join(', ');
   const caloriesInfo = workout.calories ? `, ${workout.calories} cal` : '';
   const prIndicator = isPR ? ' [PR]' : '';
-  const duration = workout.duration ? `, ${Math.round(workout.duration)}min` : '';
-  return `${date}: ${exercises}${workout.exercises.length > 5 ? '...' : ''}, ${Math.round(workout.totalVolume)}kg${duration}${caloriesInfo}${prIndicator}`;
+  const duration = workout.totalDuration ? `, ${Math.round(workout.totalDuration)}min` : '';
+  const volumeInfo = workout.workoutType === 'cardio' 
+    ? `, ${workout.totalVolume.toFixed(1)}km` 
+    : `, ${Math.round(workout.totalVolume)}kg`;
+  return `${date}: ${exercises}${workout.exercises.length > 5 ? '...' : ''}${volumeInfo}${duration}${caloriesInfo}${prIndicator}`;
 }
 
 class AIDataProcessor {

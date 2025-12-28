@@ -33,3 +33,5 @@ build
 .cache
 
 test-results/*
+.vercel
+.env*.local

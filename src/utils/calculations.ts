@@ -239,3 +239,65 @@ export function calculateNextSetByVolume(
   return { weight: Math.max(0, newWeight), reps: Math.max(1, newReps) };
 }
 
+/**
+ * Calculate pace (time per distance unit)
+ * @param time Time in seconds
+ * @param distance Distance in km or miles
+ * @param distanceUnit Unit of distance ('km' or 'miles')
+ * @returns Pace in minutes per km or minutes per mile
+ */
+export function calculatePace(time: number, distance: number, distanceUnit: 'km' | 'miles'): number {
+  if (distance <= 0 || time <= 0) return 0;
+  const timeMinutes = time / 60;
+  return timeMinutes / distance;
+}
+
+/**
+ * Estimate calories burned from steps count
+ * Approximate formula: calories ≈ steps × 0.04
+ * This is a rough estimate and varies by individual factors
+ * @param steps Number of steps
+ * @returns Estimated calories burned
+ */
+export function estimateCaloriesFromSteps(steps: number): number {
+  if (steps <= 0) return 0;
+  return Math.round(steps * 0.04);
+}
+
+/**
+ * Calculate speed (distance per time)
+ * @param distance Distance in km or miles
+ * @param time Time in seconds
+ * @param distanceUnit Unit of distance ('km' or 'miles')
+ * @returns Speed in km/h or mph
+ */
+export function calculateSpeed(distance: number, time: number, distanceUnit: 'km' | 'miles'): number {
+  if (time <= 0 || distance <= 0) return 0;
+  const timeHours = time / 3600;
+  return distance / timeHours;
+}
+
+/**
+ * Format pace for display
+ * @param pace Pace in minutes per km or miles
+ * @param distanceUnit Unit of distance
+ * @returns Formatted pace string (e.g., "5:30 /km")
+ */
+export function formatPace(pace: number, distanceUnit: 'km' | 'miles'): string {
+  if (pace <= 0) return '0:00';
+  const minutes = Math.floor(pace);
+  const seconds = Math.round((pace - minutes) * 60);
+  return `${minutes}:${seconds.toString().padStart(2, '0')} /${distanceUnit === 'km' ? 'km' : 'mi'}`;
+}
+
+/**
+ * Format speed for display
+ * @param speed Speed in km/h or mph
+ * @param distanceUnit Unit of distance
+ * @returns Formatted speed string (e.g., "12.5 km/h")
+ */
+export function formatSpeed(speed: number, distanceUnit: 'km' | 'miles'): string {
+  if (speed <= 0) return '0';
+  return `${speed.toFixed(1)} ${distanceUnit === 'km' ? 'km/h' : 'mph'}`;
+}
+

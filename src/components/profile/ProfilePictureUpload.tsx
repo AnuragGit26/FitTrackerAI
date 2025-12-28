@@ -11,6 +11,35 @@ interface ProfilePictureUploadProps {
   onPictureChange: (picture: string) => void;
 }
 
+/**
+ * Sanitizes a string for use in Supabase Storage keys
+ * Replaces invalid characters with underscores
+ */
+function sanitizeStorageKey(key: string): string {
+  // Supabase Storage keys can contain: alphanumeric, hyphens, underscores, forward slashes
+  // Replace pipe characters and other invalid characters with underscores
+  // Invalid characters: | < > : " \ ? * and control characters
+  return key
+    .split('')
+    .map((char) => {
+      const code = char.charCodeAt(0);
+      // Allow: alphanumeric, hyphen, underscore, forward slash, period
+      if (
+        (code >= 48 && code <= 57) || // 0-9
+        (code >= 65 && code <= 90) || // A-Z
+        (code >= 97 && code <= 122) || // a-z
+        char === '-' ||
+        char === '_' ||
+        char === '/' ||
+        char === '.'
+      ) {
+        return char;
+      }
+      return '_';
+    })
+    .join('');
+}
+
 export function ProfilePictureUpload({ picture, onPictureChange }: ProfilePictureUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -45,14 +74,24 @@ export function ProfilePictureUpload({ picture, onPictureChange }: ProfilePictur
       }
 
       const supabase = getSupabaseClient();
-      const fileName = `${profile.id}/${Date.now()}-${processed.file.name}`;
+      
+      // IMPORTANT: The 'profile-photos' bucket must be PUBLIC in Supabase Dashboard
+      // See supabase/migrations/002_storage_policies.sql for setup instructions
+      // The migration creates public bucket policies that work with Auth0
+
+      // Sanitize user ID and file name for storage key
+      const sanitizedUserId = sanitizeStorageKey(profile.id);
+      const sanitizedFileName = sanitizeStorageKey(processed.file.name);
+      const fileName = `${sanitizedUserId}/${Date.now()}-${sanitizedFileName}`;
 
       // Delete old profile photo if exists
       if (picture && picture.includes('profile-photos')) {
         try {
           const oldPath = picture.split('/profile-photos/')[1];
           if (oldPath) {
-            await supabase.storage.from('profile-photos').remove([oldPath]);
+            // Decode the path in case it was URL encoded
+            const decodedPath = decodeURIComponent(oldPath);
+            await supabase.storage.from('profile-photos').remove([decodedPath]);
           }
         } catch (error) {
           // Ignore errors when deleting old photo
@@ -60,7 +99,8 @@ export function ProfilePictureUpload({ picture, onPictureChange }: ProfilePictur
         }
       }
 
-      // Upload new photo
+      // Upload new photo to public bucket
+      // Public bucket policies allow uploads without authentication
       const { error: uploadError } = await supabase.storage
         .from('profile-photos')
         .upload(fileName, processed.file, {
@@ -108,7 +148,9 @@ export function ProfilePictureUpload({ picture, onPictureChange }: ProfilePictur
         const supabase = getSupabaseClient();
         const fileName = picture.split('/profile-photos/')[1];
         if (fileName) {
-          await supabase.storage.from('profile-photos').remove([fileName]);
+          // Decode the path in case it was URL encoded
+          const decodedPath = decodeURIComponent(fileName);
+          await supabase.storage.from('profile-photos').remove([decodedPath]);
         }
       }
 

@@ -39,7 +39,6 @@ class CacheVersionService {
             }
 
             // Version changed - clear all caches
-            logger.log(`[CacheVersionService] Version changed: ${storedVersion} -> ${currentVersion.version}`);
             await this.clearAllCaches();
 
             // Store new version
@@ -61,11 +60,25 @@ class CacheVersionService {
             if (!response.ok) {
                 return null;
             }
-            return await response.json();
-    } catch (error) {
-      logger.error('[CacheVersionService] Failed to fetch version.json:', error);
-      return null;
-    }
+            
+            // Check if response is actually JSON (not HTML 404 page)
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                return null;
+            }
+            
+            const text = await response.text();
+            
+            // Additional check: if response starts with HTML tags, it's not JSON
+            if (text.trim().startsWith('<!')) {
+                return null;
+            }
+            
+            return JSON.parse(text) as VersionInfo;
+        } catch (error) {
+            // Silently handle errors - version.json may not exist in dev mode
+            return null;
+        }
     }
 
     private async clearAllCaches(): Promise<void> {
@@ -76,7 +89,6 @@ class CacheVersionService {
             if ('caches' in window) {
                 const cacheNames = await caches.keys();
                 const clearPromises = cacheNames.map(cacheName => {
-                    logger.log(`[CacheVersionService] Clearing cache: ${cacheName}`);
                     return caches.delete(cacheName);
                 });
                 await Promise.all(clearPromises);
@@ -86,7 +98,6 @@ class CacheVersionService {
             if ('serviceWorker' in navigator) {
                 const registrations = await navigator.serviceWorker.getRegistrations();
                 const unregisterPromises = registrations.map(registration => {
-                    logger.log('[CacheVersionService] Unregistering service worker');
                     return registration.unregister();
                 });
                 await Promise.all(unregisterPromises);
@@ -111,8 +122,6 @@ class CacheVersionService {
                     }
                 }
             }
-
-            logger.log('[CacheVersionService] All caches cleared successfully');
         } catch (error) {
             logger.error('[CacheVersionService] Error clearing caches:', error);
         } finally {
@@ -127,7 +136,6 @@ class CacheVersionService {
 
                 messageChannel.port1.onmessage = (event) => {
                     if (event.data && event.data.type === 'CACHE_CLEARED') {
-                        logger.log('[CacheVersionService] Service worker confirmed cache cleared');
                         resolve();
                     }
                 };

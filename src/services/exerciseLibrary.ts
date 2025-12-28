@@ -2482,8 +2482,6 @@ export const exerciseLibrary = {
             existingNames.add(normalizedName);
           });
 
-          logger.info(`✅ Loaded ${STRENGTHLOG_EXERCISES.length} StrengthLog exercises (strength category only)`);
-          logger.info(`✅ Loaded ${CORE_EXERCISES.filter(ex => ex.category !== 'strength').length} core exercises (non-strength categories)`);
         } else {
           logger.warn('⚠️ No StrengthLog exercises found. Strength category exercises will be missing.');
         }
@@ -2497,8 +2495,6 @@ export const exerciseLibrary = {
       for (const exercise of exercises) {
         await dbHelpers.saveExercise(exercise);
       }
-
-      logger.info(`✅ Initialized ${exercises.length} exercises`);
     }
   },
 

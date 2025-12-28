@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check } from 'lucide-react';
+import { ArrowLeft, Check, Edit } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUserStore } from '@/store/userStore';
 import { sleepRecoveryService } from '@/services/sleepRecoveryService';
@@ -16,13 +16,20 @@ export function SleepRecovery() {
   const shouldReduceMotion = prefersReducedMotion();
 
   const [isSaving, setIsSaving] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [hasExistingData, setHasExistingData] = useState(false);
+  const [existingSleepLog, setExistingSleepLog] = useState<SleepLog | null>(null);
+  const [existingRecoveryLog, setExistingRecoveryLog] = useState<RecoveryLog | null>(null);
   
-  // Memoize today to prevent useEffect re-running on every render
-  const today = useMemo(() => {
+  // Track current date and detect changes
+  const getToday = () => {
     const date = new Date();
     date.setHours(0, 0, 0, 0);
     return date;
-  }, []);
+  };
+  
+  const [today, setToday] = useState(() => getToday());
+  const lastDateRef = useRef<string>(today.toISOString().split('T')[0]);
 
   // Sleep state
   const [bedtime, setBedtime] = useState(() => {
@@ -46,6 +53,49 @@ export function SleepRecovery() {
   const [readinessToTrain, setReadinessToTrain] = useState<'full-power' | 'light' | 'rest-day'>('full-power');
   const [recoveryNotes, setRecoveryNotes] = useState('');
 
+  // Daily reset mechanism - check for date changes
+  useEffect(() => {
+    const checkDateChange = () => {
+      const currentDate = getToday();
+      const currentDateStr = currentDate.toISOString().split('T')[0];
+      
+      if (currentDateStr !== lastDateRef.current) {
+        // Date changed - reset state
+        setToday(currentDate);
+        lastDateRef.current = currentDateStr;
+        setHasExistingData(false);
+        setIsEditMode(false);
+        setExistingSleepLog(null);
+        setExistingRecoveryLog(null);
+        
+        // Reset form to defaults
+        const defaultBedtime = new Date();
+        defaultBedtime.setHours(23, 0, 0, 0);
+        setBedtime(defaultBedtime);
+        
+        const defaultWakeTime = new Date();
+        defaultWakeTime.setHours(7, 30, 0, 0);
+        setWakeTime(defaultWakeTime);
+        setSleepQuality(8);
+        setSleepNotes('');
+        setOverallRecovery(85);
+        setStressLevel(3);
+        setEnergyLevel(8);
+        setSoreness(5);
+        setReadinessToTrain('full-power');
+        setRecoveryNotes('');
+      }
+    };
+
+    // Check immediately
+    checkDateChange();
+
+    // Set up interval to check every minute
+    const interval = setInterval(checkDateChange, 60000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   // Load existing data
   useEffect(() => {
     if (!profile?.id) return;
@@ -55,20 +105,28 @@ export function SleepRecovery() {
         const existingSleep = await sleepRecoveryService.getSleepLog(profile.id, today);
         const existingRecovery = await sleepRecoveryService.getRecoveryLog(profile.id, today);
 
-        if (existingSleep) {
-          setBedtime(new Date(existingSleep.bedtime));
-          setWakeTime(new Date(existingSleep.wakeTime));
-          setSleepQuality(existingSleep.quality);
-          setSleepNotes(existingSleep.notes || '');
-        }
+        const hasData = !!(existingSleep || existingRecovery);
+        setHasExistingData(hasData);
+        setExistingSleepLog(existingSleep || null);
+        setExistingRecoveryLog(existingRecovery || null);
 
-        if (existingRecovery) {
-          setOverallRecovery(existingRecovery.overallRecovery);
-          setStressLevel(existingRecovery.stressLevel);
-          setEnergyLevel(existingRecovery.energyLevel);
-          setSoreness(existingRecovery.soreness);
-          setReadinessToTrain(existingRecovery.readinessToTrain);
-          setRecoveryNotes(existingRecovery.notes || '');
+        // Only populate form fields if in edit mode or no data exists
+        if (isEditMode || !hasData) {
+          if (existingSleep) {
+            setBedtime(new Date(existingSleep.bedtime));
+            setWakeTime(new Date(existingSleep.wakeTime));
+            setSleepQuality(existingSleep.quality);
+            setSleepNotes(existingSleep.notes || '');
+          }
+
+          if (existingRecovery) {
+            setOverallRecovery(existingRecovery.overallRecovery);
+            setStressLevel(existingRecovery.stressLevel);
+            setEnergyLevel(existingRecovery.energyLevel);
+            setSoreness(existingRecovery.soreness);
+            setReadinessToTrain(existingRecovery.readinessToTrain);
+            setRecoveryNotes(existingRecovery.notes || '');
+          }
         }
       } catch (error) {
         console.error('Failed to load sleep/recovery data:', error);
@@ -76,7 +134,7 @@ export function SleepRecovery() {
     };
 
     loadData();
-  }, [profile?.id, today]);
+  }, [profile?.id, today, isEditMode]);
 
   const calculateDuration = () => {
     return sleepRecoveryService.calculateSleepDuration(bedtime, wakeTime);
@@ -136,6 +194,12 @@ export function SleepRecovery() {
       return;
     }
 
+    // Prevent duplicate saves if data exists and not in edit mode
+    if (hasExistingData && !isEditMode) {
+      showError('Sleep data already saved for today. Click Edit to modify.');
+      return;
+    }
+
     setIsSaving(true);
     try {
       const duration = calculateDuration();
@@ -143,6 +207,7 @@ export function SleepRecovery() {
       sleepDate.setHours(0, 0, 0, 0);
 
       const sleepLog: SleepLog = {
+        ...(existingSleepLog || {}),
         userId: profile.id,
         date: sleepDate,
         bedtime,
@@ -153,6 +218,7 @@ export function SleepRecovery() {
       };
 
       const recoveryLog: RecoveryLog = {
+        ...(existingRecoveryLog || {}),
         userId: profile.id,
         date: today,
         overallRecovery,
@@ -168,6 +234,12 @@ export function SleepRecovery() {
         sleepRecoveryService.saveRecoveryLog(recoveryLog),
       ]);
 
+      // Update state after successful save
+      setHasExistingData(true);
+      setIsEditMode(false);
+      setExistingSleepLog(sleepLog as SleepLog);
+      setExistingRecoveryLog(recoveryLog as RecoveryLog);
+
       success('Sleep & Recovery logged successfully');
       navigate(-1);
     } catch (error) {
@@ -178,8 +250,38 @@ export function SleepRecovery() {
     }
   };
 
+  const handleEdit = () => {
+    setIsEditMode(true);
+    // Load existing data into form when entering edit mode
+    if (existingSleepLog) {
+      setBedtime(new Date(existingSleepLog.bedtime));
+      setWakeTime(new Date(existingSleepLog.wakeTime));
+      setSleepQuality(existingSleepLog.quality);
+      setSleepNotes(existingSleepLog.notes || '');
+    }
+    if (existingRecoveryLog) {
+      setOverallRecovery(existingRecoveryLog.overallRecovery);
+      setStressLevel(existingRecoveryLog.stressLevel);
+      setEnergyLevel(existingRecoveryLog.energyLevel);
+      setSoreness(existingRecoveryLog.soreness);
+      setReadinessToTrain(existingRecoveryLog.readinessToTrain);
+      setRecoveryNotes(existingRecoveryLog.notes || '');
+    }
+  };
+
   const duration = calculateDuration();
   const durationFormatted = sleepRecoveryService.formatDuration(duration);
+
+  // Calculate summary metrics for minimal view
+  const summaryDuration = existingSleepLog 
+    ? sleepRecoveryService.formatDuration(existingSleepLog.duration)
+    : durationFormatted;
+  const summaryQuality = existingSleepLog?.quality || sleepQuality;
+  const summaryRecovery = existingRecoveryLog?.overallRecovery || overallRecovery;
+
+  // Determine if we should show minimal view or full form
+  const showMinimalView = hasExistingData && !isEditMode;
+  const showSaveButton = !hasExistingData || isEditMode;
 
   return (
     <div className="relative flex h-full min-h-screen w-full max-w-lg mx-auto flex-col overflow-hidden bg-background-light dark:bg-background-dark">
@@ -194,27 +296,155 @@ export function SleepRecovery() {
         <h2 className="text-slate-900 dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center">
           Log Recovery
         </h2>
-        <button
-          onClick={handleSave}
-          disabled={isSaving}
-          className="flex w-12 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors h-12"
-        >
-          {isSaving ? (
-            <span className="text-primary text-base font-bold leading-normal tracking-[0.015em] shrink-0">
-              Saving...
-            </span>
-          ) : (
-            <span className="text-primary text-base font-bold leading-normal tracking-[0.015em] shrink-0">
-              Save
-            </span>
-          )}
-        </button>
+        {showSaveButton ? (
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="flex w-12 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors h-12"
+          >
+            {isSaving ? (
+              <span className="text-primary text-base font-bold leading-normal tracking-[0.015em] shrink-0">
+                Saving...
+              </span>
+            ) : (
+              <span className="text-primary text-base font-bold leading-normal tracking-[0.015em] shrink-0">
+                Save
+              </span>
+            )}
+          </button>
+        ) : (
+          <div className="w-12" /> // Spacer for centering
+        )}
       </div>
 
       {/* Main Scrollable Content */}
       <div className="flex-1 overflow-y-auto pb-24 p-4 space-y-6">
-        {/* Sleep Log Card */}
-        <section className="flex flex-col gap-4 rounded-xl bg-white dark:bg-surface-dark p-5 shadow-sm border border-gray-100 dark:border-surface-border">
+        {/* Minimal Summary View - shown when data exists and not editing */}
+        {showMinimalView && (
+          <>
+            {/* Sleep Summary Card */}
+            <section className="flex flex-col gap-4 rounded-xl bg-white dark:bg-surface-dark p-5 shadow-sm border border-gray-100 dark:border-surface-border">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-primary/10">
+                    <span className="material-symbols-outlined text-primary">bedtime</span>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold leading-tight">Last Night&apos;s Sleep</h3>
+                    <p className="text-slate-500 dark:text-text-secondary text-xs font-medium uppercase tracking-wider">
+                      Sleep Analysis
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleEdit}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary font-medium text-sm transition-colors"
+                >
+                  <Edit className="w-4 h-4" />
+                  Edit
+                </button>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4 pt-2">
+                <div className="flex flex-col items-center p-3 rounded-lg bg-background-light dark:bg-black/30 border border-gray-100 dark:border-white/5">
+                  <span className="text-xs text-slate-500 dark:text-text-secondary mb-1">Duration</span>
+                  <span className="text-primary font-bold text-lg">{summaryDuration}</span>
+                </div>
+                <div className="flex flex-col items-center p-3 rounded-lg bg-background-light dark:bg-black/30 border border-gray-100 dark:border-white/5">
+                  <span className="text-xs text-slate-500 dark:text-text-secondary mb-1">Quality</span>
+                  <span className="text-primary font-bold text-lg">{summaryQuality}/10</span>
+                </div>
+                <div className="flex flex-col items-center p-3 rounded-lg bg-background-light dark:bg-black/30 border border-gray-100 dark:border-white/5">
+                  <span className="text-xs text-slate-500 dark:text-text-secondary mb-1">Recovery</span>
+                  <span className="text-primary font-bold text-lg">{summaryRecovery}%</span>
+                </div>
+              </div>
+
+              {existingSleepLog?.notes && (
+                <div className="mt-2 pt-3 border-t border-gray-100 dark:border-surface-border">
+                  <p className="text-xs text-slate-500 dark:text-text-secondary mb-1">Notes</p>
+                  <p className="text-sm text-slate-700 dark:text-gray-300">{existingSleepLog.notes}</p>
+                </div>
+              )}
+            </section>
+
+            {/* Recovery Summary Card */}
+            <section className="flex flex-col gap-4 rounded-xl bg-white dark:bg-surface-dark p-5 shadow-sm border border-gray-100 dark:border-surface-border">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-primary/10">
+                    <span className="material-symbols-outlined text-primary">ecg_heart</span>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold leading-tight">Body Status</h3>
+                    <p className="text-slate-500 dark:text-text-secondary text-xs font-medium uppercase tracking-wider">
+                      Daily Check-in
+                    </p>
+                  </div>
+                </div>
+                <div className="relative size-12 flex items-center justify-center">
+                  <svg className="size-full -rotate-90" viewBox="0 0 36 36">
+                    <path
+                      className="text-gray-200 dark:text-surface-border"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                    ></path>
+                    <path
+                      className="text-primary"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeDasharray={`${summaryRecovery}, 100`}
+                      strokeWidth="3"
+                    ></path>
+                  </svg>
+                  <span className="absolute text-xs font-bold text-slate-900 dark:text-white">
+                    {summaryRecovery}%
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 pt-2">
+                <div className="flex flex-col items-center p-3 rounded-lg bg-background-light dark:bg-black/30 border border-gray-100 dark:border-white/5">
+                  <span className="text-xs text-slate-500 dark:text-text-secondary mb-1">Stress</span>
+                  <span className="text-white font-medium text-sm">{getStressLabel(existingRecoveryLog?.stressLevel || stressLevel)}</span>
+                </div>
+                <div className="flex flex-col items-center p-3 rounded-lg bg-background-light dark:bg-black/30 border border-gray-100 dark:border-white/5">
+                  <span className="text-xs text-slate-500 dark:text-text-secondary mb-1">Energy</span>
+                  <span className="text-white font-medium text-sm">{getEnergyLabel(existingRecoveryLog?.energyLevel || energyLevel)}</span>
+                </div>
+                <div className="flex flex-col items-center p-3 rounded-lg bg-background-light dark:bg-black/30 border border-gray-100 dark:border-white/5">
+                  <span className="text-xs text-slate-500 dark:text-text-secondary mb-1">Soreness</span>
+                  <span className="text-white font-medium text-sm">{getSorenessLabel(existingRecoveryLog?.soreness || soreness)}</span>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <span className="text-xs text-slate-500 dark:text-text-secondary mb-1 block">Readiness to Train</span>
+                <span className="text-sm font-medium text-slate-700 dark:text-white capitalize">
+                  {existingRecoveryLog?.readinessToTrain === 'full-power' && 'Full Power'}
+                  {existingRecoveryLog?.readinessToTrain === 'light' && 'Light'}
+                  {existingRecoveryLog?.readinessToTrain === 'rest-day' && 'Rest Day'}
+                </span>
+              </div>
+
+              {existingRecoveryLog?.notes && (
+                <div className="mt-2 pt-3 border-t border-gray-100 dark:border-surface-border">
+                  <p className="text-xs text-slate-500 dark:text-text-secondary mb-1">Notes</p>
+                  <p className="text-sm text-slate-700 dark:text-gray-300">{existingRecoveryLog.notes}</p>
+                </div>
+              )}
+            </section>
+          </>
+        )}
+
+        {/* Full Form - shown when no data exists or in edit mode */}
+        {!showMinimalView && (
+          <>
+            {/* Sleep Log Card */}
+            <section className="flex flex-col gap-4 rounded-xl bg-white dark:bg-surface-dark p-5 shadow-sm border border-gray-100 dark:border-surface-border">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 rounded-lg bg-primary/10">
               <span className="material-symbols-outlined text-primary">bedtime</span>
@@ -533,20 +763,24 @@ export function SleepRecovery() {
           </label>
         </section>
         <div className="h-4"></div>
+          </>
+        )}
       </div>
 
-      {/* Floating Action Button */}
-      <div className="fixed bottom-[90px] right-4 z-40">
-        <motion.button
-          onClick={handleSave}
-          disabled={isSaving}
-          className="flex items-center justify-center size-14 rounded-full bg-primary text-black shadow-[0_4px_12px_rgba(13,242,105,0.4)] hover:shadow-[0_6px_16px_rgba(13,242,105,0.6)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          whileHover={!isSaving && !shouldReduceMotion ? { scale: 1.05 } : {}}
-          whileTap={!isSaving && !shouldReduceMotion ? { scale: 0.95 } : {}}
-        >
-          <Check className="w-6 h-6" />
-        </motion.button>
-      </div>
+      {/* Floating Action Button - only show when save button should be visible */}
+      {showSaveButton && (
+        <div className="fixed bottom-[90px] right-4 z-40">
+          <motion.button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="flex items-center justify-center size-14 rounded-full bg-primary text-black shadow-[0_4px_12px_rgba(13,242,105,0.4)] hover:shadow-[0_6px_16px_rgba(13,242,105,0.6)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            whileHover={!isSaving && !shouldReduceMotion ? { scale: 1.05 } : {}}
+            whileTap={!isSaving && !shouldReduceMotion ? { scale: 0.95 } : {}}
+          >
+            <Check className="w-6 h-6" />
+          </motion.button>
+        </div>
+      )}
     </div>
   );
 }

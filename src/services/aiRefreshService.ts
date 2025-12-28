@@ -47,7 +47,7 @@ class AIRefreshService {
     const currentWorkoutId = workoutEventTracker.getLastProcessedWorkoutId();
 
     // Check if refresh is needed
-    const { shouldRefresh, reason } = await this.shouldRefresh(
+    const { shouldRefresh } = await this.shouldRefresh(
       insightType,
       fingerprint,
       currentWorkoutId,
@@ -58,7 +58,6 @@ class AIRefreshService {
       // Try to get from cache
       const cached = await aiCallManager.getCached<T>(fingerprint, insightType);
       if (cached) {
-        logger.debug(`[AI Refresh] Using cached ${insightType} (${reason})`);
         return cached;
       }
     }
@@ -68,7 +67,6 @@ class AIRefreshService {
 
     // Check if there's already a pending refresh for this key
     if (this.pendingRefreshes.has(refreshKey)) {
-      logger.debug(`[AI Refresh] Waiting for pending ${insightType} refresh`);
       return this.pendingRefreshes.get(refreshKey) as Promise<T>;
     }
 
@@ -105,8 +103,6 @@ class AIRefreshService {
     userId?: string,
     priority: number = 0
   ): Promise<T> {
-    logger.debug(`[AI Refresh] Refreshing ${insightType} (fingerprint: ${fingerprint.substring(0, 8)}...)`);
-
     try {
       // Execute AI call with caching
       const result = await aiCallManager.executeWithCache(
@@ -124,7 +120,6 @@ class AIRefreshService {
         userId
       );
 
-      logger.debug(`[AI Refresh] Successfully refreshed ${insightType}`);
       return result;
     } catch (error) {
       logger.error(`[AI Refresh] Failed to refresh ${insightType}:`, error);

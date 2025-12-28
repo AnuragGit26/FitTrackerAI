@@ -333,7 +333,6 @@ async function updateTemplatesWithImages(userId: string): Promise<void> {
                         imageUrl: defaultImageUrl,
                         updatedAt: new Date(),
                     });
-                    logger.debug(`Updated template "${template.name}" with imageUrl`);
                 }
             }
         }
@@ -398,15 +397,8 @@ export async function initializeDefaultTemplates(userId: string): Promise<void> 
                 exercises: exercisesWithIds,
             };
             
-            // Debug: Log imageUrl to verify it's included
-            if (template.imageUrl) {
-                logger.debug(`Creating template "${template.name}" with imageUrl:`, template.imageUrl);
-            }
-            
             await templateService.createTemplate(templateToCreate);
         }
-
-        logger.info(`Initialized ${DEFAULT_TEMPLATES.length} default templates for user ${userId}`);
     } catch (error) {
         logger.error('Failed to initialize default templates:', error);
         // Don't throw - allow app to continue even if template initialization fails

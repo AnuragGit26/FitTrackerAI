@@ -88,8 +88,6 @@ export class BackgroundAIFetcher {
       userId,
       apiKey
     );
-
-    logger.debug('[Background AI Fetcher] Background fetch triggered for:', insightTypes);
   }
 
   /**

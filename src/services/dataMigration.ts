@@ -14,7 +14,6 @@ class DataMigration {
    * Run all migrations
    */
   async migrateAll(userId: string): Promise<void> {
-    logger.info('Starting data migration...');
     userContextManager.setUserId(userId);
 
     try {
@@ -22,8 +21,6 @@ class DataMigration {
       await this.migrateSyncMetadata(userId);
       await this.migrateUserIds(userId);
       await this.migrateSoftDeletes(userId);
-
-      logger.info('Data migration completed successfully');
     } catch (error) {
       logger.error('Data migration failed:', error);
       throw error;
@@ -34,8 +31,6 @@ class DataMigration {
    * Add version fields to all existing records
    */
   private async migrateVersions(userId: string): Promise<void> {
-    logger.info('Migrating versions...');
-
     const tables: Array<{ name: SyncableTable; store: string }> = [
       { name: 'workouts', store: 'workouts' },
       { name: 'workout_templates', store: 'workoutTemplates' },
@@ -88,8 +83,6 @@ class DataMigration {
             }
           }
         });
-
-        logger.info(`Migrated versions for ${name}`);
       } catch (error) {
         logger.error(`Failed to migrate versions for ${name}:`, error);
         throw error;
@@ -101,8 +94,6 @@ class DataMigration {
    * Migrate sync metadata from settings to dedicated store
    */
   private async migrateSyncMetadata(userId: string): Promise<void> {
-    logger.info('Migrating sync metadata...');
-
     const tables: SyncableTable[] = [
       'workouts',
       'exercises',
@@ -142,16 +133,12 @@ class DataMigration {
         // Don't throw - continue with other tables
       }
     }
-
-    logger.info('Sync metadata migration completed');
   }
 
   /**
    * Ensure all records have userId
    */
   private async migrateUserIds(_userId: string): Promise<void> {
-    logger.info('Migrating user IDs...');
-
     try {
       // Migrate muscle statuses
       const muscleStatuses = await dbHelpers.getAllMuscleStatuses();
@@ -168,8 +155,6 @@ class DataMigration {
           await dbHelpers.saveExercise({ ...exercise, userId: _userId });
         }
       }
-
-      logger.info('User ID migration completed');
     } catch (error) {
       logger.error('Failed to migrate user IDs:', error);
       throw error;
@@ -180,8 +165,6 @@ class DataMigration {
    * Initialize soft delete fields
    */
   private async migrateSoftDeletes(userId: string): Promise<void> {
-    logger.info('Migrating soft deletes...');
-
     // Soft delete fields are initialized as null by default
     // This migration ensures consistency
     try {
@@ -191,8 +174,6 @@ class DataMigration {
           await dbHelpers.updateWorkout(workout.id, { deletedAt: null });
         }
       }
-
-      logger.info('Soft delete migration completed');
     } catch (error) {
       logger.error('Failed to migrate soft deletes:', error);
       // Don't throw - this is not critical
@@ -224,10 +205,8 @@ class DataMigration {
    * Rollback migration (if needed)
    */
   async rollback(_userId: string): Promise<void> {
-    logger.info('Rolling back migration...');
     // Implementation would restore old structure if needed
     // For now, this is a placeholder
-    logger.info('Rollback completed');
   }
 }
 

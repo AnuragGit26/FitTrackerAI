@@ -78,6 +78,58 @@ class SWCommunication {
   }
 
   /**
+   * Deeply serialize data for postMessage (removes Promises, Functions, and converts Dates to strings)
+   */
+  private serializeForPostMessage(value: unknown, visited = new WeakSet()): unknown {
+    // Handle null and undefined
+    if (value === null || value === undefined) {
+      return value;
+    }
+
+    // Handle primitives
+    if (typeof value === 'boolean' || typeof value === 'number' || typeof value === 'string') {
+      return value;
+    }
+
+    // Handle Date objects
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+
+    // Remove Promises and Functions (not serializable)
+    if (value instanceof Promise || typeof value === 'function') {
+      return undefined;
+    }
+
+    // Handle arrays
+    if (Array.isArray(value)) {
+      return value.map(item => this.serializeForPostMessage(item, visited));
+    }
+
+    // Handle objects (check for circular references)
+    if (typeof value === 'object') {
+      // Check for circular reference
+      if (visited.has(value as object)) {
+        return '[Circular]';
+      }
+      visited.add(value as object);
+
+      const serialized: Record<string, unknown> = {};
+      for (const [key, val] of Object.entries(value)) {
+        const serializedValue = this.serializeForPostMessage(val, visited);
+        // Only include if value is not undefined (removes Promises/Functions)
+        if (serializedValue !== undefined) {
+          serialized[key] = serializedValue;
+        }
+      }
+      return serialized;
+    }
+
+    // Fallback: convert to string for unknown types
+    return String(value);
+  }
+
+  /**
    * Send message to service worker
    */
   async sendMessage(type: MessageType, data: Record<string, unknown> = {}): Promise<void> {
@@ -88,9 +140,12 @@ class SWCommunication {
     }
 
     try {
+      // Serialize all data to ensure it's postMessage-compatible
+      const serializedData = this.serializeForPostMessage(data) as Record<string, unknown>;
+      
       sw.postMessage({
         type,
-        ...data,
+        ...serializedData,
       });
     } catch (error) {
       console.error('[SW Communication] Failed to send message:', error);

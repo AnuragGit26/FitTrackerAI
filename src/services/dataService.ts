@@ -43,6 +43,35 @@ class DataService {
   private syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private syncEnabled = false;
 
+  // LocalStorage helpers for profile pictures
+  private getProfilePictureStorageKey(userId: string): string {
+    return `fitTrackAI_profilePicture_${userId}`;
+  }
+
+  getProfilePictureFromLocalStorage(userId: string): string | null {
+    try {
+      const key = this.getProfilePictureStorageKey(userId);
+      const value = localStorage.getItem(key);
+      return value || null;
+    } catch (error) {
+      console.warn('Failed to read profile picture from LocalStorage:', error);
+      return null;
+    }
+  }
+
+  private setProfilePictureToLocalStorage(userId: string, pictureUrl: string | undefined): void {
+    try {
+      const key = this.getProfilePictureStorageKey(userId);
+      if (pictureUrl) {
+        localStorage.setItem(key, pictureUrl);
+      } else {
+        localStorage.removeItem(key);
+      }
+    } catch (error) {
+      console.warn('Failed to write profile picture to LocalStorage:', error);
+    }
+  }
+
   // Event system for data synchronization
   on(event: EventType, callback: EventCallback): () => void {
     if (!this.listeners.has(event)) {
@@ -561,6 +590,15 @@ class DataService {
     try {
       const profile = await dbHelpers.getSetting('userProfile') as UserProfile | null;
       if (!profile) return null;
+      
+      // Check LocalStorage for profile picture if IndexedDB doesn't have it (backward compatibility)
+      if (!profile.profilePicture && profile.id) {
+        const localPicture = this.getProfilePictureFromLocalStorage(profile.id);
+        if (localPicture) {
+          profile.profilePicture = localPicture;
+        }
+      }
+      
       // Ensure goals is properly typed
       return {
         ...profile,
@@ -575,7 +613,17 @@ class DataService {
     let retries = 3;
     while (retries > 0) {
       try {
-        await dbHelpers.setSetting('userProfile', profile);
+        // Get existing profile to merge with partial update and get userId
+        const existingProfile = await dbHelpers.getSetting('userProfile') as UserProfile | null;
+        const mergedProfile = existingProfile ? { ...existingProfile, ...profile } : profile as UserProfile;
+        
+        await dbHelpers.setSetting('userProfile', mergedProfile);
+        
+        // Also write profile picture to LocalStorage if it's being updated
+        if (profile.profilePicture !== undefined && mergedProfile.id) {
+          this.setProfilePictureToLocalStorage(mergedProfile.id, profile.profilePicture);
+        }
+        
         this.emit('user');
         return;
       } catch (error) {

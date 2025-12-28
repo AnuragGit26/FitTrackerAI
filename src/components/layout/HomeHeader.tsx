@@ -28,9 +28,6 @@ export function HomeHeader() {
   }, [profile?.id]);
 
   const loadUnreadCount = async () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'HomeHeader.tsx:30',message:'loadUnreadCount called',data:{hasProfile:!!profile,profileId:profile?.id,profileIdType:typeof profile?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
     if (!profile?.id) return;
     try {
       const count = await notificationService.getUnreadCount(profile.id);

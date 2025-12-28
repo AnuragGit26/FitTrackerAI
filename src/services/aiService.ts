@@ -17,6 +17,7 @@ import { parseAIJSON, sanitizeAIResponse, cleanPlainTextResponse } from '@/utils
 import { logError } from '@/utils/errorHandler';
 import { addDays, format, differenceInHours } from 'date-fns';
 import { categorizeMuscleGroup } from '@/utils/analyticsHelpers';
+import { WorkoutPatternAnalysis, WorkoutRecommendation as PatternRecommendation } from './workoutAnalysisService';
 
 interface AIAnalysisContext {
   recentWorkouts: Workout[];
@@ -35,6 +36,8 @@ interface AIAnalysisContext {
   currentStreak?: number;
   equipment?: string[];
   workoutFrequency?: number;
+  patternAnalysis?: WorkoutPatternAnalysis;
+  recommendationContext?: PatternRecommendation;
 }
 
 export const aiService = {
@@ -107,34 +110,75 @@ export const aiService = {
         ? `\nTarget Frequency: ${context.workoutFrequency} days/week`
         : '';
 
+      // Build pattern analysis info
+      let patternInfo = '';
+      let todayStatusInfo = '';
+      let recommendationContextInfo = '';
+
+      if (context.patternAnalysis) {
+        const pattern = context.patternAnalysis;
+        
+        todayStatusInfo = pattern.hasWorkoutToday
+          ? `\nTODAY'S STATUS: User has ALREADY completed a workout today. ${pattern.todayWorkout ? `Workout type: ${pattern.todayWorkout.workoutType || 'mixed'}` : ''}`
+          : `\nTODAY'S STATUS: User has NOT completed a workout today.`;
+
+        patternInfo = `
+Workout Pattern Analysis:
+- Workout Frequency: ${pattern.workoutFrequency.workoutsPerWeek} workouts/week (average), ${pattern.workoutFrequency.consecutiveDays} consecutive days
+- This Week: ${pattern.workoutTypeDistribution.strengthCount} strength, ${pattern.workoutTypeDistribution.cardioCount} cardio workouts
+- Last 14 Days: ${pattern.workoutTypeDistribution.strengthCount14Days} strength, ${pattern.workoutTypeDistribution.cardioCount14Days} cardio workouts
+- Recent Workout Types: ${pattern.workoutTypeDistribution.recentTypes.join(', ')}
+- Volume Trend: ${pattern.volumeTrends.trend} (${pattern.volumeTrends.trendPercentage > 0 ? '+' : ''}${pattern.volumeTrends.trendPercentage}% change)
+- Average Volume per Workout: ${pattern.volumeTrends.averageVolumePerWorkout}kg
+- Rest Days: ${pattern.restDayPatterns.restDaysLastWeek} last week, ${pattern.restDayPatterns.averageRestDaysPerWeek} average/week`;
+
+        if (context.recommendationContext) {
+          const rec = context.recommendationContext;
+          recommendationContextInfo = `
+RECOMMENDATION CONTEXT:
+- Recommended Type: ${rec.type.toUpperCase()}
+- Confidence: ${rec.confidence}
+- Reasoning: ${rec.reasoning}
+- Key Data Points: ${rec.dataPoints.join('; ')}`;
+        }
+      }
+
       const prompt = `
 You are a certified personal trainer providing TODAY'S FOCUS - a single, actionable, data-packed recommendation for this user's workout today.
+
+${todayStatusInfo}
 
 Recent Training Summary:
 ${workoutSummary}${prSummary}
 
 Muscle Recovery Status:
 ${muscleSummary}
-Readiness Score: ${readinessScore}%${volumeInfo}${consistencyInfo}${focusInfo}${symmetryInfo}${streakInfo}${workoutCountInfo}
+Readiness Score: ${readinessScore}%${volumeInfo}${consistencyInfo}${focusInfo}${symmetryInfo}${streakInfo}${workoutCountInfo}${patternInfo}${recommendationContextInfo}
 
 User Profile:
 - Experience Level: ${context.userLevel}
 - Goals: ${context.userGoals.join(', ')}${equipmentInfo}${frequencyInfo}
 - Identified Weak Points: ${context.weakPoints.join(', ') || 'None identified'}
 
+CRITICAL DECISION LOGIC:
+${context.patternAnalysis?.hasWorkoutToday 
+  ? 'User has ALREADY worked out today. Recommend REST or light activity (walking, stretching, yoga). Emphasize recovery importance.'
+  : 'User has NOT worked out today. Analyze recovery status, workout patterns, and type balance to recommend: REST, CARDIO, or STRENGTH training.'}
+
 Provide a JSON response with this structure:
 {
-  "analysis": "A brief analysis (2-3 sentences) referencing specific metrics like recovery percentages, volume trends, PRs, or consistency scores",
-  "recommendations": ["ONE primary recommendation for TODAY that is data-packed and specific. Include concrete numbers like 'Your chest is 95% recovered' or 'Volume is up 12% this month' or 'Based on your 3 PRs this week'. Keep it to 1-2 sentences max.", "Secondary recommendation if relevant", "Third recommendation if relevant"],
-  "warnings": ["Any warnings about overtraining or imbalances with specific data"],
-  "motivation": "A motivational message referencing their actual progress (mention specific achievements like PRs, consistency, or volume increases)",
-  "tip": "One specific, actionable tip with data context (e.g., 'Your quads are 90% recovered - perfect for leg day' or 'Your consistency is 85% - maintain this pace')"
+  "analysis": "A brief analysis (2-3 sentences) referencing specific metrics like recovery percentages, volume trends, PRs, consistency scores, workout patterns, or today's status",
+  "recommendations": ["ONE primary recommendation for TODAY that is data-packed and specific. ${context.patternAnalysis?.hasWorkoutToday ? 'Since user already worked out, recommend rest or light activity with reasoning.' : 'Include concrete numbers like workout frequency, type distribution, or recovery percentages. Keep it to 1-2 sentences max.'}", "Secondary recommendation if relevant", "Third recommendation if relevant"],
+  "warnings": ["Any warnings about overtraining, imbalances, or excessive training with specific data"],
+  "motivation": "A motivational message referencing their actual progress (mention specific achievements like PRs, consistency, volume increases, or workout patterns)",
+  "tip": "One specific, actionable tip with data context (e.g., 'You've done 4 strength workouts this week - balance with cardio' or 'Your quads are 90% recovered - perfect for leg day')"
 }
 
 CRITICAL OUTPUT REQUIREMENTS:
 - The FIRST recommendation MUST be the "Today's Focus" - make it crisp, clear, and data-packed (1-2 sentences)
+- ${context.patternAnalysis?.hasWorkoutToday ? 'Since user already worked out today, the recommendation MUST be rest or light activity.' : 'Consider workout patterns, type balance, recovery status, and frequency when recommending.'}
 - Include specific metrics, percentages, or numbers in recommendations when possible
-- Reference concrete data points (PRs, recovery percentages, volume changes, consistency scores)
+- Reference concrete data points (PRs, recovery percentages, volume changes, consistency scores, workout frequency, type distribution)
 - Output ONLY valid JSON, no markdown formatting, no code blocks, no explanatory text
 - All text must be clean, professional, and polished - no gibberish, typos, or unpolished content
 - Return only the JSON object, nothing else

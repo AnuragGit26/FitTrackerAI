@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Plus, Check, Edit, Trash2, Loader2, BookOpen, Save, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useWorkoutStore } from '@/store/workoutStore';
+import { useWorkoutStore, useWorkoutStore as getWorkoutStore } from '@/store/workoutStore';
 import { useUserStore } from '@/store/userStore';
 import { ExerciseFilters } from '@/components/exercise/ExerciseFilters';
 import { WorkoutTimerCard } from '@/components/exercise/WorkoutTimerCard';
@@ -18,10 +18,11 @@ import { templateService } from '@/services/templateService';
 import { TemplateCategory } from '@/types/workout';
 import { Workout } from '@/types/workout';
 import { useWorkoutDuration, getTimerStartTime } from '@/hooks/useWorkoutDuration';
-import { clearWorkoutState, loadWorkoutState } from '@/utils/workoutStatePersistence';
+import { clearWorkoutState, loadWorkoutState, saveWorkoutState } from '@/utils/workoutStatePersistence';
 import { saveFailedWorkout } from '@/utils/workoutErrorRecovery';
 import { WorkoutErrorRecoveryModal } from '@/components/workout/WorkoutErrorRecoveryModal';
 import { LogExercise } from '@/components/workout/LogExercise';
+import { QuickCardioLog } from '@/components/workout/QuickCardioLog';
 import { calculateVolume } from '@/utils/calculations';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 
@@ -46,6 +47,7 @@ export function LogWorkout() {
   // Modal state for LogExercise
   const [showExerciseModal, setShowExerciseModal] = useState(false);
   const [editingExerciseId, setEditingExerciseId] = useState<string | null>(null);
+  const [showQuickCardioModal, setShowQuickCardioModal] = useState(false);
 
   // Workout-level modals
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
@@ -83,6 +85,25 @@ export function LogWorkout() {
       // If persisted state exists, it will be loaded by the store initialization
     }
   }, [currentWorkout, profile, startWorkout]);
+
+  // Auto-save workout state every 10 seconds when workout is active
+  useEffect(() => {
+    if (!currentWorkout) return;
+
+    const autoSaveInterval = setInterval(() => {
+      // Save current workout state to localStorage
+      const storeState = getWorkoutStore.getState();
+      saveWorkoutState({
+        currentWorkout: storeState.currentWorkout,
+        templateId: storeState.templateId || null,
+        plannedWorkoutId: storeState.plannedWorkoutId || null,
+      });
+    }, 10000); // 10 seconds
+
+    return () => {
+      clearInterval(autoSaveInterval);
+    };
+  }, [currentWorkout]);
 
   // Timer will start when "Add Exercise" is clicked, not automatically
 
@@ -816,8 +837,8 @@ export function LogWorkout() {
           onReset={resetWorkoutTimer}
         />
 
-        {/* Add Exercise Button */}
-        <div className="px-4 py-6">
+        {/* Add Exercise Buttons */}
+        <div className="px-4 py-6 space-y-3">
           <motion.button
             onClick={handleAddExercise}
             className="w-full py-4 flex items-center justify-center gap-2 rounded-xl bg-primary/10 text-primary font-bold hover:bg-primary/20 active:bg-primary/30 transition-colors border-2 border-dashed border-primary/50"
@@ -826,6 +847,15 @@ export function LogWorkout() {
           >
             <Plus className="w-5 h-5" />
             Add Exercise
+          </motion.button>
+          <motion.button
+            onClick={() => setShowQuickCardioModal(true)}
+            className="w-full py-3 flex items-center justify-center gap-2 rounded-xl bg-blue-500/10 text-blue-500 dark:text-blue-400 font-bold hover:bg-blue-500/20 active:bg-blue-500/30 transition-colors border-2 border-dashed border-blue-500/50"
+            whileHover={!shouldReduceMotion ? { scale: 1.02 } : {}}
+            whileTap={!shouldReduceMotion ? { scale: 0.98 } : {}}
+          >
+            <Plus className="w-4 h-4" />
+            Quick Cardio Log
           </motion.button>
         </div>
 
@@ -1179,6 +1209,18 @@ export function LogWorkout() {
         )}
       </AnimatePresence>
 
+      {/* Quick Cardio Log Modal */}
+      <QuickCardioLog
+        isOpen={showQuickCardioModal}
+        onClose={() => setShowQuickCardioModal(false)}
+        onSaved={() => {
+          setShowQuickCardioModal(false);
+          if (profile) {
+            loadWorkouts(profile.id);
+          }
+        }}
+      />
+
       {/* Workout Error Recovery Modal */}
       <WorkoutErrorRecoveryModal
         isOpen={showErrorRecoveryModal}
@@ -1257,3 +1299,6 @@ export function LogWorkout() {
     </div>
   );
 }
+
+// Default export for lazy loading compatibility
+export default LogWorkout;

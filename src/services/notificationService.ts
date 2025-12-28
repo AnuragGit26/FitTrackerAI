@@ -340,13 +340,7 @@ class NotificationService {
    * Get count of unread notifications
    */
   async getUnreadCount(userId: string): Promise<number> {
-    // #region agent log
-    fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'notificationService.ts:342',message:'getUnreadCount called',data:{userId,userIdType:typeof userId,isValid:!!userId && typeof userId === 'string' && userId.length > 0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
     if (!userId || typeof userId !== 'string' || userId.length === 0) {
-      // #region agent log
-      fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'notificationService.ts:345',message:'Invalid userId in getUnreadCount, returning 0',data:{userId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       return 0;
     }
     return await dbHelpers.getUnreadNotificationsCount(userId);

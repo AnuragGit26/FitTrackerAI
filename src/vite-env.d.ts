@@ -5,6 +5,10 @@ interface ImportMetaEnv {
   readonly VITE_AUTH0_DOMAIN: string;
   readonly VITE_AUTH0_CLIENT_ID: string;
   
+  // Auth0 Management API (Optional - for profile sync)
+  readonly VITE_AUTH0_MANAGEMENT_API_AUDIENCE?: string;
+  readonly VITE_AUTH0_DELEGATION_ENDPOINT?: string;
+  
   // Supabase Configuration (Required)
   // Support both VITE_ and REACT_APP_ prefixes for backward compatibility
   readonly VITE_SUPABASE_URL?: string;

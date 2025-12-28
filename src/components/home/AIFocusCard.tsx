@@ -1,12 +1,13 @@
 import { useNavigate } from 'react-router-dom';
-import { Timer, Signal, ChevronRight, Bot } from 'lucide-react';
+import { Timer, Signal, ChevronRight, Bot, CheckCircle2, Activity, Dumbbell, Moon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAIInsights } from '@/hooks/useAIInsights';
 import { useWorkoutStore } from '@/store/workoutStore';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { EmptyState } from '@/components/common/EmptyState';
 import { scaleIn, prefersReducedMotion } from '@/utils/animations';
 import { cleanPlainTextResponse } from '@/utils/aiResponseCleaner';
+import { workoutAnalysisService } from '@/services/workoutAnalysisService';
 
 export function AIFocusCard() {
   const navigate = useNavigate();
@@ -19,6 +20,15 @@ export function AIFocusCard() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workouts.length]);
+
+  // Analyze workout patterns to check if workout completed today
+  const patternAnalysis = useMemo(() => {
+    if (workouts.length === 0) return null;
+    return workoutAnalysisService.analyzeWorkoutPatterns(workouts);
+  }, [workouts]);
+
+  const hasWorkoutToday = patternAnalysis?.hasWorkoutToday ?? false;
+  const todayWorkout = patternAnalysis?.todayWorkout ?? null;
 
   if (workouts.length === 0 || !insights?.recommendations?.[0]) {
     return (
@@ -51,12 +61,54 @@ export function AIFocusCard() {
   const cleanedTitle = cleanPlainTextResponse(insights.recommendations[0] || '');
   const cleanedDescription = cleanPlainTextResponse(insights.analysis || 'Based on your recent training patterns and recovery status.');
 
-  const recommendation = {
-    title: cleanedTitle || 'Recommended Workout',
-    description: cleanedDescription,
-    duration: 45,
-    intensity: 'High Intensity',
+  // Determine recommendation type from title
+  const getRecommendationType = (title: string): 'rest' | 'cardio' | 'strength' | 'light_activity' => {
+    const lowerTitle = title.toLowerCase();
+    if (lowerTitle.includes('rest') || lowerTitle.includes('recovery') || lowerTitle.includes('rest day')) {
+      return 'rest';
+    }
+    if (lowerTitle.includes('cardio') || lowerTitle.includes('running') || lowerTitle.includes('cycling')) {
+      return 'cardio';
+    }
+    if (lowerTitle.includes('strength') || lowerTitle.includes('weight') || lowerTitle.includes('lifting')) {
+      return 'strength';
+    }
+    return 'light_activity';
   };
+
+  const recommendationType = getRecommendationType(cleanedTitle);
+  
+  // Get icon and label based on type
+  const getTypeIcon = () => {
+    if (hasWorkoutToday) return CheckCircle2;
+    switch (recommendationType) {
+      case 'rest':
+        return Moon;
+      case 'cardio':
+        return Activity;
+      case 'strength':
+        return Dumbbell;
+      default:
+        return Activity;
+    }
+  };
+
+  const getTypeLabel = () => {
+    if (hasWorkoutToday) return 'Workout Completed';
+    switch (recommendationType) {
+      case 'rest':
+        return 'Rest Day';
+      case 'cardio':
+        return 'Cardio';
+      case 'strength':
+        return 'Strength Training';
+      default:
+        return 'Light Activity';
+    }
+  };
+
+  const TypeIcon = getTypeIcon();
+  const typeLabel = getTypeLabel();
 
   const shouldReduceMotion = prefersReducedMotion();
 
@@ -67,7 +119,9 @@ export function AIFocusCard() {
         <h2 className="text-slate-900 dark:text-white text-lg font-bold">Today&apos;s Focus</h2>
       </div>
       <motion.div
-        className="relative overflow-hidden rounded-2xl bg-surface-dark shadow-lg group cursor-pointer"
+        className={`relative overflow-hidden rounded-2xl bg-surface-dark shadow-lg group cursor-pointer ${
+          hasWorkoutToday ? 'border-2 border-primary/30' : ''
+        }`}
         onClick={() => navigate('/insights')}
         variants={shouldReduceMotion ? {} : scaleIn}
         initial="hidden"
@@ -79,27 +133,50 @@ export function AIFocusCard() {
         <div className="absolute inset-0 bg-[linear-gradient(rgba(13,242,105,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(13,242,105,0.05)_1px,transparent_1px)] bg-[size:20px_20px]"></div>
         <div className="relative p-5 flex flex-col gap-4">
           <div className="flex justify-between items-start">
-            <div className="bg-primary text-background-dark text-xs font-bold px-2 py-1 rounded uppercase tracking-wider">
-              Recommended
+            <div className={`text-xs font-bold px-2 py-1 rounded uppercase tracking-wider flex items-center gap-1.5 ${
+              hasWorkoutToday 
+                ? 'bg-primary/20 text-primary border border-primary/30' 
+                : 'bg-primary text-background-dark'
+            }`}>
+              <TypeIcon className="w-3 h-3" />
+              {typeLabel}
             </div>
             <ChevronRight className="text-white/50 w-5 h-5" />
           </div>
           <div className="mt-2">
-            <h3 className="text-2xl font-bold text-white mb-1">{recommendation.title}</h3>
+            <h3 className="text-2xl font-bold text-white mb-1">
+              {hasWorkoutToday ? 'Great Work Today!' : cleanedTitle || 'Recommended Workout'}
+            </h3>
             <p className="text-gray-300 text-sm max-w-[80%] leading-relaxed">
-              {recommendation.description}
+              {cleanedDescription}
             </p>
           </div>
-          <div className="flex items-center gap-4 mt-1">
-            <div className="flex items-center gap-1.5">
-              <Timer className="text-primary w-[18px] h-[18px]" />
-              <span className="text-white text-xs font-medium">{recommendation.duration} min</span>
+          {hasWorkoutToday && todayWorkout && (
+            <div className="flex items-center gap-2 mt-2 p-2 bg-primary/10 rounded-lg border border-primary/20">
+              <div className="flex items-center gap-1.5 text-primary text-xs">
+                <Activity className="w-3 h-3" />
+                <span className="font-medium">
+                  {todayWorkout.exercises.length} exercise{todayWorkout.exercises.length !== 1 ? 's' : ''} • {todayWorkout.totalDuration} min
+                </span>
+              </div>
+              {todayWorkout.totalVolume > 0 && (
+                <div className="flex items-center gap-1.5 text-primary/80 text-xs">
+                  <Dumbbell className="w-3 h-3" />
+                  <span>{Math.round(todayWorkout.totalVolume)}kg volume</span>
+                </div>
+              )}
             </div>
-            <div className="flex items-center gap-1.5">
-              <Signal className="text-primary w-[18px] h-[18px]" />
-              <span className="text-white text-xs font-medium">{recommendation.intensity}</span>
+          )}
+          {!hasWorkoutToday && (
+            <div className="flex items-center gap-4 mt-1">
+              {insights.tip && (
+                <div className="flex items-start gap-1.5 bg-primary/10 px-2 py-1.5 rounded-lg border border-primary/20">
+                  <Bot className="text-primary w-3 h-3 mt-0.5 flex-shrink-0" />
+                  <span className="text-primary/90 text-xs leading-relaxed">{insights.tip}</span>
+                </div>
+              )}
             </div>
-          </div>
+          )}
         </div>
       </motion.div>
     </div>

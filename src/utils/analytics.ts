@@ -27,12 +27,6 @@ class Analytics {
 
     this.events.push(event);
 
-    // In development, log to console
-    if (import.meta.env.DEV) {
-      // eslint-disable-next-line no-console
-      console.log('[Analytics]', eventName, properties);
-    }
-
     // In production, send to analytics service
     // Example: if (import.meta.env.PROD) {
     //   gtag('event', eventName, properties);

@@ -1,13 +1,14 @@
 import { create } from 'zustand';
 import { dataService } from '@/services/dataService';
 import { userContextManager } from '@/services/userContextManager';
+import { auth0ManagementService } from '@/services/auth0ManagementService';
 
 export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
 export type Goal = 'build_muscle' | 'gain_strength' | 'lose_fat' | 'improve_endurance' | 'general_fitness';
 export type Gender = 'male' | 'female' | 'other';
 export type UnitSystem = 'metric' | 'imperial';
 
-interface UserProfile {
+export interface UserProfile {
   id: string;
   name: string;
   experienceLevel: ExperienceLevel;
@@ -29,10 +30,13 @@ interface UserState {
   profile: UserProfile | null;
   isLoading: boolean;
   error: string | null;
+  auth0SyncStatus: 'idle' | 'syncing' | 'success' | 'error';
+  auth0SyncError: string | null;
   
   // Actions
   initializeUser: (auth0User?: { id: string; firstName?: string | null; username?: string | null; emailAddresses?: Array<{ emailAddress: string }> }) => Promise<void>;
   syncWithAuth0: (auth0User: { id: string; firstName?: string | null; username?: string | null; emailAddresses?: Array<{ emailAddress: string }> }) => Promise<void>;
+  syncToAuth0: (auth0User: { sub?: string; email?: string }, accessToken: string) => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   setExperienceLevel: (level: ExperienceLevel) => Promise<void>;
   setGoals: (goals: Goal[]) => Promise<void>;
@@ -85,6 +89,8 @@ export const useUserStore = create<UserState>((set, get) => ({
   profile: null,
   isLoading: false,
   error: null,
+  auth0SyncStatus: 'idle',
+  auth0SyncError: null,
 
   initializeUser: async (auth0User) => {
     set({ isLoading: true, error: null });
@@ -106,12 +112,17 @@ export const useUserStore = create<UserState>((set, get) => ({
           };
           await dataService.updateUserProfile(savedProfile);
         } else {
-          // Update existing profile with Auth0 ID and name if they differ
-          if (savedProfile.id !== auth0UserId || savedProfile.name !== auth0Name) {
+          // Update existing profile with Auth0 ID, but only update name if it's empty or default
+          // Preserve user-saved custom names
+          const shouldUpdateName = !savedProfile.name || savedProfile.name === 'User' || savedProfile.name === DEFAULT_PROFILE.name;
+          const shouldUpdateId = savedProfile.id !== auth0UserId;
+          
+          if (shouldUpdateId || shouldUpdateName) {
+            const nameToUse = shouldUpdateName ? auth0Name : savedProfile.name;
             savedProfile = {
               ...savedProfile,
               id: auth0UserId,
-              name: auth0Name,
+              name: nameToUse,
             };
             await dataService.updateUserProfile(savedProfile);
           }
@@ -119,6 +130,20 @@ export const useUserStore = create<UserState>((set, get) => ({
       } else if (!savedProfile) {
         // No Auth0 user and no saved profile - use default
         savedProfile = DEFAULT_PROFILE;
+      }
+      
+      // Migrate profile picture from IndexedDB to LocalStorage if it exists and user has an ID
+      // This ensures backward compatibility and dual storage
+      // Only migrate if not already in LocalStorage to prevent infinite loops
+      if (savedProfile.profilePicture && savedProfile.id) {
+        // Check if already in LocalStorage to avoid unnecessary update
+        const existingInLocalStorage = dataService.getProfilePictureFromLocalStorage(savedProfile.id);
+        if (!existingInLocalStorage || existingInLocalStorage !== savedProfile.profilePicture) {
+          // The updateUserProfile will handle writing to LocalStorage, but we ensure it's there
+          await dataService.updateUserProfile({ profilePicture: savedProfile.profilePicture });
+          // Re-fetch to get the updated profile
+          savedProfile = await dataService.getUserProfile() || savedProfile;
+        }
       }
       
       // Set user ID in context manager for data operations
@@ -140,14 +165,37 @@ export const useUserStore = create<UserState>((set, get) => ({
     const auth0UserId = auth0User.id;
     const auth0Name = auth0User.firstName || auth0User.username || auth0User.emailAddresses?.[0]?.emailAddress || 'User';
 
-    // Update profile with Auth0 data if needed
-    if (profile.id !== auth0UserId || profile.name !== auth0Name) {
+    // Update profile with Auth0 ID, but only update name if it's empty or default
+    // Preserve user-saved custom names
+    const shouldUpdateName = !profile.name || profile.name === 'User' || profile.name === DEFAULT_PROFILE.name;
+    const shouldUpdateId = profile.id !== auth0UserId;
+    
+    if (shouldUpdateId || shouldUpdateName) {
+      const nameToUse = shouldUpdateName ? auth0Name : profile.name;
       const updatedProfile = {
         ...profile,
         id: auth0UserId,
-        name: auth0Name,
+        name: nameToUse,
       };
       await get().updateProfile(updatedProfile);
+    }
+  },
+
+  syncToAuth0: async (auth0User, accessToken) => {
+    const { profile } = get();
+    if (!profile) {
+      throw new Error('No profile to sync');
+    }
+
+    set({ auth0SyncStatus: 'syncing', auth0SyncError: null });
+
+    try {
+      await auth0ManagementService.updateUserProfile(auth0User, accessToken, profile);
+      set({ auth0SyncStatus: 'success', auth0SyncError: null });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to sync to Auth0';
+      set({ auth0SyncStatus: 'error', auth0SyncError: errorMessage });
+      throw error;
     }
   },
 
