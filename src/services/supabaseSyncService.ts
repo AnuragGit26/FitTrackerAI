@@ -431,6 +431,9 @@ class SupabaseSyncService {
         tableName: SyncableTable,
         since?: Date
     ): Promise<unknown[]> {
+        // eslint-disable-next-line no-console
+        console.debug(`[SupabaseSyncService.fetchRemoteRecords] Fetching ${tableName} for userId: ${userId}`, since ? `since ${since.toISOString()}` : '');
+        
         let query = client.from(tableName).select('*');
 
         // For exercises: fetch both library exercises (user_id IS NULL) and user's custom exercises
@@ -448,7 +451,23 @@ class SupabaseSyncService {
         const { data, error } = await query.order('updated_at', { ascending: true });
 
         if (error) {
+            // eslint-disable-next-line no-console
+            console.error(`[SupabaseSyncService.fetchRemoteRecords] Error fetching ${tableName}:`, error);
             throw new Error(`Failed to fetch remote records: ${error.message}`);
+        }
+
+        // eslint-disable-next-line no-console
+        console.debug(`[SupabaseSyncService.fetchRemoteRecords] Fetched ${data?.length || 0} records for ${tableName} (userId: ${userId})`);
+        
+        // Debug: Log user_ids found in fetched records to detect mismatches
+        if (data && data.length > 0 && tableName === 'workouts') {
+            const userIds = [...new Set(data.map((r: Record<string, unknown>) => r.user_id))];
+            // eslint-disable-next-line no-console
+            console.debug(`[SupabaseSyncService.fetchRemoteRecords] user_ids found in fetched workouts:`, userIds);
+            if (userIds.length > 1 || (userIds.length === 1 && userIds[0] !== userId)) {
+                // eslint-disable-next-line no-console
+                console.warn(`[SupabaseSyncService.fetchRemoteRecords] Mismatch detected! Query userId: ${userId}, Found user_ids:`, userIds);
+            }
         }
 
         return data || [];
@@ -663,6 +682,19 @@ class SupabaseSyncService {
         remoteRecord: unknown
     ): Promise<void> {
         const converted = this.convertFromSupabaseFormat(tableName, remoteRecord);
+        
+        // Debug: Log userId from remote record vs converted record
+        if (tableName === 'workouts') {
+            const remoteUserId = (remoteRecord as Record<string, unknown>).user_id;
+            const convertedUserId = (converted as Record<string, unknown>).userId;
+            // eslint-disable-next-line no-console
+            console.debug(`[SupabaseSyncService.createLocalRecord] Creating workout - remote user_id: ${remoteUserId}, converted userId: ${convertedUserId}`);
+            
+            if (remoteUserId !== convertedUserId) {
+                // eslint-disable-next-line no-console
+                console.warn(`[SupabaseSyncService.createLocalRecord] userId mismatch! remote: ${remoteUserId}, converted: ${convertedUserId}`);
+            }
+        }
 
         switch (tableName) {
             case 'workouts':

@@ -19,6 +19,17 @@ function inferTrackingType(set: WorkoutSet): ExerciseTrackingType {
   return 'weight_reps'; // Default fallback
 }
 
+/**
+ * Calculate total volume for workout sets
+ * For weight_reps: Volume = Σ(reps × weight) for all completed sets
+ * This is the standard volume calculation used in strength training.
+ * Note: For dumbbell exercises, weight should be the total weight of both dumbbells.
+ * For barbell exercises, weight should be the total weight (plates + barbell rod).
+ * 
+ * @param sets Array of workout sets
+ * @param trackingType Optional tracking type, will be inferred if not provided
+ * @returns Total volume (kg × reps for weight_reps, or appropriate unit for other types)
+ */
 export function calculateVolume(sets: WorkoutSet[], trackingType?: ExerciseTrackingType): number {
   return sets.reduce((total, set) => {
     if (!set.completed) return total;
@@ -215,7 +226,6 @@ export function calculateNextSetByVolume(
 
   const previousWeight = previousSet.weight;
   const previousReps = previousSet.reps;
-  const previousVolume = previousWeight * previousReps;
 
   // Weight increment based on unit (2.5kg or 5lbs)
   const weightIncrement = unit === 'kg' ? 2.5 : 5;
@@ -243,10 +253,10 @@ export function calculateNextSetByVolume(
  * Calculate pace (time per distance unit)
  * @param time Time in seconds
  * @param distance Distance in km or miles
- * @param distanceUnit Unit of distance ('km' or 'miles')
+ * @param _distanceUnit Unit of distance ('km' or 'miles') - used for documentation
  * @returns Pace in minutes per km or minutes per mile
  */
-export function calculatePace(time: number, distance: number, distanceUnit: 'km' | 'miles'): number {
+export function calculatePace(time: number, distance: number, _distanceUnit: 'km' | 'miles'): number {
   if (distance <= 0 || time <= 0) return 0;
   const timeMinutes = time / 60;
   return timeMinutes / distance;
@@ -268,10 +278,10 @@ export function estimateCaloriesFromSteps(steps: number): number {
  * Calculate speed (distance per time)
  * @param distance Distance in km or miles
  * @param time Time in seconds
- * @param distanceUnit Unit of distance ('km' or 'miles')
+ * @param _distanceUnit Unit of distance ('km' or 'miles') - used for documentation
  * @returns Speed in km/h or mph
  */
-export function calculateSpeed(distance: number, time: number, distanceUnit: 'km' | 'miles'): number {
+export function calculateSpeed(distance: number, time: number, _distanceUnit: 'km' | 'miles'): number {
   if (time <= 0 || distance <= 0) return 0;
   const timeHours = time / 3600;
   return distance / timeHours;

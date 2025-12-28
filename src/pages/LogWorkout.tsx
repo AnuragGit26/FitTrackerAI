@@ -563,6 +563,11 @@ export function LogWorkout() {
       const finalDurationSeconds = durationSeconds !== undefined ? durationSeconds : workoutElapsedSeconds;
       await finishWorkout(calories, finalDurationSeconds > 0 ? finalDurationSeconds : undefined);
       
+      // Get the saved workout ID from the store
+      const savedWorkouts = getWorkoutStore.getState().workouts;
+      const savedWorkout = savedWorkouts[0]; // Most recent workout
+      const workoutId = savedWorkout?.id;
+      
       // Reset timer when workout is finished
       resetWorkoutTimer();
       
@@ -580,7 +585,13 @@ export function LogWorkout() {
       setManualDurationMinutes('');
       setShowFinishWorkoutModal(false);
       success('Workout saved successfully!');
-      navigate('/home');
+      
+      // Navigate to workout summary if we have a workout ID, otherwise go home
+      if (workoutId) {
+        navigate(`/workout-summary/${workoutId}`);
+      } else {
+        navigate('/home');
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to save workout';
       console.error('Error finishing workout:', err);

@@ -21,6 +21,7 @@ interface CurrentSetCardProps {
   nextExerciseName?: string;
   isLastInSuperset?: boolean;
   showGroupRestMessage?: boolean;
+  exerciseEquipment?: string[];
 }
 
 export function CurrentSetCard({
@@ -36,6 +37,7 @@ export function CurrentSetCard({
   nextExerciseName,
   isLastInSuperset = false,
   showGroupRestMessage = false,
+  exerciseEquipment = [],
 }: CurrentSetCardProps) {
   const [weight, setWeight] = useState(() => (set.weight ?? 0).toString());
   const [reps, setReps] = useState(() => (set.reps ?? 0).toString());
@@ -82,6 +84,32 @@ export function CurrentSetCard({
   );
 
   const shouldReduceMotion = prefersReducedMotion();
+
+  // Determine helper text based on equipment
+  const getHelperText = (): string | null => {
+    if (!exerciseEquipment || exerciseEquipment.length === 0) return null;
+    
+    // Check for dumbbell exercises (case-insensitive)
+    const hasDumbbells = exerciseEquipment.some(eq => 
+      eq.toLowerCase().includes('dumbbell')
+    );
+    // Check for barbell exercises (case-insensitive)
+    const hasBarbell = exerciseEquipment.some(eq => 
+      eq.toLowerCase().includes('barbell')
+    );
+    
+    // Prioritize dumbbell message if both are present (shouldn't happen, but just in case)
+    if (hasDumbbells) {
+      return 'Weight = weight of both dumbbells';
+    }
+    if (hasBarbell) {
+      return 'Total weight = weight of plates + barbell rod';
+    }
+    
+    return null;
+  };
+
+  const helperText = getHelperText();
 
   const handleWeightChange = (value: string) => {
     setWeight(value);
@@ -217,6 +245,11 @@ export function CurrentSetCard({
               disabled={disabled}
             />
           </div>
+          {helperText && (
+            <p className="text-[10px] text-slate-400 dark:text-slate-500 text-center pt-1.5 font-medium leading-tight">
+              {helperText}
+            </p>
+          )}
         </label>
 
         <div className="flex h-20 items-center pt-6">

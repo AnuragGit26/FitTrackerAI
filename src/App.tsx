@@ -39,6 +39,8 @@ const Rest = lazy(() => import('@/pages/Rest').then(m => ({ default: m.Rest })))
 const Profile = lazy(() => import('@/pages/Profile').then(m => ({ default: m.Profile })));
 const Planner = lazy(() => import('@/pages/Planner').then(m => ({ default: m.Planner })));
 const SleepRecovery = lazy(() => import('@/pages/SleepRecovery').then(m => ({ default: m.SleepRecovery })));
+const WorkoutSummary = lazy(() => import('@/pages/WorkoutSummary').then(m => ({ default: m.WorkoutSummary })));
+const WorkoutHistory = lazy(() => import('@/pages/WorkoutHistory').then(m => ({ default: m.WorkoutHistory })));
 const Login = lazy(() => import('@/pages/Login').then(m => ({ default: m.Login })));
 const SignUp = lazy(() => import('@/pages/SignUp').then(m => ({ default: m.SignUp })));
 
@@ -72,18 +74,12 @@ function App() {
     const handleError = (event: ErrorEvent) => {
       const errorMsg = event.message || String(event.error);
       if (errorMsg.includes('auth0') || errorMsg.includes('400') || errorMsg.includes('Bad Request')) {
-        // #region agent log
-        fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:73',message:'Global error handler - Auth0 related',data:{errorMessage:errorMsg,errorStack:event.error?.stack?.substring(0,300),filename:event.filename,lineno:event.lineno},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
       }
     };
 
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
       const errorMsg = event.reason?.message || String(event.reason);
       if (errorMsg.includes('auth0') || errorMsg.includes('400') || errorMsg.includes('Bad Request')) {
-        // #region agent log
-        fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:81',message:'Unhandled promise rejection - Auth0 related',data:{errorMessage:errorMsg,errorString:String(event.reason),errorStack:event.reason?.stack?.substring(0,300)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
       }
     };
 
@@ -336,43 +332,17 @@ function AppRoutes() {
   const { isAuthenticated, isLoading, user: auth0User, error: auth0Error, getAccessTokenSilently } = useAuth0();
   const initializeUser = useUserStore((state) => state.initializeUser);
 
-  // #region agent log
-  useEffect(() => {
-    fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:294',message:'useAuth0 hook state',data:{isLoading,isAuthenticated,hasUser:!!auth0User,userId:auth0User?.sub?.substring(0,20),hasError:!!auth0Error,errorMessage:auth0Error?.message,errorName:auth0Error?.name},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-  }, [isLoading, isAuthenticated, auth0User, auth0Error]);
-  // #endregion
 
-  // Track token refresh attempts
-  // #region agent log
-  useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      getAccessTokenSilently({ cacheMode: 'on' }).then((token) => {
-        fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:302',message:'Token refresh success',data:{hasToken:!!token,tokenLength:token?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      }).catch((err) => {
-        fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:305',message:'Token refresh error',data:{errorName:err?.name,errorMessage:err?.message,errorString:String(err),errorStack:err?.stack?.substring(0,300)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      });
-    }
-  }, [isLoading, isAuthenticated, getAccessTokenSilently]);
-  // #endregion
 
   // Sync user store with Auth0 user when authenticated
   useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:312',message:'Auth sync effect triggered',data:{isLoading,isAuthenticated,hasUser:!!auth0User},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
     if (!isLoading && isAuthenticated && auth0User) {
-      // #region agent log
-      fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:315',message:'Initializing user',data:{userId:auth0User.sub?.substring(0,20),email:auth0User.email?.substring(0,20)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
       initializeUser({
         id: auth0User.sub || auth0User.email || 'user-unknown',
         firstName: auth0User.given_name || auth0User.nickname || null,
         username: auth0User.nickname || auth0User.name || null,
         emailAddresses: auth0User.email ? [{ emailAddress: auth0User.email }] : [],
       }).then(() => {
-        // #region agent log
-        fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:325',message:'User initialized successfully',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-        // #endregion
         const userId = auth0User.sub || auth0User.email || 'user-unknown';
         // Initialize workout event tracker for this user
         workoutEventTracker.initialize(userId).catch((error) => {
@@ -384,14 +354,8 @@ function AppRoutes() {
           logger.error('Failed to initialize templates', error);
         });
       }).catch((err) => {
-        // #region agent log
-        fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:335',message:'User initialization error',data:{errorName:err?.name,errorMessage:err?.message,errorString:String(err)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-        // #endregion
       });
     } else if (!isLoading && !isAuthenticated) {
-      // #region agent log
-      fetch('http://127.0.0.1:7248/ingest/f44644c5-d500-4fbd-a834-863cb4856614',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:339',message:'User not authenticated',data:{hasError:!!auth0Error,errorMessage:auth0Error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
     }
   }, [isLoading, isAuthenticated, auth0User, initializeUser, auth0Error]);
 
@@ -586,6 +550,34 @@ function AppRoutes() {
                     <ErrorBoundary>
                       <Suspense fallback={<RouteLoader />}>
                         <SleepRecovery />
+                      </Suspense>
+                    </ErrorBoundary>
+                  </AnimatedPage>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/workout-summary/:workoutId"
+              element={
+                <ProtectedRoute>
+                  <AnimatedPage>
+                    <ErrorBoundary>
+                      <Suspense fallback={<RouteLoader />}>
+                        <WorkoutSummary />
+                      </Suspense>
+                    </ErrorBoundary>
+                  </AnimatedPage>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/workout-history"
+              element={
+                <ProtectedRoute>
+                  <AnimatedPage>
+                    <ErrorBoundary>
+                      <Suspense fallback={<RouteLoader />}>
+                        <WorkoutHistory />
                       </Suspense>
                     </ErrorBoundary>
                   </AnimatedPage>

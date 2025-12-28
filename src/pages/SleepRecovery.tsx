@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Check, Edit } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -23,7 +23,14 @@ export function SleepRecovery() {
   
   // Track current date and detect changes
   const getToday = () => {
-    const date = new Date();
+    const now = new Date();
+    const date = new Date(now);
+    
+    // If current time is before 7:00 AM, use yesterday's date
+    if (now.getHours() < 7) {
+      date.setDate(date.getDate() - 1);
+    }
+    
     date.setHours(0, 0, 0, 0);
     return date;
   };
@@ -53,14 +60,14 @@ export function SleepRecovery() {
   const [readinessToTrain, setReadinessToTrain] = useState<'full-power' | 'light' | 'rest-day'>('full-power');
   const [recoveryNotes, setRecoveryNotes] = useState('');
 
-  // Daily reset mechanism - check for date changes
+  // Daily reset mechanism - check for date changes (resets at 7:00 AM)
   useEffect(() => {
     const checkDateChange = () => {
       const currentDate = getToday();
       const currentDateStr = currentDate.toISOString().split('T')[0];
       
       if (currentDateStr !== lastDateRef.current) {
-        // Date changed - reset state
+        // Date changed (7:00 AM reset occurred) - reset state
         setToday(currentDate);
         lastDateRef.current = currentDateStr;
         setHasExistingData(false);
@@ -90,8 +97,8 @@ export function SleepRecovery() {
     // Check immediately
     checkDateChange();
 
-    // Set up interval to check every minute
-    const interval = setInterval(checkDateChange, 60000);
+    // Set up interval to check every 30 seconds for more responsive 7 AM reset
+    const interval = setInterval(checkDateChange, 30000);
 
     return () => clearInterval(interval);
   }, []);
@@ -203,7 +210,11 @@ export function SleepRecovery() {
     setIsSaving(true);
     try {
       const duration = calculateDuration();
+      // Sleep date should use 7 AM reset logic - if bedtime is before 7 AM, use previous day
       const sleepDate = new Date(bedtime);
+      if (sleepDate.getHours() < 7) {
+        sleepDate.setDate(sleepDate.getDate() - 1);
+      }
       sleepDate.setHours(0, 0, 0, 0);
 
       const sleepLog: SleepLog = {

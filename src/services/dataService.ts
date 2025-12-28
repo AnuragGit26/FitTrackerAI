@@ -435,9 +435,16 @@ class DataService {
   }
 
   async getAllWorkouts(userId: string): Promise<Workout[]> {
+    // eslint-disable-next-line no-console
+    console.debug('[DataService.getAllWorkouts] Called with userId:', userId);
     try {
-      return await dbHelpers.getAllWorkouts(userId);
+      const workouts = await dbHelpers.getAllWorkouts(userId);
+      // eslint-disable-next-line no-console
+      console.debug(`[DataService.getAllWorkouts] Returning ${workouts.length} workouts for userId: ${userId}`);
+      return workouts;
     } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('[DataService.getAllWorkouts] Error:', error);
       throw new Error(`Failed to get workouts: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }

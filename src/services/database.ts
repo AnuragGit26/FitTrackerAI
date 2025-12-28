@@ -206,6 +206,23 @@ class FitTrackAIDB extends Dexie {
       recoveryLogs: '++id, userId, date, version, [userId+date], [userId+updatedAt]',
       notifications: 'id, userId, isRead, createdAt, [userId+isRead], [userId+createdAt], type',
     });
+
+    // Version 11: Schema update (migration completed)
+    this.version(11).stores({
+      workouts: '++id, userId, date, version, [userId+date], [userId+updatedAt], *musclesTargeted',
+      exercises: 'id, name, category, userId, version, [userId+isCustom], [userId+updatedAt], *primaryMuscles, *secondaryMuscles',
+      muscleStatuses: '++id, muscle, userId, version, [userId+muscle], [userId+updatedAt], lastWorked',
+      settings: 'key, userId, version, [userId+key]',
+      workoutTemplates: 'id, userId, category, name, version, [userId+category], [userId+updatedAt], *musclesTargeted',
+      aiCacheMetadata: '++id, insightType, userId, [insightType+userId], lastFetchTimestamp',
+      plannedWorkouts: 'id, userId, scheduledDate, version, [userId+scheduledDate], [userId+updatedAt]',
+      exerciseDetailsCache: '++id, exerciseSlug, cachedAt',
+      muscleImageCache: '++id, muscle, cachedAt',
+      syncMetadata: '++id, tableName, userId, [userId+tableName], syncStatus, lastSyncAt',
+      sleepLogs: '++id, userId, date, version, [userId+date], [userId+updatedAt]',
+      recoveryLogs: '++id, userId, date, version, [userId+date], [userId+updatedAt]',
+      notifications: 'id, userId, isRead, createdAt, [userId+isRead], [userId+createdAt], type',
+    });
   }
 }
 
@@ -227,6 +244,7 @@ export const dbHelpers = {
       .where('userId')
       .equals(userId)
       .sortBy('date');
+    
     // Sort descending (most recent first) by reversing the array
     return workouts.reverse();
   },

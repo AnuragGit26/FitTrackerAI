@@ -1410,6 +1410,7 @@ export function LogExercise({
                   nextExerciseName={nextExercise?.exerciseName}
                   isLastInSuperset={isLastInSuperset}
                   showGroupRestMessage={isInSuperset && !!nextExercise && !isLastInSuperset}
+                  exerciseEquipment={selectedExercise?.equipment}
                 />
               );
             })()}
