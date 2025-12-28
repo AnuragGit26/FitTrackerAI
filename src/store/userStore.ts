@@ -31,8 +31,8 @@ interface UserState {
   error: string | null;
   
   // Actions
-  initializeUser: (clerkUser?: { id: string; firstName?: string | null; username?: string | null; emailAddresses?: Array<{ emailAddress: string }> }) => Promise<void>;
-  syncWithClerk: (clerkUser: { id: string; firstName?: string | null; username?: string | null; emailAddresses?: Array<{ emailAddress: string }> }) => Promise<void>;
+  initializeUser: (auth0User?: { id: string; firstName?: string | null; username?: string | null; emailAddresses?: Array<{ emailAddress: string }> }) => Promise<void>;
+  syncWithAuth0: (auth0User: { id: string; firstName?: string | null; username?: string | null; emailAddresses?: Array<{ emailAddress: string }> }) => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   setExperienceLevel: (level: ExperienceLevel) => Promise<void>;
   setGoals: (goals: Goal[]) => Promise<void>;
@@ -86,38 +86,38 @@ export const useUserStore = create<UserState>((set, get) => ({
   isLoading: false,
   error: null,
 
-  initializeUser: async (clerkUser) => {
+  initializeUser: async (auth0User) => {
     set({ isLoading: true, error: null });
 
     try {
       let savedProfile = await dataService.getUserProfile();
       
-      // If we have a Clerk user, sync the profile with Clerk data
-      if (clerkUser) {
-        const clerkUserId = clerkUser.id;
-        const clerkName = clerkUser.firstName || clerkUser.username || clerkUser.emailAddresses?.[0]?.emailAddress || 'User';
+      // If we have an Auth0 user, sync the profile with Auth0 data
+      if (auth0User) {
+        const auth0UserId = auth0User.id;
+        const auth0Name = auth0User.firstName || auth0User.username || auth0User.emailAddresses?.[0]?.emailAddress || 'User';
         
-        // If no saved profile exists, create one with Clerk data
+        // If no saved profile exists, create one with Auth0 data
         if (!savedProfile) {
           savedProfile = {
             ...DEFAULT_PROFILE,
-            id: clerkUserId,
-            name: clerkName,
+            id: auth0UserId,
+            name: auth0Name,
           };
           await dataService.updateUserProfile(savedProfile);
         } else {
-          // Update existing profile with Clerk ID and name if they differ
-          if (savedProfile.id !== clerkUserId || savedProfile.name !== clerkName) {
+          // Update existing profile with Auth0 ID and name if they differ
+          if (savedProfile.id !== auth0UserId || savedProfile.name !== auth0Name) {
             savedProfile = {
               ...savedProfile,
-              id: clerkUserId,
-              name: clerkName,
+              id: auth0UserId,
+              name: auth0Name,
             };
             await dataService.updateUserProfile(savedProfile);
           }
         }
       } else if (!savedProfile) {
-        // No Clerk user and no saved profile - use default
+        // No Auth0 user and no saved profile - use default
         savedProfile = DEFAULT_PROFILE;
       }
       
@@ -133,19 +133,19 @@ export const useUserStore = create<UserState>((set, get) => ({
     }
   },
 
-  syncWithClerk: async (clerkUser) => {
+  syncWithAuth0: async (auth0User) => {
     const { profile } = get();
     if (!profile) return;
 
-    const clerkUserId = clerkUser.id;
-    const clerkName = clerkUser.firstName || clerkUser.username || clerkUser.emailAddresses?.[0]?.emailAddress || 'User';
+    const auth0UserId = auth0User.id;
+    const auth0Name = auth0User.firstName || auth0User.username || auth0User.emailAddresses?.[0]?.emailAddress || 'User';
 
-    // Update profile with Clerk data if needed
-    if (profile.id !== clerkUserId || profile.name !== clerkName) {
+    // Update profile with Auth0 data if needed
+    if (profile.id !== auth0UserId || profile.name !== auth0Name) {
       const updatedProfile = {
         ...profile,
-        id: clerkUserId,
-        name: clerkName,
+        id: auth0UserId,
+        name: auth0Name,
       };
       await get().updateProfile(updatedProfile);
     }

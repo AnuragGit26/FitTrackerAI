@@ -43,8 +43,9 @@ npm install
 
 3. Create a `.env` file in the root directory with the following variables:
 ```env
-# Clerk Authentication (Required)
-VITE_CLERK_PUBLISHABLE_KEY=pk_test_your_clerk_publishable_key_here
+# Auth0 Authentication (Required)
+VITE_AUTH0_DOMAIN=your-tenant.auth0.com
+VITE_AUTH0_CLIENT_ID=your_auth0_client_id_here
 
 # Supabase Configuration (Required)
 # Use VITE_ prefix (recommended) or REACT_APP_ prefix (for backward compatibility)
@@ -61,7 +62,7 @@ VITE_GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
 **Getting your API keys:**
-- **Clerk**: Get your publishable key from [Clerk Dashboard](https://dashboard.clerk.com/)
+- **Auth0**: Get your domain and client ID from [Auth0 Dashboard](https://manage.auth0.com/)
 - **Supabase**: Get your URL and anon key from [Supabase Dashboard](https://supabase.com/dashboard/project/_/settings/api)
 - **Gemini AI**: Get your API key from [Google AI Studio](https://makersuite.google.com/app/apikey) (optional)
 
@@ -104,17 +105,23 @@ src/
 
 The following environment variables are required for the app to function:
 
-1. **VITE_CLERK_PUBLISHABLE_KEY** (Required)
-   - Used for user authentication
-   - Get it from: [Clerk Dashboard](https://dashboard.clerk.com/)
+1. **VITE_AUTH0_DOMAIN** (Required)
+   - Auth0 tenant domain for user authentication
+   - Get it from: [Auth0 Dashboard](https://manage.auth0.com/)
+   - Format: `your-tenant.auth0.com`
+   - The app will fail to start without this variable
+
+2. **VITE_AUTH0_CLIENT_ID** (Required)
+   - Auth0 application client ID for user authentication
+   - Get it from: [Auth0 Dashboard](https://manage.auth0.com/)
    - The app will fail to start without this key
 
-2. **VITE_SUPABASE_URL** (Required)
+3. **VITE_SUPABASE_URL** (Required)
    - Supabase project URL for data synchronization
    - Get it from: [Supabase Dashboard](https://supabase.com/dashboard/project/_/settings/api)
    - The app will fail to start without this variable
 
-3. **VITE_SUPABASE_ANON_KEY** (Required)
+4. **VITE_SUPABASE_ANON_KEY** (Required)
    - Supabase anonymous/public key for API access
    - Alternative name: `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` (for backward compatibility)
    - Get it from: [Supabase Dashboard](https://supabase.com/dashboard/project/_/settings/api)
@@ -122,7 +129,7 @@ The following environment variables are required for the app to function:
 
 ### Optional Environment Variables
 
-4. **VITE_GEMINI_API_KEY** (Optional)
+5. **VITE_GEMINI_API_KEY** (Optional)
    - Used for AI-powered workout insights and recommendations
    - Get it from: [Google AI Studio](https://makersuite.google.com/app/apikey)
    - Without this key, the app will still work but AI insights will show placeholder messages

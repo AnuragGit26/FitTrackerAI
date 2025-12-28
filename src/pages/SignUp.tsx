@@ -1,232 +1,35 @@
-import { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useSignUp, useAuth } from '@clerk/clerk-react';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth0 } from '@auth0/auth0-react';
 import { motion } from 'framer-motion';
 
 export function SignUp() {
-  const [email, setEmail] = useState('');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [verificationCode, setVerificationCode] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
-  const { signUp, setActive } = useSignUp();
-  const { isSignedIn, isLoaded } = useAuth();
-  const navigate = useNavigate();
-  const formSubmitTimeRef = useRef<number | null>(null);
-  const isUpdatingRef = useRef(false);
-  const isCreatingRef = useRef(false);
-  const hasPreparedVerificationRef = useRef(false);
+  const { loginWithRedirect, error: authError } = useAuth0();
 
-  // Pre-fill email from OAuth signup if available
-  // Only run when signUp.emailAddress changes, not on every email state change
-  useEffect(() => {
-    // Pre-fill email if available from OAuth signup
-    if (signUp?.emailAddress && email !== signUp.emailAddress) {
-      setEmail(signUp.emailAddress);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signUp?.emailAddress]); // Only depend on signUp.emailAddress, not email state (intentional)
-
-  // Check if email verification is needed (only check status, don't auto-prepare)
-  useEffect(() => {
-    const emailVerification = signUp?.verifications?.emailAddress;
-    const needsVerification = signUp?.unverifiedFields?.includes('email_address') && 
-                              emailVerification?.status !== 'verified';
-    setNeedsEmailVerification(needsVerification || false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signUp?.unverifiedFields, signUp?.verifications?.emailAddress?.status]); // emailVerification object reference changes, but we only need status
-
-  const handleVerifyEmail = async () => {
-    if (!verificationCode || verificationCode.length < 6) {
-      setError('Please enter the 6-digit verification code.');
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      await signUp?.attemptEmailAddressVerification({
-        code: verificationCode,
-      });
-
-      if (signUp?.status === 'complete' && signUp.createdSessionId && setActive) {
-        await setActive({ session: signUp.createdSessionId });
-        navigate('/');
-        return;
-      }
-
-      // If still needs verification, show error
-      if (signUp?.unverifiedFields?.includes('email_address')) {
-        setError('Invalid verification code. Please try again.');
-      } else {
-        setNeedsEmailVerification(false);
-      }
-    } catch (err: unknown) {
-      const errorObj = err as { errors?: Array<{ message?: string }> };
-      const errorMessage = errorObj.errors?.[0]?.message || 'Invalid verification code. Please try again.';
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
+  const signup = () => {
+    loginWithRedirect({
+      authorizationParams: {
+        screen_hint: 'signup',
+        connection: 'Username-Password-Authentication',
+      },
+    }).catch((err) => {
+      setError(err.message || 'Failed to initiate signup. Please try again.');
+    });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    formSubmitTimeRef.current = Date.now();
-
-    // Prevent duplicate calls
-    if (isUpdatingRef.current || isCreatingRef.current || isLoading) {
-      return;
-    }
-
-    // Reset verification preparation flag for new submission
-    hasPreparedVerificationRef.current = false;
-
-    if (password !== confirmPassword) {
-      setError('Passwords do not match.');
-      return;
-    }
-
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters long.');
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      // Check if signUp is already in progress from OAuth (missing_requirements status)
-      if (signUp?.status === 'missing_requirements') {
-        // Try to update the existing signUp with email/password
-        // Use the email from signUp if available (from OAuth), otherwise use form email
-        const emailToUse = signUp.emailAddress || email;
-        try {
-          // Prevent duplicate update calls
-          if (isUpdatingRef.current) {
-            return;
-          }
-          isUpdatingRef.current = true;
-
-          await signUp.update({
-            emailAddress: emailToUse,
-            password,
-            username: username || undefined, // Include username if provided
-          });
-
-          // If email is unverified, try to verify it
-          if (signUp.unverifiedFields?.includes('email_address')) {
-            try {
-              // Prevent duplicate prepareEmailAddressVerification calls
-              if (hasPreparedVerificationRef.current) {
-                return;
-              }
-              hasPreparedVerificationRef.current = true;
-              
-              // Prepare email verification
-              await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
-
-              // For OAuth emails, try to attempt verification immediately (if Clerk supports it)
-              // If email came from OAuth, it might already be verified on the provider side
-              // Wait a bit for Clerk to process
-              await new Promise(resolve => setTimeout(resolve, 500));
-            } catch (verifyError) {
-              // Error handled silently - user will see verification UI
-            }
-          }
-
-          // Check if signup is now complete (re-check signUp to get updated status)
-          // Use a type assertion to allow TypeScript to check the updated status
-          const updatedSignUp = signUp;
-          const currentSignUpStatus = updatedSignUp.status as string;
-          if (currentSignUpStatus === 'complete' && updatedSignUp.createdSessionId && setActive) {
-            await setActive({ session: updatedSignUp.createdSessionId });
-            
-            // Wait for auth state to propagate (check both isSignedIn and isLoaded)
-            let waitAttempts = 0;
-            const maxWaitAttempts = 30; // Wait up to 3 seconds
-            while (waitAttempts < maxWaitAttempts && (!isSignedIn || !isLoaded)) {
-              await new Promise(resolve => setTimeout(resolve, 100));
-              waitAttempts++;
-            }
-            
-            navigate('/');
-            return;
-          }
-
-          // If still missing requirements, check what's needed
-          if (currentSignUpStatus === 'missing_requirements') {
-            // If only username is missing, we can't auto-complete that - user needs to provide it
-            // If email is still unverified, we need to show verification UI
-            // For now, fall through to show error or continue with normal flow
-          }
-        } catch (updateError) {
-          isUpdatingRef.current = false; // Reset on error
-          // Fall through to create new signup
-        } finally {
-          isUpdatingRef.current = false; // Reset after update completes
-        }
-      }
-
-      // Prevent duplicate create calls
-      if (isCreatingRef.current) {
-        setIsLoading(false);
-        return;
-      }
-      isCreatingRef.current = true;
-
-      const result = await signUp?.create({
-        emailAddress: email,
-        password,
-        username: username || undefined, // Include username if provided
-      });
-
-      if (result?.status === 'complete') {
-        if (setActive) {
-          await setActive({ session: result.createdSessionId });
-          
-          // Wait for auth state to propagate (check both isSignedIn and isLoaded)
-          let waitAttempts = 0;
-          const maxWaitAttempts = 30; // Wait up to 3 seconds
-          while (waitAttempts < maxWaitAttempts && (!isSignedIn || !isLoaded)) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-            waitAttempts++;
-          }
-        }
-        navigate('/');
-      } else {
-        // Email verification required
-        setError('Please check your email for verification.');
-      }
-    } catch (err: unknown) {
-      const errorObj = err as { errors?: Array<{ message?: string; code?: string; longMessage?: string }> };
-      const errorMessage = errorObj.errors?.[0]?.message || 'Failed to create account. Please try again.';
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-      isUpdatingRef.current = false;
-      isCreatingRef.current = false;
-    }
+  const handleSocialLogin = (connection: 'google-oauth2' | 'apple') => {
+    loginWithRedirect({
+      authorizationParams: {
+        connection,
+        screen_hint: 'signup',
+      },
+    }).catch((err) => {
+      setError(err.message || 'Failed to sign up with social provider.');
+    });
   };
 
-  const handleSocialLogin = async (strategy: 'oauth_google' | 'oauth_apple') => {
-    try {
-      await signUp?.authenticateWithRedirect({
-        strategy,
-        redirectUrl: '/sso-callback',
-        redirectUrlComplete: '/',
-      });
-    } catch (err: unknown) {
-      const errorObj = err as { errors?: Array<{ message?: string }> };
-      setError(errorObj.errors?.[0]?.message || 'Failed to sign up with social provider.');
-    }
-  };
+  const displayError = error || authError?.message;
 
   return (
     <div className="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white font-display min-h-screen flex flex-col antialiased overflow-x-hidden selection:bg-primary selection:text-background-dark">
@@ -264,154 +67,29 @@ export function SignUp() {
         </div>
 
         {/* Form Section */}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5 w-full">
-          {error && (
+        <div className="flex flex-col gap-5 w-full">
+          {displayError && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 text-sm"
             >
-              {error}
+              {displayError}
             </motion.div>
           )}
 
-          {/* Email Field */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium ml-1 text-slate-700 dark:text-slate-300">
-              Email Address
-            </label>
-            <div className="relative flex items-center group">
-              <input
-                className="w-full bg-white dark:bg-surface-dark border border-slate-200 dark:border-emerald-900/50 rounded-xl px-4 py-3.5 pr-12 text-base outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all placeholder:text-slate-400 dark:placeholder:text-emerald-800/60 dark:text-white"
-                placeholder="name@example.com"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={isLoading}
-              />
-              <div className="absolute right-4 text-slate-400 dark:text-emerald-700 pointer-events-none flex items-center">
-                <span className="material-symbols-outlined text-xl">mail</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Username Field - Required for SSO logins */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium ml-1 text-slate-700 dark:text-slate-300">
-              Username <span className="text-red-500">*</span>
-            </label>
-            <div className="relative flex items-center group">
-              <input
-                className="w-full bg-white dark:bg-surface-dark border border-slate-200 dark:border-emerald-900/50 rounded-xl px-4 py-3.5 pr-12 text-base outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all placeholder:text-slate-400 dark:placeholder:text-emerald-800/60 dark:text-white"
-                placeholder="Choose a username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-                disabled={isLoading}
-              />
-              <div className="absolute right-4 text-slate-400 dark:text-emerald-700 pointer-events-none flex items-center">
-                <span className="material-symbols-outlined text-xl">person</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Password Field */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium ml-1 text-slate-700 dark:text-slate-300">Password</label>
-            <div className="relative flex items-center group">
-              <input
-                className="w-full bg-white dark:bg-surface-dark border border-slate-200 dark:border-emerald-900/50 rounded-xl px-4 py-3.5 pr-12 text-base outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all placeholder:text-slate-400 dark:placeholder:text-emerald-800/60 dark:text-white"
-                placeholder="Create a password"
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={isLoading}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 text-slate-400 dark:text-emerald-700 hover:text-primary transition-colors flex items-center"
-              >
-                <span className="material-symbols-outlined text-xl">
-                  {showPassword ? 'visibility' : 'visibility_off'}
-                </span>
-              </button>
-            </div>
-          </div>
-
-          {/* Confirm Password Field */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium ml-1 text-slate-700 dark:text-slate-300">
-              Confirm Password
-            </label>
-            <div className="relative flex items-center group">
-              <input
-                className="w-full bg-white dark:bg-surface-dark border border-slate-200 dark:border-emerald-900/50 rounded-xl px-4 py-3.5 pr-12 text-base outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all placeholder:text-slate-400 dark:placeholder:text-emerald-800/60 dark:text-white"
-                placeholder="Repeat password"
-                type={showConfirmPassword ? 'text' : 'password'}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                disabled={isLoading}
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-4 text-slate-400 dark:text-emerald-700 hover:text-primary transition-colors flex items-center"
-              >
-                <span className="material-symbols-outlined text-xl">
-                  {showConfirmPassword ? 'visibility' : 'visibility_off'}
-                </span>
-              </button>
-            </div>
-          </div>
-
-          {/* Email Verification Code Field - Show when email verification is needed */}
-          {needsEmailVerification && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium ml-1 text-slate-700 dark:text-slate-300">
-                Verification Code <span className="text-red-500">*</span>
-              </label>
-              <div className="relative flex items-center group">
-                <input
-                  className="w-full bg-white dark:bg-surface-dark border border-slate-200 dark:border-emerald-900/50 rounded-xl px-4 py-3.5 pr-12 text-base outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all placeholder:text-slate-400 dark:placeholder:text-emerald-800/60 dark:text-white"
-                  placeholder="Enter 6-digit code"
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  value={verificationCode}
-                  onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
-                  required={needsEmailVerification}
-                  disabled={isLoading}
-                />
-                <div className="absolute right-4 text-slate-400 dark:text-emerald-700 pointer-events-none flex items-center">
-                  <span className="material-symbols-outlined text-xl">verified</span>
-                </div>
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 ml-1">
-                We sent a verification code to {email || signUp?.emailAddress}
-              </p>
-            </div>
-          )}
-
-          {/* Submit Button */}
+          {/* Signup Button */}
           <button
-            type={needsEmailVerification ? "button" : "submit"}
-            onClick={needsEmailVerification ? handleVerifyEmail : undefined}
-            disabled={isLoading}
-            className="mt-4 w-full bg-primary hover:bg-green-400 text-background-dark font-bold text-lg py-4 rounded-xl shadow-[0_4px_20px_rgba(13,242,105,0.25)] hover:shadow-[0_4px_25px_rgba(13,242,105,0.4)] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            type="button"
+            onClick={signup}
+            className="mt-4 w-full bg-primary hover:bg-green-400 text-background-dark font-bold text-lg py-4 rounded-xl shadow-[0_4px_20px_rgba(13,242,105,0.25)] hover:shadow-[0_4px_25px_rgba(13,242,105,0.4)] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
           >
-            {isLoading 
-              ? (needsEmailVerification ? 'Verifying...' : 'Creating Account...') 
-              : (needsEmailVerification ? 'Verify Email' : 'Create Account')}
+            Create Account
             <span className="material-symbols-outlined text-xl leading-none">
-              {needsEmailVerification ? 'verified' : 'arrow_forward'}
+              arrow_forward
             </span>
           </button>
-        </form>
+        </div>
 
         {/* Divider */}
         <div className="relative my-8">
@@ -429,9 +107,8 @@ export function SignUp() {
         <div className="grid grid-cols-2 gap-4">
           <button
             type="button"
-            onClick={() => handleSocialLogin('oauth_google')}
-            disabled={isLoading}
-            className="flex items-center justify-center gap-2 bg-white dark:bg-surface-dark border border-slate-200 dark:border-emerald-900/50 hover:border-primary/50 dark:hover:border-primary/50 rounded-xl py-3 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => handleSocialLogin('google-oauth2')}
+            className="flex items-center justify-center gap-2 bg-white dark:bg-surface-dark border border-slate-200 dark:border-emerald-900/50 hover:border-primary/50 dark:hover:border-primary/50 rounded-xl py-3 transition-all group"
           >
             <svg
               className="w-5 h-5"
@@ -466,9 +143,8 @@ export function SignUp() {
           </button>
           <button
             type="button"
-            onClick={() => handleSocialLogin('oauth_apple')}
-            disabled={isLoading}
-            className="flex items-center justify-center gap-2 bg-white dark:bg-surface-dark border border-slate-200 dark:border-emerald-900/50 hover:border-primary/50 dark:hover:border-primary/50 rounded-xl py-3 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => handleSocialLogin('apple')}
+            className="flex items-center justify-center gap-2 bg-white dark:bg-surface-dark border border-slate-200 dark:border-emerald-900/50 hover:border-primary/50 dark:hover:border-primary/50 rounded-xl py-3 transition-all group"
           >
             <img
               src="https://i.pinimg.com/736x/65/22/5a/65225ab6d965e5804a632b643e317bf4.jpg"

@@ -1,65 +1,33 @@
-import { useState, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useSignIn } from '@clerk/clerk-react';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth0 } from '@auth0/auth0-react';
 import { motion } from 'framer-motion';
 
 export function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { signIn, setActive } = useSignIn();
-  const navigate = useNavigate();
-  const isCreatingRef = useRef(false);
+  const { loginWithRedirect, error: authError } = useAuth0();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-
-    // Prevent duplicate calls
-    if (isCreatingRef.current || isLoading) {
-      return;
-    }
-
-    setIsLoading(true);
-    isCreatingRef.current = true;
-
-    try {
-      const result = await signIn?.create({
-        identifier: email,
-        password,
-      });
-
-      if (result?.status === 'complete') {
-        if (setActive && result.createdSessionId) {
-          await setActive({ session: result.createdSessionId });
-        }
-        navigate('/');
-      } else {
-        setError('Please check your email for verification.');
-      }
-    } catch (err: unknown) {
-      const errorObj = err as { errors?: Array<{ message?: string }> };
-      setError(errorObj.errors?.[0]?.message || 'Invalid email or password. Please try again.');
-    } finally {
-      setIsLoading(false);
-      isCreatingRef.current = false;
-    }
+  const login = () => {
+    loginWithRedirect({
+      authorizationParams: {
+        connection: 'Username-Password-Authentication',
+      },
+    }).catch((err) => {
+      setError(err.message || 'Failed to initiate login. Please try again.');
+    });
   };
 
-  const handleSocialLogin = async (strategy: 'oauth_google' | 'oauth_apple') => {
-    try {
-      await signIn?.authenticateWithRedirect({
-        strategy,
-        redirectUrl: '/sso-callback',
-        redirectUrlComplete: '/',
-      });
-    } catch (err: unknown) {
-      const errorObj = err as { errors?: Array<{ message?: string }> };
-      setError(errorObj.errors?.[0]?.message || 'Failed to sign in with social provider.');
-    }
+  const handleSocialLogin = (connection: 'google-oauth2' | 'apple') => {
+    loginWithRedirect({
+      authorizationParams: {
+        connection,
+      },
+    }).catch((err) => {
+      setError(err.message || 'Failed to sign in with social provider.');
+    });
   };
+
+  const displayError = error || authError?.message;
 
   return (
     <div className="relative flex min-h-screen w-full flex-col overflow-x-hidden bg-background-light dark:bg-background-dark font-display">
@@ -89,79 +57,25 @@ export function Login() {
       </div>
 
       {/* Form Area */}
-      <form onSubmit={handleSubmit} className="flex flex-col gap-5 px-6 pb-4 w-full max-w-[480px] mx-auto">
-        {error && (
+      <div className="flex flex-col gap-5 px-6 pb-4 w-full max-w-[480px] mx-auto">
+        {displayError && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 text-sm"
           >
-            {error}
+            {displayError}
           </motion.div>
         )}
-
-        {/* Email Field */}
-        <label className="flex flex-col flex-1">
-          <p className="text-gray-900 dark:text-white text-base font-medium leading-normal pb-2">
-            Email Address
-          </p>
-          <div className="relative">
-            <input
-              className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-gray-900 dark:text-white focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-gray-300 dark:border-border-dark bg-white dark:bg-surface-dark focus:border-primary h-14 placeholder:text-gray-400 dark:placeholder:text-secondary-text/60 p-[15px] text-base font-normal leading-normal transition-colors"
-              placeholder="Enter your email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              disabled={isLoading}
-            />
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-secondary-text pointer-events-none flex items-center">
-              <span className="material-symbols-outlined text-xl">mail</span>
-            </div>
-          </div>
-        </label>
-
-        {/* Password Field */}
-        <label className="flex flex-col flex-1">
-          <div className="flex justify-between items-center pb-2">
-            <p className="text-gray-900 dark:text-white text-base font-medium leading-normal">Password</p>
-            <Link
-              to="/forgot-password"
-              className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
-            >
-              Forgot Password?
-            </Link>
-          </div>
-          <div className="flex w-full flex-1 items-stretch rounded-lg group">
-            <input
-              className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg rounded-r-none text-gray-900 dark:text-white focus:outline-0 focus:ring-0 border border-gray-300 dark:border-border-dark border-r-0 bg-white dark:bg-surface-dark focus:border-primary h-14 placeholder:text-gray-400 dark:placeholder:text-secondary-text/60 p-[15px] text-base font-normal leading-normal z-10"
-              placeholder="Enter your password"
-              type={showPassword ? 'text' : 'password'}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              disabled={isLoading}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="flex items-center justify-center px-4 rounded-r-lg border border-l-0 border-gray-300 dark:border-border-dark bg-white dark:bg-surface-dark text-gray-400 dark:text-secondary-text hover:text-primary transition-colors focus:border-primary group-focus-within:border-primary"
-            >
-              <span className="material-symbols-outlined text-xl">
-                {showPassword ? 'visibility_off' : 'visibility'}
-              </span>
-            </button>
-          </div>
-        </label>
 
         {/* Login Button */}
         <div className="pt-4">
           <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full bg-primary hover:bg-primary/90 text-background-dark font-bold text-lg h-14 rounded-full transition-all transform active:scale-[0.98] flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(13,242,105,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
+            type="button"
+            onClick={login}
+            className="w-full bg-primary hover:bg-primary/90 text-background-dark font-bold text-lg h-14 rounded-full transition-all transform active:scale-[0.98] flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(13,242,105,0.2)]"
           >
-            {isLoading ? 'Logging in...' : 'Log In'}
+            Log In
             <span className="material-symbols-outlined text-xl">arrow_forward</span>
           </button>
         </div>
@@ -179,9 +93,8 @@ export function Login() {
         <div className="grid grid-cols-2 gap-4">
           <button
             type="button"
-            onClick={() => handleSocialLogin('oauth_google')}
-            disabled={isLoading}
-            className="flex items-center justify-center gap-2 h-12 rounded-lg border border-gray-300 dark:border-border-dark bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-surface-dark/80 text-gray-900 dark:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed group"
+            onClick={() => handleSocialLogin('google-oauth2')}
+            className="flex items-center justify-center gap-2 h-12 rounded-lg border border-gray-300 dark:border-border-dark bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-surface-dark/80 text-gray-900 dark:text-white transition-colors group"
           >
             <svg
               className="w-5 h-5"
@@ -214,9 +127,8 @@ export function Login() {
           </button>
           <button
             type="button"
-            onClick={() => handleSocialLogin('oauth_apple')}
-            disabled={isLoading}
-            className="flex items-center justify-center gap-2 h-12 rounded-lg border border-gray-300 dark:border-border-dark bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-surface-dark/80 text-gray-900 dark:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed group"
+            onClick={() => handleSocialLogin('apple')}
+            className="flex items-center justify-center gap-2 h-12 rounded-lg border border-gray-300 dark:border-border-dark bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-surface-dark/80 text-gray-900 dark:text-white transition-colors group"
           >
             <img
               src="https://i.pinimg.com/736x/65/22/5a/65225ab6d965e5804a632b643e317bf4.jpg"
@@ -226,7 +138,7 @@ export function Login() {
             <span className="text-sm font-medium">Apple</span>
           </button>
         </div>
-      </form>
+      </div>
 
       {/* Footer / Sign Up Link */}
       <div className="mt-auto py-8 text-center">

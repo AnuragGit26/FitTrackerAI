@@ -1,8 +1,9 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  // Clerk Authentication (Required)
-  readonly VITE_CLERK_PUBLISHABLE_KEY: string;
+  // Auth0 Authentication (Required)
+  readonly VITE_AUTH0_DOMAIN: string;
+  readonly VITE_AUTH0_CLIENT_ID: string;
   
   // Supabase Configuration (Required)
   // Support both VITE_ and REACT_APP_ prefixes for backward compatibility

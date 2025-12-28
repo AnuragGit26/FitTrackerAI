@@ -11,17 +11,22 @@ import { sanitizeString } from '@/utils/sanitize';
 import { Transaction } from 'dexie';
 import { validateReps, validateWeight, validateDuration, validateCalories, validateRPE } from '@/utils/validators';
 
+// UserProfile type - matches userStore definition
+type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
+type Goal = 'build_muscle' | 'gain_strength' | 'lose_fat' | 'improve_endurance' | 'general_fitness';
+type Gender = 'male' | 'female' | 'other';
+
 interface UserProfile {
   id: string;
   name: string;
-  experienceLevel: 'beginner' | 'intermediate' | 'advanced';
-  goals: string[];
+  experienceLevel: ExperienceLevel;
+  goals: Goal[];
   equipment: string[];
   workoutFrequency: number;
   preferredUnit: 'kg' | 'lbs';
   defaultRestTime: number;
   age?: number;
-  gender?: 'male' | 'female' | 'other';
+  gender?: Gender;
   weight?: number;
   height?: number;
   profilePicture?: string;
@@ -554,7 +559,13 @@ class DataService {
   // User profile operations
   async getUserProfile(): Promise<UserProfile | null> {
     try {
-      return await dbHelpers.getSetting('userProfile') as UserProfile | null;
+      const profile = await dbHelpers.getSetting('userProfile') as UserProfile | null;
+      if (!profile) return null;
+      // Ensure goals is properly typed
+      return {
+        ...profile,
+        goals: Array.isArray(profile.goals) ? profile.goals as Goal[] : [],
+      } as UserProfile;
     } catch (error) {
       throw new Error(`Failed to get user profile: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }

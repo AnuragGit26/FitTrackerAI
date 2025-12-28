@@ -1,7 +1,7 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, useLocation, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useAuth, useUser, AuthenticateWithRedirectCallback, useSignIn, useSignUp } from '@clerk/clerk-react';
+import { useAuth0 } from '@auth0/auth0-react';
 import { Analytics as VercelAnalytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Layout } from '@/components/layout/Layout';
@@ -42,162 +42,23 @@ const SleepRecovery = lazy(() => import('@/pages/SleepRecovery').then(m => ({ de
 const Login = lazy(() => import('@/pages/Login').then(m => ({ default: m.Login })));
 const SignUp = lazy(() => import('@/pages/SignUp').then(m => ({ default: m.SignUp })));
 
-// Component to handle OAuth callback with logging
+// Component to handle OAuth callback - Auth0 handles this automatically
 function SsoCallbackHandler() {
-  const { isSignedIn, isLoaded } = useAuth();
-  const { signIn, setActive: setActiveSignIn } = useSignIn();
-  const { signUp, setActive: setActiveSignUp } = useSignUp();
-  const navigate = useNavigate();
+  const { isLoading, isAuthenticated } = useAuth0();
 
-  // Handle OAuth callback completion - check both signIn and signUp
-  useEffect(() => {
-    if (!isLoaded) return;
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-background-light dark:bg-background-dark">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
 
-    let isMounted = true;
-    let intervalId: ReturnType<typeof setInterval> | null = null;
-    let hasNavigated = false; // Prevent multiple navigations
+  if (isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
 
-    const navigateOnce = (path: string) => {
-      if (!hasNavigated && isMounted) {
-        hasNavigated = true;
-        navigate(path, { replace: true });
-      }
-    };
-
-    const activateSession = async (sessionId: string, setActive: typeof setActiveSignIn | typeof setActiveSignUp) => {
-      if (!isMounted || hasNavigated) return;
-      try {
-        if (setActive) {
-          await setActive({ session: sessionId });
-        }
-        navigateOnce('/');
-      } catch (error) {
-        logger.error('Failed to activate session:', error);
-        // Don't navigate on error, let polling handle it
-      }
-    };
-
-    // Check initial state immediately
-    if (signIn?.status === 'complete' && signIn.createdSessionId) {
-      activateSession(signIn.createdSessionId, setActiveSignIn);
-      return;
-    }
-
-    if (signUp?.status === 'complete' && signUp.createdSessionId) {
-      activateSession(signUp.createdSessionId, setActiveSignUp);
-      return;
-    }
-
-    // Handle OAuth signup with missing requirements
-    if (signUp?.status === 'missing_requirements') {
-      const externalAccount = signUp.verifications?.externalAccount;
-      const externalAccountStatus = externalAccount?.status;
-      const hasExternalAccount = externalAccount !== null && externalAccount !== undefined;
-      const isOnSsoCallback = window.location.pathname === '/sso-callback';
-      const isLikelyOAuth = isOnSsoCallback || (signUp.missingFields?.includes('email_address') && !signUp.emailAddress);
-
-      // If OAuth and external account is unverified, wait for processing
-      if (isLikelyOAuth && (externalAccountStatus === 'unverified' || externalAccountStatus === null || !hasExternalAccount)) {
-        // Wait for AuthenticateWithRedirectCallback to process (up to 3 seconds)
-        let pollAttempts = 0;
-        const maxPollAttempts = 30; // 3 seconds at 200ms intervals
-
-        const pollStatus = async () => {
-          if (!isMounted || hasNavigated) return;
-
-          pollAttempts++;
-          await new Promise(resolve => setTimeout(resolve, 200));
-
-          if (!isMounted || hasNavigated) return;
-
-          const currentEmail = signUp.emailAddress;
-          const currentSignUpStatus = signUp.status as string;
-          const currentMissingFields = signUp.missingFields;
-
-          // If signup is complete, activate session immediately
-          if (currentSignUpStatus === 'complete' && signUp.createdSessionId && setActiveSignUp) {
-            await activateSession(signUp.createdSessionId, setActiveSignUp);
-            return;
-          }
-
-          // If email is persisted, redirect to signup page
-          if (currentEmail && currentEmail !== null && currentMissingFields && !currentMissingFields.includes('email_address') && currentSignUpStatus === 'missing_requirements') {
-            navigateOnce('/signup#/continue');
-            return;
-          }
-
-          // Continue polling if not done
-          if (pollAttempts < maxPollAttempts && !hasNavigated) {
-            pollStatus();
-          } else if (!hasNavigated) {
-            // Polling exhausted, check verified external account
-            if (externalAccount && (externalAccount.status === 'verified' || externalAccount.status === 'transferable')) {
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              if (signUp?.status === 'complete' && signUp.createdSessionId && setActiveSignUp && !hasNavigated) {
-                await activateSession(signUp.createdSessionId, setActiveSignUp);
-              }
-            }
-          }
-        };
-
-        pollStatus();
-      } else if (externalAccount && (externalAccount.status === 'verified' || externalAccount.status === 'transferable')) {
-        // External account is verified, wait for Clerk to process
-        setTimeout(async () => {
-          if (!isMounted || hasNavigated) return;
-          if (signUp?.status === 'complete' && signUp.createdSessionId && setActiveSignUp) {
-            await activateSession(signUp.createdSessionId, setActiveSignUp);
-          }
-        }, 1000);
-      }
-    }
-
-    // Single polling mechanism for status changes (fallback)
-    intervalId = setInterval(() => {
-      if (!isMounted || hasNavigated) {
-        if (intervalId) clearInterval(intervalId);
-        return;
-      }
-
-      if (signIn?.status === 'complete' && signIn.createdSessionId && setActiveSignIn) {
-        clearInterval(intervalId!);
-        activateSession(signIn.createdSessionId, setActiveSignIn);
-      } else if (signUp?.status === 'complete' && signUp.createdSessionId && setActiveSignUp) {
-        clearInterval(intervalId!);
-        activateSession(signUp.createdSessionId, setActiveSignUp);
-      } else if (signUp?.status === 'missing_requirements' && !hasNavigated) {
-        // Don't navigate here if we're already handling OAuth flow
-        const isOnSsoCallback = window.location.pathname === '/sso-callback';
-        if (!isOnSsoCallback) {
-          clearInterval(intervalId!);
-          navigateOnce('/signup#/continue');
-        }
-      }
-    }, 200);
-
-    return () => {
-      isMounted = false;
-      hasNavigated = true; // Prevent any pending navigations
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-    };
-  }, [isLoaded, signIn, signUp, setActiveSignIn, setActiveSignUp, navigate]);
-
-  // Monitor auth state changes
-  useEffect(() => {
-    if (isLoaded && isSignedIn) {
-      navigate('/', { replace: true });
-    }
-  }, [isLoaded, isSignedIn, navigate]);
-
-  return (
-    <AuthenticateWithRedirectCallback
-      redirectUrl="/"
-      afterSignInUrl="/"
-      afterSignUpUrl="/"
-    />
-  );
+  return <Navigate to="/login" replace />;
 }
 
 function App() {
@@ -440,31 +301,31 @@ function App() {
 
 function AppRoutes() {
   const location = useLocation();
-  const { isSignedIn, isLoaded } = useAuth();
-  const { user: clerkUser } = useUser();
+  const { isAuthenticated, isLoading, user: auth0User } = useAuth0();
   const initializeUser = useUserStore((state) => state.initializeUser);
 
-  // Sync user store with Clerk user when authenticated
+  // Sync user store with Auth0 user when authenticated
   useEffect(() => {
-    if (isLoaded && isSignedIn && clerkUser) {
+    if (!isLoading && isAuthenticated && auth0User) {
       initializeUser({
-        id: clerkUser.id,
-        firstName: clerkUser.firstName,
-        username: clerkUser.username,
-        emailAddresses: clerkUser.emailAddresses.map((ea) => ({ emailAddress: ea.emailAddress })),
+        id: auth0User.sub || auth0User.email || 'user-unknown',
+        firstName: auth0User.given_name || auth0User.nickname || null,
+        username: auth0User.nickname || auth0User.name || null,
+        emailAddresses: auth0User.email ? [{ emailAddress: auth0User.email }] : [],
       }).then(() => {
+        const userId = auth0User.sub || auth0User.email || 'user-unknown';
         // Initialize workout event tracker for this user
-        workoutEventTracker.initialize(clerkUser.id).catch((error) => {
+        workoutEventTracker.initialize(userId).catch((error) => {
           logger.error('Failed to initialize workout event tracker', error);
         });
         
         // Initialize default templates after user is loaded
-        initializeDefaultTemplates(clerkUser.id).catch((error) => {
+        initializeDefaultTemplates(userId).catch((error) => {
           logger.error('Failed to initialize templates', error);
         });
       });
     }
-  }, [isLoaded, isSignedIn, clerkUser, initializeUser]);
+  }, [isLoading, isAuthenticated, auth0User, initializeUser]);
 
   // Public routes (no auth required, no layout)
   const publicRoutes = (
@@ -478,7 +339,7 @@ function AppRoutes() {
       <Route
         path="/login"
         element={
-          isLoaded && isSignedIn ? (
+          !isLoading && isAuthenticated ? (
             <Navigate to="/" replace />
           ) : (
             <Suspense fallback={<RouteLoader />}>
@@ -490,7 +351,7 @@ function AppRoutes() {
       <Route
         path="/signup"
         element={
-          isLoaded && isSignedIn ? (
+          !isLoading && isAuthenticated ? (
             <Navigate to="/" replace />
           ) : (
             <Suspense fallback={<RouteLoader />}>
@@ -670,8 +531,8 @@ function AppRoutes() {
     </Layout>
   );
 
-  // Show loading while Clerk is loading
-  if (!isLoaded) {
+  // Show loading while Auth0 is loading
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen bg-background-light dark:bg-background-dark">
         <LoadingSpinner size="lg" />
@@ -679,7 +540,7 @@ function AppRoutes() {
     );
   }
 
-  return isSignedIn ? protectedRoutes : publicRoutes;
+  return isAuthenticated ? protectedRoutes : publicRoutes;
 }
 
 export default App;

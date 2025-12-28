@@ -232,7 +232,7 @@
 
 #### 3.4 Security
 
-- **Authentication**: Clerk-based authentication with OAuth support
+- **Authentication**: Auth0-based authentication with OAuth support
 - **Data Encryption**: All data encrypted in transit (HTTPS)
 - **Row-Level Security**: Supabase RLS policies for data isolation
 - **Input Validation**: All user inputs sanitized and validated
@@ -401,7 +401,7 @@ FitTrackAI follows a **mobile-first, offline-first Progressive Web App (PWA)** a
 
 ### Authentication
 
-- **Clerk**: Authentication and user management
+- **Auth0**: Authentication and user management
   - OAuth providers (Google, Apple, etc.)
   - Session management
   - User profile management
@@ -444,7 +444,7 @@ FitTrackAI follows a **mobile-first, offline-first Progressive Web App (PWA)** a
 User Action: Start Workout
     ↓
 1. Create workout object with:
-   - userId (from Clerk)
+   - userId (from Auth0)
    - date (current date)
    - startTime (current timestamp)
    - exercises: []
@@ -1003,7 +1003,7 @@ The Supabase schema mirrors the IndexedDB schema with additional features:
 ### Data Relationships
 
 ```
-User (Clerk)
+User (Auth0)
   ├── UserProfile (1:1)
   ├── Workouts (1:many)
   │     └── WorkoutExercises (1:many)
@@ -1036,23 +1036,23 @@ User (Clerk)
 
 ## API & Integration Points
 
-### 1. Clerk Authentication API
+### 1. Auth0 Authentication API
 
 **Endpoints Used**:
 
-- User authentication (OAuth, email/password)
+- User authentication (OAuth, email/password via Universal Login)
 - Session management
 - User profile retrieval
 
 **Integration**:
 
 ```typescript
-// Clerk React SDK
-import { useAuth, useUser } from '@clerk/clerk-react'
+// Auth0 React SDK
+import { useAuth0 } from '@auth0/auth0-react'
 
 // Get current user
-const { user } = useUser()
-const userId = user?.id
+const { user } = useAuth0()
+const userId = user?.sub || user?.email
 ```
 
 ### 2. Supabase API
@@ -1066,7 +1066,7 @@ const userId = user?.id
 
 **Authentication**:
 
-- JWT tokens from Clerk
+- JWT tokens from Auth0
 - Row-Level Security (RLS) policies enforce access control
 
 **Sync Service**:
@@ -1149,17 +1149,17 @@ await supabaseSyncService.pull(userId, {
 ### Authentication Flow
 
 1. **User Registration/Login**:
-   - Clerk handles authentication UI
+   - Auth0 Universal Login handles authentication UI
    - Supports: Email/Password, OAuth (Google, Apple, etc.)
-   - Session stored in Clerk
+   - Session stored in Auth0
 
 2. **Session Management**:
-   - Clerk session token stored in browser
+   - Auth0 session token stored in browser
    - Automatic token refresh
    - Logout clears session
 
 3. **Supabase Authentication**:
-   - Clerk JWT passed to Supabase
+   - Auth0 JWT passed to Supabase
    - Supabase validates JWT and extracts `user_id`
    - RLS policies use `user_id` for access control
 
@@ -1220,7 +1220,8 @@ const sanitized = sanitizeString(userInput)
 **Environment Variables**:
 
 ```env
-VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
+VITE_AUTH0_DOMAIN=your-tenant.auth0.com
+VITE_AUTH0_CLIENT_ID=your_client_id_here
 VITE_SUPABASE_URL=https://...
 VITE_SUPABASE_ANON_KEY=...
 VITE_GEMINI_API_KEY=...
@@ -1772,7 +1773,8 @@ test('log workout flow', async ({ page }) => {
 
 **Required**:
 
-- `VITE_CLERK_PUBLISHABLE_KEY`: Clerk authentication key
+- `VITE_AUTH0_DOMAIN`: Auth0 tenant domain
+- `VITE_AUTH0_CLIENT_ID`: Auth0 application client ID
 - `VITE_SUPABASE_URL`: Supabase project URL
 - `VITE_SUPABASE_ANON_KEY`: Supabase anonymous key
 
@@ -1809,7 +1811,7 @@ npm run scrape:exercises # Scrape exercise data
 - [React Documentation](https://react.dev)
 - [Vite Documentation](https://vitejs.dev)
 - [Supabase Documentation](https://supabase.com/docs)
-- [Clerk Documentation](https://clerk.com/docs)
+- [Auth0 Documentation](https://auth0.com/docs)
 - [Google Gemini AI](https://ai.google.dev)
 
 **Community**:
