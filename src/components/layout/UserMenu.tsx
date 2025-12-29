@@ -11,10 +11,12 @@ export function UserMenu() {
   const menuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { logout, user: auth0User } = useAuth0();
-  const { profile } = useUserStore();
+  const { profile, clearProfile } = useUserStore();
   
-  // Prefer Auth0 user data, fallback to store profile
-  const userName = auth0User?.name || auth0User?.nickname || auth0User?.given_name || profile?.name || 'User';
+  // Prefer profile store data (user-editable), fallback to Auth0 data
+  // This ensures the menu shows what the user sees in their profile
+  const userName = profile?.name || auth0User?.name || auth0User?.nickname || auth0User?.given_name || 'User';
+  // Use Auth0 email as fallback since email is not editable in profile
   const userEmail = auth0User?.email;
   
   // Use only user-uploaded profile picture (no Auth0 fallback)
@@ -52,9 +54,9 @@ export function UserMenu() {
       onClick: async () => {
         setIsOpen(false);
         try {
-          // Clear user context before signing out
           userContextManager.clear();
-          logout({ logoutParams: { returnTo: window.location.origin } });
+          await clearProfile();
+          logout();
         } catch (error) {
           console.error('Failed to sign out:', error);
         }

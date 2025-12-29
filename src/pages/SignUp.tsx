@@ -2,31 +2,101 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth0 } from '@auth0/auth0-react';
 import { motion } from 'framer-motion';
+import { userContextManager } from '@/services/userContextManager';
+
+/**
+ * Clear Auth0 cache from localStorage to ensure fresh signup
+ */
+function clearAuth0Cache(): void {
+  try {
+    const auth0Domain = import.meta.env.VITE_AUTH0_DOMAIN;
+    const auth0ClientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
+    
+    if (!auth0Domain || !auth0ClientId) {
+      return;
+    }
+
+    // Clear all Auth0-related localStorage entries
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (
+        key.includes('@@auth0spa-js') ||
+        key.includes(auth0ClientId) ||
+        key.includes(auth0Domain.replace(/\./g, '_'))
+      )) {
+        keysToRemove.push(key);
+      }
+    }
+    
+    keysToRemove.forEach(key => {
+      try {
+        localStorage.removeItem(key);
+      } catch (e) {
+        // Ignore errors when removing items
+      }
+    });
+  } catch (error) {
+    console.error('Failed to clear Auth0 cache:', error);
+  }
+}
 
 export function SignUp() {
   const [error, setError] = useState<string | null>(null);
-  const { loginWithRedirect, error: authError } = useAuth0();
+  const { loginWithRedirect, logout, isAuthenticated, error: authError } = useAuth0();
 
-  const signup = () => {
-    loginWithRedirect({
-      authorizationParams: {
-        screen_hint: 'signup',
-        connection: 'Username-Password-Authentication',
-      },
-    }).catch((err) => {
-      setError(err.message || 'Failed to initiate signup. Please try again.');
-    });
+  const signup = async () => {
+    try {
+      // If user is already authenticated, log them out first
+      if (isAuthenticated) {
+        logout();
+        // Wait a moment for logout to complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      // Clear Auth0 cache and user context before signup to prevent auto-login
+      clearAuth0Cache();
+      userContextManager.clear();
+      
+      loginWithRedirect({
+        authorizationParams: {
+          screen_hint: 'signup',
+          connection: 'Username-Password-Authentication',
+          prompt: 'login', // Force showing login/signup screen instead of auto-logging in
+        },
+      }).catch((err) => {
+        setError(err.message || 'Failed to initiate signup. Please try again.');
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to initiate signup. Please try again.');
+    }
   };
 
-  const handleSocialLogin = (connection: 'google-oauth2' | 'apple') => {
-    loginWithRedirect({
-      authorizationParams: {
-        connection,
-        screen_hint: 'signup',
-      },
-    }).catch((err) => {
-      setError(err.message || 'Failed to sign up with social provider.');
-    });
+  const handleSocialLogin = async (connection: 'google-oauth2' | 'apple') => {
+    try {
+      // If user is already authenticated, log them out first
+      if (isAuthenticated) {
+        logout();
+        // Wait a moment for logout to complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      // Clear Auth0 cache and user context before signup to prevent auto-login
+      clearAuth0Cache();
+      userContextManager.clear();
+      
+      loginWithRedirect({
+        authorizationParams: {
+          connection,
+          screen_hint: 'signup',
+          prompt: 'login', // Force showing login/signup screen instead of auto-logging in
+        },
+      }).catch((err) => {
+        setError(err.message || 'Failed to sign up with social provider.');
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to sign up with social provider.');
+    }
   };
 
   const displayError = error || authError?.message;

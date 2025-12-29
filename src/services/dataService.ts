@@ -592,11 +592,44 @@ class DataService {
     }
   }
 
-  // User profile operations
-  async getUserProfile(): Promise<UserProfile | null> {
+  // User profile operations - STRICTLY user-ID specific
+  /**
+   * Get user profile for a specific user ID
+   * @param userId - REQUIRED: The user ID to get the profile for
+   * @returns UserProfile or null if not found
+   */
+  async getUserProfile(userId: string): Promise<UserProfile | null> {
+    if (!userId) {
+      throw new Error('User ID is required to get user profile');
+    }
+
     try {
-      const profile = await dbHelpers.getSetting('userProfile') as UserProfile | null;
+      // Use user-specific storage key
+      const storageKey = `userProfile_${userId}`;
+      let profile = await dbHelpers.getSetting(storageKey) as UserProfile | null;
+      
+      // Migration: Check for old global profile if no user-specific profile exists
+      if (!profile) {
+        const oldProfile = await dbHelpers.getSetting('userProfile') as UserProfile | null;
+        // Only migrate if the old profile belongs to this user
+        if (oldProfile && oldProfile.id === userId) {
+          // Migrate to user-specific storage
+          await dbHelpers.setSetting(storageKey, oldProfile);
+          // Delete old global profile after migration
+          await dbHelpers.deleteSetting('userProfile').catch(() => {
+            // Ignore errors if old profile doesn't exist
+          });
+          profile = oldProfile;
+        }
+      }
+      
       if (!profile) return null;
+      
+      // Double-check: ensure profile belongs to requested user
+      if (profile.id !== userId) {
+        console.warn(`Profile ID mismatch: requested ${userId}, got ${profile.id}`);
+        return null;
+      }
       
       // Check LocalStorage for profile picture if IndexedDB doesn't have it (backward compatibility)
       if (!profile.profilePicture && profile.id) {
@@ -616,15 +649,77 @@ class DataService {
     }
   }
 
+  /**
+   * Delete user profile for a specific user ID
+   * @param userId - REQUIRED: The user ID to delete the profile for
+   */
+  async deleteUserProfile(userId: string): Promise<void> {
+    if (!userId) {
+      throw new Error('User ID is required to delete user profile');
+    }
+
+    try {
+      // Delete user-specific profile
+      const storageKey = `userProfile_${userId}`;
+      await dbHelpers.deleteSetting(storageKey);
+      
+      // Also try to delete old global profile if it exists (migration cleanup)
+      await dbHelpers.deleteSetting('userProfile').catch(() => {
+        // Ignore errors if old profile doesn't exist
+      });
+      
+      this.emit('user');
+    } catch (error) {
+      throw new Error(`Failed to delete user profile: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Update user profile - STRICTLY user-ID specific
+   * @param profile - Profile data to update (must include id field)
+   */
   async updateUserProfile(profile: Partial<UserProfile>): Promise<void> {
+    if (!profile.id) {
+      throw new Error('Profile ID is required to update user profile');
+    }
+
+    const userId = profile.id;
     let retries = 3;
     while (retries > 0) {
       try {
-        // Get existing profile to merge with partial update and get userId
-        const existingProfile = await dbHelpers.getSetting('userProfile') as UserProfile | null;
-        const mergedProfile = existingProfile ? { ...existingProfile, ...profile } : profile as UserProfile;
+        // Use user-specific storage key
+        const storageKey = `userProfile_${userId}`;
         
-        await dbHelpers.setSetting('userProfile', mergedProfile);
+        // Get existing profile for this user
+        const existingProfile = await dbHelpers.getSetting(storageKey) as UserProfile | null;
+        
+        // Migration: Check old global profile if no user-specific profile exists
+        let profileToMerge = existingProfile;
+        if (!profileToMerge) {
+          const oldProfile = await dbHelpers.getSetting('userProfile') as UserProfile | null;
+          // Only use old profile if it belongs to this user
+          if (oldProfile && oldProfile.id === userId) {
+            profileToMerge = oldProfile;
+          }
+        }
+        
+        // Merge with existing profile (same user or no existing profile)
+        const mergedProfile = profileToMerge ? { ...profileToMerge, ...profile } : profile as UserProfile;
+        
+        // Ensure the merged profile has the correct user ID
+        if (mergedProfile.id !== userId) {
+          throw new Error(`Profile ID mismatch: cannot update profile for user ${userId} with profile ID ${mergedProfile.id}`);
+        }
+        
+        // Save to user-specific storage
+        await dbHelpers.setSetting(storageKey, mergedProfile);
+        
+        // Delete old global profile if it exists (migration cleanup)
+        if (existingProfile === null) {
+          await dbHelpers.deleteSetting('userProfile').catch(() => {
+            // Ignore errors if old profile doesn't exist
+          });
+        }
         
         // Also write profile picture to LocalStorage if it's being updated
         if (profile.profilePicture !== undefined && mergedProfile.id) {

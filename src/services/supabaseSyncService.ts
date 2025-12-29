@@ -512,7 +512,7 @@ class SupabaseSyncService {
             }
 
             case 'user_profiles': {
-                const profile = await dataService.getUserProfile();
+                const profile = await dataService.getUserProfile(userId);
                 return profile ? [profile] : [];
             }
 
@@ -602,8 +602,8 @@ class SupabaseSyncService {
                 return (await dbHelpers.getMuscleStatus(muscle)) ?? null;
             }
             case 'user_profiles': {
-                const profile = await dataService.getUserProfile();
-                return profile?.id === userId ? profile : null;
+                const profile = await dataService.getUserProfile(userId);
+                return profile;
             }
             case 'settings': {
                 // For settings, recordId is composite "userId:key", need to extract key

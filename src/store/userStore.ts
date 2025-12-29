@@ -38,6 +38,7 @@ interface UserState {
   syncWithAuth0: (auth0User: { id: string; firstName?: string | null; username?: string | null; emailAddresses?: Array<{ emailAddress: string }> }) => Promise<void>;
   syncToAuth0: (auth0User: { sub?: string; email?: string }, accessToken: string) => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
+  clearProfile: () => Promise<void>;
   setExperienceLevel: (level: ExperienceLevel) => Promise<void>;
   setGoals: (goals: Goal[]) => Promise<void>;
   setEquipment: (equipment: string[]) => Promise<void>;
@@ -96,40 +97,42 @@ export const useUserStore = create<UserState>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
-      let savedProfile = await dataService.getUserProfile();
+      // REQUIRE Auth0 user for authenticated sessions
+      if (!auth0User?.id) {
+        // No Auth0 user - cannot initialize without user ID
+        set({ profile: null, isLoading: false });
+        return;
+      }
+
+      const auth0UserId = auth0User.id;
+      const auth0Name = auth0User.firstName || auth0User.username || auth0User.emailAddresses?.[0]?.emailAddress || 'User';
       
-      // If we have an Auth0 user, sync the profile with Auth0 data
-      if (auth0User) {
-        const auth0UserId = auth0User.id;
-        const auth0Name = auth0User.firstName || auth0User.username || auth0User.emailAddresses?.[0]?.emailAddress || 'User';
+      // Get profile for this specific user ID (strictly user-specific)
+      let savedProfile = await dataService.getUserProfile(auth0UserId);
+      
+      // If no saved profile exists, create one with Auth0 data
+      if (!savedProfile) {
+        savedProfile = {
+          ...DEFAULT_PROFILE,
+          id: auth0UserId,
+          name: auth0Name,
+        };
+        await dataService.updateUserProfile(savedProfile);
+      } else {
+        // Profile exists - ensure it's up to date with Auth0 data if needed
+        // Only update name if it's empty or default, preserve user-saved custom names
+        const shouldUpdateName = !savedProfile.name || savedProfile.name === 'User' || savedProfile.name === DEFAULT_PROFILE.name;
+        const shouldUpdateId = savedProfile.id !== auth0UserId;
         
-        // If no saved profile exists, create one with Auth0 data
-        if (!savedProfile) {
+        if (shouldUpdateId || shouldUpdateName) {
+          const nameToUse = shouldUpdateName ? auth0Name : savedProfile.name;
           savedProfile = {
-            ...DEFAULT_PROFILE,
+            ...savedProfile,
             id: auth0UserId,
-            name: auth0Name,
+            name: nameToUse,
           };
           await dataService.updateUserProfile(savedProfile);
-        } else {
-          // Update existing profile with Auth0 ID, but only update name if it's empty or default
-          // Preserve user-saved custom names
-          const shouldUpdateName = !savedProfile.name || savedProfile.name === 'User' || savedProfile.name === DEFAULT_PROFILE.name;
-          const shouldUpdateId = savedProfile.id !== auth0UserId;
-          
-          if (shouldUpdateId || shouldUpdateName) {
-            const nameToUse = shouldUpdateName ? auth0Name : savedProfile.name;
-            savedProfile = {
-              ...savedProfile,
-              id: auth0UserId,
-              name: nameToUse,
-            };
-            await dataService.updateUserProfile(savedProfile);
-          }
         }
-      } else if (!savedProfile) {
-        // No Auth0 user and no saved profile - use default
-        savedProfile = DEFAULT_PROFILE;
       }
       
       // Migrate profile picture from IndexedDB to LocalStorage if it exists and user has an ID
@@ -140,9 +143,12 @@ export const useUserStore = create<UserState>((set, get) => ({
         const existingInLocalStorage = dataService.getProfilePictureFromLocalStorage(savedProfile.id);
         if (!existingInLocalStorage || existingInLocalStorage !== savedProfile.profilePicture) {
           // The updateUserProfile will handle writing to LocalStorage, but we ensure it's there
-          await dataService.updateUserProfile({ profilePicture: savedProfile.profilePicture });
+          await dataService.updateUserProfile({ 
+            id: savedProfile.id, // REQUIRED: must include id
+            profilePicture: savedProfile.profilePicture 
+          });
           // Re-fetch to get the updated profile
-          savedProfile = await dataService.getUserProfile() || savedProfile;
+          savedProfile = await dataService.getUserProfile(auth0UserId) || savedProfile;
         }
       }
       
@@ -201,9 +207,12 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   updateProfile: async (updates: Partial<UserProfile>) => {
     const { profile } = get();
-    if (!profile) return;
+    if (!profile || !profile.id) {
+      throw new Error('Cannot update profile: no profile or user ID found');
+    }
 
-    const updatedProfile = { ...profile, ...updates };
+    // Ensure updates include the user ID (required for user-specific storage)
+    const updatedProfile = { ...profile, ...updates, id: profile.id };
     
     set({ isLoading: true, error: null });
 
@@ -219,6 +228,7 @@ export const useUserStore = create<UserState>((set, get) => ({
         error: error instanceof Error ? error.message : 'Failed to update profile',
         isLoading: false,
       });
+      throw error;
     }
   },
 
@@ -264,6 +274,24 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   setProfilePicture: async (picture: string) => {
     await get().updateProfile({ profilePicture: picture });
+  },
+
+  clearProfile: async () => {
+    const { profile } = get();
+    const userId = profile?.id;
+    
+    set({ profile: null });
+    userContextManager.clear();
+    
+    // Also delete profile from IndexedDB to prevent cross-user contamination
+    if (userId) {
+      try {
+        await dataService.deleteUserProfile(userId);
+      } catch (error) {
+        console.error('Failed to delete profile from IndexedDB:', error);
+        // Don't throw - clearing from memory is more important
+      }
+    }
   },
 }));
 
