@@ -895,6 +895,22 @@ const CORE_EXERCISES: Omit<Exercise, 'id' | 'isCustom'>[] = [
     trackingType: 'weight_reps',
   },
   {
+    name: 'Cable Lat Pullover',
+    category: 'strength',
+    primaryMuscles: [MuscleGroup.LATS, MuscleGroup.BACK],
+    secondaryMuscles: [MuscleGroup.TRICEPS, MuscleGroup.CHEST],
+    equipment: ['Cable Machine'],
+    difficulty: 'intermediate',
+    instructions: [
+      'Kneel facing away from cable machine',
+      'Grasp cable attachment with both hands',
+      'Pull cable overhead in an arc motion',
+      'Focus on lat stretch and contraction',
+      'Control the return to starting position'
+    ],
+    trackingType: 'weight_reps',
+  },
+  {
     name: 'Wide-Grip Barbell Row',
     category: 'strength',
     primaryMuscles: [MuscleGroup.BACK, MuscleGroup.RHOMBOIDS, MuscleGroup.TRAPS],
