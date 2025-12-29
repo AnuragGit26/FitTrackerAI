@@ -21,6 +21,7 @@ import { useWorkoutDuration, getTimerStartTime } from '@/hooks/useWorkoutDuratio
 import { clearWorkoutState, loadWorkoutState, saveWorkoutState } from '@/utils/workoutStatePersistence';
 import { saveFailedWorkout } from '@/utils/workoutErrorRecovery';
 import { WorkoutErrorRecoveryModal } from '@/components/workout/WorkoutErrorRecoveryModal';
+import { WorkoutRecoveryModal } from '@/components/common/WorkoutRecoveryModal';
 import { LogExercise } from '@/components/workout/LogExercise';
 import { QuickCardioLog } from '@/components/workout/QuickCardioLog';
 import { calculateVolume } from '@/utils/calculations';
@@ -55,6 +56,8 @@ export function LogWorkout() {
   const [showCancelWorkoutModal, setShowCancelWorkoutModal] = useState(false);
   const [showFinishWorkoutModal, setShowFinishWorkoutModal] = useState(false);
   const [showErrorRecoveryModal, setShowErrorRecoveryModal] = useState(false);
+  const [showRecoveryModal, setShowRecoveryModal] = useState(false);
+  const [recoveredWorkout, setRecoveredWorkout] = useState<Workout | null>(null);
   const [workoutCalories, setWorkoutCalories] = useState<number | ''>('');
   const [templateName, setTemplateName] = useState('');
   const [templateCategory, setTemplateCategory] = useState<TemplateCategory>('strength');
@@ -78,11 +81,23 @@ export function LogWorkout() {
     if (!currentWorkout && profile) {
       // Check if we have persisted workout state
       const persistedWorkoutState = loadWorkoutState();
-      if (!persistedWorkoutState?.currentWorkout) {
-        // Only start new workout if no persisted state exists
+      if (persistedWorkoutState?.currentWorkout) {
+        // Check if workout has exercises (not empty)
+        const hasExercises = persistedWorkoutState.currentWorkout.exercises && 
+                            persistedWorkoutState.currentWorkout.exercises.length > 0;
+        
+        if (hasExercises) {
+          // Show recovery modal for unsaved workout
+          setRecoveredWorkout(persistedWorkoutState.currentWorkout);
+          setShowRecoveryModal(true);
+        } else {
+          // Empty workout, just start a new one
+          startWorkout(profile.id);
+        }
+      } else {
+        // No persisted state, start new workout
         startWorkout(profile.id);
       }
-      // If persisted state exists, it will be loaded by the store initialization
     }
   }, [currentWorkout, profile, startWorkout]);
 
@@ -102,6 +117,24 @@ export function LogWorkout() {
 
     return () => {
       clearInterval(autoSaveInterval);
+    };
+  }, [currentWorkout]);
+
+  // Warn user before navigating away with unsaved workout
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // Only warn if workout has exercises (not empty)
+      if (currentWorkout && currentWorkout.exercises && currentWorkout.exercises.length > 0) {
+        e.preventDefault();
+        e.returnValue = ''; // Required for Chrome
+        return ''; // Required for Safari
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, [currentWorkout]);
 
@@ -1252,6 +1285,38 @@ export function LogWorkout() {
           }
         }}
       />
+
+      {/* Workout Recovery Modal - for unsaved workouts on app restart */}
+      {recoveredWorkout && (
+        <WorkoutRecoveryModal
+          isOpen={showRecoveryModal}
+          onClose={() => {
+            setShowRecoveryModal(false);
+            setRecoveredWorkout(null);
+            // If user closes without choosing, start a new workout
+            if (profile && !currentWorkout) {
+              startWorkout(profile.id);
+            }
+          }}
+          recoveredWorkout={recoveredWorkout}
+          onResume={() => {
+            // Resume workout by setting it in the store
+            getWorkoutStore.setState({ currentWorkout: recoveredWorkout });
+            setShowRecoveryModal(false);
+            setRecoveredWorkout(null);
+          }}
+          onSaveNow={async () => {
+            // Save the recovered workout immediately
+            try {
+              await finishWorkout(recoveredWorkout.calories);
+              setShowRecoveryModal(false);
+              setRecoveredWorkout(null);
+            } catch (err) {
+              console.error('Failed to save recovered workout:', err);
+            }
+          }}
+        />
+      )}
 
       {/* Finish Workout Button - Fixed at bottom when exercises exist */}
       {existingExercises.length > 0 && (

@@ -431,6 +431,24 @@ class DataService {
     return await errorRecovery.withRetry(async () => {
       return await transactionManager.execute(['workouts'], async () => {
         const id = await dbHelpers.saveWorkout(versionedWorkout as Omit<Workout, 'id'>);
+        
+        // Verify workout was actually saved by reading it back
+        const savedWorkout = await dbHelpers.getWorkout(id);
+        if (!savedWorkout) {
+          throw new Error(`Failed to verify workout save: workout with id ${id} not found after save operation`);
+        }
+        
+        // Verify critical fields match
+        if (savedWorkout.userId !== versionedWorkout.userId) {
+          throw new Error(`Workout save verification failed: userId mismatch`);
+        }
+        if (savedWorkout.date.getTime() !== new Date(versionedWorkout.date).getTime()) {
+          throw new Error(`Workout save verification failed: date mismatch`);
+        }
+        if (savedWorkout.exercises.length !== versionedWorkout.exercises.length) {
+          throw new Error(`Workout save verification failed: exercise count mismatch (expected ${versionedWorkout.exercises.length}, got ${savedWorkout.exercises.length})`);
+        }
+        
         this.emit('workout');
         return id;
       });

@@ -2436,6 +2436,71 @@ const CORE_EXERCISES: Omit<Exercise, 'id' | 'isCustom'>[] = [
 ];
 
 export const exerciseLibrary = {
+  async syncMissingExercises(): Promise<void> {
+    try {
+      const { dbHelpers } = await import('./database');
+      
+      // Dexie automatically manages database connections, so we can proceed directly
+      const existingExercises = await dbHelpers.getAllExercises();
+      const existingNames = new Set(
+        existingExercises.map(ex => ex.name.toLowerCase().trim())
+      );
+
+      // Find the highest numeric ID to continue from
+      let maxId = 0;
+      for (const ex of existingExercises) {
+        const match = ex.id.match(/^exercise-(\d+)$/);
+        if (match) {
+          const numId = parseInt(match[1], 10);
+          if (numId > maxId) {
+            maxId = numId;
+          }
+        }
+      }
+
+      // Add missing exercises from CORE_EXERCISES (including strength)
+      let addedCount = 0;
+      let nextId = maxId + 1;
+      
+      // Batch operations to avoid overwhelming the database
+      const exercisesToAdd: Exercise[] = [];
+      
+      for (const coreExercise of CORE_EXERCISES) {
+        const normalizedName = coreExercise.name.toLowerCase().trim();
+        if (!existingNames.has(normalizedName)) {
+          const exercise: Exercise = {
+            ...coreExercise,
+            id: `exercise-${nextId++}`,
+            isCustom: false,
+          };
+          exercisesToAdd.push(exercise);
+          existingNames.add(normalizedName);
+        }
+      }
+
+      // Save exercises in batches to avoid connection issues
+      if (exercisesToAdd.length > 0) {
+        for (const exercise of exercisesToAdd) {
+          try {
+            await dbHelpers.saveExercise(exercise);
+            addedCount++;
+            logger.info(`Added missing exercise: ${exercise.name}`);
+          } catch (error) {
+            logger.error(`Failed to add exercise ${exercise.name}:`, error);
+            // Continue with other exercises even if one fails
+          }
+        }
+        
+        if (addedCount > 0) {
+          logger.info(`Synced ${addedCount} new exercises to database`);
+        }
+      }
+    } catch (error) {
+      logger.error('Error syncing missing exercises:', error);
+      // Don't throw - allow app to continue even if sync fails
+    }
+  },
+
   async initialize(): Promise<void> {
     const { dbHelpers } = await import('./database');
     const existingExercises = await dbHelpers.getAllExercises();
@@ -2511,6 +2576,15 @@ export const exerciseLibrary = {
       for (const exercise of exercises) {
         await dbHelpers.saveExercise(exercise);
       }
+    } else {
+      // Database already has exercises, sync any missing ones
+      // Run sync asynchronously after initialization to avoid blocking
+      // This prevents database connection issues during app startup
+      setTimeout(() => {
+        this.syncMissingExercises().catch((error) => {
+          logger.error('Background exercise sync failed:', error);
+        });
+      }, 1000); // Delay by 1 second to ensure database is fully ready
     }
   },
 

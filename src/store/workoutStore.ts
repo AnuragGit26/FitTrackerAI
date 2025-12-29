@@ -6,6 +6,7 @@ import { templateService } from '@/services/templateService';
 import { muscleRecoveryService } from '@/services/muscleRecoveryService';
 import { plannedWorkoutService } from '@/services/plannedWorkoutService';
 import { saveWorkoutState, loadWorkoutState, clearWorkoutState } from '@/utils/workoutStatePersistence';
+import { saveFailedWorkout } from '@/utils/workoutErrorRecovery';
 import { calculateVolume } from '@/utils/calculations';
 import { userContextManager } from '@/services/userContextManager';
 
@@ -447,8 +448,40 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         calories: calories !== undefined ? calories : currentWorkout.calories,
       };
 
+      // Save to IndexedDB - this will verify the save was successful
       const workoutId = await dataService.createWorkout(completedWorkout);
       const savedWorkout = { ...completedWorkout, id: workoutId };
+
+      // Only clear state after successful IndexedDB save (verified by createWorkout)
+      const currentWorkouts = get().workouts ?? [];
+      set({
+        currentWorkout: null, // Clear current workout only after successful save
+        workouts: [savedWorkout, ...currentWorkouts],
+        isLoading: false,
+        templateId: null,
+        plannedWorkoutId: null,
+        error: null, // Clear any previous errors
+      });
+      
+      // Clear persisted state after successful IndexedDB save
+      clearWorkoutState();
+
+      // Trigger Supabase sync non-blocking (fire-and-forget)
+      // The sync is already queued via dataService.emit('workout'), but we ensure it doesn't block
+      // If sync fails, it will be retried later via the sync service
+      (async () => {
+        try {
+          const { supabaseSyncService } = await import('@/services/supabaseSyncService');
+          await supabaseSyncService.sync(currentUserId, {
+            tables: ['workouts'],
+            direction: 'push',
+          });
+        } catch (syncError) {
+          // Log sync failure but don't affect workout save
+          console.warn('Supabase sync failed for workout (will retry later):', syncError);
+          // Sync will be retried on next sync cycle
+        }
+      })();
 
       // Update muscle statuses from the completed workout
       // Don't block workout save if this fails
@@ -472,26 +505,29 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
           // Continue even if marking as completed fails
         }
       }
-
-      const currentWorkouts = get().workouts ?? [];
-      set({
-        currentWorkout: null, // Clear current workout to prevent corrupted startTime
-        workouts: [savedWorkout, ...currentWorkouts],
-        isLoading: false,
-        templateId: null,
-        plannedWorkoutId: null,
-      });
-      // Clear persisted state after successful save
-      clearWorkoutState();
     } catch (error) {
-      // On error, clear current workout to prevent corrupted startTime from persisting
+      // On error, keep workout in state so user can retry
+      // Don't clear state - this allows recovery
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save workout';
       set({
-        currentWorkout: null,
-        error: error instanceof Error ? error.message : 'Failed to save workout',
+        error: errorMessage,
         isLoading: false,
+        // Keep currentWorkout, templateId, plannedWorkoutId so user can retry
       });
-      // Clear persisted state on error to prevent corrupted data
-      clearWorkoutState();
+      // Keep persisted state so workout can be recovered
+      // Don't clear persisted state on error - this is the safety mechanism
+      
+      // Save failed workout for recovery
+      try {
+        const { currentWorkout } = get();
+        if (currentWorkout) {
+          const errorForRecovery = error instanceof Error ? error : new Error(String(error));
+          saveFailedWorkout(currentWorkout, errorForRecovery);
+        }
+      } catch (recoveryError) {
+        console.error('Failed to save failed workout for recovery:', recoveryError);
+      }
+      
       throw error;
     }
   },

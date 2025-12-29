@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useDeferredValue } from 'react';
 import { Search, Plus, ChevronDown, Filter, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Exercise, ExerciseCategory } from '@/types/exercise';
@@ -6,6 +6,8 @@ import { exerciseLibrary, EquipmentCategory, getEquipmentCategories } from '@/se
 import { cn } from '@/utils/cn';
 import { slideDown, staggerContainerFast, prefersReducedMotion } from '@/utils/animations';
 import { MuscleGroupCategory, exerciseTargetsMuscleCategory, getMuscleGroupsInCategory } from '@/utils/muscleGroupCategories';
+import { searchExercises } from '@/utils/exerciseSearch';
+import { SearchHighlight } from './SearchHighlight';
 
 interface ExerciseSelectorDropdownProps {
   selectedExercise: Exercise | null;
@@ -25,8 +27,8 @@ export function ExerciseSelectorDropdown({
   selectedMuscleGroups = [],
 }: ExerciseSelectorDropdownProps) {
   const [exercises, setExercises] = useState<Exercise[]>([]);
-  const [filteredExercises, setFilteredExercises] = useState<Exercise[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearchQuery = useDeferredValue(searchQuery);
   const [selectedEquipmentCategories, setSelectedEquipmentCategories] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -37,7 +39,27 @@ export function ExerciseSelectorDropdown({
     loadExercises();
   }, []);
 
-  useEffect(() => {
+  // Fast counter for immediate UI feedback (simple filter, no ranking)
+  const fastFilteredCount = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return exercises.length;
+    }
+    const query = searchQuery.toLowerCase();
+    return exercises.filter((ex) => {
+      if (selectedCategory && ex.category !== selectedCategory) return false;
+      if (selectedMuscleGroups.length > 0 && 
+          !exerciseTargetsMuscleCategory(ex.primaryMuscles, ex.secondaryMuscles, selectedMuscleGroups)) {
+        return false;
+      }
+      return ex.name.toLowerCase().includes(query) ||
+             ex.category.toLowerCase().includes(query) ||
+             ex.equipment.some((eq) => eq.toLowerCase().includes(query));
+    }).length;
+  }, [searchQuery, exercises, selectedCategory, selectedMuscleGroups]);
+
+  // Memoize filtered exercises to prevent unnecessary recalculations
+  // Use deferredSearchQuery for expensive search computation
+  const filteredExercises = useMemo(() => {
     let filtered = exercises;
 
     // Apply category filter
@@ -52,15 +74,9 @@ export function ExerciseSelectorDropdown({
       );
     }
 
-    // Apply search filter
-    if (searchQuery.trim() !== '') {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (ex) =>
-          ex.name.toLowerCase().includes(query) ||
-          ex.category.toLowerCase().includes(query) ||
-          ex.equipment.some((eq) => eq.toLowerCase().includes(query))
-      );
+    // Apply enhanced search filter with relevance ranking (using deferred query)
+    if (deferredSearchQuery.trim() !== '') {
+      filtered = searchExercises(filtered, deferredSearchQuery, 100);
     }
 
     // Apply equipment category filter
@@ -73,8 +89,8 @@ export function ExerciseSelectorDropdown({
       });
     }
 
-    setFilteredExercises(filtered);
-  }, [searchQuery, selectedEquipmentCategories, exercises, selectedCategory, selectedMuscleGroups]);
+    return filtered;
+  }, [deferredSearchQuery, selectedEquipmentCategories, exercises, selectedCategory, selectedMuscleGroups]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -154,7 +170,7 @@ export function ExerciseSelectorDropdown({
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search exercises..."
+                placeholder="Search by name, muscle, or equipment..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 bg-background-light dark:bg-background-dark rounded-lg border border-gray-200 dark:border-[#316847] text-sm text-gray-900 dark:text-white focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
@@ -260,6 +276,9 @@ export function ExerciseSelectorDropdown({
               <>
                 <div className="px-2 py-1 text-xs text-gray-500 dark:text-gray-400 mb-1">
                   {filteredExercises.length} of {exercises.length} exercises
+                  {deferredSearchQuery !== searchQuery && (
+                    <span className="ml-1 text-primary">(updating...)</span>
+                  )}
                 </div>
                 <motion.div 
                   className="space-y-1"
@@ -289,7 +308,11 @@ export function ExerciseSelectorDropdown({
                       whileHover={prefersReducedMotion() ? {} : { x: 4 }}
                     >
                       <div className="flex items-center justify-between">
-                        <span>{exercise.name}</span>
+                        <SearchHighlight
+                          text={exercise.name}
+                          query={deferredSearchQuery}
+                          className="flex-1"
+                        />
                         {getEquipmentCategories(exercise.equipment).length > 0 && (
                           <div className="flex gap-1 ml-2">
                             {getEquipmentCategories(exercise.equipment).slice(0, 2).map((category) => (

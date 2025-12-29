@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useDeferredValue } from 'react';
 import { Search, X, Filter } from 'lucide-react';
 import { FixedSizeList, ListChildComponentProps } from 'react-window';
 import { Exercise } from '@/types/exercise';
 import { exerciseLibrary, EquipmentCategory, getEquipmentCategories } from '@/services/exerciseLibrary';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { cn } from '@/utils/cn';
+import { searchExercises } from '@/utils/exerciseSearch';
+import { SearchHighlight } from './SearchHighlight';
 
 interface ExerciseSelectorProps {
   onSelect: (exercise: Exercise) => void;
@@ -13,8 +15,8 @@ interface ExerciseSelectorProps {
 
 export function ExerciseSelector({ onSelect, onClose }: ExerciseSelectorProps) {
   const [exercises, setExercises] = useState<Exercise[]>([]);
-  const [filteredExercises, setFilteredExercises] = useState<Exercise[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearchQuery = useDeferredValue(searchQuery);
   const [selectedEquipmentCategories, setSelectedEquipmentCategories] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
@@ -23,18 +25,27 @@ export function ExerciseSelector({ onSelect, onClose }: ExerciseSelectorProps) {
     loadExercises();
   }, []);
 
-  useEffect(() => {
+  // Fast counter for immediate UI feedback (simple filter, no ranking)
+  const fastFilteredCount = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return exercises.length;
+    }
+    const query = searchQuery.toLowerCase();
+    return exercises.filter((ex) => {
+      return ex.name.toLowerCase().includes(query) ||
+             ex.category.toLowerCase().includes(query) ||
+             ex.equipment.some((eq) => eq.toLowerCase().includes(query));
+    }).length;
+  }, [searchQuery, exercises]);
+
+  // Memoize filtered exercises to prevent unnecessary recalculations
+  // Use deferredSearchQuery for expensive search computation
+  const filteredExercises = useMemo(() => {
     let filtered = exercises;
 
-    // Apply search filter
-    if (searchQuery.trim() !== '') {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (ex) =>
-          ex.name.toLowerCase().includes(query) ||
-          ex.category.toLowerCase().includes(query) ||
-          ex.equipment.some((eq) => eq.toLowerCase().includes(query))
-      );
+    // Apply enhanced search filter with relevance ranking (using deferred query)
+    if (deferredSearchQuery.trim() !== '') {
+      filtered = searchExercises(filtered, deferredSearchQuery, 100);
     }
 
     // Apply equipment category filter
@@ -47,15 +58,14 @@ export function ExerciseSelector({ onSelect, onClose }: ExerciseSelectorProps) {
       });
     }
 
-    setFilteredExercises(filtered);
-  }, [searchQuery, selectedEquipmentCategories, exercises]);
+    return filtered;
+  }, [deferredSearchQuery, selectedEquipmentCategories, exercises]);
 
   async function loadExercises() {
     setIsLoading(true);
     try {
       const allExercises = await exerciseLibrary.getAllExercises();
       setExercises(allExercises);
-      setFilteredExercises(allExercises);
     } catch (error) {
       console.error('Failed to load exercises:', error);
     } finally {
@@ -74,9 +84,9 @@ export function ExerciseSelector({ onSelect, onClose }: ExerciseSelectorProps) {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search exercises..."
+                  placeholder="Search by name, muscle, or equipment..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg border-0 focus:ring-2 focus:ring-primary-500"
                   autoFocus
                 />
@@ -198,6 +208,9 @@ export function ExerciseSelector({ onSelect, onClose }: ExerciseSelectorProps) {
             <>
               <div className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-800">
                 Showing {filteredExercises.length} of {exercises.length} exercises
+                {deferredSearchQuery !== searchQuery && (
+                  <span className="ml-1 text-primary">(updating...)</span>
+                )}
               </div>
               <FixedSizeList
                 height={window.innerHeight - 300} // Adjust based on header height
@@ -221,7 +234,10 @@ export function ExerciseSelector({ onSelect, onClose }: ExerciseSelectorProps) {
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate">
-                              {exercise.name}
+                              <SearchHighlight
+                                text={exercise.name}
+                                query={deferredSearchQuery}
+                              />
                             </h3>
                             <div className="flex items-center gap-2 mt-1 flex-wrap">
                               <span className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-gray-600 dark:text-gray-400">
