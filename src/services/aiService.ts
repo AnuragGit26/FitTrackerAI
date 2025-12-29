@@ -619,6 +619,9 @@ CRITICAL OUTPUT REQUIREMENTS:
 
     // Calculate recovery predictions (always use calculated ones for accuracy)
     const calculatedPredictions = calculateRecoveryPredictions(muscleStatuses, userLevel, baseRestInterval);
+    
+    // Calculate muscle imbalances from actual workout data (data-driven)
+    const calculatedImbalances = calculateMuscleImbalances(workouts);
 
     if (!apiKey) {
       return generateMockWorkoutRecommendations(workouts, muscleStatuses, readinessScore, symmetryScore, focusDistribution, userLevel, baseRestInterval);
@@ -698,21 +701,21 @@ CRITICAL OUTPUT REQUIREMENTS:
       if (parsed) {
         const cleaned = sanitizeAIResponse(parsed) as Record<string, unknown>;
         const recommendedWorkout = cleaned.recommendedWorkout as Record<string, unknown> | undefined;
-        const finalRecoveryPredictions = (Array.isArray(cleaned.recoveryPredictions) && cleaned.recoveryPredictions.length > 0)
-          ? (cleaned.recoveryPredictions as unknown[]).map((pred: unknown, i: number) => {
-              const prediction = pred as Record<string, unknown>;
-              const rawDayLabel = String(prediction.dayLabel || '');
-              const cleanedDayLabel = cleanPlainTextResponse(rawDayLabel);
-              return {
-                date: new Date(Date.now() + i * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                dayLabel: cleanedDayLabel,
-                workoutType: String(prediction.workoutType || '') as 'push' | 'pull' | 'legs' | 'rest',
-                recoveryPercentage: typeof prediction.recoveryPercentage === 'number' ? prediction.recoveryPercentage : 0,
-                prPotential: (Array.isArray(prediction.prPotential) ? prediction.prPotential : []).map((p: unknown) => cleanPlainTextResponse(String(p))),
-                fatigueWarnings: (Array.isArray(prediction.fatigueWarnings) ? prediction.fatigueWarnings : []).map((w: unknown) => cleanPlainTextResponse(String(w))),
-              };
-            })
-          : calculatedPredictions;
+        // Always use calculated predictions for accurate day labels and recovery percentages
+        // But merge AI-generated workoutType if available
+        const finalRecoveryPredictions = calculatedPredictions.map((calcPred, i) => {
+          if (Array.isArray(cleaned.recoveryPredictions) && cleaned.recoveryPredictions.length > i) {
+            const aiPred = cleaned.recoveryPredictions[i] as Record<string, unknown>;
+            // Use AI workoutType if available, but always use calculated dayLabel and recoveryPercentage
+            return {
+              ...calcPred,
+              workoutType: (String(aiPred.workoutType || calcPred.workoutType || 'rest') as 'push' | 'pull' | 'legs' | 'rest'),
+              prPotential: (Array.isArray(aiPred.prPotential) ? aiPred.prPotential : calcPred.prPotential || []).map((p: unknown) => cleanPlainTextResponse(String(p))),
+              fatigueWarnings: (Array.isArray(aiPred.fatigueWarnings) ? aiPred.fatigueWarnings : calcPred.fatigueWarnings || []).map((w: unknown) => cleanPlainTextResponse(String(w))),
+            };
+          }
+          return calcPred;
+        });
         return {
           readinessScore,
           readinessStatus: String(cleaned.readinessStatus || 'Moderate'),
@@ -726,17 +729,20 @@ CRITICAL OUTPUT REQUIREMENTS:
             reason: cleanPlainTextResponse(String(recommendedWorkout.reason || '')),
           } : undefined,
           muscleBalance: {
-            imbalances: (Array.isArray(cleaned.imbalances) ? cleaned.imbalances : []).map((im: unknown) => {
-              const imbalance = im as Record<string, unknown>;
-              const imbalancePercent = typeof imbalance.imbalancePercent === 'number' ? imbalance.imbalancePercent : 0;
-              return {
-                muscle: cleanPlainTextResponse(String(imbalance.muscle || '')) as MuscleGroup,
-                leftVolume: typeof imbalance.leftVolume === 'number' ? imbalance.leftVolume : 0,
-                rightVolume: typeof imbalance.rightVolume === 'number' ? imbalance.rightVolume : 0,
-                imbalancePercent,
-                status: (imbalancePercent > 10 ? 'imbalanced' : 'balanced') as 'balanced' | 'imbalanced',
-              };
-            }),
+            // Use calculated imbalances (data-driven) instead of AI-generated ones
+            imbalances: calculatedImbalances.length > 0 
+              ? calculatedImbalances 
+              : (Array.isArray(cleaned.imbalances) ? cleaned.imbalances : []).map((im: unknown) => {
+                  const imbalance = im as Record<string, unknown>;
+                  const imbalancePercent = typeof imbalance.imbalancePercent === 'number' ? imbalance.imbalancePercent : 0;
+                  return {
+                    muscle: cleanPlainTextResponse(String(imbalance.muscle || '')) as MuscleGroup,
+                    leftVolume: typeof imbalance.leftVolume === 'number' ? imbalance.leftVolume : 0,
+                    rightVolume: typeof imbalance.rightVolume === 'number' ? imbalance.rightVolume : 0,
+                    imbalancePercent,
+                    status: (imbalancePercent > 10 ? 'imbalanced' : 'balanced') as 'balanced' | 'imbalanced',
+                  };
+                }),
             overallScore: symmetryScore,
           },
           correctiveExercises: (Array.isArray(cleaned.correctiveExercises) ? cleaned.correctiveExercises : []).map((ex: unknown, i: number) => {
@@ -1000,6 +1006,9 @@ function generateMockWorkoutRecommendations(
   userLevel: 'beginner' | 'intermediate' | 'advanced' = 'intermediate',
   baseRestInterval: number = 48
 ): WorkoutRecommendations {
+  // Calculate imbalances from actual workout data (data-driven)
+  const calculatedImbalances = calculateMuscleImbalances(workouts);
+  
   if (workouts.length === 0) {
     return {
       readinessScore: 0,
@@ -1032,7 +1041,7 @@ function generateMockWorkoutRecommendations(
     readinessStatus: readinessScore >= 80 ? 'Go Heavy' : readinessScore >= 60 ? 'Moderate' : 'Rest',
     recommendedWorkout,
     muscleBalance: {
-      imbalances: [],
+      imbalances: calculatedImbalances,
       overallScore: symmetryScore,
     },
     correctiveExercises: [],

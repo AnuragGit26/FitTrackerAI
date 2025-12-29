@@ -3,6 +3,7 @@ import { MuscleStatus } from '@/types/muscle';
 import type { Notification, NotificationCreateInput, NotificationFilters, NotificationType } from '@/types/notification';
 import { dbHelpers } from './database';
 import { getSupabaseClientWithAuth } from './supabaseClient';
+import { requireUserId } from '@/utils/userIdValidation';
 
 interface ScheduledNotification {
   id: string;
@@ -405,11 +406,17 @@ class NotificationService {
    */
   private async syncToSupabase(notification: Notification): Promise<void> {
     try {
-      const supabase = await getSupabaseClientWithAuth(notification.userId);
+      // Validate userId
+      const userId = requireUserId(notification.userId, {
+        functionName: 'syncToSupabase',
+        additionalInfo: { notificationId: notification.id },
+      });
+
+      const supabase = await getSupabaseClientWithAuth(userId);
 
       const supabaseNotification = {
         id: notification.id,
-        user_id: notification.userId,
+        user_id: userId,
         type: notification.type,
         title: notification.title,
         message: notification.message,
@@ -421,7 +428,7 @@ class NotificationService {
         created_at: new Date(notification.createdAt).toISOString(),
       };
 
-      // Upsert to Supabase
+      // Upsert to Supabase using user-scoped query
       const { error } = await supabase
         .from('notifications')
         .upsert(supabaseNotification, {
@@ -442,13 +449,19 @@ class NotificationService {
    */
   async pullFromSupabase(userId: string): Promise<void> {
     try {
-      const supabase = await getSupabaseClientWithAuth(userId);
+      // Validate userId
+      const validatedUserId = requireUserId(userId, {
+        functionName: 'pullFromSupabase',
+        additionalInfo: { operation: 'pull_notifications' },
+      });
 
-      // Get all notifications from Supabase
+      const supabase = await getSupabaseClientWithAuth(validatedUserId);
+
+      // Get all notifications from Supabase using user-scoped query
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
-        .eq('user_id', userId)
+        .eq('user_id', validatedUserId)
         .is('deleted_at', null)
         .order('created_at', { ascending: false });
 

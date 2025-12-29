@@ -1,12 +1,62 @@
+import { useNavigate } from 'react-router-dom';
 import { CorrectiveExercise } from '@/types/insights';
 import { cleanPlainTextResponse } from '@/utils/aiResponseCleaner';
+import { useUserStore } from '@/store/userStore';
+import { usePlannedWorkoutStore } from '@/store/plannedWorkoutStore';
+import { useToast } from '@/hooks/useToast';
+import { addDays } from 'date-fns';
+import { MuscleGroup } from '@/types/muscle';
 
 interface CorrectiveExercisesCarouselProps {
   exercises: CorrectiveExercise[];
 }
 
 export function CorrectiveExercisesCarousel({ exercises }: CorrectiveExercisesCarouselProps) {
+  const navigate = useNavigate();
+  const { profile } = useUserStore();
+  const { createPlannedWorkout } = usePlannedWorkoutStore();
+  const { success, error: showError } = useToast();
+
   if (exercises.length === 0) return null;
+
+  const handleAddToPlan = async (exercise: CorrectiveExercise) => {
+    if (!profile) {
+      showError('Please log in to add exercises to your plan');
+      return;
+    }
+
+    try {
+      // Schedule for tomorrow by default
+      const scheduledDate = addDays(new Date(), 1);
+      
+      // Create a planned workout with just this exercise
+      await createPlannedWorkout(profile.id, {
+        userId: profile.id,
+        scheduledDate,
+        workoutName: `${exercise.name} - Corrective`,
+        category: 'strength',
+        estimatedDuration: 20,
+        exercises: [
+          {
+            exerciseId: exercise.id,
+            exerciseName: exercise.name,
+            sets: 3,
+            reps: 10,
+            weight: 0,
+            restTime: 60,
+          },
+        ],
+        musclesTargeted: [exercise.targetMuscle],
+        notes: exercise.description,
+        isCompleted: false,
+      });
+
+      success(`${exercise.name} added to your plan for ${scheduledDate.toLocaleDateString()}`);
+      navigate('/planner');
+    } catch (error) {
+      showError(error instanceof Error ? error.message : 'Failed to add exercise to plan');
+    }
+  };
 
   const getCategoryColor = (category: string) => {
     switch (category) {
@@ -40,7 +90,10 @@ export function CorrectiveExercisesCarousel({ exercises }: CorrectiveExercisesCa
             </div>
             <h4 className="text-slate-900 dark:text-white font-bold text-base truncate">{cleanPlainTextResponse(exercise.name)}</h4>
             <p className="text-slate-500 dark:text-text-muted text-xs line-clamp-2 mt-1 mb-3">{cleanPlainTextResponse(exercise.description)}</p>
-            <button className="mt-auto w-full py-2 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold transition-colors">
+            <button 
+              onClick={() => handleAddToPlan(exercise)}
+              className="mt-auto w-full py-2 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold transition-colors"
+            >
               Add to Plan
             </button>
           </div>

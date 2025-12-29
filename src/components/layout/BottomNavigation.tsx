@@ -153,7 +153,7 @@ export function BottomNavigation() {
                     className={cn(
                       'w-6 h-6 transition-all duration-200',
                       isActive 
-                        ? 'fill-primary drop-shadow-[0_0_8px_rgba(13,242,105,0.4)]' 
+                        ? 'text-primary drop-shadow-[0_0_8px_rgba(13,242,105,0.4)]' 
                         : ''
                     )} 
                   />

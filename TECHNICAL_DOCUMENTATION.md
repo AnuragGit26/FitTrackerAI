@@ -804,15 +804,27 @@ maxPR = prs.reduce((max, pr) => {
 #### 4.3 Consistency Score
 
 ```typescript
-// Calculate based on unique workout days vs. target days
-// Target is set to 70% of the period (e.g., 21 days for 30-day period)
-uniqueWorkoutDays = count of unique days with workouts in period
-targetDays = Math.min(periodDays, Math.floor(periodDays * 0.7))
+// Calculate based on week-wise evaluation
+// Weeks start on Monday (ISO 8601 standard)
+// A week is considered consistent if it has at least 3 workouts
+// For partial weeks, the threshold is prorated: workout_count >= ceil(3 * days_in_week / 7)
 
-consistencyScore = Math.min(100, Math.round((uniqueWorkoutDays / targetDays) * 100))
+// Group all workouts by week (Monday to Sunday)
+weeks = group workouts by week starting on Monday
+
+// Evaluate each week
+for each week:
+  daysInWeek = number of days in the week (7 for full weeks, less for partial)
+  requiredWorkouts = daysInWeek === 7 ? 3 : Math.ceil((3 * daysInWeek) / 7)
+  isConsistent = workoutCount >= requiredWorkouts
+
+// Calculate score
+consistentWeeks = count of weeks with 3+ workouts (or prorated threshold)
+totalWeeks = total number of weeks (including partial weeks)
+consistencyScore = Math.min(100, Math.round((consistentWeeks / totalWeeks) * 100))
 ```
 
-**Note**: The implementation uses a target of 70% of the period days rather than comparing against user's workout frequency goal. This provides a consistent baseline for all users.
+**Note**: The implementation evaluates consistency on a week-by-week basis using all available workout data. A user is considered consistent for a week if they complete at least 3 workouts that week. Partial weeks at the start or end of the data range are prorated proportionally.
 
 #### 4.4 Workout Frequency Heatmap
 
@@ -1209,25 +1221,51 @@ const userId = user?.sub || user?.email
 **Endpoints**:
 
 - `POST /rest/v1/{table}`: Insert records
-- `PATCH /rest/v1/{table}?id=eq.{id}`: Update records
-- `DELETE /rest/v1/{table}?id=eq.{id}`: Delete records (soft delete)
-- `GET /rest/v1/{table}?select=*&user_id=eq.{userId}`: Query records
+- `PATCH /rest/v1/{table}?id=eq.{id}&user_id=eq.{userId}`: Update records (user_id required in URL)
+- `DELETE /rest/v1/{table}?id=eq.{id}&user_id=eq.{userId}`: Delete records (soft delete, user_id required)
+- `GET /rest/v1/{table}?select=*&user_id=eq.{userId}`: Query records (user_id required in URL)
 
 **Authentication**:
 
 - JWT tokens from Auth0
 - Row-Level Security (RLS) policies enforce access control
+- **User ID Enforcement**: All Supabase requests MUST include `user_id` in URL query parameters
+- User ID is validated before all operations to prevent runtime errors
+
+**User ID Validation**:
+
+All Supabase operations require validated user IDs:
+
+```typescript
+import { requireUserId } from '@/utils/userIdValidation';
+import { getSupabaseClientWithAuth } from '@/services/supabaseClient';
+import { userScopedQuery } from '@/services/supabaseQueryBuilder';
+
+// Validate userId before use
+const userId = requireUserId(userContextManager.getUserId(), {
+  functionName: 'myFunction',
+  additionalInfo: { operation: 'data_fetch' },
+});
+
+// Get authenticated client (userId is required)
+const client = await getSupabaseClientWithAuth(userId);
+
+// Use user-scoped query helper
+const { data } = await userScopedQuery(client, 'workouts', userId)
+  .select('*')
+  .order('date', { ascending: false });
+```
 
 **Sync Service**:
 
 ```typescript
-// Push local changes to Supabase
+// Push local changes to Supabase (userId validated internally)
 await supabaseSyncService.push(userId, {
   table: 'workouts',
   records: localWorkouts
 })
 
-// Pull remote changes from Supabase
+// Pull remote changes from Supabase (userId validated internally)
 await supabaseSyncService.pull(userId, {
   table: 'workouts',
   lastSyncAt: lastSyncTimestamp
@@ -1332,6 +1370,45 @@ FOR INSERT WITH CHECK (user_id = get_user_id() OR get_user_id() IS NULL);
 - Users can only access their own data
 - Service role (for migrations) can access all data
 - `get_user_id()` function extracts user ID from JWT
+
+#### 1.1 User ID Enforcement in URLs
+
+**Requirement**: All Supabase API requests MUST include `user_id` in the URL query parameters.
+
+**Implementation**:
+
+1. **Client-Level Enforcement**: `getSupabaseClientWithAuth(userId)` requires userId and adds it to all request headers
+2. **Query Builder Helpers**: `userScopedQuery()` automatically adds `user_id=eq.{userId}` filter to all queries
+3. **Storage Operations**: `userScopedStorage()` ensures user_id is in storage paths
+4. **Validation Layer**: `requireUserId()` validates userId before all operations
+
+**URL Structure**:
+
+- Database queries: `https://{project}.supabase.co/rest/v1/{table}?user_id=eq.{userId}&...`
+- Storage operations: `https://{project}.supabase.co/storage/v1/object/{bucket}/{userId}/{filename}`
+
+**Validation**:
+
+```typescript
+// All userId inputs are validated
+import { requireUserId, validateUserId } from '@/utils/userIdValidation';
+
+// Type guard with runtime check
+validateUserId(userId, { functionName: 'myFunction' });
+
+// Require userId (throws if missing)
+const userId = requireUserId(maybeUserId, {
+  functionName: 'myFunction',
+  additionalInfo: { operation: 'data_fetch' },
+});
+```
+
+**Error Handling**:
+
+- Custom `UserIdValidationError` class provides context
+- Error messages include function name and operation context
+- Validation failures are logged for debugging
+- Error boundaries prevent app crashes
 
 #### 2. Input Validation
 

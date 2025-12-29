@@ -5,13 +5,14 @@ import { useAIInsights } from '@/hooks/useAIInsights';
 import { useWorkoutStore } from '@/store/workoutStore';
 import { useEffect, useMemo } from 'react';
 import { EmptyState } from '@/components/common/EmptyState';
+import { Skeleton } from '@/components/common/Skeleton';
 import { scaleIn, prefersReducedMotion } from '@/utils/animations';
 import { cleanPlainTextResponse } from '@/utils/aiResponseCleaner';
 import { workoutAnalysisService } from '@/services/workoutAnalysisService';
 
 export function AIFocusCard() {
   const navigate = useNavigate();
-  const { insights, generateInsights } = useAIInsights();
+  const { insights, isLoading, generateInsights } = useAIInsights();
   const { workouts } = useWorkoutStore();
 
   useEffect(() => {
@@ -30,7 +31,23 @@ export function AIFocusCard() {
   const hasWorkoutToday = patternAnalysis?.hasWorkoutToday ?? false;
   const todayWorkout = patternAnalysis?.todayWorkout ?? null;
 
-  if (workouts.length === 0 || !insights?.recommendations?.[0]) {
+  // Show loading skeleton while insights are being generated
+  if (isLoading && workouts.length > 0) {
+    return (
+      <div className="px-5 mt-6">
+        <div className="flex items-center gap-2 mb-3">
+          <Bot className="w-5 h-5 text-primary" />
+          <h2 className="text-slate-900 dark:text-white text-lg font-bold">Today&apos;s Focus</h2>
+        </div>
+        <div className="rounded-2xl bg-surface-dark p-5">
+          <Skeleton height={120} className="rounded-xl" />
+        </div>
+      </div>
+    );
+  }
+
+  // Show empty state only if not loading and no data
+  if (workouts.length === 0 || (!isLoading && !insights?.recommendations?.[0])) {
     return (
       <div className="px-5 mt-6">
         <div className="flex items-center gap-2 mb-3">

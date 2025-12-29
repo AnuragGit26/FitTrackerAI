@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { getWeeklyWorkoutDays } from '@/utils/analyticsHelpers';
+import { getWeeklyWorkoutDays, calculateConsistencyScore } from '@/utils/analyticsHelpers';
 import { Workout } from '@/types/workout';
 import { prefersReducedMotion } from '@/utils/animations';
 
@@ -12,12 +12,10 @@ export function ConsistencyHeatmap({ workouts }: ConsistencyHeatmapProps) {
   const weeklyDays = useMemo(() => getWeeklyWorkoutDays(workouts), [workouts]);
 
   const consistencyScore = useMemo(() => {
-    const totalDays = weeklyDays.flat().length;
-    const workoutDays = weeklyDays.flat().filter(Boolean).length;
-    return totalDays > 0 ? Math.round((workoutDays / totalDays) * 100) : 0;
-  }, [weeklyDays]);
+    return calculateConsistencyScore(workouts);
+  }, [workouts]);
 
-  const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  const dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'Su'];
 
   return (
     <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-5 border border-gray-100 dark:border-gray-800/50 shadow-sm">

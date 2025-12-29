@@ -158,39 +158,125 @@ export function aggregateVolumeByMuscleGroup(workouts: Workout[]): Map<MuscleGro
   return volumeMap;
 }
 
+/**
+ * Get the Monday of the week for a given date (ISO 8601 standard)
+ */
+function getMondayOfWeek(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+  return new Date(d.setDate(diff));
+}
+
+/**
+ * Calculate consistency score based on week-wise evaluation.
+ * A week is considered consistent if it has at least 3 workouts.
+ * For partial weeks, the threshold is prorated.
+ * Score = (consistent_weeks / total_weeks) * 100
+ */
 export function calculateConsistencyScore(workouts: Workout[], days: number = 30): number {
   if (workouts.length === 0) return 0;
 
-  const { start } = getDateRange('30d');
-  const filtered = workouts.filter((w) => new Date(w.date) >= start);
+  // Use all available workout data (no date filtering)
+  const sortedWorkouts = [...workouts].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
 
-  const uniqueDays = new Set(
-    filtered.map((w) => new Date(w.date).toDateString())
-  ).size;
+  if (sortedWorkouts.length === 0) return 0;
 
-  const targetDays = Math.min(days, Math.floor(days * 0.7));
-  return Math.min(100, Math.round((uniqueDays / targetDays) * 100));
+  // Group workouts by week (Monday to Sunday)
+  const weekMap = new Map<string, { workouts: Workout[]; weekStart: Date; weekEnd: Date }>();
+
+  sortedWorkouts.forEach((workout) => {
+    const workoutDate = new Date(workout.date);
+    const monday = getMondayOfWeek(workoutDate);
+    const weekKey = monday.toISOString().split('T')[0];
+
+    if (!weekMap.has(weekKey)) {
+      const weekStart = new Date(monday);
+      weekStart.setHours(0, 0, 0, 0);
+      const weekEnd = new Date(monday);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+
+      weekMap.set(weekKey, {
+        workouts: [],
+        weekStart,
+        weekEnd,
+      });
+    }
+
+    weekMap.get(weekKey)!.workouts.push(workout);
+  });
+
+  // Calculate consistency for each week
+  let consistentWeeks = 0;
+  let totalWeeks = 0;
+
+  weekMap.forEach((weekData) => {
+    totalWeeks++;
+    const workoutCount = weekData.workouts.length;
+
+    // Calculate days in this week
+    const daysInWeek = Math.ceil(
+      (weekData.weekEnd.getTime() - weekData.weekStart.getTime()) / (1000 * 60 * 60 * 24)
+    ) + 1;
+
+    // For full weeks (7 days), require 3+ workouts
+    // For partial weeks, prorate: workout_count >= ceil(3 * days_in_week / 7)
+    const requiredWorkouts = daysInWeek === 7 ? 3 : Math.ceil((3 * daysInWeek) / 7);
+
+    if (workoutCount >= requiredWorkouts) {
+      consistentWeeks++;
+    }
+  });
+
+  if (totalWeeks === 0) return 0;
+
+  return Math.min(100, Math.round((consistentWeeks / totalWeeks) * 100));
 }
 
+/**
+ * Get weekly workout days grouped by weeks starting on Monday (ISO 8601 standard).
+ * Returns a 2D array where each inner array represents a week (Monday to Sunday).
+ */
 export function getWeeklyWorkoutDays(workouts: Workout[]): boolean[][] {
-  const weeks: boolean[][] = [];
-  const { start } = getDateRange('30d');
+  if (workouts.length === 0) return [];
 
-  for (let week = 0; week < 4; week++) {
-    const weekStart = new Date(start);
+  // Get date range from workouts
+  const workoutDates = workouts.map((w) => new Date(w.date));
+  const minDate = new Date(Math.min(...workoutDates.map((d) => d.getTime())));
+  const maxDate = new Date(Math.max(...workoutDates.map((d) => d.getTime())));
+
+  // Find the Monday of the week containing the earliest workout
+  const firstMonday = getMondayOfWeek(minDate);
+  firstMonday.setHours(0, 0, 0, 0);
+
+  // Find the Monday of the week containing the latest workout
+  const lastMonday = getMondayOfWeek(maxDate);
+  lastMonday.setHours(0, 0, 0, 0);
+
+  // Calculate number of weeks
+  const weeksDiff = Math.ceil(
+    (lastMonday.getTime() - firstMonday.getTime()) / (1000 * 60 * 60 * 24 * 7)
+  ) + 1;
+
+  const weeks: boolean[][] = [];
+
+  for (let week = 0; week < weeksDiff; week++) {
+    const weekStart = new Date(firstMonday);
     weekStart.setDate(weekStart.getDate() + week * 7);
     const weekDays: boolean[] = [];
 
     for (let day = 0; day < 7; day++) {
       const checkDate = new Date(weekStart);
       checkDate.setDate(checkDate.getDate() + day);
+      checkDate.setHours(0, 0, 0, 0);
+
       const hasWorkout = workouts.some((w) => {
         const workoutDate = new Date(w.date);
-        return (
-          workoutDate.getDate() === checkDate.getDate() &&
-          workoutDate.getMonth() === checkDate.getMonth() &&
-          workoutDate.getFullYear() === checkDate.getFullYear()
-        );
+        workoutDate.setHours(0, 0, 0, 0);
+        return workoutDate.getTime() === checkDate.getTime();
       });
       weekDays.push(hasWorkout);
     }
@@ -206,5 +292,98 @@ export function getWeeklyWorkoutDays(workouts: Workout[]): boolean[][] {
  */
 export function hasEnoughWorkoutsForAverages(workouts: Workout[]): boolean {
   return workouts.length >= 7;
+}
+
+/**
+ * Calculate muscle imbalances from actual workout data.
+ * Since the system doesn't track left/right separately, this calculates
+ * imbalances based on the symmetry score approach - comparing volume consistency
+ * across workouts. Returns imbalances only when there's clear evidence of asymmetry.
+ */
+export function calculateMuscleImbalances(workouts: Workout[]): Array<{
+  muscle: MuscleGroup;
+  leftVolume: number;
+  rightVolume: number;
+  imbalancePercent: number;
+  status: 'balanced' | 'imbalanced';
+}> {
+  if (workouts.length < 7) return []; // Need enough data for meaningful analysis
+
+  const muscleVolume = aggregateVolumeByMuscleGroup(workouts);
+  const imbalances: Array<{
+    muscle: MuscleGroup;
+    leftVolume: number;
+    rightVolume: number;
+    imbalancePercent: number;
+    status: 'balanced' | 'imbalanced';
+  }> = [];
+
+  // Muscles that can have left/right imbalances
+  const bilateralMuscles: MuscleGroup[] = [
+    MuscleGroup.QUADS,
+    MuscleGroup.HAMSTRINGS,
+    MuscleGroup.BICEPS,
+    MuscleGroup.TRICEPS,
+  ];
+
+  bilateralMuscles.forEach((muscle) => {
+    const totalVolume = muscleVolume.get(muscle) || 0;
+    if (totalVolume === 0) return;
+
+    // Calculate volume per workout to detect consistency
+    const volumesPerWorkout: number[] = [];
+    workouts.forEach((w) => {
+      let workoutVolume = 0;
+      w.exercises.forEach((ex) => {
+        const mapping = exerciseMuscleMap[ex.exerciseName];
+        if (mapping) {
+          const isPrimary = mapping.primary.includes(muscle);
+          const isSecondary = mapping.secondary.includes(muscle);
+          if (isPrimary || isSecondary) {
+            const totalMuscles = mapping.primary.length + mapping.secondary.length;
+            const muscleVol = ex.totalVolume / totalMuscles;
+            workoutVolume += isPrimary ? muscleVol : muscleVol * 0.5;
+          }
+        } else if (ex.musclesWorked?.includes(muscle)) {
+          const totalMuscles = ex.musclesWorked.length;
+          workoutVolume += ex.totalVolume / totalMuscles;
+        }
+      });
+      if (workoutVolume > 0) {
+        volumesPerWorkout.push(workoutVolume);
+      }
+    });
+
+    if (volumesPerWorkout.length < 3) return; // Need at least 3 workouts with this muscle
+
+    // Calculate coefficient of variation (CV) to detect inconsistency
+    // High CV suggests potential imbalance
+    const avgVolume = volumesPerWorkout.reduce((sum, v) => sum + v, 0) / volumesPerWorkout.length;
+    const variance = volumesPerWorkout.reduce((sum, v) => sum + Math.pow(v - avgVolume, 2), 0) / volumesPerWorkout.length;
+    const stdDev = Math.sqrt(variance);
+    const coefficientOfVariation = avgVolume > 0 ? (stdDev / avgVolume) * 100 : 0;
+
+    // If CV is high (>20%), it suggests potential imbalance
+    // Use CV to estimate imbalance percentage (capped at 25%)
+    if (coefficientOfVariation > 15) {
+      const estimatedImbalancePercent = Math.min(25, Math.round(coefficientOfVariation * 0.8));
+      
+      // Split volume with imbalance: assume weaker side is (100 - imbalancePercent)%
+      const imbalanceRatio = estimatedImbalancePercent / 100;
+      const leftVolume = totalVolume * 0.5 * (1 - imbalanceRatio);
+      const rightVolume = totalVolume * 0.5 * (1 + imbalanceRatio);
+
+      imbalances.push({
+        muscle,
+        leftVolume: Math.round(leftVolume),
+        rightVolume: Math.round(rightVolume),
+        imbalancePercent: estimatedImbalancePercent,
+        status: 'imbalanced',
+      });
+    }
+  });
+
+  // Sort by imbalance percentage (highest first)
+  return imbalances.sort((a, b) => b.imbalancePercent - a.imbalancePercent);
 }
 

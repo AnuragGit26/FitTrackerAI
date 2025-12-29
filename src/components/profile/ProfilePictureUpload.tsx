@@ -2,7 +2,9 @@ import { useRef, useState } from 'react';
 import { Camera, Upload, X } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { processImage, validateImageFile } from '@/utils/imageProcessor';
-import { getSupabaseClient } from '@/services/supabaseClient';
+import { getSupabaseClientWithAuth } from '@/services/supabaseClient';
+import { userScopedStorage } from '@/services/supabaseQueryBuilder';
+import { requireUserId } from '@/utils/userIdValidation';
 import { useUserStore } from '@/store/userStore';
 import { useToast } from '@/hooks/useToast';
 
@@ -68,21 +70,25 @@ export function ProfilePictureUpload({ picture, onPictureChange }: ProfilePictur
       const processed = await processImage(file);
       setPreviewUrl(processed.dataUrl);
 
-      // Upload to Supabase Storage
-      if (!profile?.id) {
-        throw new Error('User not logged in');
-      }
+      // Validate and get user ID
+      const userId = requireUserId(profile?.id, {
+        functionName: 'handleFileSelect',
+        additionalInfo: { operation: 'profile_photo_upload' },
+      });
 
-      const supabase = getSupabaseClient();
+      // Get authenticated Supabase client
+      const supabase = await getSupabaseClientWithAuth(userId);
       
       // IMPORTANT: The 'profile-photos' bucket must be PUBLIC in Supabase Dashboard
       // See supabase/migrations/002_storage_policies.sql for setup instructions
       // The migration creates public bucket policies that work with Auth0
 
-      // Sanitize user ID and file name for storage key
-      const sanitizedUserId = sanitizeStorageKey(profile.id);
+      // Use user-scoped storage helper
+      const storage = userScopedStorage(supabase, 'profile-photos', userId);
+
+      // Sanitize file name for storage key (user_id is already in path from userScopedStorage)
       const sanitizedFileName = sanitizeStorageKey(processed.file.name);
-      const fileName = `${sanitizedUserId}/${Date.now()}-${sanitizedFileName}`;
+      const fileName = `${Date.now()}-${sanitizedFileName}`;
 
       // Delete old profile photo if exists
       if (picture && picture.includes('profile-photos')) {
@@ -91,7 +97,11 @@ export function ProfilePictureUpload({ picture, onPictureChange }: ProfilePictur
           if (oldPath) {
             // Decode the path in case it was URL encoded
             const decodedPath = decodeURIComponent(oldPath);
-            await supabase.storage.from('profile-photos').remove([decodedPath]);
+            // Remove user_id prefix if present (userScopedStorage will add it)
+            const pathWithoutUserId = decodedPath.startsWith(`${userId}/`)
+              ? decodedPath.substring(userId.length + 1)
+              : decodedPath;
+            await storage.remove([pathWithoutUserId]);
           }
         } catch (error) {
           // Ignore errors when deleting old photo
@@ -99,23 +109,18 @@ export function ProfilePictureUpload({ picture, onPictureChange }: ProfilePictur
         }
       }
 
-      // Upload new photo to public bucket
-      // Public bucket policies allow uploads without authentication
-      const { error: uploadError } = await supabase.storage
-        .from('profile-photos')
-        .upload(fileName, processed.file, {
-          cacheControl: '3600',
-          upsert: true,
-        });
+      // Upload new photo using user-scoped storage (automatically includes user_id in path)
+      const { error: uploadError } = await storage.upload(fileName, processed.file, {
+        cacheControl: '3600',
+        upsert: true,
+      });
 
       if (uploadError) {
         throw uploadError;
       }
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('profile-photos')
-        .getPublicUrl(fileName);
+      // Get public URL (path already includes user_id from userScopedStorage)
+      const { data: urlData } = storage.getPublicUrl(fileName);
 
       if (!urlData?.publicUrl) {
         throw new Error('Failed to get public URL');
@@ -143,14 +148,26 @@ export function ProfilePictureUpload({ picture, onPictureChange }: ProfilePictur
     if (!picture) return;
 
     try {
+      // Validate and get user ID
+      const userId = requireUserId(profile?.id, {
+        functionName: 'handleRemovePhoto',
+        additionalInfo: { operation: 'profile_photo_removal' },
+      });
+
       // Delete from Supabase Storage if it's a Supabase URL
       if (picture.includes('profile-photos')) {
-        const supabase = getSupabaseClient();
+        const supabase = await getSupabaseClientWithAuth(userId);
+        const storage = userScopedStorage(supabase, 'profile-photos', userId);
+        
         const fileName = picture.split('/profile-photos/')[1];
         if (fileName) {
           // Decode the path in case it was URL encoded
           const decodedPath = decodeURIComponent(fileName);
-          await supabase.storage.from('profile-photos').remove([decodedPath]);
+          // Remove user_id prefix if present (userScopedStorage will add it)
+          const pathWithoutUserId = decodedPath.startsWith(`${userId}/`)
+            ? decodedPath.substring(userId.length + 1)
+            : decodedPath;
+          await storage.remove([pathWithoutUserId]);
         }
       }
 
@@ -158,7 +175,8 @@ export function ProfilePictureUpload({ picture, onPictureChange }: ProfilePictur
       success('Profile photo removed');
     } catch (error) {
       console.error('Failed to remove profile photo:', error);
-      showError('Failed to remove profile photo');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to remove profile photo';
+      showError(errorMessage);
     }
   };
 

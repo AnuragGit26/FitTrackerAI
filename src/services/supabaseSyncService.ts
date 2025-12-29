@@ -1,5 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseClientWithAuth } from './supabaseClient';
+import { userScopedQuery } from './supabaseQueryBuilder';
+import { requireUserId } from '@/utils/userIdValidation';
 import { syncMetadataService } from './syncMetadataService';
 import { dbHelpers } from './database';
 import { dataService } from './dataService';
@@ -75,6 +77,11 @@ class SupabaseSyncService {
         userId: string,
         options: SyncOptions = {}
     ): Promise<SyncResult[]> {
+        // Validate userId at the start
+        const validatedUserId = requireUserId(userId, {
+            functionName: 'performSync',
+            additionalInfo: { direction: options.direction || 'bidirectional' },
+        });
         if (this.isSyncing) {
             throw new Error('Sync is already in progress');
         }
@@ -106,8 +113,8 @@ class SupabaseSyncService {
         };
 
         try {
-            const client = await getSupabaseClientWithAuth(userId);
-            userContextManager.setUserId(userId);
+            const client = await getSupabaseClientWithAuth(validatedUserId);
+            userContextManager.setUserId(validatedUserId);
 
             // Sync tables in parallel for independent tables
             const independentTables = tables.filter(t => 
@@ -175,12 +182,18 @@ class SupabaseSyncService {
         tableName: SyncableTable,
         options: SyncOptions
     ): Promise<SyncResult> {
+        // Validate userId
+        const validatedUserId = requireUserId(userId, {
+            functionName: 'syncBidirectional',
+            additionalInfo: { tableName },
+        });
+
         const startTime = Date.now();
-        await syncMetadataService.updateSyncStatus(tableName, userId, 'syncing');
+        await syncMetadataService.updateSyncStatus(tableName, validatedUserId, 'syncing');
 
         try {
-            const pullResult = await this.syncPull(client, userId, tableName, options);
-            const pushResult = await this.syncPush(client, userId, tableName, options);
+            const pullResult = await this.syncPull(client, validatedUserId, tableName, options);
+            const pushResult = await this.syncPush(client, validatedUserId, tableName, options);
 
             const result: SyncResult = {
                 tableName,
@@ -197,13 +210,13 @@ class SupabaseSyncService {
 
             await syncMetadataService.updateSyncStatus(
                 tableName,
-                userId,
+                validatedUserId,
                 result.status === 'error' ? 'error' : 'success'
             );
             
             // Only update last sync time if sync was successful
             if (result.status === 'success') {
-                await syncMetadataService.updateLastSyncTime(tableName, userId, 'both');
+                await syncMetadataService.updateLastSyncTime(tableName, validatedUserId, 'both');
             }
 
             return result;
@@ -224,6 +237,12 @@ class SupabaseSyncService {
         tableName: SyncableTable,
         options: SyncOptions
     ): Promise<SyncResult> {
+        // Validate userId
+        const validatedUserId = requireUserId(userId, {
+            functionName: 'syncPull',
+            additionalInfo: { tableName },
+        });
+
         const startTime = Date.now();
         const result: SyncResult = {
             tableName,
@@ -239,12 +258,12 @@ class SupabaseSyncService {
         };
 
         try {
-            const metadata = await syncMetadataService.getLocalMetadata(tableName, userId);
+            const metadata = await syncMetadataService.getLocalMetadata(tableName, validatedUserId);
             const lastPullAt = metadata?.lastPullAt || (options.forceFullSync ? null : undefined);
 
             const remoteRecords = await this.fetchRemoteRecords(
                 client,
-                userId,
+                validatedUserId,
                 tableName,
                 lastPullAt ? new Date(lastPullAt) : undefined
             );
@@ -257,7 +276,7 @@ class SupabaseSyncService {
             for (const remoteRecord of remoteRecords) {
                 try {
                     const conflict = await this.resolveConflict(
-                        userId,
+                        validatedUserId,
                         tableName,
                         remoteRecord,
                         'pull'
@@ -265,10 +284,10 @@ class SupabaseSyncService {
 
                     if (conflict) {
                         result.conflicts++;
-                        await syncMetadataService.incrementConflictCount(tableName, userId);
+                        await syncMetadataService.incrementConflictCount(tableName, validatedUserId);
                     }
 
-                    await this.applyRemoteRecord(userId, tableName, remoteRecord);
+                    await this.applyRemoteRecord(validatedUserId, tableName, remoteRecord);
                     result.recordsProcessed++;
                     result.recordsCreated++;
                     this.updateProgress({
@@ -289,7 +308,7 @@ class SupabaseSyncService {
             
             // Only update last sync time if sync was successful
             if (result.status === 'success') {
-                await syncMetadataService.updateLastSyncTime(tableName, userId, 'pull');
+                await syncMetadataService.updateLastSyncTime(tableName, validatedUserId, 'pull');
             }
             
             return result;
@@ -313,6 +332,12 @@ class SupabaseSyncService {
         tableName: SyncableTable,
         options: SyncOptions
     ): Promise<SyncResult> {
+        // Validate userId
+        const validatedUserId = requireUserId(userId, {
+            functionName: 'syncPush',
+            additionalInfo: { tableName },
+        });
+
         const startTime = Date.now();
         const result: SyncResult = {
             tableName,
@@ -382,7 +407,7 @@ class SupabaseSyncService {
 
             for (const batch of batches) {
                 try {
-                    const batchResult = await this.pushBatch(client, userId, tableName, batch);
+                    const batchResult = await this.pushBatch(client, validatedUserId, tableName, batch);
                     result.recordsProcessed += batchResult.recordsProcessed;
                     result.recordsCreated += batchResult.recordsCreated;
                     result.recordsUpdated += batchResult.recordsUpdated;
@@ -407,7 +432,7 @@ class SupabaseSyncService {
             
             // Only update last sync time if sync was successful
             if (result.status === 'success') {
-                await syncMetadataService.updateLastSyncTime(tableName, userId, 'push');
+                await syncMetadataService.updateLastSyncTime(tableName, validatedUserId, 'push');
             }
             
             return result;
@@ -431,18 +456,17 @@ class SupabaseSyncService {
         tableName: SyncableTable,
         since?: Date
     ): Promise<unknown[]> {
-        // eslint-disable-next-line no-console
-        console.debug(`[SupabaseSyncService.fetchRemoteRecords] Fetching ${tableName} for userId: ${userId}`, since ? `since ${since.toISOString()}` : '');
-        
-        let query = client.from(tableName).select('*');
+        // Validate userId
+        const validatedUserId = requireUserId(userId, {
+            functionName: 'fetchRemoteRecords',
+            additionalInfo: { tableName },
+        });
 
-        // For exercises: fetch both library exercises (user_id IS NULL) and user's custom exercises
-        if (tableName === 'exercises') {
-            query = query.or(`user_id.is.null,user_id.eq.${userId}`);
-        } else {
-            // For other tables, filter by user_id
-            query = query.eq('user_id', userId);
-        }
+        // eslint-disable-next-line no-console
+        console.debug(`[SupabaseSyncService.fetchRemoteRecords] Fetching ${tableName} for userId: ${validatedUserId}`, since ? `since ${since.toISOString()}` : '');
+        
+        // Use user-scoped query helper to ensure user_id is always in URL
+        let query = userScopedQuery(client, tableName, validatedUserId).select('*');
 
         if (since) {
             query = query.gt('updated_at', since.toISOString());
@@ -464,9 +488,9 @@ class SupabaseSyncService {
             const userIds = [...new Set(data.map((r: Record<string, unknown>) => r.user_id))];
             // eslint-disable-next-line no-console
             console.debug(`[SupabaseSyncService.fetchRemoteRecords] user_ids found in fetched workouts:`, userIds);
-            if (userIds.length > 1 || (userIds.length === 1 && userIds[0] !== userId)) {
+            if (userIds.length > 1 || (userIds.length === 1 && userIds[0] !== validatedUserId)) {
                 // eslint-disable-next-line no-console
-                console.warn(`[SupabaseSyncService.fetchRemoteRecords] Mismatch detected! Query userId: ${userId}, Found user_ids:`, userIds);
+                console.warn(`[SupabaseSyncService.fetchRemoteRecords] Mismatch detected! Query userId: ${validatedUserId}, Found user_ids:`, userIds);
             }
         }
 
@@ -815,6 +839,12 @@ class SupabaseSyncService {
         conflicts: number;
         errors: SyncError[];
     }> {
+        // Validate userId at the start
+        const validatedUserId = requireUserId(userId, {
+            functionName: 'pushBatch',
+            additionalInfo: { tableName, batchSize: batch.length },
+        });
+
         const result = {
             recordsProcessed: 0,
             recordsCreated: 0,
@@ -825,7 +855,7 @@ class SupabaseSyncService {
 
         for (const localRecord of batch) {
             try {
-                const supabaseRecord = this.convertToSupabaseFormat(tableName, localRecord, userId);
+                const supabaseRecord = this.convertToSupabaseFormat(tableName, localRecord, validatedUserId);
                 const recordId = this.getRecordId(supabaseRecord, tableName);
 
                 // Build query - exercises, muscle_statuses, settings, sleep_logs, recovery_logs, and user_profiles need special handling
@@ -837,16 +867,16 @@ class SupabaseSyncService {
 
                 // For user_profiles: use user_id as primary key (no id column)
                 if (tableName === 'user_profiles') {
-                    query = query.eq('user_id', userId);
+                    query = query.eq('user_id', validatedUserId);
                 } else if (tableName === 'muscle_statuses') {
                     // For muscle_statuses: use (user_id, muscle) unique constraint instead of id
                     query = query
-                        .eq('user_id', userId)
+                        .eq('user_id', validatedUserId)
                         .eq('muscle', supabaseRecord.muscle as string);
                 } else if (tableName === 'settings') {
                     // For settings: use (user_id, key) unique constraint instead of id
                     query = query
-                        .eq('user_id', userId)
+                        .eq('user_id', validatedUserId)
                         .eq('key', supabaseRecord.key as string);
                 } else if (tableName === 'sleep_logs') {
                     // For sleep_logs: use (user_id, date) unique constraint instead of id
@@ -856,7 +886,7 @@ class SupabaseSyncService {
                         ? supabaseRecord.date.split('T')[0]
                         : supabaseRecord.date;
                     query = query
-                        .eq('user_id', userId)
+                        .eq('user_id', validatedUserId)
                         .eq('date', dateStr);
                 } else if (tableName === 'recovery_logs') {
                     // For recovery_logs: use (user_id, date) unique constraint instead of id
@@ -866,20 +896,20 @@ class SupabaseSyncService {
                         ? supabaseRecord.date.split('T')[0]
                         : supabaseRecord.date;
                     query = query
-                        .eq('user_id', userId)
+                        .eq('user_id', validatedUserId)
                         .eq('date', dateStr);
                 } else if (tableName === 'exercises') {
                     // For exercises: library exercises don't have user_id, custom exercises do
                     const isCustom = supabaseRecord.is_custom === true;
                     if (isCustom) {
-                        query = query.eq('user_id', userId).eq('id', recordId);
+                        query = query.eq('user_id', validatedUserId).eq('id', recordId);
                     } else {
                         // Library exercises: check if user_id is null or doesn't exist
                         query = query.is('user_id', null).eq('id', recordId);
                     }
                 } else {
                     // For other tables, filter by id and user_id
-                    query = query.eq('id', recordId).eq('user_id', userId);
+                    query = query.eq('id', recordId).eq('user_id', validatedUserId);
                 }
 
                 // Use maybeSingle() instead of single() to handle 0 rows gracefully
@@ -905,23 +935,23 @@ class SupabaseSyncService {
                             localRecord as { version?: number; updatedAt?: Date; deletedAt?: Date | null },
                             existing as { version?: number; updatedAt?: Date; deletedAt?: Date | null }
                         );
-                        const resolvedRecord = this.convertToSupabaseFormat(tableName, resolved, userId);
+                        const resolvedRecord = this.convertToSupabaseFormat(tableName, resolved, validatedUserId);
                         
                         // Build update query with proper filtering
                         let updateQuery = client.from(tableName).update(resolvedRecord);
 
                         // For user_profiles: use user_id as primary key (no id column)
                         if (tableName === 'user_profiles') {
-                            updateQuery = updateQuery.eq('user_id', userId);
+                            updateQuery = updateQuery.eq('user_id', validatedUserId);
                         } else if (tableName === 'muscle_statuses') {
                             // For muscle_statuses: use (user_id, muscle) unique constraint
                             updateQuery = updateQuery
-                                .eq('user_id', userId)
+                                .eq('user_id', validatedUserId)
                                 .eq('muscle', resolvedRecord.muscle as string);
                         } else if (tableName === 'settings') {
                             // For settings: use (user_id, key) unique constraint
                             updateQuery = updateQuery
-                                .eq('user_id', userId)
+                                .eq('user_id', validatedUserId)
                                 .eq('key', resolvedRecord.key as string);
                         } else if (tableName === 'sleep_logs') {
                             // For sleep_logs: use (user_id, date) unique constraint
@@ -931,7 +961,7 @@ class SupabaseSyncService {
                                 ? resolvedRecord.date.split('T')[0]
                                 : resolvedRecord.date;
                             updateQuery = updateQuery
-                                .eq('user_id', userId)
+                                .eq('user_id', validatedUserId)
                                 .eq('date', dateStr);
                         } else if (tableName === 'recovery_logs') {
                             // For recovery_logs: use (user_id, date) unique constraint
@@ -941,13 +971,13 @@ class SupabaseSyncService {
                                 ? resolvedRecord.date.split('T')[0]
                                 : resolvedRecord.date;
                             updateQuery = updateQuery
-                                .eq('user_id', userId)
+                                .eq('user_id', validatedUserId)
                                 .eq('date', dateStr);
                         } else if (tableName === 'exercises' && !supabaseRecord.is_custom) {
                             // For exercises: library exercises don't have user_id filter
                             updateQuery = updateQuery.is('user_id', null).eq('id', recordId);
                         } else {
-                            updateQuery = updateQuery.eq('id', recordId).eq('user_id', userId);
+                            updateQuery = updateQuery.eq('id', recordId).eq('user_id', validatedUserId);
                         }
 
                         const { error } = await updateQuery;
@@ -963,16 +993,16 @@ class SupabaseSyncService {
 
                         // For user_profiles: use user_id as primary key (no id column)
                         if (tableName === 'user_profiles') {
-                            updateQuery = updateQuery.eq('user_id', userId);
+                            updateQuery = updateQuery.eq('user_id', validatedUserId);
                         } else if (tableName === 'muscle_statuses') {
                             // For muscle_statuses: use (user_id, muscle) unique constraint
                             updateQuery = updateQuery
-                                .eq('user_id', userId)
+                                .eq('user_id', validatedUserId)
                                 .eq('muscle', supabaseRecord.muscle as string);
                         } else if (tableName === 'settings') {
                             // For settings: use (user_id, key) unique constraint
                             updateQuery = updateQuery
-                                .eq('user_id', userId)
+                                .eq('user_id', validatedUserId)
                                 .eq('key', supabaseRecord.key as string);
                         } else if (tableName === 'sleep_logs') {
                             // For sleep_logs: use (user_id, date) unique constraint
@@ -982,7 +1012,7 @@ class SupabaseSyncService {
                                 ? supabaseRecord.date.split('T')[0]
                                 : supabaseRecord.date;
                             updateQuery = updateQuery
-                                .eq('user_id', userId)
+                                .eq('user_id', validatedUserId)
                                 .eq('date', dateStr);
                         } else if (tableName === 'recovery_logs') {
                             // For recovery_logs: use (user_id, date) unique constraint
@@ -992,13 +1022,13 @@ class SupabaseSyncService {
                                 ? supabaseRecord.date.split('T')[0]
                                 : supabaseRecord.date;
                             updateQuery = updateQuery
-                                .eq('user_id', userId)
+                                .eq('user_id', validatedUserId)
                                 .eq('date', dateStr);
                         } else if (tableName === 'exercises' && !supabaseRecord.is_custom) {
                             // For exercises: library exercises don't have user_id filter
                             updateQuery = updateQuery.is('user_id', null).eq('id', recordId);
                         } else {
-                            updateQuery = updateQuery.eq('id', recordId).eq('user_id', userId);
+                            updateQuery = updateQuery.eq('id', recordId).eq('user_id', validatedUserId);
                         }
 
                         const { error } = await updateQuery;
@@ -1484,9 +1514,14 @@ class SupabaseSyncService {
     }
 
     async getSyncStatus(userId: string): Promise<SyncStatus> {
+        // Validate userId
+        const validatedUserId = requireUserId(userId, {
+            functionName: 'getSyncStatus',
+        });
+
         if (this.isSyncing) return 'syncing';
 
-        const allMetadata = await syncMetadataService.getAllMetadata(userId);
+        const allMetadata = await syncMetadataService.getAllMetadata(validatedUserId);
         const hasErrors = allMetadata.some(m => m.syncStatus === 'error');
         const hasConflicts = allMetadata.some(m => m.conflictCount > 0);
 
