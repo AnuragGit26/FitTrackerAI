@@ -1,7 +1,7 @@
 import { dbHelpers } from './database';
 import { Workout } from '@/types/workout';
-import { Exercise } from '@/types/exercise';
-import { MuscleStatus } from '@/types/muscle';
+import { Exercise, ExerciseTrackingType } from '@/types/exercise';
+import { MuscleStatus, MuscleGroup } from '@/types/muscle';
 import { SyncableTable } from '@/types/sync';
 import { transactionManager } from './transactionManager';
 import { versionManager } from './versionManager';
@@ -454,7 +454,6 @@ class DataService {
       console.debug(`[DataService.getAllWorkouts] Returning ${workouts.length} workouts for userId: ${userId}`);
       return workouts;
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('[DataService.getAllWorkouts] Error:', error);
       throw new Error(`Failed to get workouts: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -528,7 +527,7 @@ class DataService {
       }
       
       // Recalculate exercise volume
-      const exerciseVolume = calculateVolume(exercise.sets, trackingType as any);
+      const exerciseVolume = calculateVolume(exercise.sets, trackingType as ExerciseTrackingType);
       
       // Collect muscles from exercise
       exercise.musclesWorked?.forEach(muscle => allMuscles.add(muscle));
@@ -563,7 +562,7 @@ class DataService {
       exercises: finalExercises,
       totalVolume,
       totalDuration,
-      musclesTargeted: Array.from(allMuscles) as any[],
+      musclesTargeted: Array.from(allMuscles) as MuscleGroup[],
     };
   }
 

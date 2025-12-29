@@ -519,7 +519,6 @@ class SupabaseSyncService {
         const { data, error } = await query.order('updated_at', { ascending: true });
 
         if (error) {
-            // eslint-disable-next-line no-console
             console.error(`[SupabaseSyncService.fetchRemoteRecords] Error fetching ${tableName}:`, error);
             throw new Error(`Failed to fetch remote records: ${error.message}`);
         }
@@ -533,7 +532,6 @@ class SupabaseSyncService {
             // eslint-disable-next-line no-console
             console.debug(`[SupabaseSyncService.fetchRemoteRecords] user_ids found in fetched workouts:`, userIds);
             if (userIds.length > 1 || (userIds.length === 1 && userIds[0] !== validatedUserId)) {
-                // eslint-disable-next-line no-console
                 console.warn(`[SupabaseSyncService.fetchRemoteRecords] Mismatch detected! Query userId: ${validatedUserId}, Found user_ids:`, userIds);
             }
         }
@@ -759,7 +757,6 @@ class SupabaseSyncService {
             console.debug(`[SupabaseSyncService.createLocalRecord] Creating workout - remote user_id: ${remoteUserId}, converted userId: ${convertedUserId}`);
             
             if (remoteUserId !== convertedUserId) {
-                // eslint-disable-next-line no-console
                 console.warn(`[SupabaseSyncService.createLocalRecord] userId mismatch! remote: ${remoteUserId}, converted: ${convertedUserId}`);
             }
         }

@@ -18,7 +18,7 @@ import type { PostgrestQueryBuilder } from '@supabase/postgrest-js';
  * @returns A PostgrestQueryBuilder with user_id filter pre-applied
  * @throws {UserIdValidationError} If userId is missing or invalid
  */
-export function userScopedQuery<T = any>(
+export function userScopedQuery<T = Record<string, unknown>>(
   client: SupabaseClient,
   tableName: string,
   userId: string
@@ -153,7 +153,7 @@ export function userScopedStorage(
  * @param additionalFilters - Optional additional filter conditions
  * @returns A PostgrestQueryBuilder with user_id filter pre-applied
  */
-export function buildUserScopedQuery<T = any>(
+export function buildUserScopedQuery<T = Record<string, unknown>>(
   client: SupabaseClient,
   tableName: string,
   userId: string,

@@ -296,6 +296,7 @@ serve(async (req) => {
 
                 // Skip if user has no workout data
                 if (!workouts || workouts.length === 0) {
+                    // eslint-disable-next-line no-console
                     console.log(`Skipping user ${user.user_id}: No workout data`);
                     continue;
                 }
@@ -311,6 +312,7 @@ serve(async (req) => {
                 await createNotification(supabase, user.user_id, insights);
                 results.notificationsCreated++;
 
+                // eslint-disable-next-line no-console
                 console.log(`Created notification for user ${user.user_id}`);
             } catch (error) {
                 const errorMessage = error instanceof Error ? error.message : 'Unknown error';

@@ -21,23 +21,18 @@ window.fetch = async function(...args) {
   const isAuth0Request = url.includes('auth0.com') || url.includes('auth0');
   
   if (isAuth0Request) {
+    const response = await originalFetch.apply(this, args);
     
-    try {
-      const response = await originalFetch.apply(this, args);
-      
-      if (!response.ok && (response.status === 400 || response.status >= 400)) {
-        const clonedResponse = response.clone();
-        let errorBody = '';
-        try {
-          errorBody = await clonedResponse.text();
-        } catch {}
-        
+    if (!response.ok && (response.status === 400 || response.status >= 400)) {
+      const clonedResponse = response.clone();
+      try {
+        await clonedResponse.text();
+      } catch {
+        // Ignore error reading response body
       }
-      
-      return response;
-    } catch (error) {
-      throw error;
     }
+    
+    return response;
   }
   
   return originalFetch.apply(this, args);

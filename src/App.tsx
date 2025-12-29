@@ -75,12 +75,14 @@ function App() {
     const handleError = (event: ErrorEvent) => {
       const errorMsg = event.message || String(event.error);
       if (errorMsg.includes('auth0') || errorMsg.includes('400') || errorMsg.includes('Bad Request')) {
+        // Silently handle Auth0 errors to prevent console noise
       }
     };
 
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
       const errorMsg = event.reason?.message || String(event.reason);
       if (errorMsg.includes('auth0') || errorMsg.includes('400') || errorMsg.includes('Bad Request')) {
+        // Silently handle Auth0 errors to prevent console noise
       }
     };
 
@@ -343,7 +345,7 @@ function App() {
 
 function AppRoutes() {
   const location = useLocation();
-  const { isAuthenticated, isLoading, user: auth0User, error: auth0Error, getAccessTokenSilently } = useAuth0();
+  const { isAuthenticated, isLoading, user: auth0User, error: auth0Error } = useAuth0();
   const initializeUser = useUserStore((state) => state.initializeUser);
 
 
@@ -368,8 +370,8 @@ function AppRoutes() {
           logger.error('Failed to initialize templates', error);
         });
       }).catch((err) => {
+        logger.error('Failed to initialize user', err);
       });
-    } else if (!isLoading && !isAuthenticated) {
     }
   }, [isLoading, isAuthenticated, auth0User, initializeUser, auth0Error]);
 
