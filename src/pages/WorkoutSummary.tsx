@@ -13,6 +13,7 @@ import { SessionTrends } from '@/components/workout/summary/SessionTrends';
 import { WorkoutRating } from '@/components/workout/summary/WorkoutRating';
 import { RecoveryLog } from '@/components/workout/summary/RecoveryLog';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { EditableWorkoutName } from '@/components/common/EditableWorkoutName';
 import { formatDuration } from '@/utils/calculations';
 
 export function WorkoutSummary() {
@@ -81,6 +82,21 @@ export function WorkoutSummary() {
 
   const handleDone = () => {
     navigate('/home');
+  };
+
+  const handleSaveWorkoutName = async (newName: string) => {
+    if (!summaryData || !workoutId) return;
+
+    const id = parseInt(workoutId, 10);
+    await dataService.updateWorkout(id, { workoutType: newName });
+
+    setSummaryData({
+      ...summaryData,
+      workout: {
+        ...summaryData.workout,
+        workoutType: newName,
+      },
+    });
   };
 
   const formatWorkoutDate = (date: Date): string => {
@@ -158,9 +174,11 @@ export function WorkoutSummary() {
       <main className="flex-1 flex flex-col gap-6 overflow-y-auto">
         {/* Title Section */}
         <div className="px-4 pt-4">
-          <h1 className="text-2xl font-bold leading-tight tracking-tight mb-1 text-slate-900 dark:text-white">
-            {summaryData.workout.workoutType || 'Workout'}
-          </h1>
+          <EditableWorkoutName
+            name={summaryData.workout.workoutType || 'Workout'}
+            onSave={handleSaveWorkoutName}
+            placeholder="Workout"
+          />
         </div>
 
         {/* Session Analysis */}

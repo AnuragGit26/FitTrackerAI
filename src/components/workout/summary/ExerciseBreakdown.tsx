@@ -13,14 +13,18 @@ export function ExerciseBreakdown({ comparisons }: ExerciseBreakdownProps) {
     new Set([comparisons[0]?.exerciseId].filter(Boolean) as string[])
   );
 
-  const toggleExercise = (exerciseId: string) => {
-    const newOpen = new Set(openExercises);
-    if (newOpen.has(exerciseId)) {
-      newOpen.delete(exerciseId);
-    } else {
-      newOpen.add(exerciseId);
-    }
-    setOpenExercises(newOpen);
+  const toggleExercise = (exerciseId: string, e?: React.MouseEvent | React.SyntheticEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    setOpenExercises((prev) => {
+      const newOpen = new Set(prev);
+      if (newOpen.has(exerciseId)) {
+        newOpen.delete(exerciseId);
+      } else {
+        newOpen.add(exerciseId);
+      }
+      return newOpen;
+    });
   };
 
   const formatSetData = (set: ExerciseComparison['setComparisons'][0]) => {
@@ -104,9 +108,14 @@ export function ExerciseBreakdown({ comparisons }: ExerciseBreakdownProps) {
               key={comparison.exerciseId}
               className="flex flex-col rounded-xl border border-gray-200 dark:border-[#316847] bg-white dark:bg-[#162e21] group overflow-hidden"
               open={isOpen}
-              onToggle={() => toggleExercise(comparison.exerciseId)}
             >
-              <summary className="flex cursor-pointer items-center justify-between p-4 bg-gray-50 dark:bg-white/5 transition-colors hover:bg-gray-100 dark:hover:bg-white/10 list-none">
+              <summary 
+                className="flex cursor-pointer items-center justify-between p-4 bg-gray-50 dark:bg-white/5 transition-colors hover:bg-gray-100 dark:hover:bg-white/10 list-none"
+                onClick={(e) => {
+                  e.preventDefault();
+                  toggleExercise(comparison.exerciseId, e);
+                }}
+              >
                 <div className="flex items-center gap-3 flex-1">
                   <div className="size-10 rounded-lg bg-gray-200 dark:bg-[#316847] flex items-center justify-center shrink-0">
                     <span className="material-symbols-outlined text-gray-500 dark:text-gray-300">

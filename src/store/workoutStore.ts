@@ -7,6 +7,7 @@ import { muscleRecoveryService } from '@/services/muscleRecoveryService';
 import { plannedWorkoutService } from '@/services/plannedWorkoutService';
 import { saveWorkoutState, loadWorkoutState, clearWorkoutState } from '@/utils/workoutStatePersistence';
 import { calculateVolume } from '@/utils/calculations';
+import { userContextManager } from '@/services/userContextManager';
 
 interface WorkoutState {
   currentWorkout: Workout | null;
@@ -425,8 +426,21 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         startTime = new Date(endTime.getTime() - durationMs);
       }
 
+      // Get current user ID from context manager to ensure we use the correct user
+      // This prevents errors if user context changed (e.g., logout/login with different account)
+      const currentUserId = userContextManager.requireUserId();
+      
+      // Warn if workout was started with a different user ID (shouldn't happen normally)
+      if (currentWorkout.userId && currentWorkout.userId !== currentUserId) {
+        console.warn(
+          `Workout user ID mismatch: workout started with ${currentWorkout.userId}, ` +
+          `but finishing with ${currentUserId}. Using current user ID.`
+        );
+      }
+
       const completedWorkout: Workout = {
         ...currentWorkout,
+        userId: currentUserId, // Use current user ID from context manager
         startTime, // Use calculated/corrected startTime
         endTime,
         totalDuration: totalDurationMinutes,
@@ -441,7 +455,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
       try {
         await muscleRecoveryService.updateMuscleStatusesFromWorkout(
           savedWorkout,
-          currentWorkout.userId
+          currentUserId // Use current user ID from context manager
         );
       } catch (muscleError) {
         console.error('Failed to update muscle statuses:', muscleError);

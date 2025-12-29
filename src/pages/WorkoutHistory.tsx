@@ -4,6 +4,7 @@ import { useUserStore } from '@/store/userStore';
 import { dataService } from '@/services/dataService';
 import { Workout } from '@/types/workout';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { EditableWorkoutNameInline } from '@/components/common/EditableWorkoutNameInline';
 import { formatDuration } from '@/utils/calculations';
 import { motion } from 'framer-motion';
 
@@ -82,6 +83,16 @@ export function WorkoutHistory() {
     }
   };
 
+  const handleSaveWorkoutName = async (workoutId: number, newName: string) => {
+    await dataService.updateWorkout(workoutId, { workoutType: newName });
+    
+    setWorkouts((prevWorkouts) =>
+      prevWorkouts.map((workout) =>
+        workout.id === workoutId ? { ...workout, workoutType: newName } : workout
+      )
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background-light dark:bg-background-dark">
@@ -150,14 +161,27 @@ export function WorkoutHistory() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
-                onClick={() => handleWorkoutClick(workout.id)}
+                onClick={(e) => {
+                  const target = e.target as HTMLElement;
+                  if (!target.closest('button') && !target.closest('input')) {
+                    handleWorkoutClick(workout.id);
+                  }
+                }}
                 className="bg-white dark:bg-[#162e21] border border-gray-200 dark:border-[#316847] rounded-xl p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-[#1a2e23] transition-colors"
               >
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1">
-                    <h3 className="text-slate-900 dark:text-white font-bold text-base mb-1">
-                      {workout.workoutType || 'Workout'}
-                    </h3>
+                    {workout.id ? (
+                      <EditableWorkoutNameInline
+                        name={workout.workoutType || 'Workout'}
+                        onSave={(newName) => handleSaveWorkoutName(workout.id!, newName)}
+                        placeholder="Workout"
+                      />
+                    ) : (
+                      <h3 className="text-slate-900 dark:text-white font-bold text-base mb-1">
+                        {workout.workoutType || 'Workout'}
+                      </h3>
+                    )}
                     <p className="text-slate-500 dark:text-gray-400 text-sm">
                       {formatWorkoutDate(workout.date)} • {formatWorkoutTime(workout.date)}
                     </p>
