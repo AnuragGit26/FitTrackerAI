@@ -6,6 +6,7 @@ import { MuscleImageCache } from './muscleImageCache';
 import { SyncableTable } from '@/types/sync';
 import { SleepLog, RecoveryLog } from '@/types/sleep';
 import type { Notification } from '@/types/notification';
+import type { ErrorLog } from '@/types/error';
 
 export type InsightType = 'insights' | 'recommendations' | 'progress' | 'smart-coach';
 
@@ -56,6 +57,7 @@ class FitTrackAIDB extends Dexie {
   sleepLogs!: Table<SleepLog, number>;
   recoveryLogs!: Table<RecoveryLog, number>;
   notifications!: Table<Notification, string>;
+  errorLogs!: Table<ErrorLog, number>;
 
   constructor() {
     super('FitTrackAIDB');
@@ -222,6 +224,24 @@ class FitTrackAIDB extends Dexie {
       sleepLogs: '++id, userId, date, version, [userId+date], [userId+updatedAt]',
       recoveryLogs: '++id, userId, date, version, [userId+date], [userId+updatedAt]',
       notifications: 'id, userId, isRead, createdAt, [userId+isRead], [userId+createdAt], type',
+    });
+
+    // Version 12: Add error logs table
+    this.version(12).stores({
+      workouts: '++id, userId, date, version, [userId+date], [userId+updatedAt], *musclesTargeted',
+      exercises: 'id, name, category, userId, version, [userId+isCustom], [userId+updatedAt], *primaryMuscles, *secondaryMuscles',
+      muscleStatuses: '++id, muscle, userId, version, [userId+muscle], [userId+updatedAt], lastWorked',
+      settings: 'key, userId, version, [userId+key]',
+      workoutTemplates: 'id, userId, category, name, version, [userId+category], [userId+updatedAt], *musclesTargeted',
+      aiCacheMetadata: '++id, insightType, userId, [insightType+userId], lastFetchTimestamp',
+      plannedWorkouts: 'id, userId, scheduledDate, version, [userId+scheduledDate], [userId+updatedAt]',
+      exerciseDetailsCache: '++id, exerciseSlug, cachedAt',
+      muscleImageCache: '++id, muscle, cachedAt',
+      syncMetadata: '++id, tableName, userId, [userId+tableName], syncStatus, lastSyncAt',
+      sleepLogs: '++id, userId, date, version, [userId+date], [userId+updatedAt]',
+      recoveryLogs: '++id, userId, date, version, [userId+date], [userId+updatedAt]',
+      notifications: 'id, userId, isRead, createdAt, [userId+isRead], [userId+createdAt], type',
+      errorLogs: '++id, userId, errorType, severity, resolved, [userId+resolved], [userId+createdAt], tableName',
     });
   }
 }

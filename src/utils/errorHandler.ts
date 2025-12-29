@@ -127,7 +127,7 @@ export function getUserFriendlyErrorMessage(error: unknown): string {
 /**
  * Logs an error (in production, this would send to an error tracking service)
  */
-export function logError(error: Error | AppError, context?: Record<string, unknown>): void {
+export async function logError(error: Error | AppError, context?: Record<string, unknown>, userId?: string): Promise<void> {
     const errorData = {
         message: error.message,
         stack: error.stack,
@@ -144,6 +144,23 @@ export function logError(error: Error | AppError, context?: Record<string, unkno
     // In development, log to console
     if (import.meta.env.DEV) {
         console.error('Error logged:', errorData);
+    }
+
+    // Log to Supabase if userId is provided (non-blocking)
+    if (userId) {
+        try {
+            const { errorLogService } = await import('@/services/errorLogService');
+            await errorLogService.logError({
+                userId,
+                errorType: 'application_error',
+                errorMessage: error.message,
+                errorStack: error.stack,
+                context: errorData,
+                severity: error instanceof AppError && error.statusCode && error.statusCode >= 500 ? 'critical' : 'error',
+            });
+        } catch (logError) {
+            console.error('Failed to log error to Supabase:', logError);
+        }
     }
 
     // In production, send to error tracking service (e.g., Sentry)

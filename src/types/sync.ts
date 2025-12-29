@@ -12,7 +12,8 @@ export type SyncableTable =
     | 'settings'
     | 'notifications'
     | 'sleep_logs'
-    | 'recovery_logs';
+    | 'recovery_logs'
+    | 'error_logs';
 
 export interface SyncMetadata {
     id?: number;

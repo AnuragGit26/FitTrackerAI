@@ -20,6 +20,7 @@ import { WorkoutTemplate, PlannedWorkout } from '@/types/workout';
 import { MuscleStatus } from '@/types/muscle';
 import type { Notification } from '@/types/notification';
 import type { SleepLog, RecoveryLog } from '@/types/sleep';
+import type { ErrorLog } from '@/types/error';
 // UserProfile type is defined in userStore but not exported, using inline type
 type UserProfile = {
   id: string;
@@ -31,6 +32,7 @@ import { errorRecovery } from './errorRecovery';
 import { userContextManager } from './userContextManager';
 import { db } from './database';
 import { sleepRecoveryService } from './sleepRecoveryService';
+import { errorLogService } from './errorLogService';
 
 const BATCH_SIZE = 100;
 
@@ -100,6 +102,7 @@ class SupabaseSyncService {
             'notifications',
             'sleep_logs',
             'recovery_logs',
+            'error_logs',
         ];
 
         this.currentProgress = {
@@ -149,6 +152,7 @@ class SupabaseSyncService {
                         percentage: Math.round((results.length / tables.length) * 100),
                     });
                 } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
                     const errorResult: SyncResult = {
                         tableName: table,
                         direction,
@@ -162,7 +166,7 @@ class SupabaseSyncService {
                             {
                                 tableName: table,
                                 recordId: 'all',
-                                error: error instanceof Error ? error.message : 'Unknown error',
+                                error: errorMessage,
                                 timestamp: new Date(),
                                 operation: 'read',
                             },
@@ -170,6 +174,18 @@ class SupabaseSyncService {
                         duration: 0,
                     };
                     results.push(errorResult);
+                    
+                    // Log error to Supabase (non-blocking)
+                    errorLogService.logSyncError(
+                        userId,
+                        table,
+                        'all',
+                        error instanceof Error ? error : new Error(errorMessage),
+                        'read',
+                        { direction }
+                    ).catch((logError) => {
+                        console.error('Failed to log sync error:', logError);
+                    });
                 }
             }
 
@@ -189,6 +205,7 @@ class SupabaseSyncService {
                         percentage: Math.round((results.length / tables.length) * 100),
                     });
                 } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
                     const errorResult: SyncResult = {
                         tableName: table,
                         direction: 'pull',
@@ -202,7 +219,7 @@ class SupabaseSyncService {
                             {
                                 tableName: table,
                                 recordId: 'all',
-                                error: error instanceof Error ? error.message : 'Unknown error',
+                                error: errorMessage,
                                 timestamp: new Date(),
                                 operation: 'read',
                             },
@@ -210,6 +227,18 @@ class SupabaseSyncService {
                         duration: 0,
                     };
                     results.push(errorResult);
+                    
+                    // Log error to Supabase (non-blocking)
+                    errorLogService.logSyncError(
+                        userId,
+                        table,
+                        'all',
+                        error instanceof Error ? error : new Error(errorMessage),
+                        'read',
+                        { direction: 'pull' }
+                    ).catch((logError) => {
+                        console.error('Failed to log sync error:', logError);
+                    });
                 }
             }
         } finally {
@@ -338,12 +367,25 @@ class SupabaseSyncService {
                         recordsProcessed: result.recordsProcessed,
                     });
                 } catch (error) {
+                    const recordId = this.getRecordId(remoteRecord as Record<string, unknown>, tableName);
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
                     result.errors.push({
                         tableName,
-                        recordId: this.getRecordId(remoteRecord as Record<string, unknown>, tableName),
-                        error: error instanceof Error ? error.message : 'Unknown error',
+                        recordId,
+                        error: errorMessage,
                         timestamp: new Date(),
                         operation: 'read',
+                    });
+                    
+                    // Log error to Supabase (non-blocking)
+                    errorLogService.logSyncError(
+                        userId,
+                        tableName,
+                        recordId,
+                        error instanceof Error ? error : new Error(errorMessage),
+                        'read'
+                    ).catch((logError) => {
+                        console.error('Failed to log sync error:', logError);
                     });
                 }
             }
@@ -357,15 +399,28 @@ class SupabaseSyncService {
             
             return result;
         } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             result.status = 'error';
             result.errors.push({
                 tableName,
                 recordId: 'all',
-                error: error instanceof Error ? error.message : 'Unknown error',
+                error: errorMessage,
                 timestamp: new Date(),
                 operation: 'read',
             });
             result.duration = Date.now() - startTime;
+            
+            // Log error to Supabase (non-blocking)
+            errorLogService.logSyncError(
+                userId,
+                tableName,
+                'all',
+                error instanceof Error ? error : new Error(errorMessage),
+                'read'
+            ).catch((logError) => {
+                console.error('Failed to log sync error:', logError);
+            });
+            
             return result;
         }
     }
@@ -462,12 +517,25 @@ class SupabaseSyncService {
                         recordsProcessed: result.recordsProcessed,
                     });
                 } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
                     result.errors.push({
                         tableName,
                         recordId: 'batch',
-                        error: error instanceof Error ? error.message : 'Unknown error',
+                        error: errorMessage,
                         timestamp: new Date(),
                         operation: 'create',
+                    });
+                    
+                    // Log error to Supabase (non-blocking)
+                    errorLogService.logSyncError(
+                        userId,
+                        tableName,
+                        'batch',
+                        error instanceof Error ? error : new Error(errorMessage),
+                        'create',
+                        { batchSize: batch.length }
+                    ).catch((logError) => {
+                        console.error('Failed to log sync error:', logError);
                     });
                 }
             }
@@ -481,15 +549,28 @@ class SupabaseSyncService {
             
             return result;
         } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             result.status = 'error';
             result.errors.push({
                 tableName,
                 recordId: 'all',
-                error: error instanceof Error ? error.message : 'Unknown error',
+                error: errorMessage,
                 timestamp: new Date(),
                 operation: 'create',
             });
             result.duration = Date.now() - startTime;
+            
+            // Log error to Supabase (non-blocking)
+            errorLogService.logSyncError(
+                userId,
+                tableName,
+                'all',
+                error instanceof Error ? error : new Error(errorMessage),
+                'create'
+            ).catch((logError) => {
+                console.error('Failed to log sync error:', logError);
+            });
+            
             return result;
         }
     }
@@ -620,6 +701,14 @@ class SupabaseSyncService {
                     : logs;
             }
 
+            case 'error_logs': {
+                const { errorLogService } = await import('./errorLogService');
+                const logs = await errorLogService.getErrorLogs(userId);
+                return since
+                    ? logs.filter(l => l.createdAt >= since)
+                    : logs;
+            }
+
             default:
                 return [];
         }
@@ -700,6 +789,11 @@ class SupabaseSyncService {
                 }
                 // Fallback to id lookup if recordId is a number
                 return (await dbHelpers.getRecoveryLog(Number(recordId))) ?? null;
+            }
+            case 'error_logs': {
+                const { errorLogService } = await import('./errorLogService');
+                const logs = await errorLogService.getErrorLogs(userId);
+                return logs.find(l => l.id === Number(recordId)) ?? null;
             }
             default:
                 return null;
@@ -796,6 +890,22 @@ class SupabaseSyncService {
                 await sleepRecoveryService.saveRecoveryLog(converted as unknown as RecoveryLog);
                 break;
             }
+            case 'error_logs': {
+                const { errorLogService } = await import('./errorLogService');
+                const errorLog = converted as unknown as ErrorLog;
+                await errorLogService.logError({
+                    userId: errorLog.userId,
+                    errorType: errorLog.errorType,
+                    errorMessage: errorLog.errorMessage,
+                    errorStack: errorLog.errorStack,
+                    context: errorLog.context,
+                    tableName: errorLog.tableName,
+                    recordId: errorLog.recordId,
+                    operation: errorLog.operation,
+                    severity: errorLog.severity,
+                });
+                break;
+            }
         }
     }
 
@@ -862,6 +972,14 @@ class SupabaseSyncService {
                     await dbHelpers.updateRecoveryLog(existing.id, recoveryLog);
                 } else {
                     await sleepRecoveryService.saveRecoveryLog(recoveryLog);
+                }
+                break;
+            }
+            case 'error_logs': {
+                const { errorLogService } = await import('./errorLogService');
+                const errorLog = converted as unknown as ErrorLog;
+                if (errorLog.id && errorLog.resolved) {
+                    await errorLogService.markResolved(errorLog.id, errorLog.userId, errorLog.resolvedBy);
                 }
                 break;
             }
@@ -1096,12 +1214,25 @@ class SupabaseSyncService {
 
                 result.recordsProcessed++;
             } catch (error) {
+                const recordId = this.getRecordId(localRecord as Record<string, unknown>, tableName);
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
                 result.errors.push({
                     tableName,
-                    recordId: this.getRecordId(localRecord as Record<string, unknown>, tableName),
-                    error: error instanceof Error ? error.message : 'Unknown error',
+                    recordId,
+                    error: errorMessage,
                     timestamp: new Date(),
                     operation: 'create',
+                });
+                
+                // Log error to Supabase (non-blocking)
+                errorLogService.logSyncError(
+                    userId,
+                    tableName,
+                    recordId,
+                    error instanceof Error ? error : new Error(errorMessage),
+                    'create'
+                ).catch((logError) => {
+                    console.error('Failed to log sync error:', logError);
                 });
             }
         }
@@ -1278,6 +1409,23 @@ class SupabaseSyncService {
                     soreness: record.soreness,
                     readiness_to_train: record.readinessToTrain,
                     notes: record.notes,
+                };
+
+            case 'error_logs':
+                return {
+                    ...base,
+                    id: record.id,
+                    error_type: record.errorType,
+                    error_message: record.errorMessage,
+                    error_stack: record.errorStack,
+                    context: record.context ? JSON.stringify(record.context) : null,
+                    table_name: record.tableName,
+                    record_id: record.recordId ? String(record.recordId) : null,
+                    operation: record.operation,
+                    severity: record.severity,
+                    resolved: record.resolved,
+                    resolved_at: record.resolvedAt ? (record.resolvedAt instanceof Date ? record.resolvedAt.toISOString() : new Date(record.resolvedAt).toISOString()) : null,
+                    resolved_by: record.resolvedBy,
                 };
 
             default:
@@ -1464,6 +1612,27 @@ class SupabaseSyncService {
                     createdAt: new Date(record.created_at as string | number | Date),
                     updatedAt: new Date(record.updated_at as string | number | Date),
                     deletedAt: record.deleted_at ? new Date(record.deleted_at as string | number | Date) : null,
+                };
+
+            case 'error_logs':
+                return {
+                    id: record.id,
+                    userId: record.user_id,
+                    errorType: record.error_type,
+                    errorMessage: record.error_message,
+                    errorStack: record.error_stack,
+                    context: record.context ? (typeof record.context === 'string' ? JSON.parse(record.context) : record.context) : undefined,
+                    tableName: record.table_name,
+                    recordId: record.record_id,
+                    operation: record.operation,
+                    severity: record.severity,
+                    resolved: record.resolved,
+                    resolvedAt: record.resolved_at ? new Date(record.resolved_at as string | number | Date) : null,
+                    resolvedBy: record.resolved_by,
+                    version: record.version as number | undefined,
+                    deletedAt: record.deleted_at ? new Date(record.deleted_at as string | number | Date) : null,
+                    createdAt: new Date(record.created_at as string | number | Date),
+                    updatedAt: new Date(record.updated_at as string | number | Date),
                 };
 
             default:

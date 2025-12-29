@@ -523,6 +523,22 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         if (currentWorkout) {
           const errorForRecovery = error instanceof Error ? error : new Error(String(error));
           saveFailedWorkout(currentWorkout, errorForRecovery);
+          
+          // Log error to Supabase (non-blocking)
+          (async () => {
+            try {
+              const currentUserIdForLogging = userContextManager.requireUserId();
+              const { errorLogService } = await import('@/services/errorLogService');
+              await errorLogService.logWorkoutError(
+                currentUserIdForLogging,
+                errorForRecovery,
+                currentWorkout.id,
+                { templateId: get().templateId, plannedWorkoutId: get().plannedWorkoutId }
+              );
+            } catch (logError) {
+              console.error('Failed to log workout error:', logError);
+            }
+          })();
         }
       } catch (recoveryError) {
         console.error('Failed to save failed workout for recovery:', recoveryError);
