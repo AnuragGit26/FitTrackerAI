@@ -141,7 +141,6 @@ function App() {
         });
         
         // Initialize workout event tracker
-        const user = getUserStore.getState().profile;
         if (user?.id) {
           await workoutEventTracker.initialize(user.id);
         }
