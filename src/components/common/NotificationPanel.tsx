@@ -114,6 +114,17 @@ export function NotificationPanel({ isOpen, onClose, userId }: NotificationPanel
         }
     }, [isOpen, userId]);
 
+    // Periodically refresh notifications when panel is open (every 5 minutes)
+    useEffect(() => {
+        if (!isOpen || !userId) return;
+
+        const intervalId = setInterval(() => {
+            loadNotifications();
+        }, 5 * 60 * 1000); // 5 minutes
+
+        return () => clearInterval(intervalId);
+    }, [isOpen, userId]);
+
     // Close panel when clicking outside
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
@@ -133,6 +144,14 @@ export function NotificationPanel({ isOpen, onClose, userId }: NotificationPanel
     const loadNotifications = async () => {
         setIsLoading(true);
         try {
+            // Pull new notifications from Supabase first
+            try {
+                await notificationService.pullFromSupabase(userId);
+            } catch (error) {
+                console.warn('Failed to pull notifications from Supabase:', error);
+                // Continue loading local notifications even if pull fails
+            }
+
             const [allNotifications, unread] = await Promise.all([
                 notificationService.getNotifications({ userId, limit: 50 }),
                 notificationService.getUnreadCount(userId),

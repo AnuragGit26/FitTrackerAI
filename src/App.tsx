@@ -115,6 +115,19 @@ function App() {
         // Initialize data synchronization
         dataSync.initialize();
         
+        // Pull notifications from Supabase on app initialization
+        const user = getUserStore.getState().profile;
+        if (user?.id) {
+          try {
+            await notificationService.pullFromSupabase(user.id);
+            
+            // Start periodic notification pulling (every hour)
+            notificationService.startPeriodicPull(user.id, 60);
+          } catch (error) {
+            console.warn('Failed to initialize notifications:', error);
+          }
+        }
+        
         // Preload and cache muscle images in the background
         muscleImageCache.preloadAllImages().catch((error) => {
           console.warn('Failed to preload muscle images:', error);

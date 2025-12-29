@@ -117,11 +117,15 @@ class SupabaseSyncService {
             userContextManager.setUserId(validatedUserId);
 
             // Sync tables in parallel for independent tables
+            // Notifications are pull-only (edge function creates, client pulls)
             const independentTables = tables.filter(t => 
-                !['user_profiles', 'settings'].includes(t)
+                !['user_profiles', 'settings', 'notifications'].includes(t)
             );
             const dependentTables = tables.filter(t => 
                 ['user_profiles', 'settings'].includes(t)
+            );
+            const pullOnlyTables = tables.filter(t => 
+                t === 'notifications'
             );
 
             // Sync independent tables in parallel
@@ -148,6 +152,46 @@ class SupabaseSyncService {
                     const errorResult: SyncResult = {
                         tableName: table,
                         direction,
+                        status: 'error',
+                        recordsProcessed: 0,
+                        recordsCreated: 0,
+                        recordsUpdated: 0,
+                        recordsDeleted: 0,
+                        conflicts: 0,
+                        errors: [
+                            {
+                                tableName: table,
+                                recordId: 'all',
+                                error: error instanceof Error ? error.message : 'Unknown error',
+                                timestamp: new Date(),
+                                operation: 'read',
+                            },
+                        ],
+                        duration: 0,
+                    };
+                    results.push(errorResult);
+                }
+            }
+
+            // Sync pull-only tables (notifications - edge function creates, client only pulls)
+            for (const table of pullOnlyTables) {
+                this.updateProgress({
+                    currentTable: table,
+                    currentOperation: `Pulling ${table}...`,
+                });
+
+                try {
+                    // Force pull-only direction for notifications
+                    const result = await this.syncTable(client, userId, table, 'pull', options);
+                    results.push(result);
+                    this.updateProgress({
+                        completedTables: results.length,
+                        percentage: Math.round((results.length / tables.length) * 100),
+                    });
+                } catch (error) {
+                    const errorResult: SyncResult = {
+                        tableName: table,
+                        direction: 'pull',
                         status: 'error',
                         recordsProcessed: 0,
                         recordsCreated: 0,

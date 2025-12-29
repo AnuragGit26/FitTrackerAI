@@ -446,8 +446,9 @@ class NotificationService {
 
   /**
    * Pull notifications from Supabase and merge with local
+   * Only pulls notifications that don't exist locally or have newer versions
    */
-  async pullFromSupabase(userId: string): Promise<void> {
+  async pullFromSupabase(userId: string): Promise<number> {
     try {
       // Validate userId
       const validatedUserId = requireUserId(userId, {
@@ -458,44 +459,98 @@ class NotificationService {
       const supabase = await getSupabaseClientWithAuth(validatedUserId);
 
       // Get all notifications from Supabase using user-scoped query
+      // Only get unread notifications or notifications from last 7 days
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
         .eq('user_id', validatedUserId)
         .is('deleted_at', null)
+        .gte('created_at', sevenDaysAgo.toISOString())
         .order('created_at', { ascending: false });
 
       if (error) {
         throw error;
       }
 
-      if (!data) {
-        return;
+      if (!data || data.length === 0) {
+        return 0;
       }
 
-      // Convert Supabase format to local format and save
-      const notifications: Notification[] = data.map((n) => ({
-        id: n.id,
-        userId: n.user_id,
-        type: n.type as NotificationType,
-        title: n.title,
-        message: n.message,
-        data: n.data || {},
-        isRead: n.is_read,
-        readAt: n.read_at ? new Date(n.read_at).getTime() : null,
-        createdAt: new Date(n.created_at).getTime(),
-        version: n.version || 1,
-        deletedAt: n.deleted_at ? new Date(n.deleted_at).getTime() : null,
-      }));
+      // Get existing notifications from IndexedDB to check for duplicates
+      const existingNotifications = await dbHelpers.getAllNotifications(validatedUserId);
+      const existingIds = new Set(existingNotifications.map(n => n.id));
 
-      // Save all notifications to IndexedDB
-      await Promise.all(
-        notifications.map(n => dbHelpers.saveNotification(n))
-      );
+      // Convert Supabase format to local format and save only new/updated notifications
+      const notificationsToSave: Notification[] = [];
+      
+      for (const n of data) {
+        const existing = existingNotifications.find(ex => ex.id === n.id);
+        const remoteVersion = n.version || 1;
+        const localVersion = existing?.version || 0;
+
+        // Only save if notification doesn't exist locally or remote version is newer
+        if (!existing || remoteVersion > localVersion) {
+          notificationsToSave.push({
+            id: n.id,
+            userId: n.user_id,
+            type: n.type as NotificationType,
+            title: n.title,
+            message: n.message,
+            data: n.data || {},
+            isRead: n.is_read,
+            readAt: n.read_at ? new Date(n.read_at).getTime() : null,
+            createdAt: new Date(n.created_at).getTime(),
+            version: remoteVersion,
+            deletedAt: n.deleted_at ? new Date(n.deleted_at).getTime() : null,
+          });
+        }
+      }
+
+      // Save all new/updated notifications to IndexedDB
+      if (notificationsToSave.length > 0) {
+        await Promise.all(
+          notificationsToSave.map(n => dbHelpers.saveNotification(n))
+        );
+      }
+
+      return notificationsToSave.length;
     } catch (error) {
       console.error('[NotificationService] Failed to pull notifications from Supabase:', error);
       throw error;
     }
+  }
+
+  /**
+   * Start periodic notification pulling from Supabase
+   * Checks for new notifications every hour
+   */
+  startPeriodicPull(userId: string, intervalMinutes: number = 60): () => void {
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const pullNotifications = async () => {
+      try {
+        await this.pullFromSupabase(userId);
+      } catch (error) {
+        console.error('[NotificationService] Periodic pull failed:', error);
+      }
+    };
+
+    // Pull immediately on start
+    pullNotifications();
+
+    // Set up interval
+    intervalId = setInterval(pullNotifications, intervalMinutes * 60 * 1000);
+
+    // Return cleanup function
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
   }
 }
 
