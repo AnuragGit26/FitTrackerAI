@@ -131,16 +131,27 @@ export function aggregateVolumeByMuscleGroup(workouts: Workout[]): Map<MuscleGro
   workouts.forEach((workout) => {
     workout.exercises.forEach((exercise) => {
       const mapping = exerciseMuscleMap[exercise.exerciseName];
-      if (!mapping) return;
-
       const exerciseVolume = exercise.totalVolume;
-      const totalMuscles = mapping.primary.length + mapping.secondary.length;
-      const volumePerMuscle = exerciseVolume / totalMuscles;
-
-      [...mapping.primary, ...mapping.secondary].forEach((muscle) => {
-        const current = volumeMap.get(muscle) || 0;
-        volumeMap.set(muscle, current + volumePerMuscle);
-      });
+      
+      if (mapping) {
+        // Use mapping if available
+        const totalMuscles = mapping.primary.length + mapping.secondary.length;
+        if (totalMuscles > 0) {
+          const volumePerMuscle = exerciseVolume / totalMuscles;
+          [...mapping.primary, ...mapping.secondary].forEach((muscle) => {
+            const current = volumeMap.get(muscle) || 0;
+            volumeMap.set(muscle, current + volumePerMuscle);
+          });
+        }
+      } else if (exercise.musclesWorked && exercise.musclesWorked.length > 0) {
+        // Fallback to exercise.musclesWorked if mapping not found
+        const totalMuscles = exercise.musclesWorked.length;
+        const volumePerMuscle = exerciseVolume / totalMuscles;
+        exercise.musclesWorked.forEach((muscle) => {
+          const current = volumeMap.get(muscle) || 0;
+          volumeMap.set(muscle, current + volumePerMuscle);
+        });
+      }
     });
   });
 

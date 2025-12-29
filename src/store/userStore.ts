@@ -105,7 +105,7 @@ export const useUserStore = create<UserState>((set, get) => ({
       }
 
       const auth0UserId = auth0User.id;
-      const auth0Name = auth0User.firstName || auth0User.username || auth0User.emailAddresses?.[0]?.emailAddress || 'User';
+      const auth0Name = auth0User.firstName ?? auth0User.username ?? auth0User.emailAddresses?.[0]?.emailAddress ?? 'User';
       
       // Get profile for this specific user ID (strictly user-specific)
       let savedProfile = await dataService.getUserProfile(auth0UserId);
@@ -169,7 +169,7 @@ export const useUserStore = create<UserState>((set, get) => ({
     if (!profile) return;
 
     const auth0UserId = auth0User.id;
-    const auth0Name = auth0User.firstName || auth0User.username || auth0User.emailAddresses?.[0]?.emailAddress || 'User';
+    const auth0Name = auth0User.firstName ?? auth0User.username ?? auth0User.emailAddresses?.[0]?.emailAddress ?? 'User';
 
     // Update profile with Auth0 ID, but only update name if it's empty or default
     // Preserve user-saved custom names

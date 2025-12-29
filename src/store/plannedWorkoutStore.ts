@@ -49,7 +49,7 @@ export const usePlannedWorkoutStore = create<PlannedWorkoutState>((set, get) => 
     set({ isLoading: true, error: null });
     try {
       const plannedWorkouts = await plannedWorkoutService.getAllPlannedWorkouts(userId);
-      set({ plannedWorkouts, isLoading: false });
+      set({ plannedWorkouts: plannedWorkouts ?? [], isLoading: false });
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to load planned workouts',
@@ -70,7 +70,7 @@ export const usePlannedWorkoutStore = create<PlannedWorkoutState>((set, get) => 
         startDate,
         endDate
       );
-      set({ plannedWorkouts, isLoading: false });
+      set({ plannedWorkouts: plannedWorkouts ?? [], isLoading: false });
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to load planned workouts',
@@ -89,7 +89,7 @@ export const usePlannedWorkoutStore = create<PlannedWorkoutState>((set, get) => 
       const newPlannedWorkout = await plannedWorkoutService.getPlannedWorkout(id);
       if (newPlannedWorkout) {
         set((state) => ({
-          plannedWorkouts: [...state.plannedWorkouts, newPlannedWorkout],
+          plannedWorkouts: [...(state.plannedWorkouts ?? []), newPlannedWorkout],
           isLoading: false,
         }));
         
@@ -119,7 +119,7 @@ export const usePlannedWorkoutStore = create<PlannedWorkoutState>((set, get) => 
     set({ isLoading: true, error: null });
     try {
       // Cancel existing notification if scheduled time is changing
-      const existing = get().plannedWorkouts.find((pw) => pw.id === id);
+      const existing = (get().plannedWorkouts ?? []).find((pw) => pw.id === id);
       if (existing && (updates.scheduledTime || updates.scheduledDate)) {
         await notificationService.cancelWorkoutReminder(id);
       }
@@ -159,7 +159,7 @@ export const usePlannedWorkoutStore = create<PlannedWorkoutState>((set, get) => 
       
       await plannedWorkoutService.deletePlannedWorkout(id);
       set((state) => ({
-        plannedWorkouts: state.plannedWorkouts.filter((pw) => pw.id !== id),
+        plannedWorkouts: (state.plannedWorkouts ?? []).filter((pw) => pw.id !== id),
         isLoading: false,
       }));
     } catch (error) {
@@ -180,7 +180,7 @@ export const usePlannedWorkoutStore = create<PlannedWorkoutState>((set, get) => 
       const updatedPlannedWorkout = await plannedWorkoutService.getPlannedWorkout(id);
       if (updatedPlannedWorkout) {
         set((state) => ({
-          plannedWorkouts: state.plannedWorkouts.map((pw) =>
+          plannedWorkouts: (state.plannedWorkouts ?? []).map((pw) =>
             pw.id === id ? updatedPlannedWorkout : pw
           ),
           isLoading: false,

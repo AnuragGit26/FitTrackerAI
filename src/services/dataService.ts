@@ -225,8 +225,8 @@ class DataService {
     }
     
     // Validate each exercise
-    workout.exercises.forEach((exercise, index) => {
-      if (!exercise.exerciseId) {
+    (workout.exercises ?? []).forEach((exercise, index) => {
+      if (!exercise?.exerciseId) {
         throw new Error(`Exercise at index ${index} must have an exerciseId`);
       }
       if (!exercise.exerciseName || exercise.exerciseName.trim() === '') {
@@ -235,13 +235,22 @@ class DataService {
       if (!Array.isArray(exercise.sets)) {
         throw new Error(`Exercise at index ${index} must have a sets array`);
       }
-      if (exercise.sets.length === 0) {
+      if ((exercise.sets ?? []).length === 0) {
         throw new Error(`Exercise at index ${index} must have at least one set`);
+      }
+      
+      // Validate musclesWorked is set and is an array
+      if (!Array.isArray(exercise.musclesWorked)) {
+        throw new Error(`Exercise at index ${index} must have a musclesWorked array`);
+      }
+      if ((exercise.musclesWorked ?? []).length === 0) {
+        // Allow empty array but log a warning - this might cause issues with muscle distribution
+        console.warn(`Exercise "${exercise.exerciseName}" at index ${index} has no musclesWorked. This may cause issues with muscle distribution calculations.`);
       }
       
       // Validate each set using centralized validators
       // Get exercise tracking type from exercise library if available
-      exercise.sets.forEach((set, setIndex) => {
+      (exercise.sets ?? []).forEach((set, setIndex) => {
         // Validate reps (if present) - allow 0 for incomplete sets
         if (set.reps !== undefined) {
           if (set.reps === 0 && !set.completed) {

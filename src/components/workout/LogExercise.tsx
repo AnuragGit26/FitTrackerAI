@@ -16,6 +16,7 @@ import { PreviousWorkoutTable } from '@/components/exercise/PreviousWorkoutTable
 import { WorkoutTimerDisplay } from '@/components/exercise/WorkoutTimerDisplay';
 import { AIInsightPill } from '@/components/exercise/AIInsightPill';
 import { Exercise, WorkoutExercise, WorkoutSet, ExerciseCategory } from '@/types/exercise';
+import { MuscleGroup } from '@/types/muscle';
 import { MuscleGroupCategory } from '@/utils/muscleGroupCategories';
 import { getMuscleMapping } from '@/services/muscleMapping';
 import { calculateVolume, calculateNextSetByVolume } from '@/utils/calculations';
@@ -852,9 +853,15 @@ export function LogExercise({
 
     try {
       const muscleMapping = getMuscleMapping(selectedExercise.name);
-      const musclesWorked = muscleMapping
+      let musclesWorked: MuscleGroup[] = muscleMapping
         ? [...muscleMapping.primary, ...muscleMapping.secondary]
-        : selectedExercise.primaryMuscles;
+        : [...(selectedExercise.primaryMuscles || []), ...(selectedExercise.secondaryMuscles || [])];
+      
+      // Ensure we have at least some muscles - fallback to a default if empty
+      if (musclesWorked.length === 0) {
+        console.warn(`No muscles found for exercise "${selectedExercise.name}", using default`);
+        musclesWorked = [MuscleGroup.CHEST]; // Default fallback
+      }
 
       const totalVolume = calculateVolume(sets, selectedExercise.trackingType);
 

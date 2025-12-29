@@ -8,9 +8,9 @@ interface ExerciseBreakdownProps {
 
 export function ExerciseBreakdown({ comparisons }: ExerciseBreakdownProps) {
   const { profile } = useUserStore();
-  const unit = profile?.preferredUnit || 'kg';
+  const unit = profile?.preferredUnit ?? 'kg';
   const [openExercises, setOpenExercises] = useState<Set<string>>(
-    new Set([comparisons[0]?.exerciseId].filter(Boolean) as string[])
+    new Set([comparisons?.[0]?.exerciseId].filter(Boolean) as string[])
   );
 
   const toggleExercise = (exerciseId: string, e?: React.MouseEvent | React.SyntheticEvent) => {
@@ -83,7 +83,7 @@ export function ExerciseBreakdown({ comparisons }: ExerciseBreakdownProps) {
     return `${weight}${reps}`;
   };
 
-  if (comparisons.length === 0) {
+  if (!comparisons || comparisons.length === 0) {
     return (
       <div className="px-4 pb-6">
         <p className="text-gray-500 dark:text-gray-400 text-center">
@@ -99,9 +99,9 @@ export function ExerciseBreakdown({ comparisons }: ExerciseBreakdownProps) {
         <h3 className="text-slate-900 dark:text-white text-lg font-bold">Exercise Breakdown</h3>
       </div>
       <div className="flex flex-col gap-3">
-        {comparisons.map((comparison) => {
+        {(comparisons ?? []).map((comparison) => {
           const isOpen = openExercises.has(comparison.exerciseId);
-          const hasPreviousData = comparison.setComparisons.some((s) => s.previous);
+          const hasPreviousData = (comparison.setComparisons ?? []).some((s) => s.previous);
 
           return (
             <details
@@ -127,7 +127,7 @@ export function ExerciseBreakdown({ comparisons }: ExerciseBreakdownProps) {
                       {comparison.exerciseName}
                     </p>
                     <p className="text-slate-500 dark:text-gray-400 text-xs">
-                      {comparison.currentSets.length} Set{comparison.currentSets.length !== 1 ? 's' : ''}
+                      {(comparison.currentSets?.length ?? 0)} Set{(comparison.currentSets?.length ?? 0) !== 1 ? 's' : ''}
                       {comparison.bestSet && ` • Best: ${getBestSetText(comparison)}`}
                     </p>
                   </div>
@@ -155,7 +155,7 @@ export function ExerciseBreakdown({ comparisons }: ExerciseBreakdownProps) {
                     </div>
                     {/* Sets Data */}
                     <div className="flex flex-col gap-2">
-                      {comparison.setComparisons.map((set) => (
+                      {(comparison.setComparisons ?? []).map((set) => (
                         <div
                           key={set.setNumber}
                           className="grid grid-cols-6 items-center bg-gray-50 dark:bg-black/20 rounded p-2 text-xs"

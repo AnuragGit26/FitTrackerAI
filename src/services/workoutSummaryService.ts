@@ -73,7 +73,7 @@ export const workoutSummaryService = {
    */
   findPreviousWorkout(currentWorkout: Workout, allWorkouts: Workout[]): Workout | undefined {
     const currentDate = new Date(currentWorkout.date);
-    const previous = allWorkouts
+    const previous = (allWorkouts ?? [])
       .filter((w) => {
         const wDate = new Date(w.date);
         return wDate < currentDate && w.id !== currentWorkout.id;
@@ -139,7 +139,7 @@ export const workoutSummaryService = {
     const currentVolumeMap = aggregateVolumeByMuscleGroup([current]);
     const previousVolumeMap = previous ? aggregateVolumeByMuscleGroup([previous]) : new Map();
 
-    const totalVolume = Array.from(currentVolumeMap.values()).reduce((sum, vol) => sum + vol, 0);
+    const totalVolume = Array.from(currentVolumeMap.values()).reduce((sum, vol) => sum + (vol ?? 0), 0);
 
     const distribution: MuscleDistribution[] = Array.from(currentVolumeMap.entries())
       .map(([muscle, volume]) => {
@@ -233,14 +233,14 @@ export const workoutSummaryService = {
   ): Promise<ExerciseComparison[]> {
     const comparisons: ExerciseComparison[] = [];
 
-    for (const exercise of workout.exercises) {
+    for (const exercise of workout.exercises ?? []) {
       const previousData = await workoutHistoryService.getLastWorkoutForExercise(
         userId,
         exercise.exerciseId
       );
 
-      const currentSets = exercise.sets.filter((s) => s.completed);
-      const previousSets = previousData?.sets.filter((s) => s.completed) || [];
+      const currentSets = (exercise.sets ?? []).filter((s) => s.completed);
+      const previousSets = (previousData?.sets ?? []).filter((s) => s.completed);
 
       // Create set comparisons
       const setComparisons: SetComparison[] = currentSets.map((currentSet, index) => {
@@ -288,23 +288,23 @@ export const workoutSummaryService = {
       });
 
       // Find best set
-      const bestSet = currentSets.reduce(
+      const bestSet = currentSets.length > 0 ? currentSets.reduce(
         (best, set) => {
-          const volume = (set.weight || 0) * (set.reps || 0);
-          const bestVolume = (best.weight || 0) * (best.reps || 0);
+          const volume = (set.weight ?? 0) * (set.reps ?? 0);
+          const bestVolume = (best.weight ?? 0) * (best.reps ?? 0);
           return volume > bestVolume ? set : best;
         },
         currentSets[0]
-      );
+      ) : undefined;
 
       // Calculate estimated 1RM from best set
       const estimated1RM =
-        bestSet.weight && bestSet.reps
+        bestSet?.weight && bestSet?.reps
           ? calculateEstimatedOneRepMax(bestSet.weight, bestSet.reps)
           : undefined;
 
-      const previousVolume = previousData?.totalVolume || 0;
-      const volumeChange = exercise.totalVolume - previousVolume;
+      const previousVolume = previousData?.totalVolume ?? 0;
+      const volumeChange = (exercise.totalVolume ?? 0) - previousVolume;
 
       comparisons.push({
         exerciseId: exercise.exerciseId,
@@ -316,11 +316,11 @@ export const workoutSummaryService = {
         previousVolume: previousVolume > 0 ? previousVolume : undefined,
         volumeChange: previousVolume > 0 ? volumeChange : undefined,
         estimated1RM,
-        bestSet: bestSet.weight && bestSet.reps
+        bestSet: bestSet?.weight && bestSet?.reps
           ? {
               weight: bestSet.weight,
               reps: bestSet.reps,
-              volume: (bestSet.weight || 0) * (bestSet.reps || 0),
+              volume: (bestSet.weight ?? 0) * (bestSet.reps ?? 0),
             }
           : undefined,
       });
@@ -335,41 +335,42 @@ export const workoutSummaryService = {
   calculateExerciseTrends(workout: Workout, allWorkouts: Workout[]): ExerciseTrend[] {
     const trends: ExerciseTrend[] = [];
 
-    workout.exercises.forEach((exercise) => {
+    (workout.exercises ?? []).forEach((exercise) => {
       // Get last 5 workouts containing this exercise
-      const exerciseWorkouts = allWorkouts
+      const exerciseWorkouts = (allWorkouts ?? [])
         .filter((w) => {
-          const ex = w.exercises.find((e) => e.exerciseId === exercise.exerciseId);
-          return ex && ex.sets.some((s) => s.completed);
+          const ex = (w.exercises ?? []).find((e) => e.exerciseId === exercise.exerciseId);
+          return ex && (ex.sets ?? []).some((s) => s.completed);
         })
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
         .slice(0, 5)
         .reverse(); // Oldest first for trend
 
       const dataPoints = exerciseWorkouts.map((w) => {
-        const ex = w.exercises.find((e) => e.exerciseId === exercise.exerciseId)!;
-        const completedSets = ex.sets.filter((s) => s.completed);
-        const maxWeight = Math.max(
-          ...completedSets.map((s) => s.weight || 0),
+        const ex = (w.exercises ?? []).find((e) => e.exerciseId === exercise.exerciseId);
+        if (!ex) return null;
+        const completedSets = (ex.sets ?? []).filter((s) => s.completed);
+        const maxWeight = completedSets.length > 0 ? Math.max(
+          ...completedSets.map((s) => s.weight ?? 0),
           0
-        );
-        const maxReps = Math.max(...completedSets.map((s) => s.reps || 0), 0);
+        ) : 0;
+        const maxReps = completedSets.length > 0 ? Math.max(...completedSets.map((s) => s.reps ?? 0), 0) : 0;
 
         return {
           date: new Date(w.date),
-          volume: ex.totalVolume,
+          volume: ex.totalVolume ?? 0,
           maxWeight: maxWeight > 0 ? maxWeight : undefined,
           maxReps: maxReps > 0 ? maxReps : undefined,
         };
-      });
+      }).filter((dp): dp is NonNullable<typeof dp> => dp !== null);
 
       // Add current workout
-      const completedSets = exercise.sets.filter((s) => s.completed);
-      const maxWeight = Math.max(...completedSets.map((s) => s.weight || 0), 0);
-      const maxReps = Math.max(...completedSets.map((s) => s.reps || 0), 0);
+      const completedSets = (exercise.sets ?? []).filter((s) => s.completed);
+      const maxWeight = completedSets.length > 0 ? Math.max(...completedSets.map((s) => s.weight ?? 0), 0) : 0;
+      const maxReps = completedSets.length > 0 ? Math.max(...completedSets.map((s) => s.reps ?? 0), 0) : 0;
       dataPoints.push({
         date: new Date(workout.date),
-        volume: exercise.totalVolume,
+        volume: exercise.totalVolume ?? 0,
         maxWeight: maxWeight > 0 ? maxWeight : undefined,
         maxReps: maxReps > 0 ? maxReps : undefined,
       });
@@ -421,14 +422,14 @@ export const workoutSummaryService = {
    */
   calculatePersonalRecords(workout: Workout, allWorkouts: Workout[]): PersonalRecord[] {
     const records: PersonalRecord[] = [];
-    const previousWorkouts = allWorkouts.filter((w) => {
+    const previousWorkouts = (allWorkouts ?? []).filter((w) => {
       const wDate = new Date(w.date);
       const currentDate = new Date(workout.date);
       return wDate < currentDate && w.id !== workout.id;
     });
 
-    workout.exercises.forEach((exercise) => {
-      const completedSets = exercise.sets.filter((s) => s.completed);
+    (workout.exercises ?? []).forEach((exercise) => {
+      const completedSets = (exercise.sets ?? []).filter((s) => s.completed);
 
       // Check for 1RM PR
       completedSets.forEach((set) => {
@@ -438,9 +439,9 @@ export const workoutSummaryService = {
           // Find previous max 1RM for this exercise
           let previousMax1RM = 0;
           previousWorkouts.forEach((w) => {
-            const prevEx = w.exercises.find((e) => e.exerciseId === exercise.exerciseId);
+            const prevEx = (w.exercises ?? []).find((e) => e.exerciseId === exercise.exerciseId);
             if (prevEx) {
-              prevEx.sets
+              (prevEx.sets ?? [])
                 .filter((s) => s.completed && s.weight && s.reps)
                 .forEach((s) => {
                   const prev1RM = calculateEstimatedOneRepMax(s.weight!, s.reps!);
@@ -465,22 +466,22 @@ export const workoutSummaryService = {
       });
 
       // Check for volume PR
-      const previousMaxVolume = Math.max(
+      const previousMaxVolume = previousWorkouts.length > 0 ? Math.max(
         ...previousWorkouts
           .map((w) => {
-            const prevEx = w.exercises.find((e) => e.exerciseId === exercise.exerciseId);
-            return prevEx?.totalVolume || 0;
+            const prevEx = (w.exercises ?? []).find((e) => e.exerciseId === exercise.exerciseId);
+            return prevEx?.totalVolume ?? 0;
           })
           .filter((v) => v > 0),
         0
-      );
+      ) : 0;
 
-      if (exercise.totalVolume > previousMaxVolume && previousMaxVolume > 0) {
+      if ((exercise.totalVolume ?? 0) > previousMaxVolume && previousMaxVolume > 0) {
         records.push({
           type: 'volume',
           exerciseId: exercise.exerciseId,
           exerciseName: exercise.exerciseName,
-          value: exercise.totalVolume,
+          value: exercise.totalVolume ?? 0,
           unit: 'kg',
           previousValue: previousMaxVolume,
           workoutId: workout.id!,
@@ -490,14 +491,14 @@ export const workoutSummaryService = {
     });
 
     // Check for total workout volume PR
-    const previousMaxTotalVolume = Math.max(
-      ...previousWorkouts.map((w) => w.totalVolume),
+    const previousMaxTotalVolume = previousWorkouts.length > 0 ? Math.max(
+      ...previousWorkouts.map((w) => w.totalVolume ?? 0),
       0
-    );
-    if (workout.totalVolume > previousMaxTotalVolume && previousMaxTotalVolume > 0) {
+    ) : 0;
+    if ((workout.totalVolume ?? 0) > previousMaxTotalVolume && previousMaxTotalVolume > 0) {
       records.push({
         type: 'volume',
-        value: workout.totalVolume,
+        value: workout.totalVolume ?? 0,
         unit: 'kg',
         previousValue: previousMaxTotalVolume,
         workoutId: workout.id!,
@@ -518,26 +519,26 @@ export const workoutSummaryService = {
     exerciseComparisons?: ExerciseComparison[]
   ): WorkoutRating {
     // Volume factor (0-10)
-    const avgVolume = allWorkouts
-      ? allWorkouts.reduce((sum, w) => sum + w.totalVolume, 0) / allWorkouts.length
-      : workout.totalVolume;
-    const volumeScore = Math.min(10, (workout.totalVolume / (avgVolume * 1.5)) * 10);
+    const avgVolume = allWorkouts && allWorkouts.length > 0
+      ? allWorkouts.reduce((sum, w) => sum + (w.totalVolume ?? 0), 0) / allWorkouts.length
+      : workout.totalVolume ?? 0;
+    const volumeScore = avgVolume > 0 ? Math.min(10, ((workout.totalVolume ?? 0) / (avgVolume * 1.5)) * 10) : 0;
 
     // Intensity factor (0-10) based on RPE
     const avgRPE = rpeService.calculateAverageRPE([workout]);
     const intensityScore = (avgRPE / 10) * 10;
 
     // Consistency factor (0-10) - based on completing all sets
-    const totalSets = workout.exercises.reduce((sum, ex) => sum + ex.sets.length, 0);
-    const completedSets = workout.exercises.reduce(
-      (sum, ex) => sum + ex.sets.filter((s) => s.completed).length,
+    const totalSets = (workout.exercises ?? []).reduce((sum, ex) => sum + (ex.sets?.length ?? 0), 0);
+    const completedSets = (workout.exercises ?? []).reduce(
+      (sum, ex) => sum + (ex.sets ?? []).filter((s) => s.completed).length,
       0
     );
     const consistencyScore = totalSets > 0 ? (completedSets / totalSets) * 10 : 0;
 
     // Progression factor (0-10) - based on improvements vs previous
     let progressionScore = 5; // Default neutral
-    if (previous && exerciseComparisons) {
+    if (previous && exerciseComparisons && exerciseComparisons.length > 0) {
       const improvements = exerciseComparisons.filter(
         (comp) => comp.volumeChange && comp.volumeChange > 0
       ).length;
@@ -561,8 +562,8 @@ export const workoutSummaryService = {
     else tier = 'D-Tier';
 
     // Generate summary
-    const volumeChange = previous
-      ? ((workout.totalVolume - previous.totalVolume) / previous.totalVolume) * 100
+    const volumeChange = previous && previous.totalVolume && previous.totalVolume > 0
+      ? (((workout.totalVolume ?? 0) - previous.totalVolume) / previous.totalVolume) * 100
       : 0;
     const summary =
       volumeChange > 0
@@ -596,26 +597,28 @@ export const workoutSummaryService = {
     const insights: AIInsight[] = [];
 
     // Volume spike insight
-    if (previous && muscleDistribution) {
-      const volumeChange = ((workout.totalVolume - previous.totalVolume) / previous.totalVolume) * 100;
+    if (previous && previous.totalVolume && previous.totalVolume > 0 && muscleDistribution && muscleDistribution.length > 0) {
+      const volumeChange = (((workout.totalVolume ?? 0) - previous.totalVolume) / previous.totalVolume) * 100;
       if (volumeChange > 15) {
         const topMuscle = muscleDistribution[0];
-        insights.push({
-          type: 'volume',
-          title: 'Volume Spike Detected',
-          message: `Your ${topMuscle.muscle.toLowerCase()} volume spiked by ${Math.round(
-            topMuscle.changePercent || 0
-          )}% today. Consider adding an extra rest day before your next heavy session to maximize hypertrophy.`,
-          recommendation: 'Add 1-2 extra rest days before targeting this muscle group again.',
-          priority: 'high',
-        });
+        if (topMuscle && topMuscle.muscle) {
+          insights.push({
+            type: 'volume',
+            title: 'Volume Spike Detected',
+            message: `Your ${topMuscle.muscle.toLowerCase()} volume spiked by ${Math.round(
+              topMuscle.changePercent || 0
+            )}% today. Consider adding an extra rest day before your next heavy session to maximize hypertrophy.`,
+            recommendation: 'Add 1-2 extra rest days before targeting this muscle group again.',
+            priority: 'high',
+          });
+        }
       }
     }
 
     // Recovery insight
     if (muscleDistribution && muscleDistribution.length > 0) {
       const topMuscle = muscleDistribution[0];
-      if (topMuscle.changePercent && topMuscle.changePercent > 10) {
+      if (topMuscle && topMuscle.muscle && topMuscle.changePercent && topMuscle.changePercent > 10) {
         insights.push({
           type: 'recovery',
           title: 'Recovery Insight',
@@ -629,7 +632,7 @@ export const workoutSummaryService = {
     }
 
     // Progression insight
-    if (exerciseComparisons) {
+    if (exerciseComparisons && exerciseComparisons.length > 0) {
       const improvements = exerciseComparisons.filter(
         (comp) => comp.volumeChange && comp.volumeChange > 0
       );

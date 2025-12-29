@@ -77,16 +77,16 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
 
       const now = new Date();
       const exercises = templateService.convertTemplateToWorkoutExercises(template);
-      const totalVolume = exercises.reduce((sum, ex) => sum + ex.totalVolume, 0);
+      const totalVolume = exercises.reduce((sum, ex) => sum + (ex.totalVolume ?? 0), 0);
 
       const workout: Workout = {
         userId: template.userId,
         date: now,
         startTime: now,
         exercises,
-        totalDuration: template.estimatedDuration,
+        totalDuration: template.estimatedDuration ?? 0,
         totalVolume,
-        musclesTargeted: template.musclesTargeted,
+        musclesTargeted: template.musclesTargeted ?? [],
         workoutType: template.category,
       };
 
@@ -117,15 +117,15 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         const { exerciseLibrary } = await import('@/services/exerciseLibrary');
         
         const exercises: WorkoutExercise[] = await Promise.all(
-          plannedWorkout.exercises.map(async (ex, index) => {
+          (plannedWorkout.exercises ?? []).map(async (ex, index) => {
             // Try to get exercise details from library to get muscle groups
-            let musclesWorked = plannedWorkout.musclesTargeted;
+            let musclesWorked = plannedWorkout.musclesTargeted ?? [];
             try {
               const exerciseDetails = await exerciseLibrary.getExerciseById(ex.exerciseId);
               if (exerciseDetails) {
                 musclesWorked = [
-                  ...exerciseDetails.primaryMuscles,
-                  ...exerciseDetails.secondaryMuscles,
+                  ...(exerciseDetails.primaryMuscles ?? []),
+                  ...(exerciseDetails.secondaryMuscles ?? []),
                 ];
               }
             } catch (error) {
@@ -158,9 +158,9 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
           })
         );
 
-        const totalVolume = exercises.reduce((sum, ex) => sum + ex.totalVolume, 0);
+        const totalVolume = exercises.reduce((sum, ex) => sum + (ex.totalVolume ?? 0), 0);
         const allMuscles = Array.from(
-          new Set(exercises.flatMap((ex) => ex.musclesWorked))
+          new Set(exercises.flatMap((ex) => ex.musclesWorked ?? []))
         );
 
         const workout: Workout = {
@@ -168,10 +168,10 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
           date: now,
           startTime: now,
           exercises,
-          totalDuration: plannedWorkout.estimatedDuration,
+          totalDuration: plannedWorkout.estimatedDuration ?? 0,
           totalVolume,
           musclesTargeted: allMuscles,
-          workoutType: plannedWorkout.category,
+          workoutType: plannedWorkout.category ?? 'custom',
         };
 
         set({ currentWorkout: workout, error: null, templateId: null, plannedWorkoutId: plannedWorkoutId });
@@ -193,11 +193,11 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
 
     const updatedWorkout = {
       ...currentWorkout,
-      exercises: [...currentWorkout.exercises, exercise],
+      exercises: [...(currentWorkout.exercises ?? []), exercise],
       musclesTargeted: [
-        ...new Set([...currentWorkout.musclesTargeted, ...exercise.musclesWorked]),
+        ...new Set([...(currentWorkout.musclesTargeted ?? []), ...(exercise.musclesWorked ?? [])]),
       ],
-      totalVolume: currentWorkout.totalVolume + exercise.totalVolume,
+      totalVolume: (currentWorkout.totalVolume ?? 0) + (exercise.totalVolume ?? 0),
     };
 
     set({ currentWorkout: updatedWorkout });
@@ -206,16 +206,16 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
 
   updateExercise: (exerciseId: string, updates: Partial<WorkoutExercise>) => {
     const { currentWorkout } = get();
-    if (!currentWorkout) return;
+    if (!currentWorkout || !currentWorkout.exercises) return;
 
-    const exercises = currentWorkout.exercises.map((ex) =>
+    const exercises = (currentWorkout.exercises ?? []).map((ex) =>
       ex.id === exerciseId ? { ...ex, ...updates } : ex
     );
 
     const updatedWorkout = {
       ...currentWorkout,
       exercises,
-      totalVolume: exercises.reduce((sum, ex) => sum + ex.totalVolume, 0),
+      totalVolume: exercises.reduce((sum, ex) => sum + (ex.totalVolume ?? 0), 0),
     };
 
     set({ currentWorkout: updatedWorkout });
@@ -223,21 +223,21 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
 
   removeExercise: (exerciseId: string) => {
     const { currentWorkout } = get();
-    if (!currentWorkout) return;
+    if (!currentWorkout || !currentWorkout.exercises) return;
 
-    const exercises = currentWorkout.exercises.filter((ex) => ex.id !== exerciseId);
+    const exercises = (currentWorkout.exercises ?? []).filter((ex) => ex.id !== exerciseId);
 
     const updatedWorkout = {
       ...currentWorkout,
       exercises,
       musclesTargeted: exercises.reduce<typeof currentWorkout.musclesTargeted>(
         (acc, ex) => {
-          const muscles = new Set([...acc, ...ex.musclesWorked]);
+          const muscles = new Set([...acc, ...(ex.musclesWorked ?? [])]);
           return Array.from(muscles);
         },
         []
       ),
-      totalVolume: exercises.reduce((sum, ex) => sum + ex.totalVolume, 0),
+      totalVolume: exercises.reduce((sum, ex) => sum + (ex.totalVolume ?? 0), 0),
     };
 
     set({ currentWorkout: updatedWorkout });
@@ -246,11 +246,11 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
 
   addSet: (exerciseId: string, workoutSet: WorkoutSet) => {
     const { currentWorkout } = get();
-    if (!currentWorkout) return;
+    if (!currentWorkout || !currentWorkout.exercises) return;
 
-    const exercises = currentWorkout.exercises.map((ex) => {
+    const exercises = (currentWorkout.exercises ?? []).map((ex) => {
       if (ex.id === exerciseId) {
-        const newSets = [...ex.sets, workoutSet];
+        const newSets = [...(ex.sets ?? []), workoutSet];
         // Use centralized volume calculation utility
         // Infer tracking type from sets if not available
         const totalVolume = calculateVolume(newSets);
@@ -266,7 +266,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     const updatedWorkout = {
       ...currentWorkout,
       exercises,
-      totalVolume: exercises.reduce((sum, ex) => sum + ex.totalVolume, 0),
+      totalVolume: exercises.reduce((sum, ex) => sum + (ex.totalVolume ?? 0), 0),
     };
 
     set({ currentWorkout: updatedWorkout });
@@ -275,11 +275,11 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
 
   updateSet: (exerciseId: string, setNumber: number, updates: Partial<WorkoutSet>) => {
     const { currentWorkout } = get();
-    if (!currentWorkout) return;
+    if (!currentWorkout || !currentWorkout.exercises) return;
 
-    const exercises = currentWorkout.exercises.map((ex) => {
+    const exercises = (currentWorkout.exercises ?? []).map((ex) => {
       if (ex.id === exerciseId) {
-        const sets = ex.sets.map((s) =>
+        const sets = (ex.sets ?? []).map((s) =>
           s.setNumber === setNumber ? { ...s, ...updates } : s
         );
         // Use centralized volume calculation utility
@@ -297,7 +297,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     const updatedWorkout = {
       ...currentWorkout,
       exercises,
-      totalVolume: exercises.reduce((sum, ex) => sum + ex.totalVolume, 0),
+      totalVolume: exercises.reduce((sum, ex) => sum + (ex.totalVolume ?? 0), 0),
     };
 
     set({ currentWorkout: updatedWorkout });
@@ -473,7 +473,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         }
       }
 
-      const currentWorkouts = get().workouts;
+      const currentWorkouts = get().workouts ?? [];
       set({
         currentWorkout: null, // Clear current workout to prevent corrupted startTime
         workouts: [savedWorkout, ...currentWorkouts],
@@ -511,7 +511,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
 
     try {
       const workouts = await dataService.getAllWorkouts(userId);
-      set({ workouts, isLoading: false });
+      set({ workouts: workouts ?? [], isLoading: false });
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to load workouts',

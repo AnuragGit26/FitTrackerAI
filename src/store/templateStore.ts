@@ -36,7 +36,7 @@ export const useTemplateStore = create<TemplateState>((set) => ({
         set({ isLoading: true, error: null });
         try {
             const templates = await templateService.getAllTemplates(userId);
-            set({ templates, isLoading: false });
+            set({ templates: templates ?? [], isLoading: false });
         } catch (error) {
             set({
                 error: error instanceof Error ? error.message : 'Failed to load templates',
@@ -49,7 +49,7 @@ export const useTemplateStore = create<TemplateState>((set) => ({
         set({ isLoading: true, error: null });
         try {
             const featured = await templateService.getFeaturedTemplates(userId);
-            set({ featuredTemplates: featured, isLoading: false });
+            set({ featuredTemplates: featured ?? [], isLoading: false });
         } catch (error) {
             set({
                 error: error instanceof Error ? error.message : 'Failed to load featured templates',
@@ -62,7 +62,7 @@ export const useTemplateStore = create<TemplateState>((set) => ({
         set({ isLoading: true, error: null });
         try {
             const trending = await templateService.getTrendingTemplates(userId);
-            set({ trendingTemplates: trending, isLoading: false });
+            set({ trendingTemplates: trending ?? [], isLoading: false });
         } catch (error) {
             set({
                 error: error instanceof Error ? error.message : 'Failed to load trending templates',
@@ -75,7 +75,7 @@ export const useTemplateStore = create<TemplateState>((set) => ({
         set({ isLoading: true, error: null });
         try {
             const templates = await templateService.searchTemplates(userId, query);
-            set({ templates, isLoading: false });
+            set({ templates: templates ?? [], isLoading: false });
         } catch (error) {
             set({
                 error: error instanceof Error ? error.message : 'Failed to search templates',
@@ -88,7 +88,7 @@ export const useTemplateStore = create<TemplateState>((set) => ({
         set({ isLoading: true, error: null });
         try {
             const templates = await templateService.getTemplatesByCategory(userId, category);
-            set({ templates, isLoading: false });
+            set({ templates: templates ?? [], isLoading: false });
         } catch (error) {
             set({
                 error: error instanceof Error ? error.message : 'Failed to get templates by category',
@@ -104,7 +104,7 @@ export const useTemplateStore = create<TemplateState>((set) => ({
             const newTemplate = await templateService.getTemplate(id);
             if (newTemplate) {
                 set((state) => ({
-                    templates: [newTemplate, ...state.templates],
+                    templates: [newTemplate, ...(state.templates ?? [])],
                     isLoading: false,
                 }));
             }
@@ -125,9 +125,9 @@ export const useTemplateStore = create<TemplateState>((set) => ({
             const updatedTemplate = await templateService.getTemplate(id);
             if (updatedTemplate) {
                 set((state) => ({
-                    templates: state.templates.map((t) => (t.id === id ? updatedTemplate : t)),
-                    featuredTemplates: state.featuredTemplates.map((t) => (t.id === id ? updatedTemplate : t)),
-                    trendingTemplates: state.trendingTemplates.map((t) => (t.id === id ? updatedTemplate : t)),
+                    templates: (state.templates ?? []).map((t) => (t.id === id ? updatedTemplate : t)),
+                    featuredTemplates: (state.featuredTemplates ?? []).map((t) => (t.id === id ? updatedTemplate : t)),
+                    trendingTemplates: (state.trendingTemplates ?? []).map((t) => (t.id === id ? updatedTemplate : t)),
                     isLoading: false,
                 }));
             }
@@ -144,9 +144,9 @@ export const useTemplateStore = create<TemplateState>((set) => ({
         try {
             await templateService.deleteTemplate(id);
             set((state) => ({
-                templates: state.templates.filter((t) => t.id !== id),
-                featuredTemplates: state.featuredTemplates.filter((t) => t.id !== id),
-                trendingTemplates: state.trendingTemplates.filter((t) => t.id !== id),
+                templates: (state.templates ?? []).filter((t) => t.id !== id),
+                featuredTemplates: (state.featuredTemplates ?? []).filter((t) => t.id !== id),
+                trendingTemplates: (state.trendingTemplates ?? []).filter((t) => t.id !== id),
                 isLoading: false,
             }));
         } catch (error) {

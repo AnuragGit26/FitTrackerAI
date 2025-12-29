@@ -565,36 +565,36 @@ CRITICAL OUTPUT REQUIREMENTS:
         const cleaned = sanitizeAIResponse(parsed) as Record<string, unknown>;
         return {
           readinessScore,
-          readinessStatus: (cleaned.readinessStatus as 'optimal' | 'good' | 'moderate' | 'low') || 'good',
-          readinessMessage: cleanPlainTextResponse(String(cleaned.readinessMessage || 'System is operating normally.')),
+          readinessStatus: (cleaned.readinessStatus as 'optimal' | 'good' | 'moderate' | 'low') ?? 'good',
+          readinessMessage: cleanPlainTextResponse(String(cleaned.readinessMessage ?? 'System is operating normally.')),
           criticalAlerts: (Array.isArray(cleaned.criticalAlerts) ? cleaned.criticalAlerts : []).map((a: unknown, i: number) => {
             const alert = a as Record<string, unknown>;
             return {
               id: `alert-${i}`,
-              type: String(alert.type || '') as 'critical' | 'warning' | 'info',
-              title: cleanPlainTextResponse(String(alert.title || '')),
-              message: cleanPlainTextResponse(String(alert.message || '')),
-              muscleGroup: cleanPlainTextResponse(String(alert.muscleGroup || '')) as MuscleGroup,
+              type: String(alert.type ?? '') as 'critical' | 'warning' | 'info',
+              title: cleanPlainTextResponse(String(alert.title ?? '')),
+              message: cleanPlainTextResponse(String(alert.message ?? '')),
+              muscleGroup: cleanPlainTextResponse(String(alert.muscleGroup ?? '')) as MuscleGroup,
             };
           }),
           suggestions: (Array.isArray(cleaned.suggestions) ? cleaned.suggestions : []).map((s: unknown, i: number) => {
             const suggestion = s as Record<string, unknown>;
             return {
               id: `suggestion-${i}`,
-              type: String(suggestion.type || '') as 'deload' | 'sleep' | 'nutrition' | 'workout',
-              title: cleanPlainTextResponse(String(suggestion.title || '')),
-              description: cleanPlainTextResponse(String(suggestion.description || '')),
+              type: String(suggestion.type ?? '') as 'deload' | 'sleep' | 'nutrition' | 'workout',
+              title: cleanPlainTextResponse(String(suggestion.title ?? '')),
+              description: cleanPlainTextResponse(String(suggestion.description ?? '')),
             };
           }),
           nutritionEvents: (Array.isArray(cleaned.nutritionEvents) ? cleaned.nutritionEvents : []).map((e: unknown, i: number) => {
             const event = e as Record<string, unknown>;
             return {
               id: `nutrition-${i}`,
-              time: String(event.time || ''),
-              relativeTime: cleanPlainTextResponse(String(event.relativeTime || '')),
-              title: cleanPlainTextResponse(String(event.title || '')),
-              description: cleanPlainTextResponse(String(event.description || '')),
-              type: String(event.type || '') as 'protein' | 'carb' | 'meal' | 'supplement',
+              time: String(event.time ?? ''),
+              relativeTime: cleanPlainTextResponse(String(event.relativeTime ?? '')),
+              title: cleanPlainTextResponse(String(event.title ?? '')),
+              description: cleanPlainTextResponse(String(event.description ?? '')),
+              type: String(event.type ?? '') as 'protein' | 'carb' | 'meal' | 'supplement',
             };
           }),
         };

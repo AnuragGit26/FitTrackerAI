@@ -57,11 +57,15 @@ export function WorkoutSummary() {
     try {
       // Update workout with recovery data
       const workout = summaryData.workout;
+      const mood: 'great' | 'good' | 'okay' | 'tired' | 'exhausted' = 
+        recoveryData.mood === 'drained' ? 'exhausted' : 
+        recoveryData.mood === 'okay' ? 'okay' : 
+        'great';
       const updatedWorkout = {
         ...workout,
-        mood: recoveryData.mood === 'drained' ? 'exhausted' : recoveryData.mood === 'okay' ? 'okay' : 'great',
+        mood,
         // Store predicted soreness in notes or extend workout type
-        notes: workout.notes
+        notes: workout?.notes
           ? `${workout.notes}\nPredicted Soreness: ${recoveryData.predictedSoreness}%`
           : `Predicted Soreness: ${recoveryData.predictedSoreness}%`,
       };
@@ -156,8 +160,8 @@ export function WorkoutSummary() {
             Workout Summary
           </h2>
           <p className="text-slate-500 dark:text-gray-400 text-xs font-normal">
-            {formatWorkoutDate(summaryData.workout.date)}
-            {summaryData.workout.totalDuration > 0 && ` • ${formatDuration(summaryData.workout.totalDuration)}`}
+            {summaryData?.workout?.date ? formatWorkoutDate(summaryData.workout.date) : ''}
+            {(summaryData?.workout?.totalDuration ?? 0) > 0 && ` • ${formatDuration(summaryData.workout.totalDuration)}`}
           </p>
         </div>
         <div className="flex w-12 items-center justify-end cursor-pointer">
@@ -175,46 +179,58 @@ export function WorkoutSummary() {
         {/* Title Section */}
         <div className="px-4 pt-4">
           <EditableWorkoutName
-            name={summaryData.workout.workoutType || 'Workout'}
+            name={summaryData?.workout?.workoutType ?? 'Workout'}
             onSave={handleSaveWorkoutName}
             placeholder="Workout"
           />
         </div>
 
         {/* Session Analysis */}
-        <SessionAnalysisCard comparison={summaryData.sessionComparison} />
+        {summaryData?.sessionComparison && (
+          <SessionAnalysisCard comparison={summaryData.sessionComparison} />
+        )}
 
         {/* Muscle Distribution */}
-        <MuscleDistributionChart
-          distribution={summaryData.muscleDistribution}
-          focusArea={summaryData.focusArea}
-        />
+        {summaryData?.muscleDistribution && (
+          <MuscleDistributionChart
+            distribution={summaryData.muscleDistribution}
+            focusArea={summaryData.focusArea}
+          />
+        )}
 
         {/* AI Insight */}
-        <AIInsightCard insights={summaryData.aiInsights} />
+        {summaryData?.aiInsights && (
+          <AIInsightCard insights={summaryData.aiInsights} />
+        )}
 
         {/* Exercise Breakdown */}
-        <ExerciseBreakdown comparisons={summaryData.exerciseComparisons} />
+        {summaryData?.exerciseComparisons && (
+          <ExerciseBreakdown comparisons={summaryData.exerciseComparisons} />
+        )}
 
         {/* Session Trends */}
-        {summaryData.exerciseTrends.length > 0 && (
+        {(summaryData?.exerciseTrends?.length ?? 0) > 0 && (
           <SessionTrends trends={summaryData.exerciseTrends} />
         )}
 
         {/* Personal Records */}
-        {summaryData.personalRecords.length > 0 && (
+        {(summaryData?.personalRecords?.length ?? 0) > 0 && (
           <PersonalRecordsCard records={summaryData.personalRecords} />
         )}
 
         {/* Workout Rating */}
-        <WorkoutRating rating={summaryData.workoutRating} />
+        {summaryData?.workoutRating && (
+          <WorkoutRating rating={summaryData.workoutRating} />
+        )}
 
         {/* Recovery Log */}
-        <RecoveryLog
-          workoutId={summaryData.workout.id!}
-          initialData={summaryData.recoveryLog}
-          onSave={handleSaveRecovery}
-        />
+        {summaryData?.workout?.id && (
+          <RecoveryLog
+            workoutId={summaryData.workout.id}
+            initialData={summaryData.recoveryLog}
+            onSave={handleSaveRecovery}
+          />
+        )}
       </main>
     </div>
   );
