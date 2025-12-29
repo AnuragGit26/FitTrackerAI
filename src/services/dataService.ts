@@ -10,6 +10,8 @@ import { errorRecovery } from './errorRecovery';
 import { sanitizeString } from '@/utils/sanitize';
 import { Transaction } from 'dexie';
 import { validateReps, validateWeight, validateDuration, validateCalories, validateRPE } from '@/utils/validators';
+import { calculateVolume } from '@/utils/calculations';
+import { exerciseLibrary } from '@/services/exerciseLibrary';
 
 // UserProfile type - matches userStore definition
 type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
@@ -481,11 +483,17 @@ class DataService {
     
     userContextManager.validateUserId(current.userId);
     
-    // Increment version
-    const versionedUpdates = versionManager.incrementVersion({
+    // Merge updates with current workout
+    const mergedWorkout = {
       ...current,
       ...updates,
-    } as Workout);
+    } as Workout;
+    
+    // Recalculate metrics if exercises, sets, or times changed
+    const recalculatedWorkout = this.recalculateWorkoutMetrics(mergedWorkout);
+    
+    // Increment version
+    const versionedUpdates = versionManager.incrementVersion(recalculatedWorkout);
     
     return await errorRecovery.withRetry(async () => {
       await transactionManager.execute(['workouts'], async () => {
@@ -493,6 +501,70 @@ class DataService {
         this.emit('workout');
       });
     });
+  }
+
+  /**
+   * Recalculate workout metrics (volume, duration, muscles targeted)
+   */
+  private recalculateWorkoutMetrics(workout: Workout): Workout {
+    // Recalculate exercise volumes and total volume
+    let totalVolume = 0;
+    const allMuscles = new Set<string>();
+    
+    const finalExercises = workout.exercises.map((exercise) => {
+      // Infer tracking type from sets if not available
+      let trackingType: string | undefined;
+      const firstSet = exercise.sets[0];
+      if (firstSet) {
+        if (firstSet.weight !== undefined || (firstSet.reps !== undefined && firstSet.weight !== undefined)) {
+          trackingType = 'weight_reps';
+        } else if (firstSet.distance !== undefined) {
+          trackingType = 'cardio';
+        } else if (firstSet.duration !== undefined) {
+          trackingType = 'duration';
+        } else if (firstSet.reps !== undefined) {
+          trackingType = 'reps_only';
+        }
+      }
+      
+      // Recalculate exercise volume
+      const exerciseVolume = calculateVolume(exercise.sets, trackingType as any);
+      
+      // Collect muscles from exercise
+      exercise.musclesWorked?.forEach(muscle => allMuscles.add(muscle));
+      
+      return {
+        ...exercise,
+        totalVolume: exerciseVolume,
+      };
+    });
+    
+    // Calculate total volume
+    totalVolume = finalExercises.reduce((sum, ex) => sum + (ex.totalVolume ?? 0), 0);
+    
+    // Recalculate duration if start/end times are present
+    let totalDuration = workout.totalDuration;
+    if (workout.startTime && workout.endTime) {
+      const startTime = new Date(workout.startTime);
+      const endTime = new Date(workout.endTime);
+      const durationMs = endTime.getTime() - startTime.getTime();
+      totalDuration = Math.max(0, Math.round(durationMs / 60000)); // Convert to minutes
+      // Cap at 24 hours (1440 minutes)
+      if (totalDuration > 1440) {
+        totalDuration = 1440;
+      }
+    } else if (workout.startTime && !workout.endTime && workout.totalDuration > 0) {
+      // If only startTime is present, keep existing duration
+      totalDuration = workout.totalDuration;
+    }
+    
+    return {
+      ...workout,
+      exercises: finalExercises,
+      totalVolume,
+      totalDuration,
+      musclesTargeted: Array.from(allMuscles) as any[],
+    };
   }
 
   async deleteWorkout(id: number): Promise<void> {

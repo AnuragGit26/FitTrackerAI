@@ -165,6 +165,27 @@ class MuscleRecoveryService {
   }
 
   /**
+   * Recalculate muscle statuses after a workout is edited
+   * This is called when a workout is updated to ensure muscle recovery is accurate
+   */
+  async recalculateMuscleStatusesAfterWorkoutUpdate(workoutId: number, userId: string): Promise<void> {
+    try {
+      // Get the updated workout
+      const workout = await dataService.getWorkout(workoutId);
+      if (!workout) {
+        console.warn(`Workout ${workoutId} not found for muscle recovery recalculation`);
+        return;
+      }
+
+      // Recalculate all muscle statuses (this will include the updated workout)
+      await this.recalculateAllMuscleStatuses(userId);
+    } catch (error) {
+      console.error('Failed to recalculate muscle statuses after workout update:', error);
+      // Don't throw - this is a background operation
+    }
+  }
+
+  /**
    * Initialize muscle statuses from workout history
    */
   async initializeMuscleStatusesFromHistory(workouts: Workout[], _userId: string): Promise<void> {

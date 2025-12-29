@@ -41,6 +41,7 @@ const Planner = lazy(() => import('@/pages/Planner').then(m => ({ default: m.Pla
 const SleepRecovery = lazy(() => import('@/pages/SleepRecovery').then(m => ({ default: m.SleepRecovery })));
 const WorkoutSummary = lazy(() => import('@/pages/WorkoutSummary').then(m => ({ default: m.WorkoutSummary })));
 const WorkoutHistory = lazy(() => import('@/pages/WorkoutHistory').then(m => ({ default: m.WorkoutHistory })));
+const EditWorkout = lazy(() => import('@/pages/EditWorkout').then(m => ({ default: m.EditWorkout })));
 const Login = lazy(() => import('@/pages/Login').then(m => ({ default: m.Login })));
 const SignUp = lazy(() => import('@/pages/SignUp').then(m => ({ default: m.SignUp })));
 
@@ -578,6 +579,20 @@ function AppRoutes() {
                     <ErrorBoundary>
                       <Suspense fallback={<RouteLoader />}>
                         <WorkoutHistory />
+                      </Suspense>
+                    </ErrorBoundary>
+                  </AnimatedPage>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/edit-workout/:workoutId"
+              element={
+                <ProtectedRoute>
+                  <AnimatedPage>
+                    <ErrorBoundary>
+                      <Suspense fallback={<RouteLoader />}>
+                        <EditWorkout />
                       </Suspense>
                     </ErrorBoundary>
                   </AnimatedPage>

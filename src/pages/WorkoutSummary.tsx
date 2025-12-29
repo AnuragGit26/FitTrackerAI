@@ -164,7 +164,16 @@ export function WorkoutSummary() {
             {(summaryData?.workout?.totalDuration ?? 0) > 0 && ` • ${formatDuration(summaryData.workout.totalDuration)}`}
           </p>
         </div>
-        <div className="flex w-12 items-center justify-end cursor-pointer">
+        <div className="flex items-center gap-3 justify-end">
+          {summaryData?.workout?.id && (
+            <button
+              onClick={() => navigate(`/edit-workout/${summaryData.workout.id}`)}
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-black/20 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors"
+              title="Edit workout"
+            >
+              <span className="material-symbols-outlined">edit</span>
+            </button>
+          )}
           <button
             onClick={handleDone}
             className="text-primary text-base font-bold leading-normal tracking-wide shrink-0"

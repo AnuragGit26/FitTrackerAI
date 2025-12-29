@@ -186,9 +186,23 @@ export function WorkoutHistory() {
                       {formatWorkoutDate(workout.date)} • {formatWorkoutTime(workout.date)}
                     </p>
                   </div>
-                  <span className="material-symbols-outlined text-gray-400 dark:text-gray-500">
-                    chevron_right
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {workout.id && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/edit-workout/${workout.id}`);
+                        }}
+                        className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-black/20 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors"
+                        title="Edit workout"
+                      >
+                        <span className="material-symbols-outlined text-lg">edit</span>
+                      </button>
+                    )}
+                    <span className="material-symbols-outlined text-gray-400 dark:text-gray-500">
+                      chevron_right
+                    </span>
+                  </div>
                 </div>
                 <div className="grid grid-cols-3 gap-3 mt-3">
                   <div className="flex flex-col gap-1">
