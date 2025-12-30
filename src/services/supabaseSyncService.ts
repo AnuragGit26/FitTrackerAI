@@ -241,6 +241,38 @@ class SupabaseSyncService {
                     });
                 }
             }
+
+            // Check if there are any sync errors and sync them to Supabase
+            const hasErrors = results.some(result => result.errors && result.errors.length > 0);
+            if (hasErrors) {
+                // Log a summary error with the message 'Some sync errors occurred'
+                try {
+                    await errorLogService.logError({
+                        userId: validatedUserId,
+                        errorType: 'sync_error',
+                        errorMessage: 'Some sync errors occurred',
+                        operation: 'sync',
+                        severity: 'error',
+                        context: {
+                            totalErrors: results.reduce((sum, r) => sum + (r.errors?.length || 0), 0),
+                            tablesWithErrors: results
+                                .filter(r => r.errors && r.errors.length > 0)
+                                .map(r => ({
+                                    table: r.tableName,
+                                    errorCount: r.errors.length,
+                                    direction: r.direction,
+                                })),
+                        },
+                    });
+                } catch (logError) {
+                    console.error('Failed to log sync summary error:', logError);
+                }
+
+                // Sync all error logs to Supabase (non-blocking)
+                errorLogService.syncToSupabase(validatedUserId).catch((syncError) => {
+                    console.error('Failed to sync error logs to Supabase:', syncError);
+                });
+            }
         } finally {
             this.isSyncing = false;
             this.currentProgress = null;
