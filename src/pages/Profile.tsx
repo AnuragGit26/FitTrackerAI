@@ -17,6 +17,10 @@ import { supabaseSyncService } from '@/services/supabaseSyncService';
 import { syncMetadataService } from '@/services/syncMetadataService';
 import { SyncStatus, SyncProgress } from '@/types/sync';
 import { logger } from '@/utils/logger';
+import { ImportStrategyModal } from '@/components/profile/ImportStrategyModal';
+import { ExportProgressModal } from '@/components/profile/ExportProgressModal';
+import { ImportProgressModal } from '@/components/profile/ImportProgressModal';
+import { ImportStrategy, ImportResult, ProgressCallback } from '@/types/export';
 
 export function Profile() {
   const navigate = useNavigate();
@@ -57,6 +61,27 @@ export function Profile() {
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { success, error: showError } = useToast();
+  
+  // Export/Import progress state
+  const [exportProgress, setExportProgress] = useState<{
+    percentage: number;
+    currentOperation: string;
+    completedItems: number;
+    totalItems: number;
+  } | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [importProgress, setImportProgress] = useState<{
+    percentage: number;
+    currentOperation: string;
+    completedItems: number;
+    totalItems: number;
+  } | null>(null);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [showImportStrategyModal, setShowImportStrategyModal] = useState(false);
+  const [importPreview, setImportPreview] = useState<import('@/types/export').ImportPreview | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   
   // Sync state
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
@@ -996,19 +1021,41 @@ export function Profile() {
               onClick={async () => {
                 if (!profile?.id) return;
                 setIsExporting(true);
+                setShowExportModal(true);
+                setExportProgress({
+                  percentage: 0,
+                  currentOperation: 'Preparing export...',
+                  completedItems: 0,
+                  totalItems: 8,
+                });
+                
+                const progressCallback: ProgressCallback = (progress) => {
+                  setExportProgress(progress);
+                };
+                
                 try {
-                  await dataExport.downloadExport(profile.id);
+                  setExportError(null);
+                  await dataExport.downloadExport(profile.id, undefined, progressCallback);
                   success('Data exported successfully');
                 } catch (error) {
-                  showError(error instanceof Error ? error.message : 'Failed to export data');
+                  const errorMessage = error instanceof Error ? error.message : 'Failed to export data';
+                  setExportError(errorMessage);
+                  showError(errorMessage);
+                  logger.error('Export failed', error);
                 } finally {
                   setIsExporting(false);
+                  // Keep modal open for a moment to show completion or error
+                  if (!exportError) {
+                    setTimeout(() => {
+                      setExportProgress(null);
+                    }, 2000);
+                  }
                 }
               }}
               disabled={isExporting || !profile?.id}
               className={cn(
                 'w-full flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border',
-                'hover:bg-gray-50 dark:hover:bg-surface-dark-light transition-colors',
+                'hover:bg-gray-50 dark:hover:bg-surface-dark-light transition-colors touch-manipulation active:scale-[0.98] min-h-[44px]',
                 'disabled:opacity-50 disabled:cursor-not-allowed'
               )}
             >
@@ -1027,7 +1074,7 @@ export function Profile() {
               disabled={isImporting || !profile?.id}
               className={cn(
                 'w-full flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border',
-                'hover:bg-gray-50 dark:hover:bg-surface-dark-light transition-colors',
+                'hover:bg-gray-50 dark:hover:bg-surface-dark-light transition-colors touch-manipulation active:scale-[0.98] min-h-[44px]',
                 'disabled:opacity-50 disabled:cursor-not-allowed'
               )}
             >
@@ -1044,24 +1091,38 @@ export function Profile() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".json"
+              accept=".json,application/json"
               className="hidden"
               onChange={async (e) => {
                 const file = e.target.files?.[0];
-                if (!file || !profile?.id) return;
-                
-                setIsImporting(true);
-                try {
-                  const result = await dataExport.importFromFile(profile.id, file);
-                  if (result.errors.length > 0) {
-                    showError(`Imported ${result.imported} items with ${result.errors.length} errors`);
-                  } else {
-                    success(`Successfully imported ${result.imported} items`);
+                if (!file || !profile?.id) {
+                  if (fileInputRef.current) {
+                    fileInputRef.current.value = '';
                   }
+                  return;
+                }
+                
+                // Validate file size (max 50MB for safety)
+                const maxSize = 50 * 1024 * 1024; // 50MB
+                if (file.size > maxSize) {
+                  showError('File is too large. Maximum size is 50MB.');
+                  if (fileInputRef.current) {
+                    fileInputRef.current.value = '';
+                  }
+                  return;
+                }
+                
+                try {
+                  // Validate and preview file
+                  await dataExport.validateExportFile(file);
+                  const preview = await dataExport.previewImport(file);
+                  setImportPreview(preview);
+                  setSelectedFile(file);
+                  setShowImportStrategyModal(true);
                 } catch (error) {
-                  showError(error instanceof Error ? error.message : 'Failed to import data');
-                } finally {
-                  setIsImporting(false);
+                  const errorMessage = error instanceof Error ? error.message : 'Failed to validate import file';
+                  showError(errorMessage);
+                  logger.error('Import file validation failed', error);
                   if (fileInputRef.current) {
                     fileInputRef.current.value = '';
                   }
@@ -1071,11 +1132,98 @@ export function Profile() {
             <div className="flex items-start gap-2 p-3 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
               <AlertCircle className="w-4 h-4 text-yellow-600 dark:text-yellow-400 mt-0.5 shrink-0" />
               <p className="text-xs text-yellow-800 dark:text-yellow-300">
-                Export your data to keep a backup. Import will add data to your existing records.
+                Export all your data including workouts, templates, exercises, sleep logs, and more. 
+                Import supports merge (add new) or replace (clear all) strategies.
               </p>
             </div>
           </div>
         </section>
+
+        {/* Export Progress Modal */}
+        <ExportProgressModal
+          isOpen={showExportModal}
+          progress={exportProgress}
+          error={exportError}
+          onClose={() => {
+            setShowExportModal(false);
+            setExportProgress(null);
+            setExportError(null);
+          }}
+        />
+
+        {/* Import Strategy Modal */}
+        {showImportStrategyModal && importPreview && selectedFile && (
+          <ImportStrategyModal
+            preview={importPreview}
+            onSelect={async (strategy: ImportStrategy) => {
+              setShowImportStrategyModal(false);
+              if (!profile?.id || !selectedFile) return;
+              
+              setIsImporting(true);
+              setShowImportModal(true);
+              setImportProgress({
+                percentage: 0,
+                currentOperation: 'Starting import...',
+                completedItems: 0,
+                totalItems: 9,
+              });
+              
+              const progressCallback: ProgressCallback = (progress) => {
+                setImportProgress(progress);
+              };
+              
+              try {
+                const result = await dataExport.importFromFile(
+                  profile.id,
+                  selectedFile,
+                  strategy,
+                  progressCallback
+                );
+                setImportResult(result);
+                
+                if (result.errors.length > 0) {
+                  showError(
+                    `Imported ${result.imported} items with ${result.errors.length} error(s)`
+                  );
+                } else {
+                  success(`Successfully imported ${result.imported} items`);
+                }
+                
+                // Refresh data
+                window.location.reload();
+              } catch (error) {
+                showError(error instanceof Error ? error.message : 'Failed to import data');
+                setShowImportModal(false);
+              } finally {
+                setIsImporting(false);
+                setSelectedFile(null);
+                if (fileInputRef.current) {
+                  fileInputRef.current.value = '';
+                }
+              }
+            }}
+            onCancel={() => {
+              setShowImportStrategyModal(false);
+              setImportPreview(null);
+              setSelectedFile(null);
+              if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+              }
+            }}
+          />
+        )}
+
+        {/* Import Progress Modal */}
+        <ImportProgressModal
+          isOpen={showImportModal}
+          progress={importProgress}
+          result={importResult}
+          onClose={() => {
+            setShowImportModal(false);
+            setImportProgress(null);
+            setImportResult(null);
+          }}
+        />
 
         {/* Notification Settings */}
         <section className="space-y-4">
