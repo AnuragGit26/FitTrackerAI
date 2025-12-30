@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useMemo } from 'react';
 import { cn } from '@/utils/cn';
 
 type View = 'progress' | 'alerts' | 'recommendations';
@@ -10,11 +10,11 @@ interface InsightsTabNavigationProps {
 }
 
 export function InsightsTabNavigation({ currentView, onViewChange }: InsightsTabNavigationProps) {
-  const tabs: Array<{ id: View; label: string }> = [
+  const tabs: Array<{ id: View; label: string }> = useMemo(() => [
     { id: 'progress', label: 'Progress' },
     { id: 'alerts', label: 'Alerts' },
     { id: 'recommendations', label: 'Recommendations' },
-  ];
+  ], []);
 
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -50,7 +50,7 @@ export function InsightsTabNavigation({ currentView, onViewChange }: InsightsTab
       window.removeEventListener('resize', handleResize);
       clearTimeout(timer);
     };
-  }, [currentView]);
+  }, [currentView, tabs]);
 
   return (
     <div className="sticky top-[63px] z-40 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md border-b border-gray-200 dark:border-[#316847]">

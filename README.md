@@ -47,15 +47,10 @@ npm install
 VITE_AUTH0_DOMAIN=your-tenant.auth0.com
 VITE_AUTH0_CLIENT_ID=your_auth0_client_id_here
 
-# Supabase Configuration (Required)
-# Use VITE_ prefix (recommended) or REACT_APP_ prefix (for backward compatibility)
-VITE_SUPABASE_URL=https://your-project.supabase.co
-# OR: REACT_APP_SUPABASE_URL=https://your-project.supabase.co
-
-# Supabase Anonymous Key (choose one):
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key_here
-# OR: VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY=your_supabase_anon_key_here
-# OR: REACT_APP_SUPABASE_PUBLISHABLE_DEFAULT_KEY=your_supabase_anon_key_here
+# MongoDB Configuration (Required)
+# MongoDB Atlas connection string
+# Note: Vite requires the VITE_ prefix for client-side environment variables
+VITE_MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/database?retryWrites=true&w=majority
 
 # Google Gemini AI API Key (Optional - for AI insights)
 VITE_GEMINI_API_KEY=your_gemini_api_key_here
@@ -63,7 +58,7 @@ VITE_GEMINI_API_KEY=your_gemini_api_key_here
 
 **Getting your API keys:**
 - **Auth0**: Get your domain and client ID from [Auth0 Dashboard](https://manage.auth0.com/)
-- **Supabase**: Get your URL and anon key from [Supabase Dashboard](https://supabase.com/dashboard/project/_/settings/api)
+- **MongoDB**: Get your connection string from [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) - Create a cluster and get the connection string from the "Connect" button
 - **Gemini AI**: Get your API key from [Google AI Studio](https://makersuite.google.com/app/apikey) (optional)
 
 4. Start the development server:

@@ -3,7 +3,10 @@ import { MuscleStatus } from '@/types/muscle';
 import type { Notification, NotificationCreateInput, NotificationFilters, NotificationType } from '@/types/notification';
 import { dbHelpers } from './database';
 import { getSupabaseClientWithAuth } from './supabaseClient';
+import { connectToMongoDB } from './mongodbClient';
+import { userScopedFilter } from './mongodbQueryBuilder';
 import { requireUserId } from '@/utils/userIdValidation';
+import { Notification as NotificationModel } from './mongodb/schemas';
 
 interface ScheduledNotification {
   id: string;
@@ -312,9 +315,9 @@ class NotificationService {
     // Save to IndexedDB
     await dbHelpers.saveNotification(notification);
 
-    // Try to sync to Supabase (non-blocking)
-    this.syncToSupabase(notification).catch(error => {
-      console.error('[NotificationService] Failed to sync notification to Supabase:', error);
+    // Try to sync to MongoDB (non-blocking)
+    this.syncToMongoDB(notification).catch(error => {
+      console.error('[NotificationService] Failed to sync notification to MongoDB:', error);
     });
 
     return notification;
@@ -353,11 +356,11 @@ class NotificationService {
   async markAsRead(id: string): Promise<void> {
     await dbHelpers.markNotificationAsRead(id);
 
-    // Get the notification to sync to Supabase
+    // Get the notification to sync to MongoDB
     const notification = await dbHelpers.getNotification(id);
     if (notification) {
-      this.syncToSupabase(notification).catch(error => {
-        console.error('[NotificationService] Failed to sync notification update to Supabase:', error);
+      this.syncToMongoDB(notification).catch(error => {
+        console.error('[NotificationService] Failed to sync notification update to MongoDB:', error);
       });
     }
   }
@@ -368,11 +371,11 @@ class NotificationService {
   async markAllAsRead(userId: string): Promise<number> {
     const count = await dbHelpers.markAllNotificationsAsRead(userId);
 
-    // Sync all updated notifications to Supabase
+    // Sync all updated notifications to MongoDB
     const notifications = await dbHelpers.getAllNotifications(userId, { isRead: false });
     await Promise.all(
-      notifications.map(n => this.syncToSupabase(n).catch(error => {
-        console.error('[NotificationService] Failed to sync notification update to Supabase:', error);
+      notifications.map(n => this.syncToMongoDB(n).catch(error => {
+        console.error('[NotificationService] Failed to sync notification update to MongoDB:', error);
       }))
     );
 
@@ -385,11 +388,11 @@ class NotificationService {
   async deleteNotification(id: string): Promise<void> {
     await dbHelpers.deleteNotification(id);
 
-    // Get the notification to sync to Supabase
+    // Get the notification to sync to MongoDB
     const notification = await dbHelpers.getNotification(id);
     if (notification) {
-      this.syncToSupabase(notification).catch(error => {
-        console.error('[NotificationService] Failed to sync notification delete to Supabase:', error);
+      this.syncToMongoDB(notification).catch(error => {
+        console.error('[NotificationService] Failed to sync notification delete to MongoDB:', error);
       });
     }
   }
@@ -402,78 +405,75 @@ class NotificationService {
   }
 
   /**
-   * Sync notification to Supabase (internal helper)
+   * Sync notification to MongoDB (internal helper)
    */
-  private async syncToSupabase(notification: Notification): Promise<void> {
+  private async syncToMongoDB(notification: Notification): Promise<void> {
     try {
-      // Validate userId
       const userId = requireUserId(notification.userId, {
-        functionName: 'syncToSupabase',
+        functionName: 'syncToMongoDB',
         additionalInfo: { notificationId: notification.id },
       });
 
-      const supabase = await getSupabaseClientWithAuth(userId);
+      await connectToMongoDB();
 
-      const supabaseNotification = {
+      const mongoNotification = {
         id: notification.id,
-        user_id: userId,
+        userId: userId,
         type: notification.type,
         title: notification.title,
         message: notification.message,
         data: notification.data || {},
-        is_read: notification.isRead,
-        read_at: notification.readAt ? new Date(notification.readAt).toISOString() : null,
+        isRead: notification.isRead,
+        readAt: notification.readAt ? new Date(notification.readAt) : null,
         version: notification.version || 1,
-        deleted_at: notification.deletedAt ? new Date(notification.deletedAt).toISOString() : null,
-        created_at: new Date(notification.createdAt).toISOString(),
+        deletedAt: notification.deletedAt ? new Date(notification.deletedAt) : null,
+        createdAt: new Date(notification.createdAt),
       };
 
-      // Upsert to Supabase using user-scoped query
-      const { error } = await supabase
-        .from('notifications')
-        .upsert(supabaseNotification, {
-          onConflict: 'id',
-        });
-
-      if (error) {
-        throw error;
-      }
+      await NotificationModel.findOneAndUpdate(
+        { id: notification.id, userId: userId },
+        mongoNotification,
+        { upsert: true, new: true }
+      );
     } catch (error) {
-      // Log error but don't throw - sync failures shouldn't break the app
-      console.error('[NotificationService] Failed to sync notification to Supabase:', error);
+      console.error('[NotificationService] Failed to sync notification to MongoDB:', error);
     }
   }
 
   /**
-   * Pull notifications from Supabase and merge with local
+   * Sync notification to Supabase (deprecated - use syncToMongoDB)
+   */
+  private async syncToSupabase(notification: Notification): Promise<void> {
+    return this.syncToMongoDB(notification);
+  }
+
+  /**
+   * Pull notifications from MongoDB and merge with local
    * Only pulls notifications that don't exist locally or have newer versions
    */
-  async pullFromSupabase(userId: string): Promise<number> {
+  async pullFromMongoDB(userId: string): Promise<number> {
     try {
-      // Validate userId
       const validatedUserId = requireUserId(userId, {
-        functionName: 'pullFromSupabase',
+        functionName: 'pullFromMongoDB',
         additionalInfo: { operation: 'pull_notifications' },
       });
 
-      const supabase = await getSupabaseClientWithAuth(validatedUserId);
+      await connectToMongoDB();
 
-      // Get all notifications from Supabase using user-scoped query
+      // Get all notifications from MongoDB using user-scoped query
       // Only get unread notifications or notifications from last 7 days
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', validatedUserId)
-        .is('deleted_at', null)
-        .gte('created_at', sevenDaysAgo.toISOString())
-        .order('created_at', { ascending: false });
+      const filter = {
+        ...userScopedFilter(validatedUserId, 'notifications'),
+        deletedAt: null,
+        createdAt: { $gte: sevenDaysAgo },
+      };
 
-      if (error) {
-        throw error;
-      }
+      const data = await NotificationModel.find(filter)
+        .sort({ createdAt: -1 })
+        .lean();
 
       if (!data || data.length === 0) {
         return 0;
@@ -481,9 +481,8 @@ class NotificationService {
 
       // Get existing notifications from IndexedDB to check for duplicates
       const existingNotifications = await dbHelpers.getAllNotifications(validatedUserId);
-      const existingIds = new Set(existingNotifications.map(n => n.id));
 
-      // Convert Supabase format to local format and save only new/updated notifications
+      // Convert MongoDB format to local format and save only new/updated notifications
       const notificationsToSave: Notification[] = [];
       
       for (const n of data) {
@@ -495,16 +494,16 @@ class NotificationService {
         if (!existing || remoteVersion > localVersion) {
           notificationsToSave.push({
             id: n.id,
-            userId: n.user_id,
+            userId: n.userId,
             type: n.type as NotificationType,
             title: n.title,
             message: n.message,
             data: n.data || {},
-            isRead: n.is_read,
-            readAt: n.read_at ? new Date(n.read_at).getTime() : null,
-            createdAt: new Date(n.created_at).getTime(),
+            isRead: n.isRead,
+            readAt: n.readAt ? new Date(n.readAt).getTime() : null,
+            createdAt: new Date(n.createdAt).getTime(),
             version: remoteVersion,
-            deletedAt: n.deleted_at ? new Date(n.deleted_at).getTime() : null,
+            deletedAt: n.deletedAt ? new Date(n.deletedAt).getTime() : null,
           });
         }
       }
@@ -518,13 +517,20 @@ class NotificationService {
 
       return notificationsToSave.length;
     } catch (error) {
-      console.error('[NotificationService] Failed to pull notifications from Supabase:', error);
+      console.error('[NotificationService] Failed to pull notifications from MongoDB:', error);
       throw error;
     }
   }
 
   /**
-   * Start periodic notification pulling from Supabase
+   * Pull notifications from Supabase (deprecated - use pullFromMongoDB)
+   */
+  async pullFromSupabase(userId: string): Promise<number> {
+    return this.pullFromMongoDB(userId);
+  }
+
+  /**
+   * Start periodic notification pulling from MongoDB
    * Checks for new notifications every hour
    */
   startPeriodicPull(userId: string, intervalMinutes: number = 60): () => void {
@@ -532,7 +538,7 @@ class NotificationService {
 
     const pullNotifications = async () => {
       try {
-        await this.pullFromSupabase(userId);
+        await this.pullFromMongoDB(userId);
       } catch (error) {
         console.error('[NotificationService] Periodic pull failed:', error);
       }
@@ -555,4 +561,5 @@ class NotificationService {
 }
 
 export const notificationService = new NotificationService();
+
 

@@ -136,12 +136,12 @@ class DataService {
     this.syncQueue.clear();
 
     try {
-      const { supabaseSyncService } = await import('./supabaseSyncService');
+      const { mongodbSyncService } = await import('./mongodbSyncService');
       const { useUserStore } = await import('@/store/userStore');
       const userStore = useUserStore.getState();
       
       if (userStore.profile?.id) {
-        await supabaseSyncService.sync(userStore.profile.id, {
+        await mongodbSyncService.sync(userStore.profile.id, {
           tables: tables as SyncableTable[],
           direction: 'push',
         });
@@ -161,8 +161,8 @@ class DataService {
 
   async triggerManualSync(userId: string, tables?: SyncableTable[]): Promise<void> {
     try {
-      const { supabaseSyncService } = await import('./supabaseSyncService');
-      await supabaseSyncService.sync(userId, {
+      const { mongodbSyncService } = await import('./mongodbSyncService');
+      await mongodbSyncService.sync(userId, {
         tables,
         direction: 'bidirectional',
       });

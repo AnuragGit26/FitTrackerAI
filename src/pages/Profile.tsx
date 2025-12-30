@@ -13,7 +13,7 @@ import { dataExport } from '@/services/dataExport';
 import { useToast } from '@/hooks/useToast';
 import { cn } from '@/utils/cn';
 import { dataService } from '@/services/dataService';
-import { supabaseSyncService } from '@/services/supabaseSyncService';
+import { mongodbSyncService } from '@/services/mongodbSyncService';
 import { syncMetadataService } from '@/services/syncMetadataService';
 import { SyncStatus, SyncProgress } from '@/types/sync';
 import { logger } from '@/utils/logger';
@@ -107,12 +107,12 @@ export function Profile() {
     });
     
     // Set up sync progress callback
-    supabaseSyncService.setProgressCallback((progress) => {
+    mongodbSyncService.setProgressCallback((progress) => {
       setSyncProgress(progress);
     });
     
     return () => {
-      supabaseSyncService.setProgressCallback(null);
+      mongodbSyncService.setProgressCallback(null);
     };
   }, [loadSettings, setNotificationPermission]);
   
@@ -128,14 +128,14 @@ export function Profile() {
     if (!profile?.id) return;
     
     try {
-      const currentlySyncing = supabaseSyncService.getIsSyncing();
+      const currentlySyncing = mongodbSyncService.getIsSyncing();
       setIsSyncing(currentlySyncing);
       
       if (currentlySyncing) {
         setSyncStatus('syncing');
-        setSyncProgress(supabaseSyncService.getCurrentProgress());
+        setSyncProgress(mongodbSyncService.getCurrentProgress());
       } else {
-        const status = await supabaseSyncService.getSyncStatus(profile.id);
+        const status = await mongodbSyncService.getSyncStatus(profile.id);
         setSyncStatus(status);
       }
       
@@ -168,9 +168,9 @@ export function Profile() {
     if (!isSyncing) return;
     
     const intervalId = setInterval(() => {
-      const currentlySyncing = supabaseSyncService.getIsSyncing();
+      const currentlySyncing = mongodbSyncService.getIsSyncing();
       setIsSyncing(currentlySyncing);
-      setSyncProgress(supabaseSyncService.getCurrentProgress());
+      setSyncProgress(mongodbSyncService.getCurrentProgress());
       
       if (!currentlySyncing) {
         loadSyncStatus();
@@ -200,7 +200,7 @@ export function Profile() {
     setSyncStatus('syncing');
     
     try {
-      const results = await supabaseSyncService.sync(profile.id, {
+      const results = await mongodbSyncService.sync(profile.id, {
         direction: 'bidirectional',
       });
       

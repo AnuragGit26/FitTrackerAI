@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Bell,
@@ -10,7 +10,6 @@ import {
     Trophy,
     AlertCircle,
     Clock,
-    Sparkles,
 } from 'lucide-react';
 import { notificationService } from '@/services/notificationService';
 import type { Notification, NotificationType } from '@/types/notification';
@@ -69,7 +68,6 @@ function groupNotificationsByDate(notifications: Notification[]): {
     thisWeek: Notification[];
     older: Notification[];
 } {
-    const now = Date.now();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const yesterday = new Date(today);
@@ -106,13 +104,36 @@ export function NotificationPanel({ isOpen, onClose, userId }: NotificationPanel
     const [isLoading, setIsLoading] = useState(true);
     const [isMarkingAll, setIsMarkingAll] = useState(false);
     const panelRef = useRef<HTMLDivElement>(null);
-    const shouldReduceMotion = prefersReducedMotion();
+
+    const loadNotifications = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            // Pull new notifications from MongoDB first
+            try {
+                await notificationService.pullFromMongoDB(userId);
+            } catch (error) {
+                console.warn('Failed to pull notifications from MongoDB:', error);
+                // Continue loading local notifications even if pull fails
+            }
+
+            const [allNotifications, unread] = await Promise.all([
+                notificationService.getNotifications({ userId, limit: 50 }),
+                notificationService.getUnreadCount(userId),
+            ]);
+            setNotifications(allNotifications);
+            setUnreadCount(unread);
+        } catch (error) {
+            console.error('Failed to load notifications:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [userId]);
 
     useEffect(() => {
         if (isOpen && userId) {
             loadNotifications();
         }
-    }, [isOpen, userId]);
+    }, [isOpen, userId, loadNotifications]);
 
     // Periodically refresh notifications when panel is open (every 5 minutes)
     useEffect(() => {
@@ -123,7 +144,7 @@ export function NotificationPanel({ isOpen, onClose, userId }: NotificationPanel
         }, 5 * 60 * 1000); // 5 minutes
 
         return () => clearInterval(intervalId);
-    }, [isOpen, userId]);
+    }, [isOpen, userId, loadNotifications]);
 
     // Close panel when clicking outside
     useEffect(() => {
@@ -140,30 +161,6 @@ export function NotificationPanel({ isOpen, onClose, userId }: NotificationPanel
             };
         }
     }, [isOpen, onClose]);
-
-    const loadNotifications = async () => {
-        setIsLoading(true);
-        try {
-            // Pull new notifications from Supabase first
-            try {
-                await notificationService.pullFromSupabase(userId);
-            } catch (error) {
-                console.warn('Failed to pull notifications from Supabase:', error);
-                // Continue loading local notifications even if pull fails
-            }
-
-            const [allNotifications, unread] = await Promise.all([
-                notificationService.getNotifications({ userId, limit: 50 }),
-                notificationService.getUnreadCount(userId),
-            ]);
-            setNotifications(allNotifications);
-            setUnreadCount(unread);
-        } catch (error) {
-            console.error('Failed to load notifications:', error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
 
     const handleMarkAsRead = async (id: string) => {
         await notificationService.markAsRead(id);

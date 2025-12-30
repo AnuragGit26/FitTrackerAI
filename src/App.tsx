@@ -117,11 +117,11 @@ function App() {
         // Initialize data synchronization
         dataSync.initialize();
         
-        // Pull notifications from Supabase on app initialization
+        // Pull notifications from MongoDB on app initialization
         const user = getUserStore.getState().profile;
         if (user?.id) {
           try {
-            await notificationService.pullFromSupabase(user.id);
+            await notificationService.pullFromMongoDB(user.id);
             
             // Start periodic notification pulling (every hour)
             notificationService.startPeriodicPull(user.id, 60);

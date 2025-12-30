@@ -1,226 +1,147 @@
-/**
- * Supabase Query Builder Helpers
- * 
- * Centralized helpers that enforce user_id in all Supabase queries and storage operations.
- * These helpers ensure proper user-based data isolation and security.
- */
-
 import { SupabaseClient } from '@supabase/supabase-js';
-import { requireUserId, validateUserId } from '@/utils/userIdValidation';
-import type { PostgrestQueryBuilder } from '@supabase/postgrest-js';
 
 /**
- * Creates a user-scoped query builder that automatically includes user_id filter
+ * Creates a user-scoped storage helper that automatically prepends user_id to paths
+ * This ensures files are organized by user: {user_id}/{filename}
  * 
- * @param client - The Supabase client instance
- * @param tableName - The table name to query
- * @param userId - REQUIRED: The user ID to scope the query to
- * @returns A PostgrestQueryBuilder with user_id filter pre-applied
- * @throws {UserIdValidationError} If userId is missing or invalid
- */
-export function userScopedQuery<T = Record<string, unknown>>(
-  client: SupabaseClient,
-  tableName: string,
-  userId: string
-): PostgrestQueryBuilder<T> {
-  const validatedUserId = requireUserId(userId, {
-    functionName: 'userScopedQuery',
-    additionalInfo: { tableName },
-  });
-
-  // For exercises table: fetch both library exercises (user_id IS NULL) and user's custom exercises
-  if (tableName === 'exercises') {
-    return client
-      .from(tableName)
-      .or(`user_id.is.null,user_id.eq.${validatedUserId}`) as PostgrestQueryBuilder<T>;
-  }
-
-  // For all other tables, filter by user_id
-  return client
-    .from(tableName)
-    .eq('user_id', validatedUserId) as PostgrestQueryBuilder<T>;
-}
-
-/**
- * Creates a user-scoped storage client that ensures user_id is in storage paths
- * 
- * @param client - The Supabase client instance
- * @param bucketName - The storage bucket name
- * @param userId - REQUIRED: The user ID to scope storage operations to
- * @returns An object with storage methods that automatically prefix paths with user_id
- * @throws {UserIdValidationError} If userId is missing or invalid
+ * @param supabase - The Supabase client instance
+ * @param bucketName - The storage bucket name (e.g., 'profile-photos')
+ * @param userId - The user ID to scope storage operations to
+ * @returns A storage helper with user-scoped methods
  */
 export function userScopedStorage(
-  client: SupabaseClient,
+  supabase: SupabaseClient,
   bucketName: string,
   userId: string
 ) {
-  const validatedUserId = requireUserId(userId, {
-    functionName: 'userScopedStorage',
-    additionalInfo: { bucketName },
-  });
-
-  const storage = client.storage.from(bucketName);
-
   /**
-   * Upload a file with user_id prefix in path
+   * Prepends user_id to a file path
    */
-  const upload = async (
-    path: string,
-    file: File | Blob | ArrayBuffer | FileList,
-    options?: {
-      cacheControl?: string;
-      contentType?: string;
-      upsert?: boolean;
-      duplex?: string;
+  function getUserScopedPath(filePath: string): string {
+    // Remove leading slash if present
+    const cleanPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
+    
+    // If path already starts with userId, return as-is
+    if (cleanPath.startsWith(`${userId}/`)) {
+      return cleanPath;
     }
-  ) => {
-    // Ensure path starts with user_id/
-    const userScopedPath = path.startsWith(`${validatedUserId}/`)
-      ? path
-      : `${validatedUserId}/${path}`;
     
-    return storage.upload(userScopedPath, file, options);
-  };
-
-  /**
-   * Remove files with user_id prefix in path
-   */
-  const remove = async (paths: string[]) => {
-    // Ensure all paths start with user_id/
-    const userScopedPaths = paths.map(path =>
-      path.startsWith(`${validatedUserId}/`)
-        ? path
-        : `${validatedUserId}/${path}`
-    );
-    
-    return storage.remove(userScopedPaths);
-  };
-
-  /**
-   * Get public URL for a file with user_id prefix
-   */
-  const getPublicUrl = (path: string) => {
-    const userScopedPath = path.startsWith(`${validatedUserId}/`)
-      ? path
-      : `${validatedUserId}/${path}`;
-    
-    return storage.getPublicUrl(userScopedPath);
-  };
-
-  /**
-   * List files in user's directory
-   */
-  const list = (path?: string, options?: { limit?: number; offset?: number; sortBy?: { column?: string; order?: 'asc' | 'desc' } }) => {
-    const userScopedPath = path
-      ? path.startsWith(`${validatedUserId}/`)
-        ? path
-        : `${validatedUserId}/${path}`
-      : `${validatedUserId}/`;
-    
-    return storage.list(userScopedPath, options);
-  };
-
-  /**
-   * Download a file with user_id prefix
-   */
-  const download = (path: string) => {
-    const userScopedPath = path.startsWith(`${validatedUserId}/`)
-      ? path
-      : `${validatedUserId}/${path}`;
-    
-    return storage.download(userScopedPath);
-  };
+    // Otherwise, prepend userId
+    return `${userId}/${cleanPath}`;
+  }
 
   return {
-    upload,
-    remove,
-    getPublicUrl,
-    list,
-    download,
-    // Expose the underlying storage client for advanced operations
-    _storage: storage,
+    /**
+     * Upload a file to user-scoped storage
+     */
+    async upload(
+      filePath: string,
+      file: File | Blob,
+      options?: {
+        cacheControl?: string;
+        contentType?: string;
+        upsert?: boolean;
+      }
+    ) {
+      const scopedPath = getUserScopedPath(filePath);
+      return supabase.storage.from(bucketName).upload(scopedPath, file, {
+        cacheControl: options?.cacheControl,
+        contentType: options?.contentType,
+        upsert: options?.upsert,
+      });
+    },
+
+    /**
+     * Remove files from user-scoped storage
+     */
+    async remove(paths: string[]) {
+      const scopedPaths = paths.map(getUserScopedPath);
+      return supabase.storage.from(bucketName).remove(scopedPaths);
+    },
+
+    /**
+     * Get public URL for a user-scoped file
+     */
+    getPublicUrl(filePath: string) {
+      const scopedPath = getUserScopedPath(filePath);
+      return supabase.storage.from(bucketName).getPublicUrl(scopedPath);
+    },
+
+    /**
+     * List files in user-scoped storage
+     */
+    async list(path?: string, options?: { limit?: number; offset?: number; sortBy?: { column?: string; order?: 'asc' | 'desc' } }) {
+      const scopedPath = path ? getUserScopedPath(path) : userId;
+      return supabase.storage.from(bucketName).list(scopedPath, options);
+    },
+
+    /**
+     * Download a file from user-scoped storage
+     */
+    async download(filePath: string) {
+      const scopedPath = getUserScopedPath(filePath);
+      return supabase.storage.from(bucketName).download(scopedPath);
+    },
   };
 }
 
 /**
- * Builds a user-scoped query with proper filtering for special tables
- * Handles composite keys and special cases (muscle_statuses, settings, sleep_logs, recovery_logs, user_profiles)
+ * Creates a user-scoped query builder for Supabase tables
+ * Automatically filters queries by user_id
  * 
- * @param client - The Supabase client instance
- * @param tableName - The table name to query
- * @param userId - REQUIRED: The user ID to scope the query to
- * @param additionalFilters - Optional additional filter conditions
- * @returns A PostgrestQueryBuilder with user_id filter pre-applied
+ * @param supabase - The Supabase client instance
+ * @param tableName - The table name
+ * @param userId - The user ID to scope queries to
+ * @returns A query builder with user-scoped methods
  */
-export function buildUserScopedQuery<T = Record<string, unknown>>(
-  client: SupabaseClient,
+export function userScopedQuery<T = any>(
+  supabase: SupabaseClient,
   tableName: string,
-  userId: string,
-  additionalFilters?: {
-    id?: string | number;
-    muscle?: string;
-    key?: string;
-    date?: string | Date;
-  }
-): PostgrestQueryBuilder<T> {
-  const validatedUserId = requireUserId(userId, {
-    functionName: 'buildUserScopedQuery',
-    additionalInfo: { tableName, additionalFilters },
-  });
+  userId: string
+) {
+  return {
+    /**
+     * Select records scoped to the user
+     * Returns a chainable PostgrestQueryBuilder
+     */
+    select(columns = '*') {
+      return supabase
+        .from(tableName)
+        .select(columns)
+        .eq('user_id', userId);
+    },
 
-  let query = client.from(tableName);
+    /**
+     * Insert a record with automatic user_id assignment
+     */
+    insert(data: Partial<T> | Partial<T>[]) {
+      const records = Array.isArray(data) ? data : [data];
+      const recordsWithUserId = records.map(record => ({
+        ...record,
+        user_id: userId,
+      }));
+      return supabase.from(tableName).insert(recordsWithUserId);
+    },
 
-  // Handle special tables with composite keys
-  if (tableName === 'user_profiles') {
-    // user_profiles uses user_id as primary key
-    query = query.eq('user_id', validatedUserId) as PostgrestQueryBuilder<T>;
-  } else if (tableName === 'muscle_statuses' && additionalFilters?.muscle) {
-    // muscle_statuses uses (user_id, muscle) as composite key
-    query = query
-      .eq('user_id', validatedUserId)
-      .eq('muscle', additionalFilters.muscle) as PostgrestQueryBuilder<T>;
-  } else if (tableName === 'settings' && additionalFilters?.key) {
-    // settings uses (user_id, key) as composite key
-    query = query
-      .eq('user_id', validatedUserId)
-      .eq('key', additionalFilters.key) as PostgrestQueryBuilder<T>;
-  } else if (tableName === 'sleep_logs' && additionalFilters?.date) {
-    // sleep_logs uses (user_id, date) as composite key
-    const dateStr = additionalFilters.date instanceof Date
-      ? additionalFilters.date.toISOString().split('T')[0]
-      : typeof additionalFilters.date === 'string'
-      ? additionalFilters.date.split('T')[0]
-      : String(additionalFilters.date);
-    query = query
-      .eq('user_id', validatedUserId)
-      .eq('date', dateStr) as PostgrestQueryBuilder<T>;
-  } else if (tableName === 'recovery_logs' && additionalFilters?.date) {
-    // recovery_logs uses (user_id, date) as composite key
-    const dateStr = additionalFilters.date instanceof Date
-      ? additionalFilters.date.toISOString().split('T')[0]
-      : typeof additionalFilters.date === 'string'
-      ? additionalFilters.date.split('T')[0]
-      : String(additionalFilters.date);
-    query = query
-      .eq('user_id', validatedUserId)
-      .eq('date', dateStr) as PostgrestQueryBuilder<T>;
-  } else if (tableName === 'exercises') {
-    // exercises: library exercises (user_id IS NULL) or user's custom exercises
-    if (additionalFilters?.id) {
-      // Check if it's a custom exercise by checking if user_id matches
-      query = query.or(`user_id.is.null,user_id.eq.${validatedUserId}`).eq('id', additionalFilters.id) as PostgrestQueryBuilder<T>;
-    } else {
-      query = query.or(`user_id.is.null,user_id.eq.${validatedUserId}`) as PostgrestQueryBuilder<T>;
-    }
-  } else {
-    // Standard tables: filter by user_id and optionally by id
-    query = query.eq('user_id', validatedUserId) as PostgrestQueryBuilder<T>;
-    if (additionalFilters?.id) {
-      query = query.eq('id', additionalFilters.id) as PostgrestQueryBuilder<T>;
-    }
-  }
+    /**
+     * Update records scoped to the user
+     */
+    update(data: Partial<T>) {
+      return supabase
+        .from(tableName)
+        .update(data)
+        .eq('user_id', userId);
+    },
 
-  return query as PostgrestQueryBuilder<T>;
+    /**
+     * Delete records scoped to the user
+     */
+    delete() {
+      return supabase
+        .from(tableName)
+        .delete()
+        .eq('user_id', userId);
+    },
+  };
 }
 

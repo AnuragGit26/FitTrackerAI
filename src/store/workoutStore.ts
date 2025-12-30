@@ -471,8 +471,8 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
       // If sync fails, it will be retried later via the sync service
       (async () => {
         try {
-          const { supabaseSyncService } = await import('@/services/supabaseSyncService');
-          await supabaseSyncService.sync(currentUserId, {
+          const { mongodbSyncService } = await import('@/services/mongodbSyncService');
+          await mongodbSyncService.sync(currentUserId, {
             tables: ['workouts'],
             direction: 'push',
           });

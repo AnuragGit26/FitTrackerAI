@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Bell, BellRing } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUserStore } from '@/store/userStore';
@@ -17,6 +17,16 @@ export function HomeHeader() {
 
   const shouldReduceMotion = prefersReducedMotion();
 
+  const loadUnreadCount = useCallback(async () => {
+    if (!profile?.id) return;
+    try {
+      const count = await notificationService.getUnreadCount(profile.id);
+      setUnreadCount(count);
+    } catch (error) {
+      console.error('Failed to load unread count:', error);
+    }
+  }, [profile?.id]);
+
   // Load unread count
   useEffect(() => {
     if (profile?.id) {
@@ -25,17 +35,7 @@ export function HomeHeader() {
       const interval = setInterval(loadUnreadCount, 30000);
       return () => clearInterval(interval);
     }
-  }, [profile?.id]);
-
-  const loadUnreadCount = async () => {
-    if (!profile?.id) return;
-    try {
-      const count = await notificationService.getUnreadCount(profile.id);
-      setUnreadCount(count);
-    } catch (error) {
-      console.error('Failed to load unread count:', error);
-    }
-  };
+  }, [profile?.id, loadUnreadCount]);
 
   const handleNotificationClick = () => {
     setIsNotificationPanelOpen(!isNotificationPanelOpen);

@@ -1,6 +1,6 @@
-import { SupabaseClient } from '@supabase/supabase-js';
-import { getSupabaseClientWithAuth } from './supabaseClient';
-import { userScopedQuery } from './supabaseQueryBuilder';
+import mongoose from 'mongoose';
+import { connectToMongoDB } from './mongodbClient';
+import { userScopedFilter } from './mongodbQueryBuilder';
 import { requireUserId } from '@/utils/userIdValidation';
 import { syncMetadataService } from './syncMetadataService';
 import { dbHelpers } from './database';
@@ -21,24 +21,67 @@ import { MuscleStatus } from '@/types/muscle';
 import type { Notification } from '@/types/notification';
 import type { SleepLog, RecoveryLog } from '@/types/sleep';
 import type { ErrorLog } from '@/types/error';
-// UserProfile type is defined in userStore but not exported, using inline type
-type UserProfile = {
-  id: string;
-  name: string;
-  [key: string]: unknown;
-};
 import { versionManager } from './versionManager';
 import { errorRecovery } from './errorRecovery';
 import { userContextManager } from './userContextManager';
 import { db } from './database';
 import { sleepRecoveryService } from './sleepRecoveryService';
 import { errorLogService } from './errorLogService';
+import {
+    Workout as WorkoutModel,
+    Exercise as ExerciseModel,
+    WorkoutTemplate as WorkoutTemplateModel,
+    PlannedWorkout as PlannedWorkoutModel,
+    MuscleStatus as MuscleStatusModel,
+    UserProfile as UserProfileModel,
+    Setting as SettingModel,
+    Notification as NotificationModel,
+    SleepLog as SleepLogModel,
+    RecoveryLog as RecoveryLogModel,
+    ErrorLog as ErrorLogModel,
+} from './mongodb/schemas';
+
+type UserProfile = {
+    id: string;
+    name: string;
+    [key: string]: unknown;
+};
 
 const BATCH_SIZE = 100;
 
 type ProgressCallback = (progress: SyncProgress) => void;
 
-class SupabaseSyncService {
+// Map table names to Mongoose models
+const getModel = (tableName: SyncableTable) => {
+    switch (tableName) {
+        case 'workouts':
+            return WorkoutModel;
+        case 'exercises':
+            return ExerciseModel;
+        case 'workout_templates':
+            return WorkoutTemplateModel;
+        case 'planned_workouts':
+            return PlannedWorkoutModel;
+        case 'muscle_statuses':
+            return MuscleStatusModel;
+        case 'user_profiles':
+            return UserProfileModel;
+        case 'settings':
+            return SettingModel;
+        case 'notifications':
+            return NotificationModel;
+        case 'sleep_logs':
+            return SleepLogModel;
+        case 'recovery_logs':
+            return RecoveryLogModel;
+        case 'error_logs':
+            return ErrorLogModel;
+        default:
+            throw new Error(`Unknown table name: ${tableName}`);
+    }
+};
+
+class MongoDBSyncService {
     private isSyncing = false;
     private syncQueue: Promise<SyncResult[]> = Promise.resolve([]);
     private currentProgress: SyncProgress | null = null;
@@ -69,8 +112,6 @@ class SupabaseSyncService {
         userId: string,
         options: SyncOptions = {}
     ): Promise<SyncResult[]> {
-        // Queue sync operations to prevent race conditions
-        // Each sync waits for the previous one to complete
         this.syncQueue = this.syncQueue.then(() => this.performSync(userId, options));
         return this.syncQueue;
     }
@@ -79,7 +120,6 @@ class SupabaseSyncService {
         userId: string,
         options: SyncOptions = {}
     ): Promise<SyncResult[]> {
-        // Validate userId at the start
         const validatedUserId = requireUserId(userId, {
             functionName: 'performSync',
             additionalInfo: { direction: options.direction || 'bidirectional' },
@@ -116,11 +156,9 @@ class SupabaseSyncService {
         };
 
         try {
-            const client = await getSupabaseClientWithAuth(validatedUserId);
+            await connectToMongoDB();
             userContextManager.setUserId(validatedUserId);
 
-            // Sync tables in parallel for independent tables
-            // Notifications are pull-only (edge function creates, client pulls)
             const independentTables = tables.filter(t => 
                 !['user_profiles', 'settings', 'notifications'].includes(t)
             );
@@ -131,13 +169,11 @@ class SupabaseSyncService {
                 t === 'notifications'
             );
 
-            // Sync independent tables in parallel
             const independentResults = await Promise.all(
-                independentTables.map(table => this.syncTable(client, userId, table, direction, options))
+                independentTables.map(table => this.syncTable(validatedUserId, table, direction, options))
             );
             results.push(...independentResults);
 
-            // Sync dependent tables sequentially
             for (const table of dependentTables) {
                 this.updateProgress({
                     currentTable: table,
@@ -145,7 +181,7 @@ class SupabaseSyncService {
                 });
 
                 try {
-                    const result = await this.syncTable(client, userId, table, direction, options);
+                    const result = await this.syncTable(validatedUserId, table, direction, options);
                     results.push(result);
                     this.updateProgress({
                         completedTables: results.length,
@@ -175,7 +211,6 @@ class SupabaseSyncService {
                     };
                     results.push(errorResult);
                     
-                    // Log error to Supabase (non-blocking)
                     errorLogService.logSyncError(
                         userId,
                         table,
@@ -189,7 +224,6 @@ class SupabaseSyncService {
                 }
             }
 
-            // Sync pull-only tables (notifications - edge function creates, client only pulls)
             for (const table of pullOnlyTables) {
                 this.updateProgress({
                     currentTable: table,
@@ -197,8 +231,7 @@ class SupabaseSyncService {
                 });
 
                 try {
-                    // Force pull-only direction for notifications
-                    const result = await this.syncTable(client, userId, table, 'pull', options);
+                    const result = await this.syncTable(validatedUserId, table, 'pull', options);
                     results.push(result);
                     this.updateProgress({
                         completedTables: results.length,
@@ -228,7 +261,6 @@ class SupabaseSyncService {
                     };
                     results.push(errorResult);
                     
-                    // Log error to Supabase (non-blocking)
                     errorLogService.logSyncError(
                         userId,
                         table,
@@ -242,10 +274,8 @@ class SupabaseSyncService {
                 }
             }
 
-            // Check if there are any sync errors and sync them to Supabase
             const hasErrors = results.some(result => result.errors && result.errors.length > 0);
             if (hasErrors) {
-                // Log a summary error with the message 'Some sync errors occurred'
                 try {
                     await errorLogService.logError({
                         userId: validatedUserId,
@@ -268,9 +298,8 @@ class SupabaseSyncService {
                     console.error('Failed to log sync summary error:', logError);
                 }
 
-                // Sync all error logs to Supabase (non-blocking)
-                errorLogService.syncToSupabase(validatedUserId).catch((syncError) => {
-                    console.error('Failed to sync error logs to Supabase:', syncError);
+                errorLogService.syncToMongoDB(validatedUserId).catch((syncError) => {
+                    console.error('Failed to sync error logs to MongoDB:', syncError);
                 });
             }
         } finally {
@@ -282,12 +311,10 @@ class SupabaseSyncService {
     }
 
     private async syncBidirectional(
-        client: SupabaseClient,
         userId: string,
         tableName: SyncableTable,
         options: SyncOptions
     ): Promise<SyncResult> {
-        // Validate userId
         const validatedUserId = requireUserId(userId, {
             functionName: 'syncBidirectional',
             additionalInfo: { tableName },
@@ -297,8 +324,8 @@ class SupabaseSyncService {
         await syncMetadataService.updateSyncStatus(tableName, validatedUserId, 'syncing');
 
         try {
-            const pullResult = await this.syncPull(client, validatedUserId, tableName, options);
-            const pushResult = await this.syncPush(client, validatedUserId, tableName, options);
+            const pullResult = await this.syncPull(validatedUserId, tableName, options);
+            const pushResult = await this.syncPush(validatedUserId, tableName, options);
 
             const result: SyncResult = {
                 tableName,
@@ -319,7 +346,6 @@ class SupabaseSyncService {
                 result.status === 'error' ? 'error' : 'success'
             );
             
-            // Only update last sync time if sync was successful
             if (result.status === 'success') {
                 await syncMetadataService.updateLastSyncTime(tableName, validatedUserId, 'both');
             }
@@ -337,12 +363,10 @@ class SupabaseSyncService {
     }
 
     private async syncPull(
-        client: SupabaseClient,
         userId: string,
         tableName: SyncableTable,
         options: SyncOptions
     ): Promise<SyncResult> {
-        // Validate userId
         const validatedUserId = requireUserId(userId, {
             functionName: 'syncPull',
             additionalInfo: { tableName },
@@ -367,7 +391,6 @@ class SupabaseSyncService {
             const lastPullAt = metadata?.lastPullAt || (options.forceFullSync ? null : undefined);
 
             const remoteRecords = await this.fetchRemoteRecords(
-                client,
                 validatedUserId,
                 tableName,
                 lastPullAt ? new Date(lastPullAt) : undefined
@@ -409,7 +432,6 @@ class SupabaseSyncService {
                         operation: 'read',
                     });
                     
-                    // Log error to Supabase (non-blocking)
                     errorLogService.logSyncError(
                         userId,
                         tableName,
@@ -424,7 +446,6 @@ class SupabaseSyncService {
 
             result.duration = Date.now() - startTime;
             
-            // Only update last sync time if sync was successful
             if (result.status === 'success') {
                 await syncMetadataService.updateLastSyncTime(tableName, validatedUserId, 'pull');
             }
@@ -442,7 +463,6 @@ class SupabaseSyncService {
             });
             result.duration = Date.now() - startTime;
             
-            // Log error to Supabase (non-blocking)
             errorLogService.logSyncError(
                 userId,
                 tableName,
@@ -458,12 +478,10 @@ class SupabaseSyncService {
     }
 
     private async syncPush(
-        client: SupabaseClient,
         userId: string,
         tableName: SyncableTable,
         options: SyncOptions
     ): Promise<SyncResult> {
-        // Validate userId
         const validatedUserId = requireUserId(userId, {
             functionName: 'syncPush',
             additionalInfo: { tableName },
@@ -484,22 +502,15 @@ class SupabaseSyncService {
         };
 
         try {
-            // Fetch ALL local records from IndexedDB
             const allLocalRecords = await this.fetchLocalRecords(userId, tableName);
+            const allRemoteRecords = await this.fetchRemoteRecords(validatedUserId, tableName);
             
-            // Fetch ALL remote records from Supabase for comparison
-            const allRemoteRecords = await this.fetchRemoteRecords(client, userId, tableName);
-            
-            // Create a map of remote records by ID for quick lookup
             const remoteMap = new Map<string | number, Record<string, unknown>>();
             for (const remoteRecord of allRemoteRecords) {
                 const recordId = this.getRecordId(remoteRecord as Record<string, unknown>, tableName);
                 remoteMap.set(recordId, remoteRecord as Record<string, unknown>);
             }
             
-            // Find records that need to be pushed:
-            // 1. Records that exist locally but not remotely (need to create)
-            // 2. Records that exist in both but local is newer (need to update)
             const recordsToPush: unknown[] = [];
             
             for (const localRecord of allLocalRecords) {
@@ -507,14 +518,11 @@ class SupabaseSyncService {
                 const remoteRecord = remoteMap.get(recordId);
                 
                 if (!remoteRecord) {
-                    // Record doesn't exist remotely, needs to be created
                     recordsToPush.push(localRecord);
                 } else {
-                    // Record exists in both, check if local is newer
                     const localUpdatedAt = this.getUpdatedAt(localRecord as Record<string, unknown>);
                     const remoteUpdatedAt = this.getUpdatedAt(remoteRecord);
                     
-                    // Also check version if available
                     const localVersion = (localRecord as Record<string, unknown>).version as number | undefined;
                     const remoteVersion = remoteRecord.version as number | undefined;
                     
@@ -538,7 +546,7 @@ class SupabaseSyncService {
 
             for (const batch of batches) {
                 try {
-                    const batchResult = await this.pushBatch(client, validatedUserId, tableName, batch);
+                    const batchResult = await this.pushBatch(validatedUserId, tableName, batch);
                     result.recordsProcessed += batchResult.recordsProcessed;
                     result.recordsCreated += batchResult.recordsCreated;
                     result.recordsUpdated += batchResult.recordsUpdated;
@@ -558,7 +566,6 @@ class SupabaseSyncService {
                         operation: 'create',
                     });
                     
-                    // Log error to Supabase (non-blocking)
                     errorLogService.logSyncError(
                         userId,
                         tableName,
@@ -574,7 +581,6 @@ class SupabaseSyncService {
 
             result.duration = Date.now() - startTime;
             
-            // Only update last sync time if sync was successful
             if (result.status === 'success') {
                 await syncMetadataService.updateLastSyncTime(tableName, validatedUserId, 'push');
             }
@@ -592,7 +598,6 @@ class SupabaseSyncService {
             });
             result.duration = Date.now() - startTime;
             
-            // Log error to Supabase (non-blocking)
             errorLogService.logSyncError(
                 userId,
                 tableName,
@@ -608,48 +613,31 @@ class SupabaseSyncService {
     }
 
     private async fetchRemoteRecords(
-        client: SupabaseClient,
         userId: string,
         tableName: SyncableTable,
         since?: Date
     ): Promise<unknown[]> {
-        // Validate userId
         const validatedUserId = requireUserId(userId, {
             functionName: 'fetchRemoteRecords',
             additionalInfo: { tableName },
         });
 
         // eslint-disable-next-line no-console
-        console.debug(`[SupabaseSyncService.fetchRemoteRecords] Fetching ${tableName} for userId: ${validatedUserId}`, since ? `since ${since.toISOString()}` : '');
+        console.debug(`[MongoDBSyncService.fetchRemoteRecords] Fetching ${tableName} for userId: ${validatedUserId}`, since ? `since ${since.toISOString()}` : '');
         
-        // Use user-scoped query helper to ensure user_id is always in URL
-        let query = userScopedQuery(client, tableName, validatedUserId).select('*');
-
-        if (since) {
-            query = query.gt('updated_at', since.toISOString());
-        }
-
-        const { data, error } = await query.order('updated_at', { ascending: true });
-
-        if (error) {
-            console.error(`[SupabaseSyncService.fetchRemoteRecords] Error fetching ${tableName}:`, error);
-            throw new Error(`Failed to fetch remote records: ${error.message}`);
-        }
-
-        // eslint-disable-next-line no-console
-        console.debug(`[SupabaseSyncService.fetchRemoteRecords] Fetched ${data?.length || 0} records for ${tableName} (userId: ${userId})`);
+        const Model = getModel(tableName);
+        const baseFilter = userScopedFilter(validatedUserId, tableName);
         
-        // Debug: Log user_ids found in fetched records to detect mismatches
-        if (data && data.length > 0 && tableName === 'workouts') {
-            const userIds = [...new Set(data.map((r: Record<string, unknown>) => r.user_id))];
-            // eslint-disable-next-line no-console
-            console.debug(`[SupabaseSyncService.fetchRemoteRecords] user_ids found in fetched workouts:`, userIds);
-            if (userIds.length > 1 || (userIds.length === 1 && userIds[0] !== validatedUserId)) {
-                console.warn(`[SupabaseSyncService.fetchRemoteRecords] Mismatch detected! Query userId: ${validatedUserId}, Found user_ids:`, userIds);
-            }
-        }
+        // Add updatedAt filter if since is provided
+        const filter = since 
+            ? { ...baseFilter, updatedAt: { $gt: since } }
+            : baseFilter;
+        
+        const records = await Model.find(filter).sort({ updatedAt: 1 }).lean();
 
-        return data || [];
+        console.debug(`[MongoDBSyncService.fetchRemoteRecords] Fetched ${records?.length || 0} records for ${tableName} (userId: ${validatedUserId})`);
+
+        return records || [];
     }
 
     private async fetchLocalRecords(
@@ -684,7 +672,6 @@ class SupabaseSyncService {
 
             case 'muscle_statuses': {
                 const allStatuses = await dbHelpers.getAllMuscleStatuses();
-                // Filter by userId if provided
                 return userId 
                     ? allStatuses.filter((s: { userId?: string }) => s.userId === userId)
                     : allStatuses;
@@ -696,8 +683,6 @@ class SupabaseSyncService {
             }
 
             case 'settings': {
-                // Settings are stored as key-value pairs in IndexedDB
-                // We need to fetch all settings and convert them to array format
                 const allSettings = await db.settings.toArray();
                 return allSettings.map(s => ({
                     key: s.key,
@@ -734,7 +719,6 @@ class SupabaseSyncService {
             }
 
             case 'error_logs': {
-                const { errorLogService } = await import('./errorLogService');
                 const logs = await errorLogService.getErrorLogs(userId);
                 return since
                     ? logs.filter(l => l.createdAt >= since)
@@ -756,7 +740,6 @@ class SupabaseSyncService {
 
         if (!localRecord) return false;
 
-        // Use version manager for conflict detection
         const conflictInfo = versionManager.detectConflict(
             tableName,
             this.getRecordId(remoteRecord as Record<string, unknown>, tableName),
@@ -782,7 +765,6 @@ class SupabaseSyncService {
             case 'planned_workouts':
                 return (await dbHelpers.getPlannedWorkout(String(recordId))) ?? null;
             case 'muscle_statuses': {
-                // For muscle_statuses, recordId might be composite "userId:muscle" or just muscle
                 const muscle = typeof recordId === 'string' && recordId.includes(':') 
                     ? recordId.split(':')[1] 
                     : String(recordId);
@@ -793,7 +775,6 @@ class SupabaseSyncService {
                 return profile;
             }
             case 'settings': {
-                // For settings, recordId is composite "userId:key", need to extract key
                 const key = typeof recordId === 'string' && recordId.includes(':') 
                     ? recordId.split(':')[1] 
                     : String(recordId);
@@ -803,27 +784,22 @@ class SupabaseSyncService {
             case 'notifications':
                 return (await dbHelpers.getNotification(String(recordId))) ?? null;
             case 'sleep_logs': {
-                // For sleep_logs, recordId is composite "userId:date"
                 if (typeof recordId === 'string' && recordId.includes(':')) {
                     const [recordUserId, dateStr] = recordId.split(':');
                     const date = new Date(dateStr);
                     return (await sleepRecoveryService.getSleepLog(recordUserId, date)) ?? null;
                 }
-                // Fallback to id lookup if recordId is a number
                 return (await dbHelpers.getSleepLog(Number(recordId))) ?? null;
             }
             case 'recovery_logs': {
-                // For recovery_logs, recordId is composite "userId:date"
                 if (typeof recordId === 'string' && recordId.includes(':')) {
                     const [recordUserId, dateStr] = recordId.split(':');
                     const date = new Date(dateStr);
                     return (await dbHelpers.getRecoveryLogByDate(recordUserId, date)) ?? null;
                 }
-                // Fallback to id lookup if recordId is a number
                 return (await dbHelpers.getRecoveryLog(Number(recordId))) ?? null;
             }
             case 'error_logs': {
-                const { errorLogService } = await import('./errorLogService');
                 const logs = await errorLogService.getErrorLogs(userId);
                 return logs.find(l => l.id === Number(recordId)) ?? null;
             }
@@ -841,7 +817,6 @@ class SupabaseSyncService {
         const localRecord = await this.getLocalRecord(userId, tableName, recordId);
 
         if (localRecord) {
-            // Use version manager for conflict resolution
             const conflictInfo = versionManager.detectConflict(
                 tableName,
                 recordId,
@@ -850,7 +825,6 @@ class SupabaseSyncService {
             );
 
             if (conflictInfo.hasConflict) {
-                // Resolve conflict using last-write-wins
                 const resolved = versionManager.resolveConflictLastWriteWins(
                     localRecord as { version?: number; updatedAt?: Date; deletedAt?: Date | null },
                     remoteRecord as { version?: number; updatedAt?: Date; deletedAt?: Date | null }
@@ -860,7 +834,6 @@ class SupabaseSyncService {
                 localRecord as { version?: number; updatedAt?: Date; deletedAt?: Date | null },
                 remoteRecord as { version?: number; updatedAt?: Date; deletedAt?: Date | null }
             ) < 0) {
-                // Remote is newer, update local
                 await this.updateLocalRecord(userId, tableName, remoteRecord);
             }
         } else {
@@ -873,19 +846,7 @@ class SupabaseSyncService {
         tableName: SyncableTable,
         remoteRecord: unknown
     ): Promise<void> {
-        const converted = this.convertFromSupabaseFormat(tableName, remoteRecord);
-        
-        // Debug: Log userId from remote record vs converted record
-        if (tableName === 'workouts') {
-            const remoteUserId = (remoteRecord as Record<string, unknown>).user_id;
-            const convertedUserId = (converted as Record<string, unknown>).userId;
-            // eslint-disable-next-line no-console
-            console.debug(`[SupabaseSyncService.createLocalRecord] Creating workout - remote user_id: ${remoteUserId}, converted userId: ${convertedUserId}`);
-            
-            if (remoteUserId !== convertedUserId) {
-                console.warn(`[SupabaseSyncService.createLocalRecord] userId mismatch! remote: ${remoteUserId}, converted: ${convertedUserId}`);
-            }
-        }
+        const converted = this.convertFromMongoFormat(tableName, remoteRecord);
 
         switch (tableName) {
             case 'workouts':
@@ -923,7 +884,6 @@ class SupabaseSyncService {
                 break;
             }
             case 'error_logs': {
-                const { errorLogService } = await import('./errorLogService');
                 const errorLog = converted as unknown as ErrorLog;
                 await errorLogService.logError({
                     userId: errorLog.userId,
@@ -946,7 +906,7 @@ class SupabaseSyncService {
         tableName: SyncableTable,
         remoteRecord: unknown
     ): Promise<void> {
-        const converted = this.convertFromSupabaseFormat(tableName, remoteRecord);
+        const converted = this.convertFromMongoFormat(tableName, remoteRecord);
         const recordId = this.getRecordId(remoteRecord as Record<string, unknown>, tableName);
 
         switch (tableName) {
@@ -963,7 +923,6 @@ class SupabaseSyncService {
                 await dbHelpers.updatePlannedWorkout(String(recordId), converted as Partial<PlannedWorkout>);
                 break;
             case 'muscle_statuses': {
-                // For muscle_statuses, recordId is composite "userId:muscle", need to find by muscle
                 const record = remoteRecord as Record<string, unknown>;
                 const muscle = record.muscle as string;
                 const existing = await dbHelpers.getMuscleStatus(muscle);
@@ -986,7 +945,6 @@ class SupabaseSyncService {
                 await dbHelpers.saveNotification(converted as unknown as Notification);
                 break;
             case 'sleep_logs': {
-                // For sleep_logs, recordId is composite "userId:date", need to find by date
                 const sleepLog = converted as unknown as SleepLog;
                 const existing = await sleepRecoveryService.getSleepLog(sleepLog.userId, sleepLog.date);
                 if (existing?.id) {
@@ -997,7 +955,6 @@ class SupabaseSyncService {
                 break;
             }
             case 'recovery_logs': {
-                // For recovery_logs, recordId is composite "userId:date", need to find by date
                 const recoveryLog = converted as unknown as RecoveryLog;
                 const existing = await sleepRecoveryService.getRecoveryLog(recoveryLog.userId, recoveryLog.date);
                 if (existing?.id) {
@@ -1008,7 +965,6 @@ class SupabaseSyncService {
                 break;
             }
             case 'error_logs': {
-                const { errorLogService } = await import('./errorLogService');
                 const errorLog = converted as unknown as ErrorLog;
                 if (errorLog.id && errorLog.resolved) {
                     await errorLogService.markResolved(errorLog.id, errorLog.userId, errorLog.resolvedBy);
@@ -1019,7 +975,6 @@ class SupabaseSyncService {
     }
 
     private async pushBatch(
-        client: SupabaseClient,
         userId: string,
         tableName: SyncableTable,
         batch: unknown[]
@@ -1030,7 +985,6 @@ class SupabaseSyncService {
         conflicts: number;
         errors: SyncError[];
     }> {
-        // Validate userId at the start
         const validatedUserId = requireUserId(userId, {
             functionName: 'pushBatch',
             additionalInfo: { tableName, batchSize: batch.length },
@@ -1044,75 +998,41 @@ class SupabaseSyncService {
             errors: [] as SyncError[],
         };
 
+        const Model = getModel(tableName);
+
         for (const localRecord of batch) {
             try {
-                const supabaseRecord = this.convertToSupabaseFormat(tableName, localRecord, validatedUserId);
-                const recordId = this.getRecordId(supabaseRecord, tableName);
+                const mongoRecord = this.convertToMongoFormat(tableName, localRecord, validatedUserId);
+                const recordId = this.getRecordId(localRecord as Record<string, unknown>, tableName);
 
-                // Build query - exercises, muscle_statuses, settings, sleep_logs, recovery_logs, and user_profiles need special handling
-                // For user_profiles: use user_id instead of id in select
-                const selectFields = tableName === 'user_profiles' 
-                    ? 'user_id, updated_at, version'
-                    : 'id, updated_at, version';
-                let query = client.from(tableName).select(selectFields);
-
-                // For user_profiles: use user_id as primary key (no id column)
-                if (tableName === 'user_profiles') {
-                    query = query.eq('user_id', validatedUserId);
-                } else if (tableName === 'muscle_statuses') {
-                    // For muscle_statuses: use (user_id, muscle) unique constraint instead of id
-                    query = query
-                        .eq('user_id', validatedUserId)
-                        .eq('muscle', supabaseRecord.muscle as string);
-                } else if (tableName === 'settings') {
-                    // For settings: use (user_id, key) unique constraint instead of id
-                    query = query
-                        .eq('user_id', validatedUserId)
-                        .eq('key', supabaseRecord.key as string);
-                } else if (tableName === 'sleep_logs') {
-                    // For sleep_logs: use (user_id, date) unique constraint instead of id
-                    const dateStr = supabaseRecord.date instanceof Date 
-                        ? supabaseRecord.date.toISOString().split('T')[0]
-                        : typeof supabaseRecord.date === 'string'
-                        ? supabaseRecord.date.split('T')[0]
-                        : supabaseRecord.date;
-                    query = query
-                        .eq('user_id', validatedUserId)
-                        .eq('date', dateStr);
-                } else if (tableName === 'recovery_logs') {
-                    // For recovery_logs: use (user_id, date) unique constraint instead of id
-                    const dateStr = supabaseRecord.date instanceof Date 
-                        ? supabaseRecord.date.toISOString().split('T')[0]
-                        : typeof supabaseRecord.date === 'string'
-                        ? supabaseRecord.date.split('T')[0]
-                        : supabaseRecord.date;
-                    query = query
-                        .eq('user_id', validatedUserId)
-                        .eq('date', dateStr);
-                } else if (tableName === 'exercises') {
-                    // For exercises: library exercises don't have user_id, custom exercises do
-                    const isCustom = supabaseRecord.is_custom === true;
-                    if (isCustom) {
-                        query = query.eq('user_id', validatedUserId).eq('id', recordId);
-                    } else {
-                        // Library exercises: check if user_id is null or doesn't exist
-                        query = query.is('user_id', null).eq('id', recordId);
+                // Build filter based on table type
+                let filter: Record<string, unknown> = userScopedFilter(validatedUserId, tableName);
+                
+                // Add ID filter based on table structure
+                if (tableName === 'workouts' || tableName === 'error_logs') {
+                    // These use _id in MongoDB
+                    if (typeof recordId === 'number') {
+                        filter._id = recordId;
+                    } else if (mongoRecord._id) {
+                        filter._id = mongoRecord._id;
                     }
+                } else if (tableName === 'user_profiles') {
+                    // user_profiles uses userId as primary key
+                    filter.userId = validatedUserId;
+                } else if (tableName === 'muscle_statuses') {
+                    filter.muscle = (mongoRecord as Record<string, unknown>).muscle;
+                } else if (tableName === 'settings') {
+                    filter.key = (mongoRecord as Record<string, unknown>).key;
+                } else if (tableName === 'sleep_logs' || tableName === 'recovery_logs') {
+                    filter.date = (mongoRecord as Record<string, unknown>).date;
                 } else {
-                    // For other tables, filter by id and user_id
-                    query = query.eq('id', recordId).eq('user_id', validatedUserId);
+                    // Most tables use 'id' field
+                    filter.id = mongoRecord.id || recordId;
                 }
-
-                // Use maybeSingle() instead of single() to handle 0 rows gracefully
-                const { data: existing, error: queryError } = await query.maybeSingle();
-
-                // Handle query errors (but not 0 rows - that's expected for new records)
-                if (queryError && queryError.code !== 'PGRST116') {
-                    throw queryError;
-                }
+                
+                const existing = await Model.findOne(filter).lean();
 
                 if (existing) {
-                    // Use version manager for conflict detection
                     const conflictInfo = versionManager.detectConflict(
                         tableName,
                         recordId,
@@ -1121,126 +1041,37 @@ class SupabaseSyncService {
                     );
 
                     if (conflictInfo.hasConflict) {
-                        // Conflict detected - use last-write-wins
                         const resolved = versionManager.resolveConflictLastWriteWins(
                             localRecord as { version?: number; updatedAt?: Date; deletedAt?: Date | null },
                             existing as { version?: number; updatedAt?: Date; deletedAt?: Date | null }
                         );
-                        const resolvedRecord = this.convertToSupabaseFormat(tableName, resolved, validatedUserId);
+                        const resolvedRecord = this.convertToMongoFormat(tableName, resolved, validatedUserId);
                         
-                        // Build update query with proper filtering
-                        let updateQuery = client.from(tableName).update(resolvedRecord);
-
-                        // For user_profiles: use user_id as primary key (no id column)
-                        if (tableName === 'user_profiles') {
-                            updateQuery = updateQuery.eq('user_id', validatedUserId);
-                        } else if (tableName === 'muscle_statuses') {
-                            // For muscle_statuses: use (user_id, muscle) unique constraint
-                            updateQuery = updateQuery
-                                .eq('user_id', validatedUserId)
-                                .eq('muscle', resolvedRecord.muscle as string);
-                        } else if (tableName === 'settings') {
-                            // For settings: use (user_id, key) unique constraint
-                            updateQuery = updateQuery
-                                .eq('user_id', validatedUserId)
-                                .eq('key', resolvedRecord.key as string);
-                        } else if (tableName === 'sleep_logs') {
-                            // For sleep_logs: use (user_id, date) unique constraint
-                            const dateStr = resolvedRecord.date instanceof Date 
-                                ? resolvedRecord.date.toISOString().split('T')[0]
-                                : typeof resolvedRecord.date === 'string'
-                                ? resolvedRecord.date.split('T')[0]
-                                : resolvedRecord.date;
-                            updateQuery = updateQuery
-                                .eq('user_id', validatedUserId)
-                                .eq('date', dateStr);
-                        } else if (tableName === 'recovery_logs') {
-                            // For recovery_logs: use (user_id, date) unique constraint
-                            const dateStr = resolvedRecord.date instanceof Date 
-                                ? resolvedRecord.date.toISOString().split('T')[0]
-                                : typeof resolvedRecord.date === 'string'
-                                ? resolvedRecord.date.split('T')[0]
-                                : resolvedRecord.date;
-                            updateQuery = updateQuery
-                                .eq('user_id', validatedUserId)
-                                .eq('date', dateStr);
-                        } else if (tableName === 'exercises' && !supabaseRecord.is_custom) {
-                            // For exercises: library exercises don't have user_id filter
-                            updateQuery = updateQuery.is('user_id', null).eq('id', recordId);
-                        } else {
-                            updateQuery = updateQuery.eq('id', recordId).eq('user_id', validatedUserId);
+                        // Preserve _id if it exists
+                        if (existing._id) {
+                            resolvedRecord._id = existing._id;
                         }
-
-                        const { error } = await updateQuery;
-                        if (error) throw error;
+                        
+                        await Model.findOneAndUpdate(filter, resolvedRecord, { upsert: true, new: true, setDefaultsOnInsert: true });
                         result.recordsUpdated++;
                         result.conflicts++;
                     } else if (versionManager.compareVersions(
                         localRecord as { version?: number; updatedAt?: Date; deletedAt?: Date | null },
                         existing as { version?: number; updatedAt?: Date; deletedAt?: Date | null }
                     ) > 0) {
-                        // Local is newer, update remote
-                        let updateQuery = client.from(tableName).update(supabaseRecord);
-
-                        // For user_profiles: use user_id as primary key (no id column)
-                        if (tableName === 'user_profiles') {
-                            updateQuery = updateQuery.eq('user_id', validatedUserId);
-                        } else if (tableName === 'muscle_statuses') {
-                            // For muscle_statuses: use (user_id, muscle) unique constraint
-                            updateQuery = updateQuery
-                                .eq('user_id', validatedUserId)
-                                .eq('muscle', supabaseRecord.muscle as string);
-                        } else if (tableName === 'settings') {
-                            // For settings: use (user_id, key) unique constraint
-                            updateQuery = updateQuery
-                                .eq('user_id', validatedUserId)
-                                .eq('key', supabaseRecord.key as string);
-                        } else if (tableName === 'sleep_logs') {
-                            // For sleep_logs: use (user_id, date) unique constraint
-                            const dateStr = supabaseRecord.date instanceof Date 
-                                ? supabaseRecord.date.toISOString().split('T')[0]
-                                : typeof supabaseRecord.date === 'string'
-                                ? supabaseRecord.date.split('T')[0]
-                                : supabaseRecord.date;
-                            updateQuery = updateQuery
-                                .eq('user_id', validatedUserId)
-                                .eq('date', dateStr);
-                        } else if (tableName === 'recovery_logs') {
-                            // For recovery_logs: use (user_id, date) unique constraint
-                            const dateStr = supabaseRecord.date instanceof Date 
-                                ? supabaseRecord.date.toISOString().split('T')[0]
-                                : typeof supabaseRecord.date === 'string'
-                                ? supabaseRecord.date.split('T')[0]
-                                : supabaseRecord.date;
-                            updateQuery = updateQuery
-                                .eq('user_id', validatedUserId)
-                                .eq('date', dateStr);
-                        } else if (tableName === 'exercises' && !supabaseRecord.is_custom) {
-                            // For exercises: library exercises don't have user_id filter
-                            updateQuery = updateQuery.is('user_id', null).eq('id', recordId);
-                        } else {
-                            updateQuery = updateQuery.eq('id', recordId).eq('user_id', validatedUserId);
+                        // Preserve _id if it exists
+                        if (existing._id) {
+                            mongoRecord._id = existing._id;
                         }
-
-                        const { error } = await updateQuery;
-                        if (error) throw error;
+                        await Model.findOneAndUpdate(filter, mongoRecord, { upsert: true, new: true, setDefaultsOnInsert: true });
                         result.recordsUpdated++;
                     } else {
-                        // Remote is newer or equal, skip
                         result.conflicts++;
                     }
                 } else {
-                    // Record doesn't exist, create it
-                    // For exercises: library exercises should have user_id = null
-                    if (tableName === 'exercises' && !supabaseRecord.is_custom) {
-                        supabaseRecord.user_id = null;
-                    }
-
-                    const { error } = await client
-                        .from(tableName)
-                        .insert(supabaseRecord);
-
-                    if (error) throw error;
+                    // Remove _id for new records (MongoDB will generate it)
+                    delete mongoRecord._id;
+                    await Model.create(mongoRecord);
                     result.recordsCreated++;
                 }
 
@@ -1256,7 +1087,6 @@ class SupabaseSyncService {
                     operation: 'create',
                 });
                 
-                // Log error to Supabase (non-blocking)
                 errorLogService.logSyncError(
                     userId,
                     tableName,
@@ -1272,433 +1102,131 @@ class SupabaseSyncService {
         return result;
     }
 
-    private convertToSupabaseFormat(
+    private convertToMongoFormat(
         tableName: SyncableTable,
         localRecord: unknown,
         userId: string
     ): Record<string, unknown> {
         const record = localRecord as Record<string, unknown>;
-        const base = {
-            user_id: userId,
-            updated_at: this.getUpdatedAt(record).toISOString(),
-            created_at: this.getCreatedAt(record).toISOString(),
+        
+        // MongoDB already uses camelCase, so we mostly just need to ensure userId is set
+        const base: Record<string, unknown> = {
+            userId: userId,
             version: record.version ?? 1,
-            deleted_at: record.deletedAt ? (record.deletedAt instanceof Date ? record.deletedAt.toISOString() : new Date(record.deletedAt as string | number).toISOString()) : null,
+            deletedAt: record.deletedAt || null,
         };
 
+        // For most tables, we can pass through the record with userId set
+        // Special handling for tables that need ID mapping
         switch (tableName) {
-            case 'workouts':
-                return {
+            case 'workouts': {
+                // Workouts: preserve id as _id if it exists (for consistency)
+                const workoutRecord: Record<string, unknown> = {
                     ...base,
-                    id: record.id,
-                    date: record.date instanceof Date ? record.date.toISOString().split('T')[0] : record.date,
-                    start_time: record.startTime instanceof Date ? (record.startTime as Date).toISOString() : record.startTime,
-                    end_time: record.endTime instanceof Date ? (record.endTime as Date).toISOString() : record.endTime,
-                    exercises: JSON.stringify(record.exercises),
-                    total_duration: record.totalDuration,
-                    total_volume: record.totalVolume,
-                    calories: record.calories,
-                    notes: record.notes,
-                    muscles_targeted: record.musclesTargeted,
-                    workout_type: record.workoutType,
-                    mood: record.mood,
+                    ...record,
                 };
-
+                // If id exists and is a number, we can't use it as _id directly in MongoDB
+                // MongoDB _id must be ObjectId or string. We'll let MongoDB generate _id
+                // and store the original id in a separate field if needed, or just let it be
+                // The id will be lost on first sync, but that's okay - we'll use _id going forward
+                delete workoutRecord.id; // Remove id, MongoDB will generate _id
+                return workoutRecord;
+            }
             case 'exercises': {
                 const exerciseRecord: Record<string, unknown> = {
                     ...base,
-                    id: record.id,
-                    name: record.name,
-                    category: record.category,
-                    primary_muscles: record.primaryMuscles,
-                    secondary_muscles: record.secondaryMuscles,
-                    equipment: record.equipment,
-                    difficulty: record.difficulty,
-                    instructions: record.instructions,
-                    video_url: record.videoUrl,
-                    is_custom: record.isCustom,
-                    tracking_type: record.trackingType,
-                    anatomy_image_url: record.anatomyImageUrl,
-                    strengthlog_url: record.strengthlogUrl,
-                    strengthlog_slug: record.strengthlogSlug,
-                    advanced_details: record.advancedDetails ? JSON.stringify(record.advancedDetails) : null,
-                    muscle_category: record.muscleCategory,
+                    ...record,
                 };
-                // Library exercises should have user_id = null
                 if (!record.isCustom) {
-                    exerciseRecord.user_id = null;
+                    exerciseRecord.userId = null;
                 }
                 return exerciseRecord;
             }
-
-            case 'workout_templates':
+            case 'user_profiles': {
+                // user_profiles uses userId as primary key
                 return {
                     ...base,
-                    id: record.id,
-                    name: record.name,
-                    category: record.category,
-                    description: record.description,
-                    image_url: record.imageUrl,
-                    difficulty: record.difficulty,
-                    days_per_week: record.daysPerWeek,
-                    exercises: JSON.stringify(record.exercises),
-                    estimated_duration: record.estimatedDuration,
-                    muscles_targeted: record.musclesTargeted,
-                    is_featured: record.isFeatured,
-                    is_trending: record.isTrending,
-                    match_percentage: record.matchPercentage,
+                    userId: record.id || userId,
+                    ...record,
                 };
-
-            case 'planned_workouts':
-                return {
-                    ...base,
-                    id: record.id,
-                    scheduled_date: record.scheduledDate instanceof Date ? (record.scheduledDate as Date).toISOString().split('T')[0] : record.scheduledDate,
-                    scheduled_time: record.scheduledTime instanceof Date ? (record.scheduledTime as Date).toISOString() : record.scheduledTime,
-                    template_id: record.templateId,
-                    workout_name: record.workoutName,
-                    category: record.category,
-                    estimated_duration: record.estimatedDuration,
-                    exercises: JSON.stringify(record.exercises),
-                    muscles_targeted: record.musclesTargeted,
-                    notes: record.notes,
-                    is_completed: record.isCompleted,
-                    completed_workout_id: record.completedWorkoutId,
-                };
-
-            case 'muscle_statuses':
-                return {
-                    ...base,
-                    id: record.id,
-                    muscle: record.muscle,
-                    last_worked: record.lastWorked instanceof Date ? (record.lastWorked as Date).toISOString() : record.lastWorked,
-                    recovery_status: record.recoveryStatus,
-                    recovery_percentage: record.recoveryPercentage,
-                    workload_score: record.workloadScore,
-                    recommended_rest_days: record.recommendedRestDays,
-                    total_volume_last_7_days: record.totalVolumeLast7Days,
-                    training_frequency: record.trainingFrequency,
-                };
-
-            case 'user_profiles':
-                return {
-                    ...base,
-                    user_id: record.id,
-                    name: record.name,
-                    experience_level: record.experienceLevel,
-                    goals: record.goals,
-                    equipment: record.equipment,
-                    workout_frequency: record.workoutFrequency,
-                    preferred_unit: record.preferredUnit,
-                    default_rest_time: record.defaultRestTime,
-                    age: record.age,
-                    gender: record.gender,
-                    weight: record.weight,
-                    height: record.height,
-                    profile_picture: record.profilePicture,
-                };
-
-            case 'settings':
-                return {
-                    ...base,
-                    key: record.key,
-                    value: typeof record.value === 'string' ? record.value : JSON.stringify(record.value),
-                };
-
-            case 'notifications':
-                return {
-                    ...base,
-                    id: record.id,
-                    type: record.type,
-                    title: record.title,
-                    message: record.message,
-                    data: typeof record.data === 'string' ? record.data : JSON.stringify(record.data || {}),
-                    is_read: record.isRead,
-                    read_at: record.readAt ? new Date(record.readAt as number).toISOString() : null,
-                    created_at: new Date(record.createdAt as number).toISOString(),
-                };
-
-            case 'sleep_logs':
-                return {
-                    ...base,
-                    id: record.id,
-                    date: record.date instanceof Date ? record.date.toISOString().split('T')[0] : record.date,
-                    bedtime: record.bedtime instanceof Date ? (record.bedtime as Date).toISOString() : record.bedtime,
-                    wake_time: record.wakeTime instanceof Date ? (record.wakeTime as Date).toISOString() : record.wakeTime,
-                    duration: record.duration,
-                    quality: record.quality,
-                    notes: record.notes,
-                };
-
-            case 'recovery_logs':
-                return {
-                    ...base,
-                    id: record.id,
-                    date: record.date instanceof Date ? record.date.toISOString().split('T')[0] : record.date,
-                    overall_recovery: record.overallRecovery,
-                    stress_level: record.stressLevel,
-                    energy_level: record.energyLevel,
-                    soreness: record.soreness,
-                    readiness_to_train: record.readinessToTrain,
-                    notes: record.notes,
-                };
-
-            case 'error_logs':
-                return {
-                    ...base,
-                    id: record.id,
-                    error_type: record.errorType,
-                    error_message: record.errorMessage,
-                    error_stack: record.errorStack,
-                    context: record.context ? JSON.stringify(record.context) : null,
-                    table_name: record.tableName,
-                    record_id: record.recordId ? String(record.recordId) : null,
-                    operation: record.operation,
-                    severity: record.severity,
-                    resolved: record.resolved,
-                    resolved_at: record.resolvedAt ? (record.resolvedAt instanceof Date ? record.resolvedAt.toISOString() : new Date(record.resolvedAt).toISOString()) : null,
-                    resolved_by: record.resolvedBy,
-                };
-
+            }
             default:
-                return base;
+                return {
+                    ...base,
+                    ...record,
+                };
         }
     }
 
-    private convertFromSupabaseFormat(
+    private convertFromMongoFormat(
         tableName: SyncableTable,
         remoteRecord: unknown
     ): Record<string, unknown> {
         const record = remoteRecord as Record<string, unknown>;
-        switch (tableName) {
-            case 'workouts':
-                return {
-                    id: record.id,
-                    userId: record.user_id,
-                    date: new Date(record.date as string | number | Date),
-                    startTime: new Date(record.start_time as string | number | Date),
-                    endTime: record.end_time ? new Date(record.end_time as string | number | Date) : undefined,
-                    exercises: typeof record.exercises === 'string' ? JSON.parse(record.exercises) : record.exercises,
-                    totalDuration: record.total_duration,
-                    totalVolume: Number(record.total_volume),
-                    calories: record.calories,
-                    notes: record.notes,
-                    musclesTargeted: record.muscles_targeted,
-                    workoutType: record.workout_type,
-                    mood: record.mood,
-                    version: record.version as number | undefined,
-                    deletedAt: record.deleted_at ? new Date(record.deleted_at as string | number | Date) : null,
-                };
+        
+        // MongoDB uses camelCase, so conversion is simpler than Supabase
+        // Main thing is to map _id to id for IndexedDB
+        const base: Record<string, unknown> = {
+            ...record,
+        };
 
-            case 'exercises':
-                return {
-                    id: record.id,
-                    name: record.name,
-                    category: record.category,
-                    primaryMuscles: record.primary_muscles,
-                    secondaryMuscles: record.secondary_muscles,
-                    equipment: record.equipment,
-                    difficulty: record.difficulty,
-                    instructions: record.instructions,
-                    videoUrl: record.video_url,
-                    isCustom: record.is_custom,
-                    trackingType: record.tracking_type,
-                    anatomyImageUrl: record.anatomy_image_url,
-                    strengthlogUrl: record.strengthlog_url,
-                    strengthlogSlug: record.strengthlog_slug,
-                    advancedDetails: record.advanced_details ? (typeof record.advanced_details === 'string' ? JSON.parse(record.advanced_details) : record.advanced_details) : undefined,
-                    muscleCategory: record.muscle_category,
-                    userId: record.user_id as string | undefined,
-                    version: record.version as number | undefined,
-                    deletedAt: record.deleted_at ? new Date(record.deleted_at as string | number | Date) : null,
-                };
-
-            case 'workout_templates':
-                return {
-                    id: record.id,
-                    userId: record.user_id,
-                    name: record.name,
-                    category: record.category,
-                    description: record.description,
-                    imageUrl: record.image_url,
-                    difficulty: record.difficulty,
-                    daysPerWeek: record.days_per_week,
-                    exercises: typeof record.exercises === 'string' ? JSON.parse(record.exercises) : record.exercises,
-                    estimatedDuration: record.estimated_duration,
-                    musclesTargeted: record.muscles_targeted,
-                    isFeatured: record.is_featured,
-                    isTrending: record.is_trending,
-                    matchPercentage: record.match_percentage ? Number(record.match_percentage) : undefined,
-                    createdAt: new Date(record.created_at as string | number | Date),
-                    updatedAt: new Date(record.updated_at as string | number | Date),
-                    version: record.version as number | undefined,
-                    deletedAt: record.deleted_at ? new Date(record.deleted_at as string | number | Date) : null,
-                };
-
-            case 'planned_workouts':
-                return {
-                    id: record.id,
-                    userId: record.user_id,
-                    scheduledDate: new Date(record.scheduled_date as string | number | Date),
-                    scheduledTime: record.scheduled_time ? new Date(record.scheduled_time as string | number | Date) : undefined,
-                    templateId: record.template_id,
-                    workoutName: record.workout_name,
-                    category: record.category,
-                    estimatedDuration: record.estimated_duration,
-                    exercises: typeof record.exercises === 'string' ? JSON.parse(record.exercises) : record.exercises,
-                    musclesTargeted: record.muscles_targeted,
-                    notes: record.notes,
-                    isCompleted: record.is_completed,
-                    completedWorkoutId: record.completed_workout_id,
-                    createdAt: new Date(record.created_at as string | number | Date),
-                    updatedAt: new Date(record.updated_at as string | number | Date),
-                    version: record.version as number | undefined,
-                    deletedAt: record.deleted_at ? new Date(record.deleted_at as string | number | Date) : null,
-                };
-
-            case 'muscle_statuses':
-                return {
-                    id: record.id,
-                    muscle: record.muscle,
-                    lastWorked: record.last_worked ? new Date(record.last_worked as string | number | Date) : null,
-                    recoveryStatus: record.recovery_status,
-                    recoveryPercentage: record.recovery_percentage,
-                    workloadScore: Number(record.workload_score),
-                    recommendedRestDays: record.recommended_rest_days,
-                    totalVolumeLast7Days: Number(record.total_volume_last_7_days),
-                    trainingFrequency: Number(record.training_frequency),
-                    userId: record.user_id as string | undefined,
-                    version: record.version as number | undefined,
-                    deletedAt: record.deleted_at ? new Date(record.deleted_at as string | number | Date) : null,
-                };
-
-            case 'user_profiles':
-                return {
-                    id: record.user_id,
-                    name: record.name,
-                    experienceLevel: record.experience_level,
-                    goals: record.goals,
-                    equipment: record.equipment,
-                    workoutFrequency: record.workout_frequency,
-                    preferredUnit: record.preferred_unit,
-                    defaultRestTime: record.default_rest_time,
-                    age: record.age,
-                    gender: record.gender,
-                    weight: record.weight ? Number(record.weight) : undefined,
-                    height: record.height ? Number(record.height) : undefined,
-                    profilePicture: record.profile_picture,
-                    version: record.version as number | undefined,
-                    deletedAt: record.deleted_at ? new Date(record.deleted_at as string | number | Date) : null,
-                };
-
-            case 'settings':
-                return {
-                    key: record.key,
-                    value: typeof record.value === 'string' ? JSON.parse(record.value) : record.value,
-                    userId: record.user_id as string,
-                };
-
-            case 'notifications':
-                return {
-                    id: record.id,
-                    userId: record.user_id,
-                    type: record.type,
-                    title: record.title,
-                    message: record.message,
-                    data: typeof record.data === 'string' ? JSON.parse(record.data) : (record.data || {}),
-                    isRead: record.is_read,
-                    readAt: record.read_at ? new Date(record.read_at as string | number | Date).getTime() : null,
-                    createdAt: new Date(record.created_at as string | number | Date).getTime(),
-                    version: record.version as number | undefined,
-                    deletedAt: record.deleted_at ? new Date(record.deleted_at as string | number | Date).getTime() : null,
-                };
-
-            case 'sleep_logs':
-                return {
-                    id: record.id,
-                    userId: record.user_id,
-                    date: new Date(record.date as string | number | Date),
-                    bedtime: new Date(record.bedtime as string | number | Date),
-                    wakeTime: new Date(record.wake_time as string | number | Date),
-                    duration: Number(record.duration),
-                    quality: Number(record.quality),
-                    notes: record.notes,
-                    version: record.version as number | undefined,
-                    createdAt: new Date(record.created_at as string | number | Date),
-                    updatedAt: new Date(record.updated_at as string | number | Date),
-                    deletedAt: record.deleted_at ? new Date(record.deleted_at as string | number | Date) : null,
-                };
-
-            case 'recovery_logs':
-                return {
-                    id: record.id,
-                    userId: record.user_id,
-                    date: new Date(record.date as string | number | Date),
-                    overallRecovery: Number(record.overall_recovery),
-                    stressLevel: Number(record.stress_level),
-                    energyLevel: Number(record.energy_level),
-                    soreness: Number(record.soreness),
-                    readinessToTrain: record.readiness_to_train,
-                    notes: record.notes,
-                    version: record.version as number | undefined,
-                    createdAt: new Date(record.created_at as string | number | Date),
-                    updatedAt: new Date(record.updated_at as string | number | Date),
-                    deletedAt: record.deleted_at ? new Date(record.deleted_at as string | number | Date) : null,
-                };
-
-            case 'error_logs':
-                return {
-                    id: record.id,
-                    userId: record.user_id,
-                    errorType: record.error_type,
-                    errorMessage: record.error_message,
-                    errorStack: record.error_stack,
-                    context: record.context ? (typeof record.context === 'string' ? JSON.parse(record.context) : record.context) : undefined,
-                    tableName: record.table_name,
-                    recordId: record.record_id,
-                    operation: record.operation,
-                    severity: record.severity,
-                    resolved: record.resolved,
-                    resolvedAt: record.resolved_at ? new Date(record.resolved_at as string | number | Date) : null,
-                    resolvedBy: record.resolved_by,
-                    version: record.version as number | undefined,
-                    deletedAt: record.deleted_at ? new Date(record.deleted_at as string | number | Date) : null,
-                    createdAt: new Date(record.created_at as string | number | Date),
-                    updatedAt: new Date(record.updated_at as string | number | Date),
-                };
-
-            default:
-                return record;
+        // Map _id to id for IndexedDB compatibility
+        if (record._id) {
+            if (tableName === 'workouts' || tableName === 'error_logs') {
+                // These use numeric IDs in IndexedDB
+                // Convert ObjectId to a number (use timestamp portion for consistency)
+                if (record._id instanceof mongoose.Types.ObjectId) {
+                    // Use the timestamp portion of ObjectId as a numeric ID
+                    base.id = record._id.getTimestamp().getTime();
+                } else {
+                    base.id = typeof record._id === 'string' ? parseInt(record._id, 16) : Number(record._id);
+                }
+            } else if (tableName !== 'user_profiles') {
+                // Most other tables use string IDs
+                base.id = record.id || (record._id instanceof mongoose.Types.ObjectId ? record._id.toString() : String(record._id));
+            }
+            delete base._id;
         }
+
+        // Special handling for notifications (timestamps)
+        if (tableName === 'notifications') {
+            if (record.createdAt instanceof Date) {
+                base.createdAt = record.createdAt.getTime();
+            }
+            if (record.updatedAt instanceof Date) {
+                base.updatedAt = record.updatedAt.getTime();
+            }
+            if (record.readAt instanceof Date) {
+                base.readAt = record.readAt.getTime();
+            }
+        }
+
+        return base;
     }
 
     private getRecordId(record: Record<string, unknown>, tableName?: SyncableTable): string | number {
-        // For user_profiles, use user_id as primary key (no id column)
         if (tableName === 'user_profiles') {
-            return (record.user_id as string | number) || (record.userId as string | number) || (record.id as string | number) || '';
+            return (record.userId as string | number) || (record.id as string | number) || '';
         }
         
-        // For muscle_statuses, use composite key (user_id, muscle) since it has UNIQUE constraint
         if (tableName === 'muscle_statuses') {
-            const userId = record.user_id || record.userId;
+            const userId = record.userId;
             const muscle = record.muscle;
             if (userId && muscle) {
                 return `${userId}:${muscle}`;
             }
         }
         
-        // For settings, use composite key (user_id, key) since it has UNIQUE constraint
         if (tableName === 'settings') {
-            const userId = record.user_id || record.userId;
+            const userId = record.userId;
             const key = record.key;
             if (userId && key) {
                 return `${userId}:${key}`;
             }
         }
         
-        // For sleep_logs, use composite key (user_id, date) since it has UNIQUE constraint
         if (tableName === 'sleep_logs') {
-            const userId = record.user_id || record.userId;
+            const userId = record.userId;
             const date = record.date;
             if (userId && date) {
                 const dateStr = date instanceof Date 
@@ -1710,9 +1238,8 @@ class SupabaseSyncService {
             }
         }
         
-        // For recovery_logs, use composite key (user_id, date) since it has UNIQUE constraint
         if (tableName === 'recovery_logs') {
-            const userId = record.user_id || record.userId;
+            const userId = record.userId;
             const date = record.date;
             if (userId && date) {
                 const dateStr = date instanceof Date 
@@ -1724,15 +1251,12 @@ class SupabaseSyncService {
             }
         }
         
-        return (record.id as string | number) || (record.user_id as string | number) || (record.key as string) || '';
+        return (record.id as string | number) || (record._id as string | number) || (record.userId as string | number) || (record.key as string) || '';
     }
 
     private getUpdatedAt(record: Record<string, unknown>): Date {
         if (record.updatedAt) {
             return record.updatedAt instanceof Date ? record.updatedAt : new Date(record.updatedAt as string | number | Date);
-        }
-        if (record.updated_at) {
-            return new Date(record.updated_at as string | number | Date);
         }
         return new Date();
     }
@@ -1740,9 +1264,6 @@ class SupabaseSyncService {
     private getCreatedAt(record: Record<string, unknown>): Date {
         if (record.createdAt) {
             return record.createdAt instanceof Date ? record.createdAt : new Date(record.createdAt as string | number | Date);
-        }
-        if (record.created_at) {
-            return new Date(record.created_at as string | number | Date);
         }
         return new Date();
     }
@@ -1756,7 +1277,6 @@ class SupabaseSyncService {
     }
 
     async getSyncStatus(userId: string): Promise<SyncStatus> {
-        // Validate userId
         const validatedUserId = requireUserId(userId, {
             functionName: 'getSyncStatus',
         });
@@ -1772,11 +1292,7 @@ class SupabaseSyncService {
         return 'idle';
     }
 
-    /**
-     * Sync a single table with error recovery
-     */
     private async syncTable(
-        client: SupabaseClient,
         userId: string,
         table: SyncableTable,
         direction: SyncDirection,
@@ -1784,11 +1300,11 @@ class SupabaseSyncService {
     ): Promise<SyncResult> {
         return await errorRecovery.withRetry(async () => {
             if (direction === 'bidirectional') {
-                return await this.syncBidirectional(client, userId, table, options);
+                return await this.syncBidirectional(userId, table, options);
             } else if (direction === 'push') {
-                return await this.syncPush(client, userId, table, options);
+                return await this.syncPush(userId, table, options);
             } else {
-                return await this.syncPull(client, userId, table, options);
+                return await this.syncPull(userId, table, options);
             }
         }, {
             maxRetries: options.maxRetries ?? 3,
@@ -1800,8 +1316,7 @@ class SupabaseSyncService {
             },
         });
     }
-
 }
 
-export const supabaseSyncService = new SupabaseSyncService();
+export const mongodbSyncService = new MongoDBSyncService();
 

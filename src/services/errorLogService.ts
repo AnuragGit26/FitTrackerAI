@@ -1,8 +1,11 @@
 import { getSupabaseClientWithAuth } from './supabaseClient';
 import { userScopedQuery } from './supabaseQueryBuilder';
+import { connectToMongoDB } from './mongodbClient';
+import { userScopedFilter } from './mongodbQueryBuilder';
 import { requireUserId } from '@/utils/userIdValidation';
 import { ErrorLog, ErrorLogCreateInput, ErrorType, ErrorSeverity } from '@/types/error';
 import { db } from './database';
+import { ErrorLog as ErrorLogModel } from './mongodb/schemas';
 
 interface LocalErrorLog {
     id?: number;
@@ -193,15 +196,15 @@ class ErrorLogService {
     }
 
     /**
-     * Sync error logs to Supabase
+     * Sync error logs to MongoDB
      */
-    async syncToSupabase(userId: string): Promise<void> {
+    async syncToMongoDB(userId: string): Promise<void> {
         const validatedUserId = requireUserId(userId, {
-            functionName: 'syncToSupabase',
+            functionName: 'syncToMongoDB',
         });
 
         try {
-            const client = await getSupabaseClientWithAuth(validatedUserId);
+            await connectToMongoDB();
             const localLogs = await db.errorLogs
                 .where('userId')
                 .equals(validatedUserId)
@@ -212,25 +215,32 @@ class ErrorLogService {
                 return;
             }
 
-            const supabaseLogs = localLogs.map((log) =>
-                this.convertToSupabaseFormat(log)
+            const mongoLogs = localLogs.map((log) =>
+                this.convertToMongoFormat(log)
             );
 
-            const { error } = await client
-                .from('error_logs')
-                .upsert(supabaseLogs, {
-                    onConflict: 'id',
-                    ignoreDuplicates: false,
-                });
+            // Use bulkWrite for efficient upserts
+            const operations = mongoLogs.map((log) => ({
+                updateOne: {
+                    filter: { userId: validatedUserId, _id: log._id || log.id },
+                    update: { $set: log },
+                    upsert: true,
+                },
+            }));
 
-            if (error) {
-                console.error('Failed to sync error logs to Supabase:', error);
-                throw error;
-            }
+            await ErrorLogModel.bulkWrite(operations);
         } catch (error) {
-            console.error('Error syncing error logs to Supabase:', error);
+            console.error('Error syncing error logs to MongoDB:', error);
             throw error;
         }
+    }
+
+    /**
+     * Sync error logs to Supabase (deprecated - use syncToMongoDB)
+     */
+    async syncToSupabase(userId: string): Promise<void> {
+        // Redirect to MongoDB sync
+        return this.syncToMongoDB(userId);
     }
 
     /**
@@ -344,6 +354,27 @@ class ErrorLogService {
             resolvedAt: log.resolvedAt ? new Date(log.resolvedAt) : null,
             resolvedBy: log.resolvedBy,
             version: log.version,
+            deletedAt: log.deletedAt ? new Date(log.deletedAt) : null,
+            createdAt: new Date(log.createdAt),
+            updatedAt: new Date(log.updatedAt),
+        };
+    }
+
+    private convertToMongoFormat(log: LocalErrorLog): Record<string, unknown> {
+        return {
+            userId: log.userId,
+            errorType: log.errorType,
+            errorMessage: log.errorMessage,
+            errorStack: log.errorStack,
+            context: log.context,
+            tableName: log.tableName,
+            recordId: log.recordId,
+            operation: log.operation,
+            severity: log.severity,
+            resolved: log.resolved,
+            resolvedAt: log.resolvedAt ? new Date(log.resolvedAt) : null,
+            resolvedBy: log.resolvedBy,
+            version: log.version || 1,
             deletedAt: log.deletedAt ? new Date(log.deletedAt) : null,
             createdAt: new Date(log.createdAt),
             updatedAt: new Date(log.updatedAt),

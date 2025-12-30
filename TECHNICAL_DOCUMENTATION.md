@@ -61,7 +61,7 @@
   - Offline usage percentage
   - Data sync success rate
   - User satisfaction with offline experience
-- **Implementation**: IndexedDB-first architecture with background sync to Supabase
+- **Implementation**: IndexedDB-first architecture with background sync to MongoDB
 
 ### 2. Core Business Features
 
@@ -272,13 +272,13 @@
 
 - **Concurrent Users**: Support 10,000+ concurrent users
 - **Data Storage**: Efficient IndexedDB usage with automatic cleanup
-- **API Rate Limiting**: Respect API quotas (Gemini AI, Supabase)
+- **API Rate Limiting**: Respect API quotas (Gemini AI, MongoDB Atlas)
 
 #### 3.4 Security
 
 - **Authentication**: Auth0-based authentication with OAuth support
 - **Data Encryption**: All data encrypted in transit (HTTPS)
-- **Row-Level Security**: Supabase RLS policies for data isolation
+- **User Data Isolation**: MongoDB query filters for data isolation
 - **Input Validation**: All user inputs sanitized and validated
 
 #### 3.5 Accessibility
@@ -297,7 +297,7 @@
 FitTrackAI follows a **mobile-first, offline-first Progressive Web App (PWA)** architecture with the following key principles:
 
 1. **Client-Side First**: All data stored locally in IndexedDB
-2. **Background Sync**: Bidirectional sync with Supabase when online
+2. **Background Sync**: Bidirectional sync with MongoDB Atlas when online
 3. **Service Worker**: Background processing and offline support
 4. **Component-Based**: React component architecture with code splitting
 
@@ -346,7 +346,7 @@ FitTrackAI follows a **mobile-first, offline-first Progressive Web App (PWA)** a
                 ┌───────────┴───────────┐
                 ▼                       ▼
 ┌──────────────────────────┐  ┌──────────────────────────┐
-│      IndexedDB            │  │      Supabase            │
+│      IndexedDB            │  │      MongoDB Atlas       │
 │   (Local Storage)         │  │   (Cloud Sync)          │
 │  ┌────────────────────┐   │  │  ┌────────────────────┐ │
 │  │  Workouts          │   │  │  │  Workouts          │ │
@@ -372,7 +372,7 @@ FitTrackAI follows a **mobile-first, offline-first Progressive Web App (PWA)** a
 2. **State Update** → Zustand store updates
 3. **Service Call** → Service layer processes business logic
 4. **Local Persistence** → Data saved to IndexedDB immediately
-5. **Background Sync** → Queued for Supabase sync when online
+5. **Background Sync** → Queued for MongoDB sync when online
 6. **UI Update** → Component re-renders with new data
 
 ### Key Architectural Patterns
@@ -380,7 +380,7 @@ FitTrackAI follows a **mobile-first, offline-first Progressive Web App (PWA)** a
 #### 1. Offline-First Pattern
 
 - All data operations write to IndexedDB first
-- Supabase sync happens asynchronously in background
+- MongoDB sync happens asynchronously in background
 - Conflict resolution using version numbers (optimistic locking)
 
 #### 2. Service Layer Pattern
@@ -438,10 +438,10 @@ FitTrackAI follows a **mobile-first, offline-first Progressive Web App (PWA)** a
 - **Dexie.js**: IndexedDB wrapper
   - Local database for offline-first architecture
   - Tables: workouts, exercises, muscleStatuses, templates, userProfiles, settings
-- **Supabase**: Cloud database and sync
-  - PostgreSQL database with Row-Level Security
-  - Real-time subscriptions (future)
-  - Storage for user uploads (future)
+- **MongoDB Atlas**: Cloud database and sync
+  - MongoDB database with Mongoose ODM
+  - User-scoped queries for data isolation
+  - Connection pooling and automatic reconnection
 
 ### Authentication
 
@@ -507,7 +507,7 @@ User Action: Start Workout
    - Update endTime
    - Save final workout
    - Trigger muscle recovery recalculation
-   - Queue for Supabase sync
+   - Queue for MongoDB sync
 ```
 
 #### 1.2 Exercise Logging Logic
@@ -631,7 +631,7 @@ workloadScore = baseScore × intensityMultiplier × rpeMultiplier
    - Date/time picker
 3. System creates workout with single cardio exercise
 4. Workout saved with `workoutType: 'cardio'`
-5. Data syncs to IndexedDB and Supabase
+5. Data syncs to IndexedDB and MongoDB
 
 **Cardio Calculations:**
 
@@ -1149,14 +1149,14 @@ restTimer.start({
 }
 ```
 
-#### Supabase Schema
+#### MongoDB Schema
 
-The Supabase schema mirrors the IndexedDB schema with additional features:
+The MongoDB schema mirrors the IndexedDB schema with additional features:
 
-1. **Row-Level Security (RLS)**: Policies ensure users can only access their own data
-2. **Triggers**: Automatic version increment and timestamp updates
-3. **Indexes**: Optimized for common query patterns
-4. **Soft Deletes**: `deleted_at` timestamp instead of hard deletes
+1. **User Data Isolation**: Mongoose schemas enforce `userId` filtering for data isolation
+2. **Pre-save Hooks**: Automatic version increment and timestamp updates
+3. **Indexes**: Optimized for common query patterns (userId, userId+date, etc.)
+4. **Soft Deletes**: `deletedAt` timestamp instead of hard deletes
 
 ### Data Relationships
 
@@ -1186,12 +1186,12 @@ User (Auth0)
 - `templates`: `userId`, `category`, `userId+category`
 - `plannedWorkouts`: `userId`, `scheduledDate`, `userId+scheduledDate`
 
-**Supabase Indexes**:
+**MongoDB Indexes**:
 
 - Similar to IndexedDB plus:
-- `updated_at` indexes for sync queries
-- `deleted_at` partial indexes for soft deletes
-- Composite indexes for common query patterns
+- `updatedAt` indexes for sync queries
+- `deletedAt` indexes for soft delete queries
+- Compound indexes for common query patterns (userId+updatedAt, userId+date)
 
 ---
 
@@ -1216,30 +1216,30 @@ const { user } = useAuth0()
 const userId = user?.sub || user?.email
 ```
 
-### 2. Supabase API
+### 2. MongoDB Atlas API
 
-**Endpoints**:
+**Connection**:
 
-- `POST /rest/v1/{table}`: Insert records
-- `PATCH /rest/v1/{table}?id=eq.{id}&user_id=eq.{userId}`: Update records (user_id required in URL)
-- `DELETE /rest/v1/{table}?id=eq.{id}&user_id=eq.{userId}`: Delete records (soft delete, user_id required)
-- `GET /rest/v1/{table}?select=*&user_id=eq.{userId}`: Query records (user_id required in URL)
+- MongoDB Atlas connection string via `MONGODB_URI` environment variable
+- Mongoose ODM for schema validation and query building
+- Connection pooling and automatic reconnection
 
 **Authentication**:
 
-- JWT tokens from Auth0
-- Row-Level Security (RLS) policies enforce access control
-- **User ID Enforcement**: All Supabase requests MUST include `user_id` in URL query parameters
+- Connection string authentication (username/password in URI)
+- User ID validation enforced in application layer
+- **User ID Enforcement**: All MongoDB queries MUST filter by `userId`
 - User ID is validated before all operations to prevent runtime errors
 
 **User ID Validation**:
 
-All Supabase operations require validated user IDs:
+All MongoDB operations require validated user IDs:
 
 ```typescript
 import { requireUserId } from '@/utils/userIdValidation';
-import { getSupabaseClientWithAuth } from '@/services/supabaseClient';
-import { userScopedQuery } from '@/services/supabaseQueryBuilder';
+import { connectToMongoDB } from '@/services/mongodbClient';
+import { userScopedFilter } from '@/services/mongodbQueryBuilder';
+import { Workout } from '@/services/mongodb/schemas';
 
 // Validate userId before use
 const userId = requireUserId(userContextManager.getUserId(), {
@@ -1247,28 +1247,21 @@ const userId = requireUserId(userContextManager.getUserId(), {
   additionalInfo: { operation: 'data_fetch' },
 });
 
-// Get authenticated client (userId is required)
-const client = await getSupabaseClientWithAuth(userId);
+// Connect to MongoDB
+await connectToMongoDB();
 
-// Use user-scoped query helper
-const { data } = await userScopedQuery(client, 'workouts', userId)
-  .select('*')
-  .order('date', { ascending: false });
+// Use user-scoped filter helper
+const filter = userScopedFilter(userId, 'workouts');
+const data = await Workout.find(filter).sort({ date: -1 });
 ```
 
 **Sync Service**:
 
 ```typescript
-// Push local changes to Supabase (userId validated internally)
-await supabaseSyncService.push(userId, {
-  table: 'workouts',
-  records: localWorkouts
-})
-
-// Pull remote changes from Supabase (userId validated internally)
-await supabaseSyncService.pull(userId, {
-  table: 'workouts',
-  lastSyncAt: lastSyncTimestamp
+// Sync local changes with MongoDB (userId validated internally)
+await mongodbSyncService.sync(userId, {
+  tables: ['workouts'],
+  direction: 'bidirectional'
 })
 ```
 
@@ -1345,47 +1338,47 @@ await supabaseSyncService.pull(userId, {
    - Automatic token refresh
    - Logout clears session
 
-3. **Supabase Authentication**:
-   - Auth0 JWT passed to Supabase
-   - Supabase validates JWT and extracts `user_id`
-   - RLS policies use `user_id` for access control
+3. **MongoDB Authentication**:
+   - Connection string authentication via MongoDB Atlas
+   - User ID validated in application layer
+   - User-scoped queries enforce data isolation
 
 ### Data Security
 
-#### 1. Row-Level Security (RLS)
+#### 1. User Data Isolation
 
-**Supabase Policies**:
+**MongoDB Query Filtering**:
 
-```sql
--- Example: Workouts table
-CREATE POLICY "workouts_select_policy" ON workouts
-FOR SELECT USING (user_id = get_user_id() OR get_user_id() IS NULL);
+All MongoDB queries are automatically scoped to the user's data using query filters:
 
-CREATE POLICY "workouts_insert_policy" ON workouts
-FOR INSERT WITH CHECK (user_id = get_user_id() OR get_user_id() IS NULL);
+```typescript
+// User-scoped filter automatically applied
+const filter = userScopedFilter(userId, 'workouts');
+const workouts = await Workout.find(filter);
 ```
 
-**Policy Pattern**:
+**Isolation Pattern**:
 
-- Users can only access their own data
-- Service role (for migrations) can access all data
-- `get_user_id()` function extracts user ID from JWT
+- All queries filter by `userId` field
+- Mongoose schemas enforce `userId` as required for user-scoped collections
+- Query builder helpers automatically add user filters
+- Validation layer ensures userId is present before all operations
 
-#### 1.1 User ID Enforcement in URLs
+#### 1.1 User ID Enforcement in Queries
 
-**Requirement**: All Supabase API requests MUST include `user_id` in the URL query parameters.
+**Requirement**: All MongoDB queries MUST filter by `userId` to ensure data isolation.
 
 **Implementation**:
 
-1. **Client-Level Enforcement**: `getSupabaseClientWithAuth(userId)` requires userId and adds it to all request headers
-2. **Query Builder Helpers**: `userScopedQuery()` automatically adds `user_id=eq.{userId}` filter to all queries
-3. **Storage Operations**: `userScopedStorage()` ensures user_id is in storage paths
-4. **Validation Layer**: `requireUserId()` validates userId before all operations
+1. **Query Builder Helpers**: `userScopedFilter()` automatically adds `userId` filter to all queries
+2. **Model-Level Validation**: Mongoose schemas require `userId` for user-scoped collections
+3. **Validation Layer**: `requireUserId()` validates userId before all operations
+4. **Connection Security**: MongoDB Atlas connection string includes authentication
 
-**URL Structure**:
+**Query Structure**:
 
-- Database queries: `https://{project}.supabase.co/rest/v1/{table}?user_id=eq.{userId}&...`
-- Storage operations: `https://{project}.supabase.co/storage/v1/object/{bucket}/{userId}/{filename}`
+- All queries: `Model.find({ userId: validatedUserId, deletedAt: null, ... })`
+- Compound indexes ensure efficient user-scoped queries
 
 **Validation**:
 
@@ -1431,14 +1424,14 @@ const sanitized = sanitizeString(userInput)
 
 **Server-Side Validation**:
 
-- Supabase constraints enforce data types
-- Check constraints validate enum values
-- Foreign key constraints maintain referential integrity
+- Mongoose schemas enforce data types and validation rules
+- Schema validators check enum values and required fields
+- Index constraints maintain data integrity
 
 #### 3. Data Encryption
 
 - **In Transit**: HTTPS/TLS for all API calls
-- **At Rest**: Supabase encrypts data at rest
+- **At Rest**: MongoDB Atlas encrypts data at rest
 - **IndexedDB**: Browser-level encryption (browser-dependent)
 
 #### 4. API Key Management
@@ -1448,8 +1441,7 @@ const sanitized = sanitizeString(userInput)
 ```env
 VITE_AUTH0_DOMAIN=your-tenant.auth0.com
 VITE_AUTH0_CLIENT_ID=your_client_id_here
-VITE_SUPABASE_URL=https://...
-VITE_SUPABASE_ANON_KEY=...
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/database
 VITE_GEMINI_API_KEY=...
 ```
 
@@ -1555,11 +1547,12 @@ const volumeData = useMemo(() =>
 - Automatic cleanup of old data
 - Archive old workouts (optional feature)
 
-**Supabase Scalability**:
+**MongoDB Scalability**:
 
-- PostgreSQL handles millions of rows
+- MongoDB handles millions of documents
 - Indexes optimize query performance
 - Connection pooling for concurrent requests
+- Horizontal scaling with sharding (MongoDB Atlas)
 
 #### 2. API Rate Limiting
 
@@ -1569,9 +1562,9 @@ const volumeData = useMemo(() =>
 - Caching reduces actual API calls
 - Background fetching spreads load
 
-**Supabase**:
+**MongoDB Atlas**:
 
-- Rate limits based on plan
+- Rate limits based on cluster tier
 - Batch operations reduce request count
 - Retry with exponential backoff
 
@@ -1716,11 +1709,12 @@ jobs:
 
 ### Database Migrations
 
-**Supabase Migrations**:
+**MongoDB Schema Updates**:
 
-- SQL migration files in `supabase/migrations/`
-- Applied via Supabase CLI or dashboard
-- Versioned and reversible
+- Mongoose schemas defined in `src/services/mongodb/schemas/`
+- Schema changes applied automatically on connection
+- Versioned through Mongoose schema versioning
+- Indexes created automatically on schema definition
 
 **IndexedDB Migrations**:
 
@@ -1857,7 +1851,7 @@ test('log workout flow', async ({ page }) => {
 **Data Sync**:
 
 - [ ] Make changes on device A
-- [ ] Verify sync to Supabase
+- [ ] Verify sync to MongoDB
 - [ ] Check device B receives updates
 - [ ] Test conflict resolution
 
@@ -1979,7 +1973,7 @@ test('log workout flow', async ({ page }) => {
 - `src/services/dataService.ts`: Main data operations
 - `src/services/aiService.ts`: AI insight generation
 - `src/services/muscleRecoveryService.ts`: Recovery calculations
-- `src/services/supabaseSyncService.ts`: Cloud sync
+- `src/services/mongodbSyncService.ts`: Cloud sync
 
 **State Management**:
 
@@ -2001,8 +1995,7 @@ test('log workout flow', async ({ page }) => {
 
 - `VITE_AUTH0_DOMAIN`: Auth0 tenant domain
 - `VITE_AUTH0_CLIENT_ID`: Auth0 application client ID
-- `VITE_SUPABASE_URL`: Supabase project URL
-- `VITE_SUPABASE_ANON_KEY`: Supabase anonymous key
+- `MONGODB_URI`: MongoDB Atlas connection string
 
 **Optional**:
 
@@ -2036,7 +2029,8 @@ npm run scrape:exercises # Scrape exercise data
 
 - [React Documentation](https://react.dev)
 - [Vite Documentation](https://vitejs.dev)
-- [Supabase Documentation](https://supabase.com/docs)
+- [MongoDB Documentation](https://www.mongodb.com/docs/)
+- [Mongoose Documentation](https://mongoosejs.com/docs/)
 - [Auth0 Documentation](https://auth0.com/docs)
 - [Google Gemini AI](https://ai.google.dev)
 
