@@ -26,6 +26,45 @@ interface LocalErrorLog {
 
 class ErrorLogService {
     /**
+     * Send error log to Vercel API endpoint (non-blocking)
+     */
+    private async sendToVercel(errorLog: LocalErrorLog): Promise<void> {
+        // Only send in production or if explicitly enabled
+        const isProduction = import.meta.env.PROD;
+        const enableVercelLogging = import.meta.env.VITE_ENABLE_VERCEL_LOGGING !== 'false';
+        
+        if (!isProduction && !enableVercelLogging) {
+            return;
+        }
+
+        try {
+            const vercelApiUrl = import.meta.env.VITE_VERCEL_API_URL || '/api/logs/error';
+            
+            await fetch(vercelApiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    userId: errorLog.userId,
+                    errorType: errorLog.errorType,
+                    errorMessage: errorLog.errorMessage,
+                    errorStack: errorLog.errorStack,
+                    context: errorLog.context,
+                    tableName: errorLog.tableName,
+                    recordId: errorLog.recordId,
+                    operation: errorLog.operation,
+                    severity: errorLog.severity,
+                    timestamp: new Date(errorLog.createdAt).toISOString(),
+                }),
+            });
+        } catch (error) {
+            // Silently fail - don't block error logging if Vercel endpoint is unavailable
+            console.warn('Failed to send error log to Vercel:', error);
+        }
+    }
+
+    /**
      * Log an error to IndexedDB and queue for Supabase sync
      */
     async logError(input: ErrorLogCreateInput): Promise<number> {
@@ -52,6 +91,12 @@ class ErrorLogService {
 
         try {
             const id = await db.errorLogs.add(errorLog);
+            
+            // Send to Vercel (non-blocking)
+            this.sendToVercel(errorLog).catch(() => {
+                // Already handled in sendToVercel
+            });
+            
             return id as number;
         } catch (error) {
             console.error('Failed to save error log to IndexedDB:', error);
