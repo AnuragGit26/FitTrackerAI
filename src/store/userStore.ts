@@ -223,6 +223,22 @@ export const useUserStore = create<UserState>((set, get) => ({
         userContextManager.setUserId(updatedProfile.id);
       }
       set({ profile: updatedProfile, isLoading: false });
+      
+      // Sync to MongoDB/Supabase in production (non-blocking, similar to workout sync)
+      if (updatedProfile.id) {
+        (async () => {
+          try {
+            const { mongodbSyncService } = await import('@/services/mongodbSyncService');
+            await mongodbSyncService.sync(updatedProfile.id, {
+              tables: ['user_profiles'],
+              direction: 'push',
+            });
+          } catch (syncError) {
+            // Log sync failure but don't affect profile save
+            console.warn('MongoDB sync failed for profile (will retry later):', syncError);
+          }
+        })();
+      }
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to update profile',
