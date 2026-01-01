@@ -45,16 +45,16 @@ class DataMigration {
 
           switch (name) {
             case 'workouts':
-              records = await dbHelpers.getAllWorkouts(userId);
+              records = (await dbHelpers.getAllWorkouts(userId)) as unknown as Array<Record<string, unknown>>;
               break;
             case 'workout_templates':
-              records = await dbHelpers.getAllTemplates(userId);
+              records = (await dbHelpers.getAllTemplates(userId)) as unknown as Array<Record<string, unknown>>;
               break;
             case 'planned_workouts':
-              records = await dbHelpers.getAllPlannedWorkouts(userId);
+              records = (await dbHelpers.getAllPlannedWorkouts(userId)) as unknown as Array<Record<string, unknown>>;
               break;
             case 'muscle_statuses':
-              records = await dbHelpers.getAllMuscleStatuses();
+              records = (await dbHelpers.getAllMuscleStatuses()) as unknown as Array<Record<string, unknown>>;
               break;
           }
 
@@ -64,19 +64,26 @@ class DataMigration {
               
               switch (name) {
                 case 'workouts':
-                  if (record.id) {
+                  if (record.id && typeof record.id === 'string') {
                     await dbHelpers.updateWorkout(record.id, versioned);
                   }
                   break;
                 case 'workout_templates':
-                  await dbHelpers.updateTemplate(record.id, versioned);
+                  if (record.id && typeof record.id === 'string') {
+                    await dbHelpers.updateTemplate(record.id, versioned);
+                  }
                   break;
                 case 'planned_workouts':
-                  await dbHelpers.updatePlannedWorkout(record.id, versioned);
+                  if (record.id && typeof record.id === 'string') {
+                    await dbHelpers.updatePlannedWorkout(record.id, versioned);
+                  }
                   break;
                 case 'muscle_statuses':
                   if (record.id) {
-                    await dbHelpers.updateMuscleStatus(record.id, versioned);
+                    const id = typeof record.id === 'number' ? record.id : parseInt(String(record.id), 10);
+                    if (!isNaN(id)) {
+                      await dbHelpers.updateMuscleStatus(id, versioned);
+                    }
                   }
                   break;
               }
@@ -114,15 +121,15 @@ class DataMigration {
           await dbHelpers.saveSyncMetadata({
             tableName,
             userId,
-            lastSyncAt: metadata.lastSyncAt ? new Date(metadata.lastSyncAt).getTime() : null,
-            lastPushAt: metadata.lastPushAt ? new Date(metadata.lastPushAt).getTime() : null,
-            lastPullAt: metadata.lastPullAt ? new Date(metadata.lastPullAt).getTime() : null,
-            syncStatus: metadata.syncStatus || 'idle',
-            conflictCount: metadata.conflictCount || 0,
-            errorMessage: metadata.errorMessage,
-            lastErrorAt: metadata.lastErrorAt ? new Date(metadata.lastErrorAt).getTime() : undefined,
-            recordCount: metadata.recordCount,
-            version: metadata.version || 1,
+            lastSyncAt: metadata.lastSyncAt && typeof metadata.lastSyncAt === 'string' ? new Date(metadata.lastSyncAt).getTime() : null,
+            lastPushAt: metadata.lastPushAt && typeof metadata.lastPushAt === 'string' ? new Date(metadata.lastPushAt).getTime() : null,
+            lastPullAt: metadata.lastPullAt && typeof metadata.lastPullAt === 'string' ? new Date(metadata.lastPullAt).getTime() : null,
+            syncStatus: (metadata.syncStatus as 'idle' | 'syncing' | 'success' | 'error' | 'conflict') || 'idle',
+            conflictCount: (typeof metadata.conflictCount === 'number' ? metadata.conflictCount : 0),
+            errorMessage: typeof metadata.errorMessage === 'string' ? metadata.errorMessage : undefined,
+            lastErrorAt: metadata.lastErrorAt && typeof metadata.lastErrorAt === 'string' ? new Date(metadata.lastErrorAt).getTime() : undefined,
+            recordCount: typeof metadata.recordCount === 'number' ? metadata.recordCount : undefined,
+            version: (typeof metadata.version === 'number' ? metadata.version : 1),
           });
 
           // Optionally delete old setting

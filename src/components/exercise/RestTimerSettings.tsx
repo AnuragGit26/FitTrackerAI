@@ -1,15 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { ArrowLeft, Plus } from 'lucide-react';
 import { TimeWheelPicker } from '@/components/common/TimeWheelPicker';
 import { Modal } from '@/components/common/Modal';
-import { useSettingsStore } from '@/store/settingsStore';
 import { dataService } from '@/services/dataService';
 import { restTimerService, RestTimerPreset } from '@/services/restTimerService';
 import { useToast } from '@/hooks/useToast';
 import { cn } from '@/utils/cn';
-import { prefersReducedMotion } from '@/utils/animations';
 
 interface RestTimerSettingsData {
   defaultDuration: number;
@@ -24,7 +21,6 @@ interface RestTimerSettingsData {
 
 export function RestTimerSettings() {
   const navigate = useNavigate();
-  const { settings, updateSettings } = useSettingsStore();
   const { success, error: showError } = useToast();
   const [restTimerSettings, setRestTimerSettings] = useState<RestTimerSettingsData>({
     defaultDuration: 90,
@@ -40,7 +36,6 @@ export function RestTimerSettings() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [minutes, setMinutes] = useState(1);
   const [seconds, setSeconds] = useState(30);
-  const shouldReduceMotion = prefersReducedMotion();
 
   useEffect(() => {
     loadSettings();
@@ -49,9 +44,10 @@ export function RestTimerSettings() {
   const loadSettings = async () => {
     try {
       const saved = await dataService.getSetting('restTimerSettings');
-      if (saved) {
-        setRestTimerSettings(saved as RestTimerSettingsData);
-        const totalSeconds = saved.defaultDuration || 90;
+      if (saved && typeof saved === 'object' && 'defaultDuration' in saved) {
+        const settings = saved as RestTimerSettingsData;
+        setRestTimerSettings(settings);
+        const totalSeconds = settings.defaultDuration || 90;
         setMinutes(Math.floor(totalSeconds / 60));
         setSeconds(totalSeconds % 60);
       }

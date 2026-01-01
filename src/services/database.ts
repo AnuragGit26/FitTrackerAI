@@ -1,5 +1,5 @@
 import Dexie, { Table } from 'dexie';
-import { Workout, WorkoutTemplate, PlannedWorkout } from '@/types/workout';
+import { Workout, WorkoutTemplate, PlannedWorkout, PlannedExercise } from '@/types/workout';
 import { Exercise, ExerciseAdvancedDetails } from '@/types/exercise';
 import { MuscleStatus } from '@/types/muscle';
 import { MuscleImageCache } from './muscleImageCache';
@@ -7,6 +7,7 @@ import { SyncableTable } from '@/types/sync';
 import { SleepLog, RecoveryLog } from '@/types/sleep';
 import type { Notification } from '@/types/notification';
 import type { ErrorLog } from '@/types/error';
+import { logger } from '@/utils/logger';
 
 export type InsightType = 'insights' | 'recommendations' | 'progress' | 'smart-coach';
 
@@ -14,7 +15,7 @@ export interface AICacheMetadata {
   id?: number;
   insightType: InsightType;
   lastFetchTimestamp: number;
-  lastWorkoutId: number | null;
+  lastWorkoutId: string | null;
   fingerprint: string;
   userId?: string;
 }
@@ -44,7 +45,7 @@ export interface LocalSyncMetadata {
 }
 
 class FitTrackAIDB extends Dexie {
-  workouts!: Table<Workout, number>;
+  workouts!: Table<Workout, string>;
   exercises!: Table<Exercise, string>;
   muscleStatuses!: Table<MuscleStatus, number>;
   settings!: Table<{ key: string; value: unknown }, string>;
@@ -243,6 +244,308 @@ class FitTrackAIDB extends Dexie {
       notifications: 'id, userId, isRead, createdAt, [userId+isRead], [userId+createdAt], type',
       errorLogs: '++id, userId, errorType, severity, resolved, [userId+resolved], [userId+createdAt], tableName',
     });
+
+    // Version 13: Migrate exercise and workout IDs to alphanumeric/string format
+    this.version(13).stores({
+      workouts: 'id, userId, date, version, [userId+date], [userId+updatedAt], *musclesTargeted',
+      exercises: 'id, name, category, userId, version, [userId+isCustom], [userId+updatedAt], *primaryMuscles, *secondaryMuscles',
+      muscleStatuses: '++id, muscle, userId, version, [userId+muscle], [userId+updatedAt], lastWorked',
+      settings: 'key, userId, version, [userId+key]',
+      workoutTemplates: 'id, userId, category, name, version, [userId+category], [userId+updatedAt], *musclesTargeted',
+      aiCacheMetadata: '++id, insightType, userId, [insightType+userId], lastFetchTimestamp',
+      plannedWorkouts: 'id, userId, scheduledDate, version, [userId+scheduledDate], [userId+updatedAt]',
+      exerciseDetailsCache: '++id, exerciseSlug, cachedAt',
+      muscleImageCache: '++id, muscle, cachedAt',
+      syncMetadata: '++id, tableName, userId, [userId+tableName], syncStatus, lastSyncAt',
+      sleepLogs: '++id, userId, date, version, [userId+date], [userId+updatedAt]',
+      recoveryLogs: '++id, userId, date, version, [userId+date], [userId+updatedAt]',
+      notifications: 'id, userId, isRead, createdAt, [userId+isRead], [userId+createdAt], type',
+      errorLogs: '++id, userId, errorType, severity, resolved, [userId+resolved], [userId+createdAt], tableName',
+    }).upgrade(async (tx) => {
+      // Migration functions imported but not used directly
+      // const { exerciseIdMigration } = await import('./exerciseIdMigration');
+      // const { workoutIdMigration } = await import('./workoutIdMigration');
+      const { generateWorkoutId } = await import('@/utils/idGenerator');
+      
+      try {
+        // Exercise ID Migration
+        logger.info('Starting exercise ID migration in database upgrade...');
+        
+        const exercisesTable = tx.table('exercises');
+        const allExercises = await exercisesTable.toArray() as Exercise[];
+        
+        // Find exercises with old numeric IDs
+        const exercisesToMigrate = allExercises.filter(ex => 
+          /^exercise-\d+$/.test(ex.id)
+        );
+        
+        if (exercisesToMigrate.length > 0) {
+          logger.info(`Found ${exercisesToMigrate.length} exercises to migrate`);
+          
+          // Create ID mapping
+          const idMapping = new Map<string, string>();
+          const existingIds = new Set(allExercises.map(ex => ex.id));
+          
+          for (const exercise of exercisesToMigrate) {
+            const { generateAlphanumericId } = await import('@/utils/idGenerator');
+            let newId = generateAlphanumericId('exr');
+            let attempts = 0;
+            while (existingIds.has(newId) && attempts < 10) {
+              newId = generateAlphanumericId('exr');
+              attempts++;
+            }
+            
+            if (existingIds.has(newId)) {
+              throw new Error(`Failed to generate unique ID for exercise ${exercise.id} after 10 attempts`);
+            }
+            
+            idMapping.set(exercise.id, newId);
+            existingIds.add(newId);
+          }
+          
+          logger.info(`Generated ${idMapping.size} new exercise IDs`);
+          
+          // Update exercises: delete old and create new
+          for (const [oldId, newId] of idMapping) {
+            const exercise = exercisesToMigrate.find(ex => ex.id === oldId);
+            if (!exercise) continue;
+            
+            // Delete old exercise
+            await exercisesTable.delete(oldId);
+            
+            // Create new exercise with new ID
+            const updatedExercise: Exercise = {
+              ...exercise,
+              id: newId,
+            };
+            await exercisesTable.add(updatedExercise);
+          }
+          
+          logger.info(`Migrated ${idMapping.size} exercises`);
+          
+          // Update references in workouts
+          const workoutsTable = tx.table('workouts');
+          const allWorkouts = await workoutsTable.toArray() as Workout[];
+          
+          let workoutRefsUpdated = 0;
+          for (const workout of allWorkouts) {
+            let updated = false;
+            const updatedExercises = workout.exercises.map(ex => {
+              if (idMapping.has(ex.exerciseId)) {
+                updated = true;
+                return {
+                  ...ex,
+                  exerciseId: idMapping.get(ex.exerciseId)!,
+                };
+              }
+              return ex;
+            });
+            
+            if (updated) {
+              await workoutsTable.update(workout.id!, {
+                exercises: updatedExercises,
+              });
+              workoutRefsUpdated++;
+            }
+          }
+          
+          logger.info(`Updated ${workoutRefsUpdated} workout references`);
+          
+          // Update references in workout templates
+          const templatesTable = tx.table('workoutTemplates');
+          const allTemplates = await templatesTable.toArray() as WorkoutTemplate[];
+          
+          let templateRefsUpdated = 0;
+          for (const template of allTemplates) {
+            let updated = false;
+            const updatedExercises = template.exercises.map((ex: WorkoutTemplate['exercises'][number]) => {
+              if (idMapping.has(ex.exerciseId)) {
+                updated = true;
+                return {
+                  ...ex,
+                  exerciseId: idMapping.get(ex.exerciseId)!,
+                };
+              }
+              return ex;
+            });
+            
+            if (updated) {
+              await templatesTable.update(template.id, {
+                exercises: updatedExercises,
+              });
+              templateRefsUpdated++;
+            }
+          }
+          
+          logger.info(`Updated ${templateRefsUpdated} template references`);
+          
+          // Update references in planned workouts
+          const plannedWorkoutsTable = tx.table('plannedWorkouts');
+          const allPlannedWorkouts = await plannedWorkoutsTable.toArray() as PlannedWorkout[];
+          
+          let plannedRefsUpdated = 0;
+          for (const plannedWorkout of allPlannedWorkouts) {
+            let updated = false;
+            const updatedExercises = plannedWorkout.exercises.map((ex: PlannedExercise) => {
+              if (idMapping.has(ex.exerciseId)) {
+                updated = true;
+                return {
+                  ...ex,
+                  exerciseId: idMapping.get(ex.exerciseId)!,
+                };
+              }
+              return ex;
+            });
+            
+            if (updated) {
+              await plannedWorkoutsTable.update(plannedWorkout.id, {
+                exercises: updatedExercises,
+              });
+              plannedRefsUpdated++;
+            }
+          }
+          
+          logger.info(`Updated ${plannedRefsUpdated} planned workout references`);
+          
+          // Mark migration as completed
+          const settingsTable = tx.table('settings');
+          await settingsTable.put({
+            key: 'exercise_id_migration_completed',
+            value: {
+              count: idMapping.size,
+              refsUpdated: workoutRefsUpdated + templateRefsUpdated + plannedRefsUpdated,
+              completedAt: Date.now(),
+            },
+            userId: '',
+            version: 1,
+          });
+        } else {
+          logger.info('No exercises to migrate');
+          // Mark migration as completed even if no exercises to migrate
+          const settingsTable = tx.table('settings');
+          await settingsTable.put({
+            key: 'exercise_id_migration_completed',
+            value: {
+              count: 0,
+              refsUpdated: 0,
+              completedAt: Date.now(),
+            },
+            userId: '',
+            version: 1,
+          });
+        }
+        
+        logger.info('Exercise ID migration completed');
+
+        // Workout ID Migration
+        logger.info('Starting workout ID migration in database upgrade...');
+        
+        // Get all workouts from the transaction
+        const workoutsTable = tx.table('workouts');
+        const allWorkouts = await workoutsTable.toArray() as Workout[];
+        
+        // Filter workouts with numeric IDs
+        const workoutsToMigrate = allWorkouts.filter(w => typeof w.id === 'number');
+        
+        if (workoutsToMigrate.length > 0) {
+          logger.info(`Found ${workoutsToMigrate.length} workouts to migrate`);
+          
+          // Get existing string IDs to avoid collisions
+          const existingStringIds = new Set(
+            allWorkouts
+              .filter(w => typeof w.id === 'string')
+              .map(w => w.id as string)
+          );
+          
+          // Create ID mapping
+          const idMapping = new Map<number, string>();
+          
+          for (const workout of workoutsToMigrate) {
+            if (typeof workout.id === 'number') {
+              const newId = generateWorkoutId(
+                workout.userId,
+                workout.startTime || workout.date,
+                existingStringIds
+              );
+              idMapping.set(workout.id, newId);
+              existingStringIds.add(newId);
+            }
+          }
+          
+          logger.info(`Generated ${idMapping.size} new workout IDs`);
+          
+          // Migrate workouts: delete old and create new
+          for (const [oldId, newId] of idMapping) {
+            const workout = workoutsToMigrate.find(w => typeof w.id === 'number' && w.id === oldId);
+            if (!workout) continue;
+            
+            // Delete old workout
+            await workoutsTable.delete(oldId);
+            
+            // Create new workout with string ID
+            const updatedWorkout: Workout = {
+              ...workout,
+              id: newId,
+            };
+            await workoutsTable.add(updatedWorkout);
+          }
+          
+          logger.info(`Migrated ${idMapping.size} workouts`);
+          
+          // Update planned workout references
+          const plannedWorkoutsTable = tx.table('plannedWorkouts');
+          const allPlannedWorkouts = await plannedWorkoutsTable.toArray() as PlannedWorkout[];
+          
+          let plannedRefsUpdated = 0;
+          for (const plannedWorkout of allPlannedWorkouts) {
+            if (plannedWorkout.completedWorkoutId && typeof plannedWorkout.completedWorkoutId === 'number') {
+              const newWorkoutId = idMapping.get(plannedWorkout.completedWorkoutId);
+              if (newWorkoutId) {
+                await plannedWorkoutsTable.update(plannedWorkout.id, {
+                  completedWorkoutId: newWorkoutId,
+                });
+                plannedRefsUpdated++;
+              }
+            }
+          }
+          
+          logger.info(`Updated ${plannedRefsUpdated} planned workout references`);
+          
+          // Mark migration as completed
+          const settingsTable = tx.table('settings');
+          await settingsTable.put({
+            key: 'workout_id_migration_completed',
+            value: {
+              count: idMapping.size,
+              refsUpdated: plannedRefsUpdated,
+              completedAt: Date.now(),
+            },
+            userId: '',
+            version: 1,
+          });
+        } else {
+          logger.info('No workouts to migrate');
+          // Mark migration as completed even if no workouts to migrate
+          const settingsTable = tx.table('settings');
+          await settingsTable.put({
+            key: 'workout_id_migration_completed',
+            value: {
+              count: 0,
+              refsUpdated: 0,
+              completedAt: Date.now(),
+            },
+            userId: '',
+            version: 1,
+          });
+        }
+        
+        logger.info('Workout ID migration completed');
+      } catch (error) {
+        logger.error('Migration error in database upgrade:', error);
+        // Don't throw - allow app to continue even if migration fails
+        // The migration can be retried on next app start
+      }
+    });
   }
 }
 
@@ -251,11 +554,16 @@ export const db = new FitTrackAIDB();
 // Database helper functions
 export const dbHelpers = {
   // Workout operations
-  async saveWorkout(workout: Omit<Workout, 'id'>): Promise<number> {
-    return await db.workouts.add(workout as Workout);
+  async saveWorkout(workout: Omit<Workout, 'id'> | Workout): Promise<string> {
+    const workoutWithId = workout as Workout;
+    if (!workoutWithId.id) {
+      throw new Error('Workout must have an id');
+    }
+    await db.workouts.put(workoutWithId);
+    return workoutWithId.id;
   },
 
-  async getWorkout(id: number): Promise<Workout | undefined> {
+  async getWorkout(id: string): Promise<Workout | undefined> {
     return await db.workouts.get(id);
   },
 
@@ -284,16 +592,36 @@ export const dbHelpers = {
       .toArray();
   },
 
-  async updateWorkout(id: number, updates: Partial<Workout>): Promise<number> {
-    return await db.workouts.update(id, updates);
+  async updateWorkout(id: string, updates: Partial<Workout>): Promise<string> {
+    await db.workouts.update(id, updates);
+    return id;
   },
 
-  async deleteWorkout(id: number): Promise<void> {
+  async deleteWorkout(id: string): Promise<void> {
     await db.workouts.delete(id);
   },
 
   // Exercise operations
+  async findExerciseByName(normalizedName: string): Promise<Exercise | undefined> {
+    return await db.exercises
+      .filter(ex => ex.name.toLowerCase().trim() === normalizedName)
+      .first();
+  },
+
   async saveExercise(exercise: Exercise): Promise<string> {
+    const normalizedName = exercise.name.toLowerCase().trim();
+    const existingExercise = await this.findExerciseByName(normalizedName);
+    
+    if (existingExercise && existingExercise.id !== exercise.id) {
+      // Duplicate found by name - update existing record instead of creating new one
+      const updatedExercise: Exercise = {
+        ...exercise,
+        id: existingExercise.id, // Use existing ID
+      };
+      return await db.exercises.put(updatedExercise);
+    }
+    
+    // No duplicate found, save normally
     return await db.exercises.put(exercise);
   },
 
@@ -302,36 +630,79 @@ export const dbHelpers = {
   },
 
   async getAllExercises(): Promise<Exercise[]> {
-    return await db.exercises.toArray();
+    const allExercises = await db.exercises.toArray();
+    
+    // Deduplicate by normalized name, keeping the first occurrence
+    const seen = new Map<string, Exercise>();
+    const deduplicated: Exercise[] = [];
+    
+    for (const exercise of allExercises) {
+      const normalizedName = exercise.name.toLowerCase().trim();
+      if (!seen.has(normalizedName)) {
+        seen.set(normalizedName, exercise);
+        deduplicated.push(exercise);
+      }
+    }
+    
+    return deduplicated;
   },
 
   async searchExercises(query: string): Promise<Exercise[]> {
     const lowerQuery = query.toLowerCase();
-    return await db.exercises
+    const results = await db.exercises
       .filter(exercise => 
         exercise.name.toLowerCase().includes(lowerQuery) ||
         exercise.category.toLowerCase().includes(lowerQuery) ||
         exercise.equipment.some(eq => eq.toLowerCase().includes(lowerQuery))
       )
       .toArray();
+    
+    // Deduplicate by normalized name, keeping the first occurrence
+    const seen = new Map<string, Exercise>();
+    const deduplicated: Exercise[] = [];
+    
+    for (const exercise of results) {
+      const normalizedName = exercise.name.toLowerCase().trim();
+      if (!seen.has(normalizedName)) {
+        seen.set(normalizedName, exercise);
+        deduplicated.push(exercise);
+      }
+    }
+    
+    return deduplicated;
   },
 
   async filterExercisesByEquipment(equipmentCategories: string[]): Promise<Exercise[]> {
-    if (equipmentCategories.length === 0) {
-      return await db.exercises.toArray();
-    }
-
     const { getEquipmentCategories } = await import('./exerciseLibrary');
     
-    return await db.exercises
-      .filter(exercise => {
-        const exerciseCategories = getEquipmentCategories(exercise.equipment);
-        const exerciseCategoryStrings = exerciseCategories.map(cat => String(cat));
-        return equipmentCategories.some(category => 
-          exerciseCategoryStrings.includes(category)
-        );
-      })
-      .toArray();
+    let results: Exercise[];
+    if (equipmentCategories.length === 0) {
+      results = await db.exercises.toArray();
+    } else {
+      results = await db.exercises
+        .filter(exercise => {
+          const exerciseCategories = getEquipmentCategories(exercise.equipment);
+          const exerciseCategoryStrings = exerciseCategories.map(cat => String(cat));
+          return equipmentCategories.some(category => 
+            exerciseCategoryStrings.includes(category)
+          );
+        })
+        .toArray();
+    }
+    
+    // Deduplicate by normalized name, keeping the first occurrence
+    const seen = new Map<string, Exercise>();
+    const deduplicated: Exercise[] = [];
+    
+    for (const exercise of results) {
+      const normalizedName = exercise.name.toLowerCase().trim();
+      if (!seen.has(normalizedName)) {
+        seen.set(normalizedName, exercise);
+        deduplicated.push(exercise);
+      }
+    }
+    
+    return deduplicated;
   },
 
   async deleteExercise(id: string): Promise<void> {
@@ -565,7 +936,7 @@ export const dbHelpers = {
 
   async markPlannedWorkoutCompleted(
     id: string,
-    completedWorkoutId: number
+    completedWorkoutId: string
   ): Promise<string> {
     await db.plannedWorkouts.update(id, {
       isCompleted: true,

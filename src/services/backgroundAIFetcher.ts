@@ -99,7 +99,7 @@ export class BackgroundAIFetcher {
       date: workout.date instanceof Date ? workout.date.toISOString() : workout.date,
       exercises: workout.exercises?.map((ex) => ({
         ...ex,
-        date: ex.date instanceof Date ? ex.date.toISOString() : ex.date,
+        timestamp: ex.timestamp instanceof Date ? ex.timestamp.toISOString() : ex.timestamp,
       })),
     }));
   }
@@ -132,7 +132,10 @@ export class BackgroundAIFetcher {
   private serializeStrengthProgression(progression: StrengthProgression[]): Array<Record<string, unknown>> {
     return progression.map((prog) => ({
       ...prog,
-      date: prog.date instanceof Date ? prog.date.toISOString() : prog.date,
+      dataPoints: prog.dataPoints.map((dp) => ({
+        ...dp,
+        date: dp.date,
+      })),
     }));
   }
 }
