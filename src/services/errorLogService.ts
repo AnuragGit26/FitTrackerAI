@@ -1,11 +1,9 @@
 import { getSupabaseClientWithAuth } from './supabaseClient';
 import { userScopedQuery } from './supabaseQueryBuilder';
-import { connectToMongoDB } from './mongodbClient';
-import { userScopedFilter } from './mongodbQueryBuilder';
+import { prisma } from './prismaClient';
 import { requireUserId } from '@/utils/userIdValidation';
 import { ErrorLog, ErrorLogCreateInput, ErrorType, ErrorSeverity } from '@/types/error';
 import { db } from './database';
-import { ErrorLog as ErrorLogModel } from './mongodb/schemas';
 
 interface LocalErrorLog {
     id?: number;
@@ -34,8 +32,9 @@ class ErrorLogService {
     private async sendToVercel(errorLog: LocalErrorLog): Promise<void> {
         // Only send in production or if explicitly enabled
         const isProduction = import.meta.env.PROD;
-        const enableVercelLogging = import.meta.env.VITE_ENABLE_VERCEL_LOGGING !== 'false';
+        const enableVercelLogging = import.meta.env.VITE_ENABLE_VERCEL_LOGGING === 'true';
         
+        // Skip Vercel logging in development unless explicitly enabled
         if (!isProduction && !enableVercelLogging) {
             return;
         }
@@ -93,7 +92,28 @@ class ErrorLogService {
         };
 
         try {
-            const id = await db.errorLogs.add(errorLog);
+            // Convert LocalErrorLog to ErrorLog format for database
+            const errorLogForDb: ErrorLog = {
+                id: errorLog.id,
+                userId: errorLog.userId,
+                errorType: errorLog.errorType,
+                errorMessage: errorLog.errorMessage,
+                errorStack: errorLog.errorStack,
+                context: errorLog.context,
+                tableName: errorLog.tableName,
+                recordId: errorLog.recordId,
+                operation: errorLog.operation as ErrorLog['operation'],
+                severity: errorLog.severity,
+                resolved: errorLog.resolved,
+                resolvedAt: errorLog.resolvedAt ? new Date(errorLog.resolvedAt) : null,
+                resolvedBy: errorLog.resolvedBy,
+                version: errorLog.version,
+                deletedAt: errorLog.deletedAt ? new Date(errorLog.deletedAt) : null,
+                createdAt: new Date(errorLog.createdAt),
+                updatedAt: new Date(errorLog.updatedAt),
+            };
+            
+            const id = await db.errorLogs.add(errorLogForDb);
             
             // Send to Vercel (non-blocking)
             this.sendToVercel(errorLog).catch(() => {
@@ -137,7 +157,7 @@ class ErrorLogService {
     async logWorkoutError(
         userId: string,
         error: Error | string,
-        workoutId?: number,
+        workoutId?: string,
         context?: Record<string, unknown>
     ): Promise<number> {
         return this.logError({
@@ -167,7 +187,30 @@ class ErrorLogService {
         }
 
         const logs = await query.toArray();
-        return logs.map(this.convertFromLocalFormat);
+        // Convert ErrorLog[] from database to LocalErrorLog format, then back to ErrorLog
+        return logs.map((log: ErrorLog): ErrorLog => {
+            // Convert ErrorLog (with Date) to LocalErrorLog (with number), then back
+            const localLog: LocalErrorLog = {
+                id: log.id,
+                userId: log.userId,
+                errorType: log.errorType,
+                errorMessage: log.errorMessage,
+                errorStack: log.errorStack,
+                context: log.context,
+                tableName: log.tableName,
+                recordId: log.recordId,
+                operation: log.operation,
+                severity: log.severity,
+                resolved: log.resolved,
+                resolvedAt: log.resolvedAt ? log.resolvedAt.getTime() : null,
+                resolvedBy: log.resolvedBy,
+                version: log.version,
+                deletedAt: log.deletedAt ? log.deletedAt.getTime() : null,
+                createdAt: log.createdAt.getTime(),
+                updatedAt: log.updatedAt.getTime(),
+            };
+            return this.convertFromLocalFormat(localLog);
+        });
     }
 
     /**
@@ -204,7 +247,6 @@ class ErrorLogService {
         });
 
         try {
-            await connectToMongoDB();
             const localLogs = await db.errorLogs
                 .where('userId')
                 .equals(validatedUserId)
@@ -215,20 +257,50 @@ class ErrorLogService {
                 return;
             }
 
-            const mongoLogs = localLogs.map((log) =>
-                this.convertToMongoFormat(log)
-            );
-
-            // Use bulkWrite for efficient upserts
-            const operations = mongoLogs.map((log) => ({
-                updateOne: {
-                    filter: { userId: validatedUserId, _id: log._id || log.id },
-                    update: { $set: log },
-                    upsert: true,
-                },
-            }));
-
-            await ErrorLogModel.bulkWrite(operations);
+            // Batch creates to avoid resource exhaustion
+            // Error logs are append-only, so we just create new ones in MongoDB
+            // The numeric IDs from IndexedDB can't be used as MongoDB ObjectIds
+            const localLogsArray: LocalErrorLog[] = localLogs as unknown as LocalErrorLog[];
+            const BATCH_SIZE = 10; // Process 10 logs at a time
+            
+            for (let i = 0; i < localLogsArray.length; i += BATCH_SIZE) {
+                const batch = localLogsArray.slice(i, i + BATCH_SIZE);
+                const promises = batch.map(async (localLog: LocalErrorLog) => {
+                    const mongoLog = this.convertToMongoFormat(localLog);
+                    // Remove id - MongoDB will generate a new ObjectId
+                    const createData = { ...mongoLog };
+                    delete createData.id;
+                    
+                    // Check if a similar log already exists to avoid duplicates
+                    // Match on userId + errorMessage + createdAt (within 2 second tolerance)
+                    const existing = await prisma.errorLog.findFirst({
+                        where: {
+                            userId: mongoLog.userId as string,
+                            errorMessage: mongoLog.errorMessage as string,
+                            createdAt: {
+                                gte: new Date((mongoLog.createdAt as Date).getTime() - 2000),
+                                lte: new Date((mongoLog.createdAt as Date).getTime() + 2000),
+                            },
+                        },
+                    });
+                    
+                    // If a duplicate exists, skip creating a new one
+                    // Error logs are append-only, so we don't update existing ones
+                    if (existing && existing.id) {
+                        // eslint-disable-next-line no-console
+                        console.log('[ErrorLogService] Skipping duplicate error log:', existing.id);
+                        return null;
+                    }
+                    
+                    // Create new log
+                    return prisma.errorLog.create({
+                        data: createData as never,
+                    });
+                });
+                // Filter out null results (skipped duplicates)
+                const results = await Promise.all(promises);
+                results.filter((r) => r !== null);
+            }
         } catch (error) {
             console.error('Error syncing error logs to MongoDB:', error);
             throw error;
@@ -268,11 +340,32 @@ class ErrorLogService {
             }
 
             if (data && data.length > 0) {
-                const localLogs = data.map((log) =>
-                    this.convertFromSupabaseFormat(log)
+                const localLogs: LocalErrorLog[] = data.map((log: unknown) =>
+                    this.convertFromSupabaseFormat(log as Record<string, unknown>)
                 );
 
-                await db.errorLogs.bulkPut(localLogs);
+                // Convert LocalErrorLog[] to ErrorLog[] for database
+                const errorLogsForDb: ErrorLog[] = localLogs.map((log) => ({
+                    id: log.id,
+                    userId: log.userId,
+                    errorType: log.errorType,
+                    errorMessage: log.errorMessage,
+                    errorStack: log.errorStack,
+                    context: log.context,
+                    tableName: log.tableName,
+                    recordId: log.recordId,
+                    operation: log.operation as ErrorLog['operation'],
+                    severity: log.severity,
+                    resolved: log.resolved,
+                    resolvedAt: log.resolvedAt ? new Date(log.resolvedAt) : null,
+                    resolvedBy: log.resolvedBy,
+                    version: log.version,
+                    deletedAt: log.deletedAt ? new Date(log.deletedAt) : null,
+                    createdAt: new Date(log.createdAt),
+                    updatedAt: new Date(log.updatedAt),
+                }));
+
+                await db.errorLogs.bulkPut(errorLogsForDb);
             }
         } catch (error) {
             console.error('Error pulling error logs from Supabase:', error);
@@ -280,6 +373,8 @@ class ErrorLogService {
         }
     }
 
+    // Unused but kept for potential future use
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     private convertToSupabaseFormat(log: LocalErrorLog): Record<string, unknown> {
         return {
             id: log.id,
@@ -348,7 +443,7 @@ class ErrorLogService {
             context: log.context,
             tableName: log.tableName,
             recordId: log.recordId,
-            operation: log.operation as any,
+            operation: log.operation as 'create' | 'update' | 'delete' | 'read' | 'sync' | 'other' | undefined,
             severity: log.severity,
             resolved: log.resolved,
             resolvedAt: log.resolvedAt ? new Date(log.resolvedAt) : null,
@@ -360,8 +455,25 @@ class ErrorLogService {
         };
     }
 
+    /**
+     * Get current local date/time as a Date object
+     */
+    private getCurrentLocalDate(): Date {
+        return new Date();
+    }
+
+    /**
+     * Convert a timestamp to a local Date object
+     */
+    private timestampToLocalDate(timestamp: number | Date | string | null | undefined): Date | null {
+        if (!timestamp) return null;
+        if (timestamp instanceof Date) return timestamp;
+        if (typeof timestamp === 'string') return new Date(timestamp);
+        return new Date(timestamp);
+    }
+
     private convertToMongoFormat(log: LocalErrorLog): Record<string, unknown> {
-        return {
+        const result: Record<string, unknown> = {
             userId: log.userId,
             errorType: log.errorType,
             errorMessage: log.errorMessage,
@@ -372,13 +484,20 @@ class ErrorLogService {
             operation: log.operation,
             severity: log.severity,
             resolved: log.resolved,
-            resolvedAt: log.resolvedAt ? new Date(log.resolvedAt) : null,
+            resolvedAt: this.timestampToLocalDate(log.resolvedAt),
             resolvedBy: log.resolvedBy,
             version: log.version || 1,
-            deletedAt: log.deletedAt ? new Date(log.deletedAt) : null,
-            createdAt: new Date(log.createdAt),
-            updatedAt: new Date(log.updatedAt),
+            deletedAt: this.timestampToLocalDate(log.deletedAt),
+            createdAt: this.timestampToLocalDate(log.createdAt) || this.getCurrentLocalDate(),
+            updatedAt: this.getCurrentLocalDate(), // Always use current local date/time for updates
         };
+        
+        // Include id if it exists (for updates/upserts)
+        if (log.id !== undefined) {
+            result.id = String(log.id);
+        }
+        
+        return result;
     }
 }
 

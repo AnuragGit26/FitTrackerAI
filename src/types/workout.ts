@@ -4,7 +4,7 @@ import { WorkoutExercise } from './exercise';
 export type WorkoutMood = 'great' | 'good' | 'okay' | 'tired' | 'exhausted';
 
 export interface Workout {
-  id?: number;
+  id?: string;
   userId: string;
   date: Date;
   startTime: Date;
@@ -85,7 +85,7 @@ export interface PlannedWorkout {
   musclesTargeted: MuscleGroup[];
   notes?: string;
   isCompleted: boolean;
-  completedWorkoutId?: number;
+  completedWorkoutId?: string;
   createdAt: Date;
   updatedAt: Date;
   version?: number; // For optimistic locking

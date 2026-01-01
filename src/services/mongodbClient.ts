@@ -1,126 +1,64 @@
-import mongoose from 'mongoose';
-import { requireUserId } from '@/utils/userIdValidation';
+/**
+ * MongoDB Client - Prisma Compatibility Layer
+ * 
+ * This file provides backward compatibility for code that imports from mongodbClient.
+ * All functionality has been migrated to Prisma Client.
+ * 
+ * @deprecated Use prismaClient.ts instead
+ */
 
-// SECURITY WARNING: MongoDB connection strings contain credentials.
-// In production, consider using a backend API proxy instead of connecting directly from the browser.
-// If you must connect from the browser, ensure:
-// 1. MongoDB Atlas IP whitelist is configured
-// 2. Database user has minimal required permissions
-// 3. Connection string uses a read-only or limited-access user
-const mongodbUri = import.meta.env.VITE_MONGODB_URI || import.meta.env.MONGODB_URI;
-
-if (!mongodbUri) {
-    throw new Error(
-        'VITE_MONGODB_URI (or MONGODB_URI) is required. Please add it to your .env file.\n' +
-        'Note: Vite requires the VITE_ prefix for client-side environment variables.\n' +
-        'Get your connection string from: https://www.mongodb.com/cloud/atlas'
-    );
-}
-
-// Type assertion: we've already checked that mongodbUri is not null/undefined
-const mongoUri: string = mongodbUri;
-
-let isConnected = false;
-let connectionPromise: Promise<typeof mongoose> | null = null;
+import { prisma, getPrismaClient, getPrismaConnectionStatus, disconnectPrisma } from './prismaClient';
 
 /**
- * Connect to MongoDB using Mongoose
- * Handles connection pooling and reconnection automatically
+ * @deprecated Use getPrismaClient() from prismaClient.ts instead
  */
-export async function connectToMongoDB(): Promise<typeof mongoose> {
-    if (isConnected && mongoose.connection.readyState === 1) {
-        return mongoose;
-    }
-
-    if (connectionPromise) {
-        return connectionPromise;
-    }
-
-    connectionPromise = mongoose.connect(mongoUri, {
-        maxPoolSize: 10,
-        serverSelectionTimeoutMS: 5000,
-        socketTimeoutMS: 45000,
-        bufferCommands: false,
-    }).then((mongooseInstance) => {
-        isConnected = true;
-        connectionPromise = null;
-        return mongooseInstance;
-    }).catch((error) => {
-        connectionPromise = null;
-        isConnected = false;
-        console.error('MongoDB connection error:', error);
-        throw error;
-    });
-
-    // Set up connection event handlers
-    mongoose.connection.on('connected', () => {
-        isConnected = true;
-        // eslint-disable-next-line no-console
-        console.log('MongoDB connected');
-    });
-
-    mongoose.connection.on('error', (error) => {
-        isConnected = false;
-        // eslint-disable-next-line no-console
-        console.error('MongoDB connection error:', error);
-    });
-
-    mongoose.connection.on('disconnected', () => {
-        isConnected = false;
-        // eslint-disable-next-line no-console
-        console.log('MongoDB disconnected');
-    });
-
-    return connectionPromise;
+export async function connectToMongoDB() {
+    // Prisma Client is already initialized, just return it
+    return getPrismaClient();
 }
 
 /**
- * Get MongoDB connection status
+ * @deprecated Use getPrismaConnectionStatus() from prismaClient.ts instead
  */
-export function getMongoDBConnectionStatus(): {
-    isConnected: boolean;
-    readyState: number;
-} {
+export function getMongoDBConnectionStatus() {
+    const status = getPrismaConnectionStatus();
     return {
-        isConnected: isConnected && mongoose.connection.readyState === 1,
-        readyState: mongoose.connection.readyState,
+        isConnected: status.isConnected,
+        readyState: status.isConnected ? 1 : 0,
     };
 }
 
 /**
- * Disconnect from MongoDB
+ * @deprecated Use disconnectPrisma() from prismaClient.ts instead
  */
-export async function disconnectFromMongoDB(): Promise<void> {
-    if (mongoose.connection.readyState !== 0) {
-        await mongoose.disconnect();
-        isConnected = false;
-    }
+export async function disconnectFromMongoDB() {
+    return disconnectPrisma();
 }
 
 /**
- * Ensure MongoDB connection is established
- * Validates userId before operations
- * 
- * @param userId - REQUIRED: The user ID to validate
- * @returns Mongoose instance
- * @throws {UserIdValidationError} If userId is missing or invalid
+ * @deprecated Use getPrismaClient() from prismaClient.ts instead
  */
-export async function getMongoDBConnection(userId?: string): Promise<typeof mongoose> {
+export async function getMongoDBConnection(userId?: string) {
     if (userId) {
+        // Validate userId if provided
+        const { requireUserId } = await import('@/utils/userIdValidation');
         requireUserId(userId, {
             functionName: 'getMongoDBConnection',
             additionalInfo: { operation: 'mongodb_connection' },
         });
     }
-
-    return connectToMongoDB();
+    return getPrismaClient();
 }
 
 /**
- * Reset MongoDB connection (useful for testing)
+ * @deprecated Use resetPrismaClient() from prismaClient.ts instead
  */
-export function resetMongoDBConnection(): void {
-    isConnected = false;
-    connectionPromise = null;
+export function resetMongoDBConnection() {
+    // Import synchronously for compatibility
+    import('./prismaClient').then(({ resetPrismaClient }) => {
+        resetPrismaClient();
+    });
 }
 
+// Export Prisma client for direct use
+export { prisma };

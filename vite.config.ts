@@ -4,6 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 import eslint from 'vite-plugin-eslint'
 import path from 'path'
 import { versionPlugin } from './vite-plugin-version'
+import { excludePrismaPlugin } from './vite-plugin-exclude-prisma'
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -31,14 +32,10 @@ export default defineConfig(({ mode }) => {
   define: {
     ...defineVars,
   },
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
-  },
   plugins: [
     react(),
     versionPlugin(),
+    excludePrismaPlugin(),
     eslint({
       failOnError: false, // Don't fail build on ESLint errors in dev
       failOnWarning: false, // Don't fail build on ESLint warnings in dev
@@ -157,7 +154,13 @@ export default defineConfig(({ mode }) => {
   ],
   server: {
     port: 3000,
-    open: true
+    open: true,
+    proxy: {
+      '/api/prisma': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+    },
   },
   build: {
     outDir: 'dist',
@@ -170,7 +173,26 @@ export default defineConfig(({ mode }) => {
           'chart-vendor': ['recharts']
         }
       }
+    },
+    // Configure for Prisma Client browser compatibility
+    commonjsOptions: {
+      transformMixedEsModules: true,
     }
+  },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+      // Redirect runtime Prisma Client imports to stub (type imports still work)
+      '@prisma/client$': path.resolve(__dirname, './src/stubs/prisma-client-stub.ts'),
+    },
+  },
+  optimizeDeps: {
+    // Exclude Prisma Client from optimization - it doesn't work in browsers
+    exclude: ['@prisma/client', '@prisma/extension-accelerate']
+  },
+  ssr: {
+    // Externalize Prisma Client - don't bundle it
+    external: ['@prisma/client', '@prisma/extension-accelerate']
   }
   }
 })

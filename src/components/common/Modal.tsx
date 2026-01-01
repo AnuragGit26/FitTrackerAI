@@ -141,7 +141,7 @@ export function Modal({
             exit="exit"
           >
             {(title || showCloseButton || header) && (
-              <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+              <div className="relative flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
                 {header ? (
                   header
                 ) : (

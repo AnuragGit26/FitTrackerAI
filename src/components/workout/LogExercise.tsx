@@ -70,7 +70,6 @@ export function LogExercise({
 
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
   const [sets, setSets] = useState<WorkoutSet[]>([]);
-  const restTimerEnabled = false; // Rest timer is always enabled when auto-start is on
   const [workoutDate, setWorkoutDate] = useState<Date>(new Date());
   const [notes, setNotes] = useState('');
   const [showAdditionalDetails, setShowAdditionalDetails] = useState(false);
@@ -357,7 +356,7 @@ export function LogExercise({
   const stateSnapshotRef = useRef({
     selectedExerciseId: null as string | null,
     sets: [] as WorkoutSet[],
-    restTimerEnabled: false,
+    restTimerEnabled: false, // Will be set from settings.autoStartRestTimer
     workoutDate: new Date(),
     notes: '',
     exerciseId: null as string | null,
@@ -389,7 +388,7 @@ export function LogExercise({
     stateSnapshotRef.current = {
       selectedExerciseId: selectedExercise?.id || null,
       sets,
-      restTimerEnabled,
+      restTimerEnabled: settings.autoStartRestTimer,
       workoutDate,
       notes,
       exerciseId: exerciseId || null,
@@ -653,7 +652,7 @@ export function LogExercise({
             }
 
             // Start rest timer if enabled
-            if (restTimerEnabled && settings.autoStartRestTimer) {
+            if (settings.autoStartRestTimer) {
               setRestTimerRemaining(defaultRestDuration);
               setRestTimerStartTime(new Date());
               setRestTimerOriginalDuration(defaultRestDuration);
@@ -1033,7 +1032,7 @@ export function LogExercise({
       // Don't navigate yet - wait for timer to complete
     } else if (isInSuperset && isLastInSuperset) {
       // Last exercise in superset - show regular rest timer
-      if (restTimerEnabled && settings.autoStartRestTimer) {
+      if (settings.autoStartRestTimer) {
         setRestTimerRemaining(defaultRestDuration);
         setRestTimerStartTime(new Date());
         setRestTimerOriginalDuration(defaultRestDuration);
@@ -1041,7 +1040,7 @@ export function LogExercise({
       }
     } else {
       // Not in superset - show regular rest timer
-      if (restTimerEnabled && settings.autoStartRestTimer) {
+      if (settings.autoStartRestTimer) {
         setRestTimerRemaining(defaultRestDuration);
         setRestTimerStartTime(new Date());
         setRestTimerOriginalDuration(defaultRestDuration);
@@ -1562,7 +1561,7 @@ export function LogExercise({
           onPause={handleRestPause}
           onTimeAdjust={handleRestTimeAdjust}
           onRemainingTimeChange={handleRestRemainingTimeChange}
-          isVisible={restTimerVisible && restTimerEnabled && !groupRestTimerVisible}
+          isVisible={restTimerVisible && settings.autoStartRestTimer && !groupRestTimerVisible}
           initialPaused={restTimerPaused}
           initialRemainingTime={restTimerVisible ? restTimerRemaining : undefined}
         />

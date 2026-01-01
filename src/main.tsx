@@ -17,7 +17,14 @@ const redirectUri = window.location.origin;
 // Intercept fetch calls to Auth0 endpoints to catch 400 errors
 const originalFetch = window.fetch;
 window.fetch = async function(...args) {
-  const url = typeof args[0] === 'string' ? args[0] : args[0]?.url || '';
+  const firstArg = args[0];
+  const url = typeof firstArg === 'string' 
+    ? firstArg 
+    : firstArg instanceof Request 
+    ? firstArg.url 
+    : firstArg instanceof URL
+    ? firstArg.toString()
+    : '';
   const isAuth0Request = url.includes('auth0.com') || url.includes('auth0');
   
   if (isAuth0Request) {
@@ -50,18 +57,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       cacheLocation="localstorage"
       useRefreshTokens={true}
       useCookiesForTransactions={false}
-      onError={(error) => {
-        console.error('Auth0 error:', error);
-        // Log specific guidance for common errors
-        if (error?.message?.includes('400') || error?.error === 'invalid_request') {
-          console.error('⚠️ Auth0 400 Error - Common fixes:');
-          console.error('1. Add your app URL to "Allowed Web Origins" in Auth0 Dashboard:');
-          console.error(`   - Go to Auth0 Dashboard > Applications > Your App > Settings`);
-          console.error(`   - Add "${redirectUri}" to "Allowed Web Origins"`);
-          console.error(`   - Add "${redirectUri}" to "Allowed Callback URLs"`);
-          console.error(`   - Add "${redirectUri}" to "Allowed Logout URLs"`);
-        }
-      }}
     >
       <App />
     </Auth0Provider>

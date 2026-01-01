@@ -28,6 +28,8 @@ import { cacheVersionService } from '@/services/cacheVersionService';
 import { logger } from '@/utils/logger';
 
 // Lazy load route components for code splitting
+// Pages with default exports: LogWorkout, WorkoutSummary, EditWorkout, WorkoutHistory
+// Pages with named exports only: all others
 const Home = lazy(() => import('@/pages/Home').then(m => ({ default: m.Home })));
 const LogWorkout = lazy(() => import('@/pages/LogWorkout'));
 const CreateCustomExercise = lazy(() => import('@/pages/CreateCustomExercise').then(m => ({ default: m.CreateCustomExercise })));
@@ -39,9 +41,9 @@ const Rest = lazy(() => import('@/pages/Rest').then(m => ({ default: m.Rest })))
 const Profile = lazy(() => import('@/pages/Profile').then(m => ({ default: m.Profile })));
 const Planner = lazy(() => import('@/pages/Planner').then(m => ({ default: m.Planner })));
 const SleepRecovery = lazy(() => import('@/pages/SleepRecovery').then(m => ({ default: m.SleepRecovery })));
-const WorkoutSummary = lazy(() => import('@/pages/WorkoutSummary').then(m => ({ default: m.WorkoutSummary })));
-const WorkoutHistory = lazy(() => import('@/pages/WorkoutHistory').then(m => ({ default: m.WorkoutHistory })));
-const EditWorkout = lazy(() => import('@/pages/EditWorkout').then(m => ({ default: m.EditWorkout })));
+const WorkoutSummary = lazy(() => import('@/pages/WorkoutSummary'));
+const WorkoutHistory = lazy(() => import('@/pages/WorkoutHistory'));
+const EditWorkout = lazy(() => import('@/pages/EditWorkout'));
 const Login = lazy(() => import('@/pages/Login').then(m => ({ default: m.Login })));
 const SignUp = lazy(() => import('@/pages/SignUp').then(m => ({ default: m.SignUp })));
 

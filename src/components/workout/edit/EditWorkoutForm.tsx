@@ -89,6 +89,12 @@ export function EditWorkoutForm({ workout, onSave, onCancel, isSaving }: EditWor
   };
 
   const handleSave = async () => {
+    // Validate at least one exercise exists
+    if (exercises.length === 0) {
+      showError('A workout must have at least one exercise');
+      return;
+    }
+
     // Validate date and times
     const workoutDate = new Date(date);
     const startTimeDate = startTime ? new Date(startTime) : workout.startTime;

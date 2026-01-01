@@ -34,7 +34,7 @@ export function Planner() {
 
   // Load planned workouts based on view mode
   useEffect(() => {
-    if (!profile) return;
+    if (!profile?.id) return;
 
     const loadWorkouts = async () => {
       let startDate: Date;
@@ -56,10 +56,10 @@ export function Planner() {
     };
 
     loadWorkouts();
-  }, [profile, currentDate, viewMode, loadPlannedWorkoutsByDateRange]);
+  }, [profile?.id, currentDate, viewMode, loadPlannedWorkoutsByDateRange]);
 
   const handleStartWorkout = async (plannedWorkout: PlannedWorkout) => {
-    if (!profile) return;
+    if (!profile?.id) return;
 
     try {
       const { startWorkoutFromPlanned } = useWorkoutStore.getState();

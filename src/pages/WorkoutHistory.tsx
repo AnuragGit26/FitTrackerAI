@@ -17,7 +17,7 @@ export function WorkoutHistory() {
 
   useEffect(() => {
     const loadWorkouts = async () => {
-      if (!profile) {
+      if (!profile?.id) {
         setError('Please log in to view workout history');
         setIsLoading(false);
         return;
@@ -26,7 +26,7 @@ export function WorkoutHistory() {
       try {
         const allWorkouts = await dataService.getAllWorkouts(profile.id);
         // Sort by date, most recent first
-        const sorted = allWorkouts.sort((a, b) => {
+        const sorted = (allWorkouts ?? []).sort((a, b) => {
           const dateA = new Date(a.date).getTime();
           const dateB = new Date(b.date).getTime();
           return dateB - dateA;
@@ -41,7 +41,7 @@ export function WorkoutHistory() {
     };
 
     loadWorkouts();
-  }, [profile]);
+  }, [profile?.id]);
 
   const formatWorkoutDate = (date: Date): string => {
     const d = new Date(date);
@@ -77,13 +77,13 @@ export function WorkoutHistory() {
     return Math.round(volume).toString();
   };
 
-  const handleWorkoutClick = (workoutId?: number) => {
+  const handleWorkoutClick = (workoutId?: string) => {
     if (workoutId) {
       navigate(`/workout-summary/${workoutId}`);
     }
   };
 
-  const handleSaveWorkoutName = async (workoutId: number, newName: string) => {
+  const handleSaveWorkoutName = async (workoutId: string, newName: string) => {
     await dataService.updateWorkout(workoutId, { workoutType: newName });
     
     setWorkouts((prevWorkouts) =>
@@ -229,7 +229,7 @@ export function WorkoutHistory() {
                       <p className="text-xs font-semibold uppercase tracking-wider">Ex</p>
                     </div>
                     <p className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
-                      {workout.exercises.length}
+                      {(workout.exercises ?? []).length}
                     </p>
                   </div>
                 </div>

@@ -1,6 +1,33 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 
 /**
+ * Sanitizes a string for use in Supabase Storage keys
+ * Replaces invalid characters with underscores
+ * Supabase Storage keys can contain: alphanumeric, hyphens, underscores, forward slashes, periods
+ */
+function sanitizeStorageKey(key: string): string {
+  return key
+    .split('')
+    .map((char) => {
+      const code = char.charCodeAt(0);
+      // Allow: alphanumeric, hyphen, underscore, forward slash, period
+      if (
+        (code >= 48 && code <= 57) || // 0-9
+        (code >= 65 && code <= 90) || // A-Z
+        (code >= 97 && code <= 122) || // a-z
+        char === '-' ||
+        char === '_' ||
+        char === '/' ||
+        char === '.'
+      ) {
+        return char;
+      }
+      return '_';
+    })
+    .join('');
+}
+
+/**
  * Creates a user-scoped storage helper that automatically prepends user_id to paths
  * This ensures files are organized by user: {user_id}/{filename}
  * 
@@ -14,6 +41,9 @@ export function userScopedStorage(
   bucketName: string,
   userId: string
 ) {
+  // Sanitize userId to ensure it's valid for storage keys (e.g., replace | with _)
+  const sanitizedUserId = sanitizeStorageKey(userId);
+  
   /**
    * Prepends user_id to a file path
    */
@@ -21,13 +51,16 @@ export function userScopedStorage(
     // Remove leading slash if present
     const cleanPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
     
-    // If path already starts with userId, return as-is
-    if (cleanPath.startsWith(`${userId}/`)) {
-      return cleanPath;
+    // Sanitize the file path as well
+    const sanitizedPath = sanitizeStorageKey(cleanPath);
+    
+    // If path already starts with sanitizedUserId, return as-is
+    if (sanitizedPath.startsWith(`${sanitizedUserId}/`)) {
+      return sanitizedPath;
     }
     
-    // Otherwise, prepend userId
-    return `${userId}/${cleanPath}`;
+    // Otherwise, prepend sanitized userId
+    return `${sanitizedUserId}/${sanitizedPath}`;
   }
 
   return {
@@ -71,7 +104,7 @@ export function userScopedStorage(
      * List files in user-scoped storage
      */
     async list(path?: string, options?: { limit?: number; offset?: number; sortBy?: { column?: string; order?: 'asc' | 'desc' } }) {
-      const scopedPath = path ? getUserScopedPath(path) : userId;
+      const scopedPath = path ? getUserScopedPath(path) : sanitizedUserId;
       return supabase.storage.from(bucketName).list(scopedPath, options);
     },
 
@@ -94,7 +127,7 @@ export function userScopedStorage(
  * @param userId - The user ID to scope queries to
  * @returns A query builder with user-scoped methods
  */
-export function userScopedQuery<T = any>(
+export function userScopedQuery<T = Record<string, unknown>>(
   supabase: SupabaseClient,
   tableName: string,
   userId: string

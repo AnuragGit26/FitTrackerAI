@@ -8,7 +8,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isLoading, isAuthenticated, error: auth0Error } = useAuth0();
+  const { isLoading, isAuthenticated } = useAuth0();
 
 
   if (isLoading) {

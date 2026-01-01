@@ -1,26 +1,51 @@
-// Export all schemas from a single file for easy importing
-export { Workout } from './Workout';
-export type { IWorkout } from './Workout';
-export { Exercise } from './Exercise';
-export type { IExercise } from './Exercise';
-export { WorkoutTemplate } from './WorkoutTemplate';
-export type { IWorkoutTemplate } from './WorkoutTemplate';
-export { PlannedWorkout } from './PlannedWorkout';
-export type { IPlannedWorkout } from './PlannedWorkout';
-export { MuscleStatus } from './MuscleStatus';
-export type { IMuscleStatus } from './MuscleStatus';
-export { UserProfile } from './UserProfile';
-export type { IUserProfile } from './UserProfile';
-export { Setting } from './Setting';
-export type { ISetting } from './Setting';
-export { Notification } from './Notification';
-export type { INotification } from './Notification';
-export { SleepLog } from './SleepLog';
-export type { ISleepLog } from './SleepLog';
-export { RecoveryLog } from './RecoveryLog';
-export type { IRecoveryLog } from './RecoveryLog';
-export { ErrorLog } from './ErrorLog';
-export type { IErrorLog } from './ErrorLog';
-export { SyncMetadata } from './SyncMetadata';
-export type { ISyncMetadata } from './SyncMetadata';
+// Export Prisma-generated types for all models
+// Use type-only import to prevent bundling Prisma Client in browser
+import type { Prisma } from '@prisma/client';
 
+// Workout types
+export type Workout = Prisma.WorkoutGetPayload<{}>;
+export type IWorkout = Workout;
+
+// Exercise types
+export type Exercise = Prisma.ExerciseGetPayload<{}>;
+export type IExercise = Exercise;
+
+// WorkoutTemplate types
+export type WorkoutTemplate = Prisma.WorkoutTemplateGetPayload<{}>;
+export type IWorkoutTemplate = WorkoutTemplate;
+
+// PlannedWorkout types
+export type PlannedWorkout = Prisma.PlannedWorkoutGetPayload<{}>;
+export type IPlannedWorkout = PlannedWorkout;
+
+// MuscleStatus types
+export type MuscleStatus = Prisma.MuscleStatusGetPayload<{}>;
+export type IMuscleStatus = MuscleStatus;
+
+// UserProfile types
+export type UserProfile = Prisma.UserProfileGetPayload<{}>;
+export type IUserProfile = UserProfile;
+
+// Setting types
+export type Setting = Prisma.SettingGetPayload<{}>;
+export type ISetting = Setting;
+
+// Notification types
+export type Notification = Prisma.NotificationGetPayload<{}>;
+export type INotification = Notification;
+
+// SleepLog types
+export type SleepLog = Prisma.SleepLogGetPayload<{}>;
+export type ISleepLog = SleepLog;
+
+// RecoveryLog types
+export type RecoveryLog = Prisma.RecoveryLogGetPayload<{}>;
+export type IRecoveryLog = RecoveryLog;
+
+// ErrorLog types
+export type ErrorLog = Prisma.ErrorLogGetPayload<{}>;
+export type IErrorLog = ErrorLog;
+
+// SyncMetadata types
+export type SyncMetadata = Prisma.SyncMetadataGetPayload<{}>;
+export type ISyncMetadata = SyncMetadata;

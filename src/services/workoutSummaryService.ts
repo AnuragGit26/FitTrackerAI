@@ -24,7 +24,7 @@ export const workoutSummaryService = {
   /**
    * Generate complete workout summary data
    */
-  async generateSummary(workoutId: number, userId: string): Promise<WorkoutSummaryData> {
+  async generateSummary(workoutId: string, userId: string): Promise<WorkoutSummaryData> {
     const workout = await dataService.getWorkout(workoutId);
     if (!workout) {
       throw new Error('Workout not found');

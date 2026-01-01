@@ -2,6 +2,7 @@ import { Exercise, ExerciseAdvancedDetails } from '@/types/exercise';
 import { MuscleGroup } from '@/types/muscle';
 import { exerciseDetailsService } from './exerciseDetailsService';
 import { logger } from '@/utils/logger';
+import { generateAlphanumericId, generateCustomExerciseId } from '@/utils/idGenerator';
 
 export enum EquipmentCategory {
   FREE_WEIGHTS = 'Free Weights',
@@ -2446,21 +2447,11 @@ export const exerciseLibrary = {
         existingExercises.map(ex => ex.name.toLowerCase().trim())
       );
 
-      // Find the highest numeric ID to continue from
-      let maxId = 0;
-      for (const ex of existingExercises) {
-        const match = ex.id.match(/^exercise-(\d+)$/);
-        if (match) {
-          const numId = parseInt(match[1], 10);
-          if (numId > maxId) {
-            maxId = numId;
-          }
-        }
-      }
-
+      // Check for existing IDs (both old numeric and new alphanumeric formats)
+      const existingIds = new Set(existingExercises.map(ex => ex.id));
+      
       // Add missing exercises from CORE_EXERCISES (including strength)
       let addedCount = 0;
-      let nextId = maxId + 1;
       
       // Batch operations to avoid overwhelming the database
       const exercisesToAdd: Exercise[] = [];
@@ -2468,13 +2459,22 @@ export const exerciseLibrary = {
       for (const coreExercise of CORE_EXERCISES) {
         const normalizedName = coreExercise.name.toLowerCase().trim();
         if (!existingNames.has(normalizedName)) {
+          // Generate new alphanumeric ID, ensuring uniqueness
+          let newId = generateAlphanumericId('exr');
+          let attempts = 0;
+          while (existingIds.has(newId) && attempts < 10) {
+            newId = generateAlphanumericId('exr');
+            attempts++;
+          }
+          
           const exercise: Exercise = {
             ...coreExercise,
-            id: `exercise-${nextId++}`,
+            id: newId,
             isCustom: false,
           };
           exercisesToAdd.push(exercise);
           existingNames.add(normalizedName);
+          existingIds.add(newId);
         }
       }
 
@@ -2505,16 +2505,40 @@ export const exerciseLibrary = {
     const { dbHelpers } = await import('./database');
     const existingExercises = await dbHelpers.getAllExercises();
 
-    if (existingExercises.length === 0) {
+    // Cleanup duplicates before initialization if exercises exist
+    if (existingExercises.length > 0) {
+      try {
+        await this.cleanupDuplicateExercises();
+      } catch (error) {
+        logger.warn('Failed to cleanup duplicate exercises during initialization:', error);
+        // Continue with initialization even if cleanup fails
+      }
+    }
+
+    // Re-fetch after cleanup to get accurate count
+    const exercisesAfterCleanup = await dbHelpers.getAllExercises();
+
+    if (exercisesAfterCleanup.length === 0) {
       // Start with core exercises, but EXCLUDE strength category exercises
       // Strength category exercises will come from StrengthLog data only
+      const existingIds = new Set<string>();
       const exercises: Exercise[] = CORE_EXERCISES
         .filter(ex => ex.category !== 'strength') // Exclude strength exercises from core
-        .map((ex, index) => ({
-        ...ex,
-        id: `exercise-${index + 1}`,
-        isCustom: false,
-      }));
+        .map((ex) => {
+          // Generate unique alphanumeric ID
+          let newId = generateAlphanumericId('exr');
+          let attempts = 0;
+          while (existingIds.has(newId) && attempts < 10) {
+            newId = generateAlphanumericId('exr');
+            attempts++;
+          }
+          existingIds.add(newId);
+          return {
+            ...ex,
+            id: newId,
+            isCustom: false,
+          };
+        });
 
       // Load StrengthLog exercises for strength category ONLY
       try {
@@ -2527,7 +2551,6 @@ export const exerciseLibrary = {
           );
 
           // Convert StrengthLog exercises to Exercise format
-          let nextId = exercises.length + 1;
           STRENGTHLOG_EXERCISES.forEach((slExercise) => {
             const normalizedName = slExercise.name.toLowerCase().trim();
             
@@ -2536,6 +2559,15 @@ export const exerciseLibrary = {
               return;
             }
 
+            // Generate unique alphanumeric ID
+            let newId = generateAlphanumericId('exr');
+            let attempts = 0;
+            while (existingIds.has(newId) && attempts < 10) {
+              newId = generateAlphanumericId('exr');
+              attempts++;
+            }
+            existingIds.add(newId);
+
             // Use muscle groups from StrengthLog data (already mapped)
             const primaryMuscles = slExercise.primaryMuscles.length > 0 
               ? slExercise.primaryMuscles 
@@ -2543,7 +2575,7 @@ export const exerciseLibrary = {
             const secondaryMuscles = slExercise.secondaryMuscles || [];
 
             const exercise: Exercise = {
-              id: `exercise-${nextId++}`,
+              id: newId,
               name: slExercise.name,
               category: 'strength', // Always 'strength' for StrengthLog exercises
               primaryMuscles: primaryMuscles,
@@ -2607,25 +2639,9 @@ export const exerciseLibrary = {
     const { dbHelpers } = await import('./database');
     const { userContextManager } = await import('./userContextManager');
     
-    // Generate UUID for custom exercises to prevent multi-user collisions
-    // Using crypto.randomUUID() if available, fallback to a more robust method
-    const generateUUID = (): string => {
-      if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-        return crypto.randomUUID();
-      }
-      // Fallback: more robust UUID v4 generation
-      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-        const r = (Math.random() * 16) | 0;
-        const v = c === 'x' ? r : (r & 0x3) | 0x8;
-        return v.toString(16);
-      });
-    };
-    
     const userId = userContextManager.getUserId();
-    // Include user_id in ID prefix for additional safety and easier debugging
-    const id = userId 
-      ? `custom-${userId}-${generateUUID()}`
-      : `custom-${generateUUID()}`;
+    // Generate alphanumeric ID for custom exercises
+    const id = generateCustomExerciseId(userId || undefined);
     
     const customExercise: Exercise = {
       ...exercise,
@@ -2704,6 +2720,73 @@ export const exerciseLibrary = {
     // This is a synchronous helper - we'll need to get the exercise first
     // For async version, use getExerciseDetails
     return null; // Return null for sync version, use async getExerciseDetails instead
+  },
+
+  /**
+   * Cleanup duplicate exercises by normalized name
+   * Keeps the first occurrence (or most recent if version is available)
+   * Can be called during app initialization or as a migration
+   */
+  async cleanupDuplicateExercises(): Promise<{ removed: number; kept: number }> {
+    try {
+      const { dbHelpers, db } = await import('./database');
+      // Get all exercises directly from database (before deduplication)
+      const allExercises = await db.exercises.toArray();
+      
+      // Group exercises by normalized name
+      const exercisesByName = new Map<string, Exercise[]>();
+      
+      for (const exercise of allExercises) {
+        const normalizedName = exercise.name.toLowerCase().trim();
+        if (!exercisesByName.has(normalizedName)) {
+          exercisesByName.set(normalizedName, []);
+        }
+        exercisesByName.get(normalizedName)!.push(exercise);
+      }
+      
+      let removedCount = 0;
+      let keptCount = 0;
+      
+      // For each group, keep one and remove duplicates
+      for (const [, duplicates] of exercisesByName.entries()) {
+        if (duplicates.length > 1) {
+          // Sort by updatedAt if available (most recent first), otherwise keep first
+          duplicates.sort((a, b) => {
+            const aTime = a.version || 0;
+            const bTime = b.version || 0;
+            return bTime - aTime; // Most recent first
+          });
+          
+          const toKeep = duplicates[0];
+          const toRemove = duplicates.slice(1);
+          
+          // Remove duplicates
+          for (const duplicate of toRemove) {
+            try {
+              await dbHelpers.deleteExercise(duplicate.id);
+              removedCount++;
+              logger.info(`Removed duplicate exercise: ${duplicate.name} (ID: ${duplicate.id})`);
+            } catch (error) {
+              logger.error(`Failed to remove duplicate exercise ${duplicate.name} (ID: ${duplicate.id}):`, error);
+            }
+          }
+          
+          keptCount++;
+          logger.info(`Kept exercise: ${toKeep.name} (ID: ${toKeep.id})`);
+        } else {
+          keptCount++;
+        }
+      }
+      
+      if (removedCount > 0) {
+        logger.info(`Cleanup complete: Removed ${removedCount} duplicate exercises, kept ${keptCount} unique exercises`);
+      }
+      
+      return { removed: removedCount, kept: keptCount };
+    } catch (error) {
+      logger.error('Error cleaning up duplicate exercises:', error);
+      throw error;
+    }
   },
 };
 

@@ -33,12 +33,8 @@ export function WorkoutSummary() {
       }
 
       try {
-        const id = parseInt(workoutId, 10);
-        if (isNaN(id)) {
-          throw new Error('Invalid workout ID');
-        }
-
-        const data = await workoutSummaryService.generateSummary(id, profile.id);
+        // Workout IDs are now strings, no need to parse
+        const data = await workoutSummaryService.generateSummary(workoutId, profile.id);
         setSummaryData(data);
       } catch (err) {
         console.error('Failed to load workout summary:', err);
@@ -70,7 +66,7 @@ export function WorkoutSummary() {
           : `Predicted Soreness: ${recoveryData.predictedSoreness}%`,
       };
 
-      await dataService.updateWorkout(parseInt(workoutId, 10), updatedWorkout);
+      await dataService.updateWorkout(workoutId, updatedWorkout);
       
       // Update local state
       setSummaryData({
@@ -91,8 +87,7 @@ export function WorkoutSummary() {
   const handleSaveWorkoutName = async (newName: string) => {
     if (!summaryData || !workoutId) return;
 
-    const id = parseInt(workoutId, 10);
-    await dataService.updateWorkout(id, { workoutType: newName });
+    await dataService.updateWorkout(workoutId, { workoutType: newName });
 
     setSummaryData({
       ...summaryData,

@@ -18,10 +18,10 @@ export function Home() {
   const { profile } = useUserStore();
 
   useEffect(() => {
-    if (profile) {
+    if (profile?.id) {
       loadWorkouts(profile.id);
     }
-  }, [profile, loadWorkouts]);
+  }, [profile?.id, loadWorkouts]);
 
   const handleStartWorkout = () => {
     navigate('/workout-templates');

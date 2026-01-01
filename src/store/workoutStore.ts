@@ -28,10 +28,11 @@ interface WorkoutState {
   removeExercise: (exerciseId: string) => void;
   addSet: (exerciseId: string, set: WorkoutSet) => void;
   updateSet: (exerciseId: string, setNumber: number, updates: Partial<WorkoutSet>) => void;
+  cancelSet: (exerciseId: string, setNumber: number) => void;
   finishWorkout: (calories?: number, currentDurationSeconds?: number) => Promise<void>;
   cancelWorkout: () => void;
   loadWorkouts: (userId: string) => Promise<void>;
-  getWorkout: (id: number) => Promise<Workout | undefined>;
+  getWorkout: (id: string) => Promise<Workout | undefined>;
   setWorkoutTimerStartTime: (startTime: Date | null) => void;
 }
 
@@ -285,6 +286,46 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         );
         // Use centralized volume calculation utility
         // Infer tracking type from sets if not available
+        const totalVolume = calculateVolume(sets);
+        return {
+          ...ex,
+          sets,
+          totalVolume,
+        };
+      }
+      return ex;
+    });
+
+    const updatedWorkout = {
+      ...currentWorkout,
+      exercises,
+      totalVolume: exercises.reduce((sum, ex) => sum + (ex.totalVolume ?? 0), 0),
+    };
+
+    set({ currentWorkout: updatedWorkout });
+    saveWorkoutState({ currentWorkout: updatedWorkout, templateId: get().templateId, plannedWorkoutId: get().plannedWorkoutId });
+  },
+
+  cancelSet: (exerciseId: string, setNumber: number) => {
+    const { currentWorkout } = get();
+    if (!currentWorkout || !currentWorkout.exercises) return;
+
+    const exercises = (currentWorkout.exercises ?? []).map((ex) => {
+      if (ex.id === exerciseId) {
+        const sets = (ex.sets ?? []).map((s) => {
+          if (s.setNumber === setNumber) {
+            // Revert set to incomplete state
+            return {
+              ...s,
+              completed: false,
+              setDuration: undefined,
+              setStartTime: undefined,
+              setEndTime: undefined,
+            };
+          }
+          return s;
+        });
+        // Recalculate volume after canceling set
         const totalVolume = calculateVolume(sets);
         return {
           ...ex,
@@ -572,7 +613,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     }
   },
 
-  getWorkout: async (id: number) => {
+  getWorkout: async (id: string) => {
     try {
       return await dataService.getWorkout(id);
     } catch (error) {

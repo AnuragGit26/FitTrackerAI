@@ -24,6 +24,12 @@ interface ImportMetaEnv {
   // Use VITE_MONGODB_URI for client-side access (Vite requires VITE_ prefix)
   readonly VITE_MONGODB_URI?: string;
   readonly MONGODB_URI?: string; // Fallback for backward compatibility
+  
+  // Prisma Configuration (Required for Prisma Accelerate)
+  // Note: Vite requires VITE_ prefix for client-side access
+  readonly VITE_ORM_PRISMA_DATABASE_URL?: string;
+  readonly ORM_PRISMA_DATABASE_URL?: string; // Fallback for server-side
+  readonly ORM_POSTGRES_URL?: string;
 }
 
 interface ImportMeta {

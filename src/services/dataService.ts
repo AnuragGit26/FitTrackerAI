@@ -12,6 +12,7 @@ import { Transaction } from 'dexie';
 import { validateReps, validateWeight, validateDuration, validateCalories, validateRPE } from '@/utils/validators';
 import { calculateVolume } from '@/utils/calculations';
 import { exerciseLibrary } from '@/services/exerciseLibrary';
+import { generateWorkoutId } from '@/utils/idGenerator';
 
 // UserProfile type - matches userStore definition
 type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
@@ -207,6 +208,13 @@ class DataService {
       throw new Error('Workout startTime cannot be in the future');
     }
     
+    // Validate startTime is on the same day as workout date
+    const workoutDateStr = workoutDate.toISOString().split('T')[0];
+    const startTimeStr = startTime.toISOString().split('T')[0];
+    if (workoutDateStr !== startTimeStr) {
+      throw new Error('Workout startTime must be on the same day as workout date');
+    }
+    
     // Validate endTime if present
     if (workout.endTime) {
       const endTime = new Date(workout.endTime);
@@ -215,6 +223,14 @@ class DataService {
       }
       if (endTime.getTime() > now.getTime() + toleranceMs) {
         throw new Error('Workout endTime cannot be in the future');
+      }
+      // Allow endTime to be on next day (for late-night workouts)
+      const endTimeStr = endTime.toISOString().split('T')[0];
+      const endDateObj = new Date(endTimeStr);
+      const startDateObj = new Date(startTimeStr);
+      const daysDiff = Math.floor((endDateObj.getTime() - startDateObj.getTime()) / (1000 * 60 * 60 * 24));
+      if (daysDiff > 1) {
+        throw new Error('Workout endTime cannot be more than 1 day after startTime');
       }
     }
     
@@ -400,7 +416,7 @@ class DataService {
   }
 
   // Workout operations with ACID transactions and versioning
-  async createWorkout(workout: Omit<Workout, 'id'>): Promise<number> {
+  async createWorkout(workout: Omit<Workout, 'id'>): Promise<string> {
     this.validateWorkout(workout);
     
     // Sanitize user inputs to prevent XSS and normalize duration
@@ -411,10 +427,10 @@ class DataService {
         ? Math.round(workout.totalDuration) 
         : workout.totalDuration,
       notes: workout.notes ? sanitizeString(workout.notes) : undefined,
-      exercises: workout.exercises.map(ex => ({
+      exercises: (workout.exercises ?? []).map(ex => ({
         ...ex,
         notes: ex.notes ? sanitizeString(ex.notes) : undefined,
-        sets: ex.sets.map(set => ({
+        sets: (ex.sets ?? []).map(set => ({
           ...set,
           notes: set.notes ? sanitizeString(set.notes) : undefined,
         })),
@@ -422,20 +438,29 @@ class DataService {
     };
     
     // Ensure user context
-    userContextManager.requireUserId();
+    const userId = userContextManager.requireUserId();
     const workoutWithUser = userContextManager.ensureUserId(sanitizedWorkout as Workout);
     
+    // Generate workout ID with username and datetime
+    const workoutId = generateWorkoutId(
+      userId,
+      workoutWithUser.startTime || workoutWithUser.date
+    );
+    
     // Initialize version
-    const versionedWorkout = versionManager.initializeVersion(workoutWithUser as Workout);
+    const versionedWorkout = versionManager.initializeVersion({
+      ...workoutWithUser,
+      id: workoutId,
+    } as Workout);
     
     return await errorRecovery.withRetry(async () => {
       return await transactionManager.execute(['workouts'], async () => {
-        const id = await dbHelpers.saveWorkout(versionedWorkout as Omit<Workout, 'id'>);
+        await dbHelpers.saveWorkout(versionedWorkout as Omit<Workout, 'id'>);
         
         // Verify workout was actually saved by reading it back
-        const savedWorkout = await dbHelpers.getWorkout(id);
+        const savedWorkout = await dbHelpers.getWorkout(workoutId);
         if (!savedWorkout) {
-          throw new Error(`Failed to verify workout save: workout with id ${id} not found after save operation`);
+          throw new Error(`Failed to verify workout save: workout with id ${workoutId} not found after save operation`);
         }
         
         // Verify critical fields match
@@ -445,17 +470,17 @@ class DataService {
         if (savedWorkout.date.getTime() !== new Date(versionedWorkout.date).getTime()) {
           throw new Error(`Workout save verification failed: date mismatch`);
         }
-        if (savedWorkout.exercises.length !== versionedWorkout.exercises.length) {
-          throw new Error(`Workout save verification failed: exercise count mismatch (expected ${versionedWorkout.exercises.length}, got ${savedWorkout.exercises.length})`);
+        if ((savedWorkout.exercises ?? []).length !== (versionedWorkout.exercises ?? []).length) {
+          throw new Error(`Workout save verification failed: exercise count mismatch (expected ${(versionedWorkout.exercises ?? []).length}, got ${(savedWorkout.exercises ?? []).length})`);
         }
         
         this.emit('workout');
-        return id;
+        return workoutId;
       });
     });
   }
 
-  async getWorkout(id: number): Promise<Workout | undefined> {
+  async getWorkout(id: string): Promise<Workout | undefined> {
     try {
       return await dbHelpers.getWorkout(id);
     } catch (error) {
@@ -489,7 +514,7 @@ class DataService {
     }
   }
 
-  async updateWorkout(id: number, updates: Partial<Workout>): Promise<void> {
+  async updateWorkout(id: string, updates: Partial<Workout>): Promise<void> {
     userContextManager.requireUserId();
     
     // Get current workout to check version
@@ -528,10 +553,10 @@ class DataService {
     let totalVolume = 0;
     const allMuscles = new Set<string>();
     
-    const finalExercises = workout.exercises.map((exercise) => {
+    const finalExercises = (workout.exercises ?? []).map((exercise) => {
       // Infer tracking type from sets if not available
       let trackingType: string | undefined;
-      const firstSet = exercise.sets[0];
+      const firstSet = (exercise.sets ?? [])[0];
       if (firstSet) {
         if (firstSet.weight !== undefined || (firstSet.reps !== undefined && firstSet.weight !== undefined)) {
           trackingType = 'weight_reps';
@@ -545,10 +570,10 @@ class DataService {
       }
       
       // Recalculate exercise volume
-      const exerciseVolume = calculateVolume(exercise.sets, trackingType as ExerciseTrackingType);
+      const exerciseVolume = calculateVolume(exercise.sets ?? [], trackingType as ExerciseTrackingType);
       
       // Collect muscles from exercise
-      exercise.musclesWorked?.forEach(muscle => allMuscles.add(muscle));
+      (exercise.musclesWorked ?? []).forEach(muscle => allMuscles.add(muscle));
       
       return {
         ...exercise,
@@ -584,7 +609,7 @@ class DataService {
     };
   }
 
-  async deleteWorkout(id: number): Promise<void> {
+  async deleteWorkout(id: string): Promise<void> {
     userContextManager.requireUserId();
     
     // Get current workout for soft delete
@@ -614,7 +639,7 @@ class DataService {
     const sanitizedExercise: Exercise = {
       ...exercise,
       name: sanitizeString(exercise.name),
-      instructions: exercise.instructions.map(inst => sanitizeString(inst)),
+      instructions: (exercise.instructions ?? []).map(inst => sanitizeString(inst)),
     };
     
     // Ensure user context for custom exercises

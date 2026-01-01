@@ -30,7 +30,7 @@ interface PlannedWorkoutState {
     updates: Partial<Omit<PlannedWorkout, 'id' | 'createdAt'>>
   ) => Promise<void>;
   deletePlannedWorkout: (id: string) => Promise<void>;
-  markAsCompleted: (id: string, completedWorkoutId: number) => Promise<void>;
+  markAsCompleted: (id: string, completedWorkoutId: string) => Promise<void>;
   setSelectedDate: (date: Date) => void;
   setViewMode: (mode: PlannerViewMode) => void;
   setCustomDays: (days: number) => void;
@@ -170,7 +170,7 @@ export const usePlannedWorkoutStore = create<PlannedWorkoutState>((set, get) => 
     }
   },
 
-  markAsCompleted: async (id: string, completedWorkoutId: number) => {
+  markAsCompleted: async (id: string, completedWorkoutId: string) => {
     set({ isLoading: true, error: null });
     try {
       // Cancel notification when workout is completed

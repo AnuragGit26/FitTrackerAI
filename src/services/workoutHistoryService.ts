@@ -3,7 +3,7 @@ import { WorkoutExercise, WorkoutSet } from '@/types/exercise';
 import { dataService } from './dataService';
 
 export interface PreviousWorkoutData {
-  workoutId: number;
+  workoutId: string;
   date: Date;
   sets: WorkoutSet[];
   totalVolume: number;

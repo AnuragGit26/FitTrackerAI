@@ -7,7 +7,7 @@ export interface PersonalRecord {
   maxWeight: number;
   maxReps: number;
   date: Date;
-  workoutId: number;
+  workoutId: string;
 }
 
 export interface VolumeData {

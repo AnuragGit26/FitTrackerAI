@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useWorkoutStore } from '@/store/workoutStore';
 import { useUserStore } from '@/store/userStore';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -35,10 +35,6 @@ export function useInsightsData() {
   const lastFingerprintRef = useRef<string | null>(null);
   const swListenerCleanupRef = useRef<(() => void) | null>(null);
   
-  const muscleStatusesKey = useMemo(() =>
-    muscleStatuses.map(s => `${s.muscle}-${s.recoveryPercentage}`).join(','),
-    [muscleStatuses]
-  );
 
   // Load cached data immediately on mount
   useEffect(() => {
@@ -61,7 +57,7 @@ export function useInsightsData() {
         previousMonthStart.setMonth(previousMonthStart.getMonth() - 1);
 
         const currentMonthWorkouts = filterWorkoutsByDateRange(workouts, '30d');
-        const metrics = analyticsService.getAllMetrics(currentMonthWorkouts, '30d');
+        const metrics = await analyticsService.getAllMetrics(currentMonthWorkouts, '30d');
         const personalRecords = analyticsService.getPersonalRecords(currentMonthWorkouts);
 
         // Get fingerprint for cache lookup
@@ -138,24 +134,27 @@ export function useInsightsData() {
 
       // Only update if fingerprint matches current
       if (fingerprint === lastFingerprintRef.current) {
-        if (results.progress) {
-          setProgressAnalysis(results.progress);
-          await aiCallManager.setCached(fingerprint, 'progress', results.progress);
+        if (results.progress && typeof results.progress === 'object' && results.progress !== null) {
+          const progress = results.progress as ProgressAnalysis;
+          setProgressAnalysis(progress);
+          await aiCallManager.setCached(fingerprint, 'progress', progress);
         }
-        if (results.insights) {
-          setSmartAlerts(results.insights);
-          await aiCallManager.setCached(fingerprint, 'insights', results.insights);
+        if (results.insights && typeof results.insights === 'object' && results.insights !== null) {
+          const insights = results.insights as SmartAlerts;
+          setSmartAlerts(insights);
+          await aiCallManager.setCached(fingerprint, 'insights', insights);
         }
-        if (results.recommendations) {
+        if (results.recommendations && typeof results.recommendations === 'object' && results.recommendations !== null) {
+          const recommendations = results.recommendations as WorkoutRecommendations;
           // Fix old format if detected (has 'muscle' property instead of 'dayLabel')
-          const firstPred = results.recommendations.recoveryPredictions?.[0];
+          const firstPred = recommendations.recoveryPredictions?.[0];
           if (firstPred && 'muscle' in firstPred && !('dayLabel' in firstPred)) {
             // Old format detected - skip it and let the main service regenerate
             console.warn('[useInsightsData] Old format detected in SW recommendations, skipping');
             // Don't set the old format data, but continue with state updates
           } else {
-            setWorkoutRecommendations(results.recommendations);
-            await aiCallManager.setCached(fingerprint, 'recommendations', results.recommendations);
+            setWorkoutRecommendations(recommendations);
+            await aiCallManager.setCached(fingerprint, 'recommendations', recommendations);
           }
         }
 
@@ -328,8 +327,8 @@ export function useInsightsData() {
         }
       );
 
-      const metrics = analyticsService.getAllMetrics(currentMonthWorkouts, '30d');
-      const previousMetrics = analyticsService.getAllMetrics(previousMonthWorkouts, '30d');
+      const metrics = await analyticsService.getAllMetrics(currentMonthWorkouts, '30d');
+      const previousMetrics = await analyticsService.getAllMetrics(previousMonthWorkouts, '30d');
 
       const volumeTrend = analyticsService.calculateVolumeTrend(currentMonthWorkouts, '30d');
       const personalRecords = analyticsService.getPersonalRecords(currentMonthWorkouts);

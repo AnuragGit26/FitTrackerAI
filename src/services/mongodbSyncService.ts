@@ -1,5 +1,4 @@
-import mongoose from 'mongoose';
-import { connectToMongoDB } from './mongodbClient';
+import { prisma } from './prismaClient';
 import { userScopedFilter } from './mongodbQueryBuilder';
 import { requireUserId } from '@/utils/userIdValidation';
 import { syncMetadataService } from './syncMetadataService';
@@ -27,19 +26,26 @@ import { userContextManager } from './userContextManager';
 import { db } from './database';
 import { sleepRecoveryService } from './sleepRecoveryService';
 import { errorLogService } from './errorLogService';
-import {
-    Workout as WorkoutModel,
-    Exercise as ExerciseModel,
-    WorkoutTemplate as WorkoutTemplateModel,
-    PlannedWorkout as PlannedWorkoutModel,
-    MuscleStatus as MuscleStatusModel,
-    UserProfile as UserProfileModel,
-    Setting as SettingModel,
-    Notification as NotificationModel,
-    SleepLog as SleepLogModel,
-    RecoveryLog as RecoveryLogModel,
-    ErrorLog as ErrorLogModel,
-} from './mongodb/schemas';
+
+/**
+ * Get current local date/time as a Date object
+ * This ensures we use the local timezone instead of UTC
+ */
+function getCurrentLocalDate(): Date {
+    return new Date();
+}
+
+/**
+ * Convert a timestamp (number) to a local Date object
+ * Preserves the local time representation
+ */
+function timestampToLocalDate(timestamp: number | Date | string | null | undefined): Date | null {
+    if (!timestamp) return null;
+    if (timestamp instanceof Date) return timestamp;
+    if (typeof timestamp === 'string') return new Date(timestamp);
+    // For numeric timestamps, create a Date object which will be in local time
+    return new Date(timestamp);
+}
 
 type UserProfile = {
     id: string;
@@ -50,36 +56,6 @@ type UserProfile = {
 const BATCH_SIZE = 100;
 
 type ProgressCallback = (progress: SyncProgress) => void;
-
-// Map table names to Mongoose models
-const getModel = (tableName: SyncableTable) => {
-    switch (tableName) {
-        case 'workouts':
-            return WorkoutModel;
-        case 'exercises':
-            return ExerciseModel;
-        case 'workout_templates':
-            return WorkoutTemplateModel;
-        case 'planned_workouts':
-            return PlannedWorkoutModel;
-        case 'muscle_statuses':
-            return MuscleStatusModel;
-        case 'user_profiles':
-            return UserProfileModel;
-        case 'settings':
-            return SettingModel;
-        case 'notifications':
-            return NotificationModel;
-        case 'sleep_logs':
-            return SleepLogModel;
-        case 'recovery_logs':
-            return RecoveryLogModel;
-        case 'error_logs':
-            return ErrorLogModel;
-        default:
-            throw new Error(`Unknown table name: ${tableName}`);
-    }
-};
 
 class MongoDBSyncService {
     private isSyncing = false;
@@ -112,7 +88,21 @@ class MongoDBSyncService {
         userId: string,
         options: SyncOptions = {}
     ): Promise<SyncResult[]> {
-        this.syncQueue = this.syncQueue.then(() => this.performSync(userId, options));
+        // eslint-disable-next-line no-console
+        console.log('[MongoDBSyncService.sync] Starting sync for userId:', userId, 'options:', options);
+        this.syncQueue = this.syncQueue
+            .then(() => {
+                // eslint-disable-next-line no-console
+                console.log('[MongoDBSyncService.sync] Executing performSync...');
+                return this.performSync(userId, options);
+            })
+            .catch((error) => {
+                // eslint-disable-next-line no-console
+                console.error('[MongoDBSyncService.sync] Sync failed:', error);
+                this.isSyncing = false;
+                this.currentProgress = null;
+                throw error;
+            });
         return this.syncQueue;
     }
 
@@ -156,11 +146,14 @@ class MongoDBSyncService {
         };
 
         try {
-            await connectToMongoDB();
+            // eslint-disable-next-line no-console
+            console.log('[MongoDBSyncService.performSync] Using Prisma Client, setting userId...');
             userContextManager.setUserId(validatedUserId);
 
+            // Filter independent tables (exclude user_profiles, settings, notifications, and error_logs)
+            // error_logs are synced separately at the end
             const independentTables = tables.filter(t => 
-                !['user_profiles', 'settings', 'notifications'].includes(t)
+                !['user_profiles', 'settings', 'notifications', 'error_logs'].includes(t)
             );
             const dependentTables = tables.filter(t => 
                 ['user_profiles', 'settings'].includes(t)
@@ -169,10 +162,58 @@ class MongoDBSyncService {
                 t === 'notifications'
             );
 
-            const independentResults = await Promise.all(
-                independentTables.map(table => this.syncTable(validatedUserId, table, direction, options))
-            );
+            // eslint-disable-next-line no-console
+            console.log('[MongoDBSyncService.performSync] Syncing independent tables:', independentTables);
+            // Use Promise.allSettled instead of Promise.all to prevent one failure from stopping others
+            const independentPromises = independentTables.map(async (table) => {
+                // eslint-disable-next-line no-console
+                console.log(`[MongoDBSyncService.performSync] Syncing table: ${table}`);
+                try {
+                    const result = await this.syncTable(validatedUserId, table, direction, options);
+                    this.updateProgress({
+                        completedTables: results.length + 1,
+                        percentage: Math.round(((results.length + 1) / tables.length) * 100),
+                    });
+                    return result;
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                    // eslint-disable-next-line no-console
+                    console.error(`[MongoDBSyncService.performSync] Error syncing table ${table}:`, errorMessage);
+                    const errorResult: SyncResult = {
+                        tableName: table,
+                        direction,
+                        status: 'error',
+                        recordsProcessed: 0,
+                        recordsCreated: 0,
+                        recordsUpdated: 0,
+                        recordsDeleted: 0,
+                        conflicts: 0,
+                        errors: [{
+                            tableName: table,
+                            recordId: 'all',
+                            error: errorMessage,
+                            timestamp: new Date(),
+                            operation: 'read',
+                        }],
+                        duration: 0,
+                    };
+                    errorLogService.logSyncError(
+                        validatedUserId,
+                        table,
+                        'all',
+                        error instanceof Error ? error : new Error(errorMessage),
+                        'read',
+                        { direction }
+                    ).catch((logError) => {
+                        console.error('Failed to log sync error:', logError);
+                    });
+                    return errorResult;
+                }
+            });
+            const independentResults = await Promise.all(independentPromises);
             results.push(...independentResults);
+            // eslint-disable-next-line no-console
+            console.log('[MongoDBSyncService.performSync] Independent tables synced, results:', independentResults);
 
             for (const table of dependentTables) {
                 this.updateProgress({
@@ -212,7 +253,7 @@ class MongoDBSyncService {
                     results.push(errorResult);
                     
                     errorLogService.logSyncError(
-                        userId,
+                        validatedUserId,
                         table,
                         'all',
                         error instanceof Error ? error : new Error(errorMessage),
@@ -262,7 +303,7 @@ class MongoDBSyncService {
                     results.push(errorResult);
                     
                     errorLogService.logSyncError(
-                        userId,
+                        validatedUserId,
                         table,
                         'all',
                         error instanceof Error ? error : new Error(errorMessage),
@@ -302,9 +343,17 @@ class MongoDBSyncService {
                     console.error('Failed to sync error logs to MongoDB:', syncError);
                 });
             }
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('[MongoDBSyncService.performSync] Sync error:', error);
+            this.isSyncing = false;
+            this.currentProgress = null;
+            throw error;
         } finally {
             this.isSyncing = false;
             this.currentProgress = null;
+            // eslint-disable-next-line no-console
+            console.log('[MongoDBSyncService.performSync] Sync completed, results count:', results.length);
         }
 
         return results;
@@ -432,15 +481,15 @@ class MongoDBSyncService {
                         operation: 'read',
                     });
                     
-                    errorLogService.logSyncError(
-                        userId,
-                        tableName,
-                        recordId,
-                        error instanceof Error ? error : new Error(errorMessage),
-                        'read'
-                    ).catch((logError) => {
-                        console.error('Failed to log sync error:', logError);
-                    });
+                errorLogService.logSyncError(
+                    validatedUserId,
+                    tableName,
+                    recordId,
+                    error instanceof Error ? error : new Error(errorMessage),
+                    'read'
+                ).catch((logError) => {
+                    console.error('Failed to log sync error:', logError);
+                });
                 }
             }
 
@@ -464,7 +513,7 @@ class MongoDBSyncService {
             result.duration = Date.now() - startTime;
             
             errorLogService.logSyncError(
-                userId,
+                validatedUserId,
                 tableName,
                 'all',
                 error instanceof Error ? error : new Error(errorMessage),
@@ -487,6 +536,9 @@ class MongoDBSyncService {
             additionalInfo: { tableName },
         });
 
+        // eslint-disable-next-line no-console
+        console.log(`[MongoDBSyncService.syncPush] Starting push sync for table: ${tableName}, userId: ${validatedUserId}`);
+
         const startTime = Date.now();
         const result: SyncResult = {
             tableName,
@@ -502,8 +554,17 @@ class MongoDBSyncService {
         };
 
         try {
+            // eslint-disable-next-line no-console
+            console.log(`[MongoDBSyncService.syncPush] Fetching local records for ${tableName}...`);
             const allLocalRecords = await this.fetchLocalRecords(userId, tableName);
+            // eslint-disable-next-line no-console
+            console.log(`[MongoDBSyncService.syncPush] Fetched ${allLocalRecords.length} local records`);
+            
+            // eslint-disable-next-line no-console
+            console.log(`[MongoDBSyncService.syncPush] Fetching remote records for ${tableName}...`);
             const allRemoteRecords = await this.fetchRemoteRecords(validatedUserId, tableName);
+            // eslint-disable-next-line no-console
+            console.log(`[MongoDBSyncService.syncPush] Fetched ${allRemoteRecords.length} remote records`);
             
             const remoteMap = new Map<string | number, Record<string, unknown>>();
             for (const remoteRecord of allRemoteRecords) {
@@ -537,16 +598,25 @@ class MongoDBSyncService {
                 }
             }
 
+            // eslint-disable-next-line no-console
+            console.log(`[MongoDBSyncService.syncPush] Found ${recordsToPush.length} records to push to ${tableName}`);
+
             this.updateProgress({
                 currentOperation: `Pushing ${recordsToPush.length} records to ${tableName}...`,
                 totalRecords: recordsToPush.length,
             });
 
             const batches = this.chunkArray(recordsToPush, options.batchSize || BATCH_SIZE);
+            // eslint-disable-next-line no-console
+            console.log(`[MongoDBSyncService.syncPush] Split into ${batches.length} batches`);
 
             for (const batch of batches) {
                 try {
+                    // eslint-disable-next-line no-console
+                    console.log(`[MongoDBSyncService.syncPush] Pushing batch of ${batch.length} records to ${tableName}...`);
                     const batchResult = await this.pushBatch(validatedUserId, tableName, batch);
+                    // eslint-disable-next-line no-console
+                    console.log(`[MongoDBSyncService.syncPush] Batch result:`, batchResult);
                     result.recordsProcessed += batchResult.recordsProcessed;
                     result.recordsCreated += batchResult.recordsCreated;
                     result.recordsUpdated += batchResult.recordsUpdated;
@@ -567,7 +637,7 @@ class MongoDBSyncService {
                     });
                     
                     errorLogService.logSyncError(
-                        userId,
+                        validatedUserId,
                         tableName,
                         'batch',
                         error instanceof Error ? error : new Error(errorMessage),
@@ -599,7 +669,7 @@ class MongoDBSyncService {
             result.duration = Date.now() - startTime;
             
             errorLogService.logSyncError(
-                userId,
+                validatedUserId,
                 tableName,
                 'all',
                 error instanceof Error ? error : new Error(errorMessage),
@@ -625,19 +695,94 @@ class MongoDBSyncService {
         // eslint-disable-next-line no-console
         console.debug(`[MongoDBSyncService.fetchRemoteRecords] Fetching ${tableName} for userId: ${validatedUserId}`, since ? `since ${since.toISOString()}` : '');
         
-        const Model = getModel(tableName);
         const baseFilter = userScopedFilter(validatedUserId, tableName);
         
         // Add updatedAt filter if since is provided
-        const filter = since 
-            ? { ...baseFilter, updatedAt: { $gt: since } }
+        const where = since 
+            ? { ...baseFilter, updatedAt: { gt: since } }
             : baseFilter;
         
-        const records = await Model.find(filter).sort({ updatedAt: 1 }).lean();
+        let records: unknown[] = [];
 
-        console.debug(`[MongoDBSyncService.fetchRemoteRecords] Fetched ${records?.length || 0} records for ${tableName} (userId: ${validatedUserId})`);
+        try {
+            switch (tableName) {
+                case 'workouts':
+                    records = await prisma.workout.findMany({
+                        where: where as never,
+                        orderBy: { updatedAt: 'asc' },
+                    });
+                    break;
+                case 'exercises':
+                    records = await prisma.exercise.findMany({
+                        where: where as never,
+                        orderBy: { updatedAt: 'asc' },
+                    });
+                    break;
+                case 'workout_templates':
+                    records = await prisma.workoutTemplate.findMany({
+                        where: where as never,
+                        orderBy: { updatedAt: 'asc' },
+                    });
+                    break;
+                case 'planned_workouts':
+                    records = await prisma.plannedWorkout.findMany({
+                        where: where as never,
+                        orderBy: { updatedAt: 'asc' },
+                    });
+                    break;
+                case 'muscle_statuses':
+                    records = await prisma.muscleStatus.findMany({
+                        where: where as never,
+                        orderBy: { updatedAt: 'asc' },
+                    });
+                    break;
+                case 'user_profiles':
+                    records = await prisma.userProfile.findMany({
+                        where: where as never,
+                    });
+                    break;
+                case 'settings':
+                    records = await prisma.setting.findMany({
+                        where: where as never,
+                        orderBy: { updatedAt: 'asc' },
+                    });
+                    break;
+                case 'notifications':
+                    records = await prisma.notification.findMany({
+                        where: where as never,
+                        orderBy: { updatedAt: 'asc' },
+                    });
+                    break;
+                case 'sleep_logs':
+                    records = await prisma.sleepLog.findMany({
+                        where: where as never,
+                        orderBy: { updatedAt: 'asc' },
+                    });
+                    break;
+                case 'recovery_logs':
+                    records = await prisma.recoveryLog.findMany({
+                        where: where as never,
+                        orderBy: { updatedAt: 'asc' },
+                    });
+                    break;
+                case 'error_logs':
+                    records = await prisma.errorLog.findMany({
+                        where: where as never,
+                        orderBy: { updatedAt: 'asc' },
+                    });
+                    break;
+                default:
+                    records = [];
+            }
+        } catch (error) {
+            console.error(`[MongoDBSyncService.fetchRemoteRecords] Error fetching ${tableName}:`, error);
+            records = [];
+        }
 
-        return records || [];
+        // eslint-disable-next-line no-console
+        console.debug(`[MongoDBSyncService.fetchRemoteRecords] Fetched ${records.length} records for ${tableName} (userId: ${validatedUserId})`);
+
+        return records;
     }
 
     private async fetchLocalRecords(
@@ -757,7 +902,7 @@ class MongoDBSyncService {
     ): Promise<unknown | null> {
         switch (tableName) {
             case 'workouts':
-                return (await dbHelpers.getWorkout(Number(recordId))) ?? null;
+                return (await dbHelpers.getWorkout(String(recordId))) ?? null;
             case 'exercises':
                 return (await dbHelpers.getExercise(String(recordId))) ?? null;
             case 'workout_templates':
@@ -852,9 +997,24 @@ class MongoDBSyncService {
             case 'workouts':
                 await dbHelpers.saveWorkout(converted as Omit<Workout, 'id'>);
                 break;
-            case 'exercises':
-                await dbHelpers.saveExercise(converted as unknown as Exercise);
+            case 'exercises': {
+                const exercise = converted as unknown as Exercise;
+                // Check for existing exercise by normalized name before saving
+                const normalizedName = exercise.name.toLowerCase().trim();
+                const existingExercise = await dbHelpers.findExerciseByName(normalizedName);
+                
+                if (existingExercise) {
+                    // Use existing ID to prevent duplicate
+                    const exerciseWithExistingId: Exercise = {
+                        ...exercise,
+                        id: existingExercise.id,
+                    };
+                    await dbHelpers.saveExercise(exerciseWithExistingId);
+                } else {
+                    await dbHelpers.saveExercise(exercise);
+                }
                 break;
+            }
             case 'workout_templates':
                 await dbHelpers.saveTemplate(converted as unknown as WorkoutTemplate);
                 break;
@@ -911,11 +1071,26 @@ class MongoDBSyncService {
 
         switch (tableName) {
             case 'workouts':
-                await dbHelpers.updateWorkout(Number(recordId), converted as Partial<Workout>);
+                await dbHelpers.updateWorkout(String(recordId), converted as Partial<Workout>);
                 break;
-            case 'exercises':
-                await dbHelpers.saveExercise(converted as unknown as Exercise);
+            case 'exercises': {
+                const exercise = converted as unknown as Exercise;
+                // Check for existing exercise by normalized name before saving
+                const normalizedName = exercise.name.toLowerCase().trim();
+                const existingExercise = await dbHelpers.findExerciseByName(normalizedName);
+                
+                if (existingExercise && existingExercise.id !== exercise.id) {
+                    // Use existing ID to prevent duplicate
+                    const exerciseWithExistingId: Exercise = {
+                        ...exercise,
+                        id: existingExercise.id,
+                    };
+                    await dbHelpers.saveExercise(exerciseWithExistingId);
+                } else {
+                    await dbHelpers.saveExercise(exercise);
+                }
                 break;
+            }
             case 'workout_templates':
                 await dbHelpers.updateTemplate(String(recordId), converted as Partial<WorkoutTemplate>);
                 break;
@@ -990,6 +1165,9 @@ class MongoDBSyncService {
             additionalInfo: { tableName, batchSize: batch.length },
         });
 
+        // eslint-disable-next-line no-console
+        console.log(`[MongoDBSyncService.pushBatch] Processing batch of ${batch.length} records for ${tableName}`);
+
         const result = {
             recordsProcessed: 0,
             recordsCreated: 0,
@@ -998,41 +1176,187 @@ class MongoDBSyncService {
             errors: [] as SyncError[],
         };
 
-        const Model = getModel(tableName);
+        // eslint-disable-next-line no-console
+        console.log(`[MongoDBSyncService.pushBatch] Processing ${tableName} with Prisma`);
 
         for (const localRecord of batch) {
             try {
                 const mongoRecord = this.convertToMongoFormat(tableName, localRecord, validatedUserId);
                 const recordId = this.getRecordId(localRecord as Record<string, unknown>, tableName);
 
-                // Build filter based on table type
-                let filter: Record<string, unknown> = userScopedFilter(validatedUserId, tableName);
+                // Build where clause based on table type to find existing record
+                // For workouts/error_logs: use userId + other unique fields since ID format may differ
+                // For other tables: use their unique identifiers
+                const where: Record<string, unknown> = userScopedFilter(validatedUserId, tableName);
                 
+                // Helper function to check if a string is a valid MongoDB ObjectID (24 hex chars)
+                const isValidObjectId = (id: string): boolean => {
+                    return /^[0-9a-fA-F]{24}$/.test(id);
+                };
+
                 // Add ID filter based on table structure
-                if (tableName === 'workouts' || tableName === 'error_logs') {
-                    // These use _id in MongoDB
-                    if (typeof recordId === 'number') {
-                        filter._id = recordId;
-                    } else if (mongoRecord._id) {
-                        filter._id = mongoRecord._id;
+                // Note: For workouts/error_logs, we can't reliably use numeric IDs to find ObjectId strings
+                // So we'll search by userId + other unique fields, or try to find by ID if it's a valid ObjectID
+                if (tableName === 'workouts') {
+                    // For workouts, try to find by id if it's a valid ObjectID, otherwise search by userId + date
+                    const idToCheck = (mongoRecord.id && typeof mongoRecord.id === 'string') 
+                        ? mongoRecord.id 
+                        : (typeof recordId === 'string' ? recordId : null);
+                    
+                    if (idToCheck && isValidObjectId(idToCheck)) {
+                        // Valid ObjectID format - use it for lookup
+                        where.id = idToCheck;
+                    } else {
+                        // Not a valid ObjectID (e.g., "wkt-..." format) - use userId + date instead
+                        if (mongoRecord.date) {
+                            where.date = mongoRecord.date;
+                        }
+                    }
+                } else if (tableName === 'error_logs') {
+                    // For error_logs, try to find by id if it's a valid ObjectID, otherwise search by userId + errorMessage + createdAt
+                    const errorIdToCheck = (mongoRecord.id && typeof mongoRecord.id === 'string') 
+                        ? mongoRecord.id 
+                        : (typeof recordId === 'string' ? recordId : null);
+                    
+                    if (errorIdToCheck && isValidObjectId(errorIdToCheck)) {
+                        // Valid ObjectID format - use it for lookup
+                        where.id = errorIdToCheck;
+                    } else {
+                        // Not a valid ObjectID - use userId + errorMessage + createdAt
+                        if (mongoRecord.errorMessage) {
+                            where.errorMessage = mongoRecord.errorMessage;
+                        }
+                        if (mongoRecord.createdAt) {
+                            where.createdAt = mongoRecord.createdAt;
+                        }
                     }
                 } else if (tableName === 'user_profiles') {
                     // user_profiles uses userId as primary key
-                    filter.userId = validatedUserId;
+                    where.userId = validatedUserId;
                 } else if (tableName === 'muscle_statuses') {
-                    filter.muscle = (mongoRecord as Record<string, unknown>).muscle;
+                    where.muscle = (mongoRecord as Record<string, unknown>).muscle;
                 } else if (tableName === 'settings') {
-                    filter.key = (mongoRecord as Record<string, unknown>).key;
+                    where.key = (mongoRecord as Record<string, unknown>).key;
                 } else if (tableName === 'sleep_logs' || tableName === 'recovery_logs') {
-                    filter.date = (mongoRecord as Record<string, unknown>).date;
+                    where.date = (mongoRecord as Record<string, unknown>).date;
+                } else if (tableName === 'exercises') {
+                    where.exerciseId = mongoRecord.exerciseId || recordId;
+                } else if (tableName === 'workout_templates') {
+                    where.templateId = mongoRecord.templateId || recordId;
+                } else if (tableName === 'planned_workouts') {
+                    where.plannedWorkoutId = mongoRecord.plannedWorkoutId || recordId;
+                } else if (tableName === 'notifications') {
+                    where.notificationId = mongoRecord.notificationId || recordId;
                 } else {
-                    // Most tables use 'id' field
-                    filter.id = mongoRecord.id || recordId;
+                    // Fallback - only use ID if it's a valid ObjectID
+                    const fallbackId = (mongoRecord.id && typeof mongoRecord.id === 'string') 
+                        ? mongoRecord.id 
+                        : (typeof recordId === 'string' ? recordId : null);
+                    
+                    if (fallbackId && isValidObjectId(fallbackId)) {
+                        where.id = fallbackId;
+                    }
                 }
                 
-                const existing = await Model.findOne(filter).lean();
+                // Fetch existing record using Prisma
+                // eslint-disable-next-line no-console
+                console.log(`[MongoDBSyncService.pushBatch] Looking for existing ${tableName} record with where:`, JSON.stringify(where, null, 2));
+                let existing: unknown = null;
+                try {
+                    switch (tableName) {
+                        case 'workouts':
+                            existing = await prisma.workout.findFirst({ where: where as never });
+                            break;
+                        case 'exercises':
+                            existing = await prisma.exercise.findFirst({ where: where as never });
+                            break;
+                        case 'workout_templates':
+                            existing = await prisma.workoutTemplate.findFirst({ where: where as never });
+                            break;
+                        case 'planned_workouts':
+                            existing = await prisma.plannedWorkout.findFirst({ where: where as never });
+                            break;
+                        case 'muscle_statuses':
+                            existing = await prisma.muscleStatus.findFirst({ where: where as never });
+                            break;
+                        case 'user_profiles':
+                            existing = await prisma.userProfile.findFirst({ where: where as never });
+                            break;
+                        case 'settings':
+                            existing = await prisma.setting.findFirst({ where: where as never });
+                            break;
+                        case 'notifications':
+                            existing = await prisma.notification.findFirst({ where: where as never });
+                            break;
+                        case 'sleep_logs':
+                            existing = await prisma.sleepLog.findFirst({ where: where as never });
+                            break;
+                        case 'recovery_logs':
+                            existing = await prisma.recoveryLog.findFirst({ where: where as never });
+                            break;
+                        case 'error_logs':
+                            existing = await prisma.errorLog.findFirst({ where: where as never });
+                            break;
+                    }
+                    // eslint-disable-next-line no-console
+                    console.log(`[MongoDBSyncService.pushBatch] findFirst result for ${tableName} ${recordId}:`, existing ? 'FOUND' : 'NOT FOUND');
+                    if (existing && tableName === 'workouts') {
+                        // eslint-disable-next-line no-console
+                        console.log(`[MongoDBSyncService.pushBatch] Found workout with id: ${(existing as Record<string, unknown>).id}, date: ${(existing as Record<string, unknown>).date}`);
+                    }
+                } catch (findError) {
+                    const errorMessage = findError instanceof Error ? findError.message : 'Unknown error';
+                    // eslint-disable-next-line no-console
+                    console.error(`[MongoDBSyncService.pushBatch] Error finding existing record for ${tableName} ${recordId}:`, errorMessage);
+                    result.errors.push({
+                        tableName,
+                        recordId,
+                        error: errorMessage,
+                        timestamp: new Date(),
+                        operation: 'read',
+                    });
+                    errorLogService.logSyncError(
+                        validatedUserId,
+                        tableName,
+                        recordId,
+                        findError instanceof Error ? findError : new Error(errorMessage),
+                        'read'
+                    ).catch((logError) => {
+                        console.error('Failed to log sync error:', logError);
+                    });
+                    continue; // Skip to next record if we can't find existing
+                }
 
                 if (existing) {
+                    // Validate that existing is a proper record object, not a response wrapper
+                    // Check if it looks like a response wrapper (e.g., { success: true })
+                    const existingObj = existing as Record<string, unknown>;
+                    if (Object.keys(existingObj).length === 1 && 'success' in existingObj) {
+                        // This is likely a response wrapper, not an actual record
+                        // eslint-disable-next-line no-console
+                        console.warn(`[MongoDBSyncService.pushBatch] Received response wrapper instead of record for ${tableName} ${recordId}, treating as not found`);
+                        existing = null;
+                    }
+                }
+
+                if (existing) {
+                    // Extract existingId early so it's available in all code paths
+                    const existingId = (existing as Record<string, unknown>).id;
+                    
+                    // eslint-disable-next-line no-console
+                    console.log(`[MongoDBSyncService.pushBatch] Found existing record for ${tableName} ${recordId}, existing version: ${(existing as { version?: number }).version || 1}, local version: ${(localRecord as { version?: number }).version || 1}`);
+                    
+                    if (tableName === 'workouts') {
+                        // eslint-disable-next-line no-console
+                        console.log(`[MongoDBSyncService.pushBatch] Workout existing record keys:`, Object.keys(existing as Record<string, unknown>));
+                        // eslint-disable-next-line no-console
+                        console.log(`[MongoDBSyncService.pushBatch] Workout existingId extracted:`, existingId, `type:`, typeof existingId);
+                        if (!existingId) {
+                            // eslint-disable-next-line no-console
+                            console.error(`[MongoDBSyncService.pushBatch] Workout existing record (no id):`, JSON.stringify(existing, null, 2));
+                        }
+                    }
+                    
                     const conflictInfo = versionManager.detectConflict(
                         tableName,
                         recordId,
@@ -1041,38 +1365,726 @@ class MongoDBSyncService {
                     );
 
                     if (conflictInfo.hasConflict) {
-                        const resolved = versionManager.resolveConflictLastWriteWins(
-                            localRecord as { version?: number; updatedAt?: Date; deletedAt?: Date | null },
-                            existing as { version?: number; updatedAt?: Date; deletedAt?: Date | null }
-                        );
-                        const resolvedRecord = this.convertToMongoFormat(tableName, resolved, validatedUserId);
+                        // eslint-disable-next-line no-console
+                        console.log(`[MongoDBSyncService.pushBatch] Conflict detected for ${tableName} record ${recordId}, pushing local data to remote`);
                         
-                        // Preserve _id if it exists
-                        if (existing._id) {
-                            resolvedRecord._id = existing._id;
+                        // For push operations, always push local data to remote
+                        // Conflict resolution (last-write-wins) will be handled on pull
+                        const resolvedRecord = this.convertToMongoFormat(tableName, localRecord, validatedUserId);
+                        
+                        // Preserve id if it exists (for workouts/error_logs that use ObjectId)
+                        // Use the existingId we extracted earlier
+                        if (existingId && (tableName === 'workouts' || tableName === 'error_logs')) {
+                            resolvedRecord.id = existingId;
                         }
                         
-                        await Model.findOneAndUpdate(filter, resolvedRecord, { upsert: true, new: true, setDefaultsOnInsert: true });
-                        result.recordsUpdated++;
-                        result.conflicts++;
+                        // Update with version increment
+                        // Calculate new version manually (Prisma increment might not work with MongoDB)
+                        const existingVersion = (existing as { version?: number }).version || 1;
+                        const newVersion = existingVersion + 1;
+                        const updateData: Record<string, unknown> = {
+                            ...resolvedRecord,
+                            version: newVersion, // Use calculated version instead of increment
+                            updatedAt: getCurrentLocalDate(), // Use current local date/time
+                        };
+                        // Remove id from update data (will be used in where clause instead)
+                        if (tableName === 'workouts' || tableName === 'error_logs') {
+                            delete updateData.id;
+                        }
+                        // For user_profiles, never include id field
+                        if (tableName === 'user_profiles') {
+                            delete updateData.id;
+                        }
+                        delete updateData.createdAt; // Don't update createdAt
+                        
+                        // Use upsert directly to handle both update and create cases
+                        const upsertData = { ...resolvedRecord };
+                        // Remove id from upsert data for tables that auto-generate it
+                        if (tableName === 'workouts' || tableName === 'error_logs') {
+                            delete upsertData.id;
+                        }
+                        // Remove id for composite key tables
+                        if (tableName === 'muscle_statuses' || tableName === 'settings' || 
+                            tableName === 'sleep_logs' || tableName === 'recovery_logs') {
+                            delete upsertData.id;
+                        }
+                        // For user_profiles, never include id field (uses userId as primary key)
+                        if (tableName === 'user_profiles') {
+                            delete upsertData.id;
+                        }
+                        
+                        try {
+                            // eslint-disable-next-line no-console
+                            console.log(`[MongoDBSyncService.pushBatch] Attempting to upsert ${tableName} record ${recordId}`);
+                            // eslint-disable-next-line no-console
+                            console.log(`[MongoDBSyncService.pushBatch] existingId: ${existingId}, updateData keys: ${Object.keys(updateData).join(', ')}`);
+                            switch (tableName) {
+                                case 'workouts': {
+                                    // For workouts, we need the existingId to update
+                                    // Use the existingId we extracted earlier (before conflict detection)
+                                    // eslint-disable-next-line no-console
+                                    console.log(`[MongoDBSyncService.pushBatch] Workout conflict resolution - existingId: ${existingId}, type: ${typeof existingId}`);
+                                    
+                                    if (!existingId) {
+                                        // eslint-disable-next-line no-console
+                                        console.error(`[MongoDBSyncService.pushBatch] No existingId for workout ${recordId}, existing record keys:`, Object.keys(existing as Record<string, unknown>));
+                                        // eslint-disable-next-line no-console
+                                        console.error(`[MongoDBSyncService.pushBatch] Existing record:`, JSON.stringify(existing, null, 2));
+                                        
+                                        // The existing record should have an id if it came from MongoDB
+                                        // If it doesn't, this is a data integrity issue
+                                        // Try to use the existing record's _id field (MongoDB native)
+                                        const mongoId = (existing as Record<string, unknown>)._id || (existing as Record<string, unknown>).id;
+                                        if (mongoId) {
+                                            // eslint-disable-next-line no-console
+                                            console.log(`[MongoDBSyncService.pushBatch] Using _id field as fallback: ${mongoId}`);
+                                            const workoutResult = await prisma.workout.upsert({ 
+                                                where: { id: String(mongoId) }, 
+                                                update: updateData as never, 
+                                                create: upsertData as never 
+                                            });
+                                            // eslint-disable-next-line no-console
+                                            console.log(`[MongoDBSyncService.pushBatch] Workout upsert result (using _id):`, workoutResult.id);
+                                        } else {
+                                            // Last resort: try to find by userId + date
+                                            const workoutWhere = userScopedFilter(validatedUserId, 'workouts') as Record<string, unknown>;
+                                            if (mongoRecord.date) {
+                                                // Ensure date is a Date object for comparison
+                                                const workoutDate = mongoRecord.date instanceof Date 
+                                                    ? mongoRecord.date 
+                                                    : new Date(mongoRecord.date as string | number);
+                                                workoutWhere.date = workoutDate;
+                                            }
+                                            // eslint-disable-next-line no-console
+                                            console.log(`[MongoDBSyncService.pushBatch] Attempting fallback query by date:`, workoutWhere);
+                                            const foundWorkout = await prisma.workout.findFirst({ where: workoutWhere as never });
+                                            if (foundWorkout && (foundWorkout as Record<string, unknown>).id) {
+                                                const fallbackId = (foundWorkout as Record<string, unknown>).id;
+                                                // eslint-disable-next-line no-console
+                                                console.log(`[MongoDBSyncService.pushBatch] Found workout by date fallback, using id: ${fallbackId}`);
+                                                const workoutResult = await prisma.workout.upsert({ 
+                                                    where: { id: String(fallbackId) }, 
+                                                    update: updateData as never, 
+                                                    create: upsertData as never 
+                                                });
+                                                // eslint-disable-next-line no-console
+                                                console.log(`[MongoDBSyncService.pushBatch] Workout upsert result (fallback):`, workoutResult.id);
+                                            } else {
+                                                // eslint-disable-next-line no-console
+                                                console.error(`[MongoDBSyncService.pushBatch] Could not find workout by date fallback, foundWorkout:`, foundWorkout);
+                                                throw new Error(`No existingId for workout ${recordId} and could not find by date`);
+                                            }
+                                        }
+                                    } else {
+                                        const workoutResult = await prisma.workout.upsert({ 
+                                            where: { id: String(existingId) }, 
+                                            update: updateData as never, 
+                                            create: upsertData as never 
+                                        });
+                                        // eslint-disable-next-line no-console
+                                        console.log(`[MongoDBSyncService.pushBatch] Workout upsert result:`, workoutResult.id);
+                                    }
+                                    break;
+                                }
+                                case 'exercises':
+                                    await prisma.exercise.upsert({ 
+                                        where: { exerciseId: (where.exerciseId as string) || 'new' }, 
+                                        update: updateData as never, 
+                                        create: upsertData as never 
+                                    });
+                                    break;
+                                case 'workout_templates':
+                                    await prisma.workoutTemplate.upsert({ 
+                                        where: { templateId: (where.templateId as string) || 'new' }, 
+                                        update: updateData as never, 
+                                        create: upsertData as never 
+                                    });
+                                    break;
+                                case 'planned_workouts':
+                                    await prisma.plannedWorkout.upsert({ 
+                                        where: { plannedWorkoutId: (where.plannedWorkoutId as string) || 'new' }, 
+                                        update: updateData as never, 
+                                        create: upsertData as never 
+                                    });
+                                    break;
+                                case 'muscle_statuses':
+                                    await prisma.muscleStatus.upsert({ 
+                                        where: { userId_muscle: { userId: validatedUserId, muscle: (where.muscle as string) || '' } }, 
+                                        update: updateData as never, 
+                                        create: upsertData as never 
+                                    });
+                                    break;
+                                case 'user_profiles':
+                                    await prisma.userProfile.upsert({ 
+                                        where: { userId: validatedUserId }, 
+                                        update: updateData as never, 
+                                        create: upsertData as never 
+                                    });
+                                    break;
+                                case 'settings': {
+                                    const settingKey = (where.key as string) || (mongoRecord.key as string);
+                                    if (!settingKey) {
+                                        // eslint-disable-next-line no-console
+                                        console.error(`[MongoDBSyncService.pushBatch] Invalid key for setting ${recordId}`);
+                                        throw new Error(`Invalid key for setting ${recordId}`);
+                                    }
+                                    await prisma.setting.upsert({ 
+                                        where: { userId_key: { userId: validatedUserId, key: settingKey } }, 
+                                        update: updateData as never, 
+                                        create: upsertData as never 
+                                    });
+                                    break;
+                                }
+                                case 'notifications': {
+                                    const notificationId = (where.notificationId as string) || (mongoRecord.notificationId as string) || recordId;
+                                    if (!notificationId || notificationId === 'new') {
+                                        // eslint-disable-next-line no-console
+                                        console.error(`[MongoDBSyncService.pushBatch] Invalid notificationId for notification ${recordId}`);
+                                        throw new Error(`Invalid notificationId for notification ${recordId}`);
+                                    }
+                                    await prisma.notification.upsert({ 
+                                        where: { notificationId: notificationId as string }, 
+                                        update: updateData as never, 
+                                        create: upsertData as never 
+                                    });
+                                    break;
+                                }
+                                case 'sleep_logs':
+                                    await prisma.sleepLog.upsert({ 
+                                        where: { userId_date: { userId: validatedUserId, date: (where.date as Date) || new Date() } }, 
+                                        update: updateData as never, 
+                                        create: upsertData as never 
+                                    });
+                                    break;
+                                case 'recovery_logs':
+                                    await prisma.recoveryLog.upsert({ 
+                                        where: { userId_date: { userId: validatedUserId, date: (where.date as Date) || new Date() } }, 
+                                        update: updateData as never, 
+                                        create: upsertData as never 
+                                    });
+                                    break;
+                                case 'error_logs':
+                                    await prisma.errorLog.upsert({ 
+                                        where: { id: (existingId as string) || 'new' }, 
+                                        update: updateData as never, 
+                                        create: upsertData as never 
+                                    });
+                                    break;
+                            }
+                            // eslint-disable-next-line no-console
+                            console.log(`[MongoDBSyncService.pushBatch] Successfully resolved conflict and updated ${tableName} record ${recordId}`);
+                            result.recordsUpdated++;
+                            result.conflicts++;
+                        } catch (upsertError) {
+                            const errorMessage = upsertError instanceof Error ? upsertError.message : 'Unknown error';
+                            // eslint-disable-next-line no-console
+                            console.error(`[MongoDBSyncService.pushBatch] Error upserting conflict-resolved record for ${tableName} ${recordId}:`, errorMessage);
+                            result.errors.push({
+                                tableName,
+                                recordId,
+                                error: errorMessage,
+                                timestamp: new Date(),
+                                operation: 'update',
+                            });
+                            result.conflicts++;
+                            errorLogService.logSyncError(
+                                validatedUserId,
+                                tableName,
+                                recordId,
+                                upsertError instanceof Error ? upsertError : new Error(errorMessage),
+                                'update'
+                            ).catch((logError) => {
+                                console.error('Failed to log sync error:', logError);
+                            });
+                        }
                     } else if (versionManager.compareVersions(
                         localRecord as { version?: number; updatedAt?: Date; deletedAt?: Date | null },
                         existing as { version?: number; updatedAt?: Date; deletedAt?: Date | null }
                     ) > 0) {
-                        // Preserve _id if it exists
-                        if (existing._id) {
-                            mongoRecord._id = existing._id;
+                        // Local record is newer, update remote
+                        // eslint-disable-next-line no-console
+                        console.log(`[MongoDBSyncService.pushBatch] Local record is newer for ${tableName} ${recordId}, updating remote`);
+                        // Preserve id if it exists (for workouts/error_logs that use ObjectId)
+                        // existingId was extracted earlier, reuse it
+                        if (existingId && (tableName === 'workouts' || tableName === 'error_logs')) {
+                            mongoRecord.id = existingId;
                         }
-                        await Model.findOneAndUpdate(filter, mongoRecord, { upsert: true, new: true, setDefaultsOnInsert: true });
+                        
+                        // Update with version increment
+                        // Calculate new version manually (Prisma increment might not work with MongoDB)
+                        const existingVersion = (existing as { version?: number }).version || 1;
+                        const newVersion = existingVersion + 1;
+                        const updateData: Record<string, unknown> = {
+                            ...mongoRecord,
+                            version: newVersion, // Use calculated version instead of increment
+                            updatedAt: getCurrentLocalDate(), // Use current local date/time
+                        };
+                        // Remove id from update data (will be used in where clause instead)
+                        if (tableName === 'workouts' || tableName === 'error_logs') {
+                            delete updateData.id;
+                        }
+                        // For user_profiles, never include id field
+                        if (tableName === 'user_profiles') {
+                            delete updateData.id;
+                        }
+                        delete updateData.createdAt; // Don't update createdAt
+                        
+                        // Use upsert directly to handle both update and create cases
+                        const upsertData = { ...mongoRecord };
+                        // Remove id from upsert data for tables that auto-generate it
+                        if (tableName === 'workouts' || tableName === 'error_logs') {
+                            delete upsertData.id;
+                        }
+                        // Remove id for composite key tables
+                        if (tableName === 'muscle_statuses' || tableName === 'settings' || 
+                            tableName === 'sleep_logs' || tableName === 'recovery_logs') {
+                            delete upsertData.id;
+                        }
+                        // For user_profiles, never include id field
+                        if (tableName === 'user_profiles') {
+                            delete upsertData.id;
+                        }
+                        
+                        switch (tableName) {
+                            case 'workouts': {
+                                // For workouts, we need the existingId to update
+                                const workoutExistingId = existingId || (existing as Record<string, unknown>).id;
+                                if (!workoutExistingId) {
+                                    // Try to find by userId + date as fallback
+                                    const workoutWhere = userScopedFilter(validatedUserId, 'workouts');
+                                    if (mongoRecord.date) {
+                                        workoutWhere.date = mongoRecord.date;
+                                    }
+                                    const foundWorkout = await prisma.workout.findFirst({ where: workoutWhere as never });
+                                    if (foundWorkout && (foundWorkout as Record<string, unknown>).id) {
+                                        const fallbackId = (foundWorkout as Record<string, unknown>).id;
+                                        await prisma.workout.upsert({ 
+                                            where: { id: fallbackId as string }, 
+                                            update: updateData as never, 
+                                            create: upsertData as never 
+                                        });
+                                    } else {
+                                        throw new Error(`No existingId for workout ${recordId} and could not find by date`);
+                                    }
+                                } else {
+                                    await prisma.workout.upsert({ 
+                                        where: { id: workoutExistingId as string }, 
+                                        update: updateData as never, 
+                                        create: upsertData as never 
+                                    });
+                                }
+                                break;
+                            }
+                            case 'exercises':
+                                await prisma.exercise.upsert({ 
+                                    where: { exerciseId: (where.exerciseId as string) || 'new' }, 
+                                    update: updateData as never, 
+                                    create: upsertData as never 
+                                });
+                                break;
+                            case 'workout_templates':
+                                await prisma.workoutTemplate.upsert({ 
+                                    where: { templateId: (where.templateId as string) || 'new' }, 
+                                    update: updateData as never, 
+                                    create: upsertData as never 
+                                });
+                                break;
+                            case 'planned_workouts':
+                                await prisma.plannedWorkout.upsert({ 
+                                    where: { plannedWorkoutId: (where.plannedWorkoutId as string) || 'new' }, 
+                                    update: updateData as never, 
+                                    create: upsertData as never 
+                                });
+                                break;
+                            case 'muscle_statuses':
+                                await prisma.muscleStatus.upsert({ 
+                                    where: { userId_muscle: { userId: validatedUserId, muscle: (where.muscle as string) || '' } }, 
+                                    update: updateData as never, 
+                                    create: upsertData as never 
+                                });
+                                break;
+                            case 'user_profiles':
+                                await prisma.userProfile.upsert({ 
+                                    where: { userId: validatedUserId }, 
+                                    update: updateData as never, 
+                                    create: upsertData as never 
+                                });
+                                break;
+                            case 'settings':
+                                await prisma.setting.upsert({ 
+                                    where: { userId_key: { userId: validatedUserId, key: (where.key as string) || '' } }, 
+                                    update: updateData as never, 
+                                    create: upsertData as never 
+                                });
+                                break;
+                            case 'notifications':
+                                await prisma.notification.upsert({ 
+                                    where: { notificationId: (where.notificationId as string) || 'new' }, 
+                                    update: updateData as never, 
+                                    create: upsertData as never 
+                                });
+                                break;
+                            case 'sleep_logs':
+                                await prisma.sleepLog.upsert({ 
+                                    where: { userId_date: { userId: validatedUserId, date: (where.date as Date) || new Date() } }, 
+                                    update: updateData as never, 
+                                    create: upsertData as never 
+                                });
+                                break;
+                            case 'recovery_logs':
+                                await prisma.recoveryLog.upsert({ 
+                                    where: { userId_date: { userId: validatedUserId, date: (where.date as Date) || new Date() } }, 
+                                    update: updateData as never, 
+                                    create: upsertData as never 
+                                });
+                                break;
+                            case 'error_logs':
+                                await prisma.errorLog.upsert({ 
+                                    where: { id: (existingId as string) || 'new' }, 
+                                    update: updateData as never, 
+                                    create: upsertData as never 
+                                });
+                                break;
+                        }
                         result.recordsUpdated++;
                     } else {
-                        result.conflicts++;
+                        // Remote record is newer or same, but for push operations, we still push local data
+                        // Conflict resolution (last-write-wins) will be handled on pull
+                        // eslint-disable-next-line no-console
+                        console.log(`[MongoDBSyncService.pushBatch] Remote record is newer or same for ${tableName} ${recordId}, but pushing local data anyway (push operation)`);
+                        
+                        // Preserve id if it exists (for workouts/error_logs that use ObjectId)
+                        // existingId was extracted earlier, reuse it
+                        if (existingId && (tableName === 'workouts' || tableName === 'error_logs')) {
+                            mongoRecord.id = existingId;
+                        }
+                        
+                        // Update with version increment
+                        // Calculate new version manually (Prisma increment might not work with MongoDB)
+                        const existingVersion = (existing as { version?: number }).version || 1;
+                        const newVersion = existingVersion + 1;
+                        const updateData: Record<string, unknown> = {
+                            ...mongoRecord,
+                            version: newVersion, // Use calculated version instead of increment
+                            updatedAt: getCurrentLocalDate(), // Use current local date/time
+                        };
+                        // Remove id from update data (will be used in where clause instead)
+                        if (tableName === 'workouts' || tableName === 'error_logs') {
+                            delete updateData.id;
+                        }
+                        // For user_profiles, never include id field
+                        if (tableName === 'user_profiles') {
+                            delete updateData.id;
+                        }
+                        delete updateData.createdAt; // Don't update createdAt
+                        
+                        // Use upsert directly to handle both update and create cases
+                        const upsertData = { ...mongoRecord };
+                        // Remove id from upsert data for tables that auto-generate it
+                        if (tableName === 'workouts' || tableName === 'error_logs') {
+                            delete upsertData.id;
+                        }
+                        // Remove id for composite key tables
+                        if (tableName === 'muscle_statuses' || tableName === 'settings' || 
+                            tableName === 'sleep_logs' || tableName === 'recovery_logs') {
+                            delete upsertData.id;
+                        }
+                        // For user_profiles, never include id field
+                        if (tableName === 'user_profiles') {
+                            delete upsertData.id;
+                        }
+                        
+                        try {
+                            // eslint-disable-next-line no-console
+                            console.log(`[MongoDBSyncService.pushBatch] Attempting to upsert ${tableName} record ${recordId} (remote newer but pushing local)`);
+                            switch (tableName) {
+                                case 'workouts': {
+                                    // For workouts, we need the existingId to update
+                                    const workoutExistingId = existingId || (existing as Record<string, unknown>).id;
+                                    if (!workoutExistingId) {
+                                        // Try to find by userId + date as fallback
+                                        const workoutWhere = userScopedFilter(validatedUserId, 'workouts') as Record<string, unknown>;
+                                        if (mongoRecord.date) {
+                                            const workoutDate = mongoRecord.date instanceof Date 
+                                                ? mongoRecord.date 
+                                                : new Date(mongoRecord.date as string | number);
+                                            workoutWhere.date = workoutDate;
+                                        }
+                                        const foundWorkout = await prisma.workout.findFirst({ where: workoutWhere as never });
+                                        if (foundWorkout && (foundWorkout as Record<string, unknown>).id) {
+                                            const fallbackId = (foundWorkout as Record<string, unknown>).id;
+                                            await prisma.workout.upsert({ 
+                                                where: { id: fallbackId as string }, 
+                                                update: updateData as never, 
+                                                create: upsertData as never 
+                                            });
+                                        } else {
+                                            throw new Error(`No existingId for workout ${recordId} and could not find by date`);
+                                        }
+                                    } else {
+                                        await prisma.workout.upsert({ 
+                                            where: { id: workoutExistingId as string }, 
+                                            update: updateData as never, 
+                                            create: upsertData as never 
+                                        });
+                                    }
+                                    break;
+                                }
+                                case 'exercises': {
+                                    const exerciseId = (where.exerciseId as string) || (mongoRecord.exerciseId as string) || recordId;
+                                    if (!exerciseId || exerciseId === 'new') {
+                                        throw new Error(`Invalid exerciseId for exercise ${recordId}`);
+                                    }
+                                    await prisma.exercise.upsert({ 
+                                        where: { exerciseId: exerciseId as string }, 
+                                        update: updateData as never, 
+                                        create: upsertData as never 
+                                    });
+                                    break;
+                                }
+                                case 'workout_templates': {
+                                    const templateId = (where.templateId as string) || (mongoRecord.templateId as string) || recordId;
+                                    if (!templateId || templateId === 'new') {
+                                        throw new Error(`Invalid templateId for template ${recordId}`);
+                                    }
+                                    await prisma.workoutTemplate.upsert({ 
+                                        where: { templateId: templateId as string }, 
+                                        update: updateData as never, 
+                                        create: upsertData as never 
+                                    });
+                                    break;
+                                }
+                                case 'planned_workouts': {
+                                    const plannedWorkoutId = (where.plannedWorkoutId as string) || (mongoRecord.plannedWorkoutId as string) || recordId;
+                                    if (!plannedWorkoutId || plannedWorkoutId === 'new') {
+                                        throw new Error(`Invalid plannedWorkoutId for planned workout ${recordId}`);
+                                    }
+                                    await prisma.plannedWorkout.upsert({ 
+                                        where: { plannedWorkoutId: plannedWorkoutId as string }, 
+                                        update: updateData as never, 
+                                        create: upsertData as never 
+                                    });
+                                    break;
+                                }
+                                case 'muscle_statuses':
+                                    await prisma.muscleStatus.upsert({ 
+                                        where: { userId_muscle: { userId: validatedUserId, muscle: (where.muscle as string) || '' } }, 
+                                        update: updateData as never, 
+                                        create: upsertData as never 
+                                    });
+                                    break;
+                                case 'user_profiles':
+                                    await prisma.userProfile.upsert({ 
+                                        where: { userId: validatedUserId }, 
+                                        update: updateData as never, 
+                                        create: upsertData as never 
+                                    });
+                                    break;
+                                case 'settings': {
+                                    const settingKey = (where.key as string) || (mongoRecord.key as string);
+                                    if (!settingKey) {
+                                        throw new Error(`Invalid key for setting ${recordId}`);
+                                    }
+                                    await prisma.setting.upsert({ 
+                                        where: { userId_key: { userId: validatedUserId, key: settingKey } }, 
+                                        update: updateData as never, 
+                                        create: upsertData as never 
+                                    });
+                                    break;
+                                }
+                                case 'notifications': {
+                                    const notificationId = (where.notificationId as string) || (mongoRecord.notificationId as string) || recordId;
+                                    if (!notificationId || notificationId === 'new') {
+                                        throw new Error(`Invalid notificationId for notification ${recordId}`);
+                                    }
+                                    await prisma.notification.upsert({ 
+                                        where: { notificationId: notificationId as string }, 
+                                        update: updateData as never, 
+                                        create: upsertData as never 
+                                    });
+                                    break;
+                                }
+                                case 'sleep_logs':
+                                    await prisma.sleepLog.upsert({ 
+                                        where: { userId_date: { userId: validatedUserId, date: (where.date as Date) || new Date() } }, 
+                                        update: updateData as never, 
+                                        create: upsertData as never 
+                                    });
+                                    break;
+                                case 'recovery_logs':
+                                    await prisma.recoveryLog.upsert({ 
+                                        where: { userId_date: { userId: validatedUserId, date: (where.date as Date) || new Date() } }, 
+                                        update: updateData as never, 
+                                        create: upsertData as never 
+                                    });
+                                    break;
+                                case 'error_logs': {
+                                    if (!existingId) {
+                                        throw new Error(`No existingId for error log ${recordId}`);
+                                    }
+                                    await prisma.errorLog.upsert({ 
+                                        where: { id: existingId as string }, 
+                                        update: updateData as never, 
+                                        create: upsertData as never 
+                                    });
+                                    break;
+                                }
+                            }
+                            // eslint-disable-next-line no-console
+                            console.log(`[MongoDBSyncService.pushBatch] Successfully pushed local data for ${tableName} record ${recordId} (remote was newer)`);
+                            result.recordsUpdated++;
+                            result.conflicts++;
+                        } catch (upsertError) {
+                            const errorMessage = upsertError instanceof Error ? upsertError.message : 'Unknown error';
+                            // eslint-disable-next-line no-console
+                            console.error(`[MongoDBSyncService.pushBatch] Error upserting record for ${tableName} ${recordId} (remote newer case):`, errorMessage);
+                            result.errors.push({
+                                tableName,
+                                recordId,
+                                error: errorMessage,
+                                timestamp: new Date(),
+                                operation: 'update',
+                            });
+                            result.conflicts++;
+                            errorLogService.logSyncError(
+                                validatedUserId,
+                                tableName,
+                                recordId,
+                                upsertError instanceof Error ? upsertError : new Error(errorMessage),
+                                'update'
+                            ).catch((logError) => {
+                                console.error('Failed to log sync error:', logError);
+                            });
+                        }
                     }
                 } else {
-                    // Remove _id for new records (MongoDB will generate it)
-                    delete mongoRecord._id;
-                    await Model.create(mongoRecord);
-                    result.recordsCreated++;
+                    // No existing record - create new record
+                    // Remove id from mongoRecord for create operations (let MongoDB generate it)
+                    const createData = { ...mongoRecord };
+                    if (tableName === 'workouts' || tableName === 'error_logs') {
+                        delete createData.id;
+                    }
+                    // Remove id for composite key tables
+                    if (tableName === 'muscle_statuses' || tableName === 'settings' || 
+                        tableName === 'sleep_logs' || tableName === 'recovery_logs') {
+                        delete createData.id;
+                    }
+                    // For user_profiles, never include id field (uses userId as primary key)
+                    if (tableName === 'user_profiles') {
+                        delete createData.id;
+                    }
+                    // eslint-disable-next-line no-console
+                    console.log(`[MongoDBSyncService.pushBatch] Creating new record in ${tableName}:`, createData);
+                    
+                    try {
+                        switch (tableName) {
+                            case 'workouts':
+                                await prisma.workout.create({ 
+                                    data: createData as never 
+                                });
+                                // eslint-disable-next-line no-console
+                                console.log(`[MongoDBSyncService.pushBatch] Successfully created workout record`);
+                                break;
+                            case 'exercises': {
+                                const exerciseId = (mongoRecord.exerciseId as string) || recordId;
+                                if (!exerciseId || exerciseId === 'new') {
+                                    throw new Error(`Invalid exerciseId for exercise ${recordId}`);
+                                }
+                                await prisma.exercise.create({ 
+                                    data: createData as never 
+                                });
+                                break;
+                            }
+                            case 'workout_templates': {
+                                const templateId = (mongoRecord.templateId as string) || recordId;
+                                if (!templateId || templateId === 'new') {
+                                    throw new Error(`Invalid templateId for template ${recordId}`);
+                                }
+                                await prisma.workoutTemplate.create({ 
+                                    data: createData as never 
+                                });
+                                break;
+                            }
+                            case 'planned_workouts': {
+                                const plannedWorkoutId = (mongoRecord.plannedWorkoutId as string) || recordId;
+                                if (!plannedWorkoutId || plannedWorkoutId === 'new') {
+                                    throw new Error(`Invalid plannedWorkoutId for planned workout ${recordId}`);
+                                }
+                                await prisma.plannedWorkout.create({ 
+                                    data: createData as never 
+                                });
+                                break;
+                            }
+                            case 'muscle_statuses':
+                                await prisma.muscleStatus.create({ 
+                                    data: createData as never 
+                                });
+                                break;
+                            case 'user_profiles':
+                                await prisma.userProfile.create({ 
+                                    data: createData as never 
+                                });
+                                break;
+                            case 'settings': {
+                                const settingKey = (mongoRecord.key as string);
+                                if (!settingKey) {
+                                    throw new Error(`Invalid key for setting ${recordId}`);
+                                }
+                                await prisma.setting.create({ 
+                                    data: createData as never 
+                                });
+                                break;
+                            }
+                            case 'notifications': {
+                                const notificationId = (mongoRecord.notificationId as string) || recordId;
+                                if (!notificationId || notificationId === 'new') {
+                                    throw new Error(`Invalid notificationId for notification ${recordId}`);
+                                }
+                                await prisma.notification.create({ 
+                                    data: createData as never 
+                                });
+                                break;
+                            }
+                            case 'sleep_logs':
+                                await prisma.sleepLog.create({ 
+                                    data: createData as never 
+                                });
+                                break;
+                            case 'recovery_logs':
+                                await prisma.recoveryLog.create({ 
+                                    data: createData as never 
+                                });
+                                break;
+                            case 'error_logs':
+                                await prisma.errorLog.create({ 
+                                    data: createData as never 
+                                });
+                                break;
+                        }
+                        // eslint-disable-next-line no-console
+                        console.log(`[MongoDBSyncService.pushBatch] Successfully created record in ${tableName}`);
+                        result.recordsCreated++;
+                    } catch (createError) {
+                        const errorMessage = createError instanceof Error ? createError.message : 'Unknown error';
+                        // eslint-disable-next-line no-console
+                        console.error(`[MongoDBSyncService.pushBatch] Error creating new record for ${tableName} ${recordId}:`, errorMessage);
+                        result.errors.push({
+                            tableName,
+                            recordId,
+                            error: errorMessage,
+                            timestamp: new Date(),
+                            operation: 'create',
+                        });
+                        errorLogService.logSyncError(
+                            validatedUserId,
+                            tableName,
+                            recordId,
+                            createError instanceof Error ? createError : new Error(errorMessage),
+                            'create'
+                        ).catch((logError) => {
+                            console.error('Failed to log sync error:', logError);
+                        });
+                    }
                 }
 
                 result.recordsProcessed++;
@@ -1088,7 +2100,7 @@ class MongoDBSyncService {
                 });
                 
                 errorLogService.logSyncError(
-                    userId,
+                    validatedUserId,
                     tableName,
                     recordId,
                     error instanceof Error ? error : new Error(errorMessage),
@@ -1113,8 +2125,16 @@ class MongoDBSyncService {
         const base: Record<string, unknown> = {
             userId: userId,
             version: record.version ?? 1,
-            deletedAt: record.deletedAt || null,
+            deletedAt: record.deletedAt ? timestampToLocalDate(record.deletedAt as number | Date | string) : null,
         };
+        
+        // Convert date fields to local Date objects
+        if (record.createdAt) {
+            base.createdAt = timestampToLocalDate(record.createdAt as number | Date | string) || getCurrentLocalDate();
+        }
+        if (record.updatedAt) {
+            base.updatedAt = timestampToLocalDate(record.updatedAt as number | Date | string) || getCurrentLocalDate();
+        }
 
         // For most tables, we can pass through the record with userId set
         // Special handling for tables that need ID mapping
@@ -1137,18 +2157,98 @@ class MongoDBSyncService {
                     ...base,
                     ...record,
                 };
+                // Map id to exerciseId for Prisma
+                if (record.id && !record.exerciseId) {
+                    exerciseRecord.exerciseId = record.id;
+                    delete exerciseRecord.id;
+                }
                 if (!record.isCustom) {
                     exerciseRecord.userId = null;
                 }
                 return exerciseRecord;
             }
+            case 'workout_templates': {
+                const templateRecord: Record<string, unknown> = {
+                    ...base,
+                    ...record,
+                };
+                // Map id to templateId for Prisma
+                if (record.id && !record.templateId) {
+                    templateRecord.templateId = record.id;
+                    delete templateRecord.id;
+                }
+                return templateRecord;
+            }
+            case 'planned_workouts': {
+                const plannedRecord: Record<string, unknown> = {
+                    ...base,
+                    ...record,
+                };
+                // Map id to plannedWorkoutId for Prisma
+                if (record.id && !record.plannedWorkoutId) {
+                    plannedRecord.plannedWorkoutId = record.id;
+                    delete plannedRecord.id;
+                }
+                return plannedRecord;
+            }
+            case 'notifications': {
+                const notificationRecord: Record<string, unknown> = {
+                    ...base,
+                    ...record,
+                };
+                // Map id to notificationId for Prisma
+                if (record.id && !record.notificationId) {
+                    notificationRecord.notificationId = record.id;
+                    delete notificationRecord.id;
+                }
+                return notificationRecord;
+            }
             case 'user_profiles': {
-                // user_profiles uses userId as primary key
-                return {
+                // user_profiles uses userId as primary key, never use id field
+                const profileRecord: Record<string, unknown> = {
                     ...base,
                     userId: record.id || userId,
                     ...record,
                 };
+                // Remove id field - user_profiles uses userId as primary key, not id
+                delete profileRecord.id;
+                return profileRecord;
+            }
+            case 'muscle_statuses': {
+                const muscleRecord: Record<string, unknown> = {
+                    ...base,
+                    ...record,
+                };
+                // Remove id field - muscle_statuses uses composite key userId_muscle
+                delete muscleRecord.id;
+                return muscleRecord;
+            }
+            case 'settings': {
+                const settingRecord: Record<string, unknown> = {
+                    ...base,
+                    ...record,
+                };
+                // Remove id field - settings uses composite key userId_key
+                delete settingRecord.id;
+                return settingRecord;
+            }
+            case 'sleep_logs': {
+                const sleepRecord: Record<string, unknown> = {
+                    ...base,
+                    ...record,
+                };
+                // Remove id field - sleep_logs uses composite key userId_date
+                delete sleepRecord.id;
+                return sleepRecord;
+            }
+            case 'recovery_logs': {
+                const recoveryRecord: Record<string, unknown> = {
+                    ...base,
+                    ...record,
+                };
+                // Remove id field - recovery_logs uses composite key userId_date
+                delete recoveryRecord.id;
+                return recoveryRecord;
             }
             default:
                 return {
@@ -1170,34 +2270,53 @@ class MongoDBSyncService {
             ...record,
         };
 
-        // Map _id to id for IndexedDB compatibility
-        if (record._id) {
+        // Map Prisma id field to IndexedDB id field
+        // Prisma uses 'id' (mapped from MongoDB _id)
+        if (record.id) {
             if (tableName === 'workouts' || tableName === 'error_logs') {
                 // These use numeric IDs in IndexedDB
-                // Convert ObjectId to a number (use timestamp portion for consistency)
-                if (record._id instanceof mongoose.Types.ObjectId) {
-                    // Use the timestamp portion of ObjectId as a numeric ID
-                    base.id = record._id.getTimestamp().getTime();
-                } else {
-                    base.id = typeof record._id === 'string' ? parseInt(record._id, 16) : Number(record._id);
-                }
+                // Convert string ID to number if possible
+                base.id = typeof record.id === 'string' ? parseInt(record.id, 16) : Number(record.id);
+            } else if (tableName === 'exercises') {
+                // Exercises use exerciseId in Prisma, map to id for IndexedDB
+                base.id = record.exerciseId || record.id;
+            } else if (tableName === 'workout_templates') {
+                // Templates use templateId in Prisma
+                base.id = record.templateId || record.id;
+            } else if (tableName === 'planned_workouts') {
+                // Planned workouts use plannedWorkoutId in Prisma
+                base.id = record.plannedWorkoutId || record.id;
+            } else if (tableName === 'notifications') {
+                // Notifications use notificationId in Prisma
+                base.id = record.notificationId || record.id;
             } else if (tableName !== 'user_profiles') {
                 // Most other tables use string IDs
-                base.id = record.id || (record._id instanceof mongoose.Types.ObjectId ? record._id.toString() : String(record._id));
+                base.id = record.id;
             }
-            delete base._id;
         }
 
+        // Convert Date objects to timestamps for IndexedDB
+        // Preserve local time representation
+        if (record.createdAt instanceof Date) {
+            base.createdAt = record.createdAt.getTime();
+        } else if (record.createdAt) {
+            const localDate = timestampToLocalDate(record.createdAt as number | Date | string);
+            base.createdAt = localDate ? localDate.getTime() : Date.now();
+        }
+        if (record.updatedAt instanceof Date) {
+            base.updatedAt = record.updatedAt.getTime();
+        } else if (record.updatedAt) {
+            const localDate = timestampToLocalDate(record.updatedAt as number | Date | string);
+            base.updatedAt = localDate ? localDate.getTime() : Date.now();
+        }
+        
         // Special handling for notifications (timestamps)
         if (tableName === 'notifications') {
-            if (record.createdAt instanceof Date) {
-                base.createdAt = record.createdAt.getTime();
-            }
-            if (record.updatedAt instanceof Date) {
-                base.updatedAt = record.updatedAt.getTime();
-            }
             if (record.readAt instanceof Date) {
                 base.readAt = record.readAt.getTime();
+            } else if (record.readAt) {
+                const localDate = timestampToLocalDate(record.readAt as number | Date | string);
+                base.readAt = localDate ? localDate.getTime() : null;
             }
         }
 
@@ -1261,12 +2380,6 @@ class MongoDBSyncService {
         return new Date();
     }
 
-    private getCreatedAt(record: Record<string, unknown>): Date {
-        if (record.createdAt) {
-            return record.createdAt instanceof Date ? record.createdAt : new Date(record.createdAt as string | number | Date);
-        }
-        return new Date();
-    }
 
     private chunkArray<T>(array: T[], size: number): T[][] {
         const chunks: T[][] = [];

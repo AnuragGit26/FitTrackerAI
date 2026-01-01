@@ -27,8 +27,8 @@ export function EditWorkout() {
       }
 
       try {
-        const id = parseInt(workoutId, 10);
-        if (isNaN(id)) {
+        const id = workoutId;
+        if (!id) {
           throw new Error('Invalid workout ID');
         }
 

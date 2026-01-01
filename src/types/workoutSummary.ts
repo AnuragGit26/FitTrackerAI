@@ -101,7 +101,7 @@ export interface PersonalRecord {
   value: number;
   unit?: string;
   previousValue?: number;
-  workoutId: number;
+  workoutId: string;
   date: Date;
 }
 

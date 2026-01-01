@@ -6,7 +6,7 @@ type WorkoutEventCallback = (workout: Workout) => void;
 
 class WorkoutEventTracker {
   private listeners: Set<WorkoutEventCallback> = new Set();
-  private lastProcessedWorkoutId: number | null = null;
+  private lastProcessedWorkoutId: string | null = null;
   private lastProcessedWorkoutTimestamp: number | null = null;
   private isInitialized = false;
 
@@ -89,7 +89,7 @@ class WorkoutEventTracker {
   /**
    * Get the last processed workout ID
    */
-  getLastProcessedWorkoutId(): number | null {
+  getLastProcessedWorkoutId(): string | null {
     return this.lastProcessedWorkoutId;
   }
 

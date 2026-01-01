@@ -35,6 +35,12 @@ export function RestTimer({
   const onCompleteRef = useRef(onComplete);
   const hasInitializedRef = useRef(initialRemainingTime !== undefined || initialPaused);
   const { settings } = useSettingsStore();
+  const onRemainingTimeChangeRef = useRef(onRemainingTimeChange);
+  
+  // Keep callback ref up to date
+  useEffect(() => {
+    onRemainingTimeChangeRef.current = onRemainingTimeChange;
+  }, [onRemainingTimeChange]);
 
   // Keep onComplete ref up to date
   useEffect(() => {
@@ -66,22 +72,50 @@ export function RestTimer({
   // Reset timer when duration changes or component becomes visible
   // But don't reset if we're restoring from persisted state
   useEffect(() => {
-    if (isVisible && !hasInitializedRef.current) {
-      initialDurationRef.current = duration;
-      setRemainingTime(duration);
-      setIsPaused(false);
-    } else if (isVisible && hasInitializedRef.current) {
-      // We've restored from persisted state, mark as initialized
+    if (!isVisible) {
+      // Reset initialization flag when timer becomes invisible
+      // This allows proper reinitialization when timer becomes visible again
       hasInitializedRef.current = false;
-      if (initialRemainingTime !== undefined) {
-        initialDurationRef.current = initialRemainingTime;
-      }
+      return;
     }
-  }, [duration, isVisible, initialRemainingTime]);
+
+    if (isVisible && !hasInitializedRef.current) {
+      // Check if we're restoring from persisted state
+      const isRestoring = initialRemainingTime !== undefined || initialPaused;
+      
+      if (isRestoring && initialRemainingTime !== undefined) {
+        // Restore from persisted state
+        initialDurationRef.current = initialRemainingTime;
+        setRemainingTime(initialRemainingTime);
+        setIsPaused(initialPaused);
+        // Sync with parent - defer to avoid updating parent during render
+        setTimeout(() => {
+          onRemainingTimeChange?.(initialRemainingTime);
+        }, 0);
+      } else {
+        // First time becoming visible - initialize with duration
+        initialDurationRef.current = duration;
+        setRemainingTime(duration);
+        setIsPaused(false);
+        // Sync with parent - defer to avoid updating parent during render
+        setTimeout(() => {
+          onRemainingTimeChange?.(duration);
+        }, 0);
+      }
+      // Mark as initialized after setting up
+      hasInitializedRef.current = true;
+    }
+  }, [duration, isVisible, initialRemainingTime, initialPaused, onRemainingTimeChange]);
 
   // Timer countdown logic
   useEffect(() => {
     if (isVisible && !isPaused && remainingTime > 0) {
+      // Clear existing interval before creating new one
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      
       intervalRef.current = setInterval(() => {
         setRemainingTime((prev) => {
           if (prev <= 1) {
@@ -115,14 +149,15 @@ export function RestTimer({
             setTimeout(() => {
               onCompleteRef.current();
             }, 0);
-            onRemainingTimeChange?.(0);
+            // Defer onRemainingTimeChange to avoid updating parent during render
+            setTimeout(() => {
+              onRemainingTimeChangeRef.current?.(0);
+            }, 0);
             return 0;
           }
           const newTime = prev - 1;
-          // Report remaining time changes periodically (every 5 seconds) for state sync
-          if (newTime % 5 === 0) {
-            onRemainingTimeChange?.(newTime);
-          }
+          // Report remaining time changes on every tick to keep parent state in sync
+          onRemainingTimeChangeRef.current?.(newTime);
           return newTime;
         });
       }, 1000);
@@ -139,7 +174,7 @@ export function RestTimer({
         intervalRef.current = null;
       }
     };
-  }, [isVisible, isPaused, remainingTime, settings.soundEnabled, settings.vibrationEnabled, onRemainingTimeChange]);
+  }, [isVisible, isPaused, remainingTime, settings.soundEnabled, settings.vibrationEnabled]);
 
   const handlePause = () => {
     const newPausedState = !isPaused;

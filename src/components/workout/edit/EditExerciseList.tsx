@@ -80,6 +80,12 @@ export function EditExerciseList({ exercises, onExercisesChange }: EditExerciseL
   };
 
   const handleRemoveExercise = (exerciseId: string) => {
+    // Check if this is the last exercise
+    if (exercises.length <= 1) {
+      showError('A workout must have at least one exercise');
+      return;
+    }
+    
     if (window.confirm('Are you sure you want to remove this exercise?')) {
       onExercisesChange(exercises.filter(ex => ex.id !== exerciseId));
     }

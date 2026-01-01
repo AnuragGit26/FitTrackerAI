@@ -168,7 +168,7 @@ class MuscleRecoveryService {
    * Recalculate muscle statuses after a workout is edited
    * This is called when a workout is updated to ensure muscle recovery is accurate
    */
-  async recalculateMuscleStatusesAfterWorkoutUpdate(workoutId: number, userId: string): Promise<void> {
+  async recalculateMuscleStatusesAfterWorkoutUpdate(workoutId: string, userId: string): Promise<void> {
     try {
       // Get the updated workout
       const workout = await dataService.getWorkout(workoutId);

@@ -321,7 +321,21 @@ export function LogWorkout() {
   };
 
   // Modal handlers
-  const handleAddExercise = () => {
+  const handleAddExercise = async () => {
+    // Ensure workout exists before opening modal
+    if (!currentWorkout && profile) {
+      try {
+        await startWorkout(profile.id);
+      } catch (error) {
+        showError('Failed to start workout. Please try again.');
+        console.error('Error starting workout:', error);
+        return;
+      }
+    } else if (!currentWorkout) {
+      showError('Please log in to add exercises');
+      return;
+    }
+    
     // Start workout timer when "Add Exercise" is clicked (explicit start)
     startWorkoutTimer();
     setEditingExerciseId(null);
@@ -582,10 +596,32 @@ export function LogWorkout() {
       }
       
       // Update workout with calculated start/end times
+      // Ensure startTime is on the same day as workout date
       if (workoutStartTime && currentWorkout) {
+        const workoutDate = currentWorkout.date instanceof Date 
+          ? currentWorkout.date 
+          : new Date(currentWorkout.date);
+        const workoutDateStr = workoutDate.toISOString().split('T')[0];
+        const startTimeStr = workoutStartTime.toISOString().split('T')[0];
+        
+        // Adjust startTime to match workout date if needed
+        let adjustedStartTime = workoutStartTime;
+        if (workoutDateStr !== startTimeStr) {
+          adjustedStartTime = new Date(workoutDate);
+          adjustedStartTime.setHours(workoutStartTime.getHours());
+          adjustedStartTime.setMinutes(workoutStartTime.getMinutes());
+          adjustedStartTime.setSeconds(workoutStartTime.getSeconds());
+          adjustedStartTime.setMilliseconds(workoutStartTime.getMilliseconds());
+          
+          // Show warning if adjusted
+          if (workoutDateStr !== startTimeStr) {
+            console.warn('Start time adjusted to match workout date');
+          }
+        }
+        
         const updatedWorkout = {
           ...currentWorkout,
-          startTime: workoutStartTime,
+          startTime: adjustedStartTime,
           endTime: workoutEndTime,
         };
         useWorkoutStore.setState({ currentWorkout: updatedWorkout });
@@ -1100,42 +1136,59 @@ export function LogWorkout() {
       </Modal>
 
       {/* Finish Workout Confirmation Modal */}
-      <AnimatePresence>
-        {showFinishWorkoutModal && (
-          <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm transition-opacity duration-300"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setShowFinishWorkoutModal(false)}
-          >
-            <motion.div
-              className="relative w-full max-w-xs sm:max-w-sm overflow-hidden rounded-xl bg-white dark:bg-[#1c2e24] shadow-2xl border border-gray-200 dark:border-[#316847]/50 transform transition-all scale-100 opacity-100"
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
+      <Modal
+        isOpen={showFinishWorkoutModal}
+        onClose={() => {
+          setShowFinishWorkoutModal(false);
+          setWorkoutCalories('');
+          setManualStartTime('');
+          setManualEndTime('');
+          setManualDurationMinutes('');
+        }}
+        title="Finish Workout?"
+        size="sm"
+        footer={
+          <div className="flex flex-col gap-3 sm:flex-row-reverse">
+            <button
+              onClick={handleConfirmFinishWorkout}
+              disabled={isSaving || (!!templateId && (!manualStartTime || !manualEndTime))}
+              className="flex w-full flex-1 items-center justify-center rounded-xl bg-primary hover:bg-[#0be060] px-4 py-3 text-sm font-bold text-black shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
             >
-              <button
-                onClick={() => setShowFinishWorkoutModal(false)}
-                className="absolute top-3 right-3 p-1 rounded-full text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
-                aria-label="Close modal"
-              >
-                <X className="w-5 h-5" />
-              </button>
-              <div className="flex flex-col p-6 text-center">
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/20">
-                  <CheckCircle2 className="w-6 h-6 text-primary" />
-                </div>
-                <h3 className="mb-2 text-lg font-bold leading-tight text-gray-900 dark:text-white">
-                  Finish Workout?
-                </h3>
-                <p className="mb-4 text-sm text-gray-600 dark:text-[#90cba8] font-normal leading-relaxed">
-                  Are you sure you want to mark this workout as finished?
-                </p>
-                {/* Manual Timer Inputs for Template Workouts */}
-                {templateId && (
-                  <div className="mb-6 space-y-4 text-left">
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Saving...
+                </>
+              ) : (
+                'Finish Workout'
+              )}
+            </button>
+            <button
+              onClick={() => {
+                setShowFinishWorkoutModal(false);
+                setWorkoutCalories('');
+                setManualStartTime('');
+                setManualEndTime('');
+                setManualDurationMinutes('');
+              }}
+              disabled={isSaving}
+              className="flex w-full flex-1 items-center justify-center rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-transparent px-4 py-3 text-sm font-bold text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
+            >
+              Cancel
+            </button>
+          </div>
+        }
+      >
+        <div className="flex flex-col text-center space-y-4">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/20">
+            <CheckCircle2 className="w-6 h-6 text-primary" />
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400 font-normal leading-relaxed">
+            Are you sure you want to mark this workout as finished?
+          </p>
+          {/* Manual Timer Inputs for Template Workouts */}
+          {templateId && (
+            <div className="space-y-4 text-left">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Start Time <span className="text-gray-500 dark:text-gray-400">(required)</span>
@@ -1154,7 +1207,7 @@ export function LogWorkout() {
                             setManualDurationMinutes(durationMinutes > 0 ? durationMinutes : '');
                           }
                         }}
-                        className="w-full rounded-lg bg-white dark:bg-[#224932] border border-gray-300 dark:border-[#316847] text-gray-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-[#1c2e24] h-10 px-3 text-sm"
+                        className="w-full rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 h-10 px-3 text-sm"
                         required
                       />
                     </div>
@@ -1176,7 +1229,7 @@ export function LogWorkout() {
                             setManualDurationMinutes(durationMinutes > 0 ? durationMinutes : '');
                           }
                         }}
-                        className="w-full rounded-lg bg-white dark:bg-[#224932] border border-gray-300 dark:border-[#316847] text-gray-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-[#1c2e24] h-10 px-3 text-sm"
+                        className="w-full rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 h-10 px-3 text-sm"
                         required
                       />
                     </div>
@@ -1200,58 +1253,26 @@ export function LogWorkout() {
                           }
                         }}
                         placeholder="Auto-calculated from start/end times"
-                        className="w-full rounded-lg bg-white dark:bg-[#224932] border border-gray-300 dark:border-[#316847] text-gray-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-[#1c2e24] h-10 px-3 text-sm"
+                        className="w-full rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 h-10 px-3 text-sm"
                       />
-                    </div>
-                  </div>
-                )}
-                <div className="mb-6 text-left">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Calories <span className="text-gray-500 dark:text-gray-400">(optional)</span>
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={workoutCalories}
-                    onChange={(e) => setWorkoutCalories(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
-                    placeholder="Enter Calories"
-                    className="w-full rounded-lg bg-white dark:bg-[#224932] border border-gray-300 dark:border-[#316847] text-gray-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-[#1c2e24] h-10 px-3 text-sm"
-                  />
-                </div>
-                <div className="flex flex-col gap-3 sm:flex-row-reverse">
-                  <button
-                    onClick={handleConfirmFinishWorkout}
-                    disabled={isSaving || (!!templateId && (!manualStartTime || !manualEndTime))}
-                    className="flex w-full flex-1 items-center justify-center rounded-lg bg-primary dark:bg-primary hover:bg-green-400 dark:hover:bg-green-500 px-4 py-2.5 text-sm font-bold text-background-dark shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-[#1c2e24] disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isSaving ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                        Saving...
-                      </>
-                    ) : (
-                      'Finish Workout'
-                    )}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowFinishWorkoutModal(false);
-                      setWorkoutCalories('');
-                      setManualStartTime('');
-                      setManualEndTime('');
-                      setManualDurationMinutes('');
-                    }}
-                    disabled={isSaving}
-                    className="flex w-full flex-1 items-center justify-center rounded-lg border border-gray-300 dark:border-[#316847] bg-white dark:bg-transparent px-4 py-2.5 text-sm font-bold text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-[#224932] transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-[#1c2e24] disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Cancel
-                  </button>
-                </div>
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </div>
+          )}
+          <div className="text-left">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Calories <span className="text-gray-500 dark:text-gray-400">(optional)</span>
+            </label>
+            <input
+              type="number"
+              min="0"
+              value={workoutCalories}
+              onChange={(e) => setWorkoutCalories(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
+              placeholder="Enter Calories"
+              className="w-full rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 h-10 px-3 text-sm"
+            />
+          </div>
+        </div>
+      </Modal>
 
       {/* Quick Cardio Log Modal */}
       <QuickCardioLog

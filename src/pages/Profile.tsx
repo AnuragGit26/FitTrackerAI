@@ -26,6 +26,12 @@ export function Profile() {
   const navigate = useNavigate();
   const { user: auth0User, getAccessTokenSilently, isAuthenticated } = useAuth0();
   const { profile, updateProfile, isLoading, setPreferredUnit, setDefaultRestTime, setProfilePicture: updateProfilePictureInStore, syncToAuth0, auth0SyncStatus, auth0SyncError } = useUserStore();
+  
+  // Debug logging for profile state
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log('[Profile] Component render - profile:', profile, 'profile?.id:', profile?.id, 'isLoading:', isLoading, 'isAuthenticated:', isAuthenticated);
+  }, [profile, isLoading, isAuthenticated]);
   const { 
     settings, 
     setTheme, 
@@ -194,15 +200,27 @@ export function Profile() {
   };
   
   const handleManualSync = async () => {
-    if (!profile?.id || isSyncing) return;
+    // eslint-disable-next-line no-console
+    console.log('[Profile.handleManualSync] Button clicked, profile.id:', profile?.id, 'isSyncing:', isSyncing);
+    
+    if (!profile?.id || isSyncing) {
+      // eslint-disable-next-line no-console
+      console.warn('[Profile.handleManualSync] Sync aborted - missing profile.id or already syncing');
+      return;
+    }
     
     setIsSyncing(true);
     setSyncStatus('syncing');
     
     try {
+      // eslint-disable-next-line no-console
+      console.log('[Profile.handleManualSync] Calling mongodbSyncService.sync...');
       const results = await mongodbSyncService.sync(profile.id, {
         direction: 'bidirectional',
       });
+      
+      // eslint-disable-next-line no-console
+      console.log('[Profile.handleManualSync] Sync completed, results:', results);
       
       const hasErrors = results.some((r) => r.status === 'error');
       const totalConflicts = results.reduce((sum, r) => sum + r.conflicts, 0);
@@ -243,17 +261,24 @@ export function Profile() {
       setLastSyncTime(new Date());
       await loadSyncStatus();
     } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('[Profile.handleManualSync] Sync error:', error);
       setSyncStatus('error');
       const errorMessage = error instanceof Error ? error.message : 'Failed to sync data';
       
       // Provide helpful error message for missing env var
-      if (errorMessage.includes('VITE_SUPABASE') || errorMessage.includes('anonymous key is not configured')) {
+      if (errorMessage.includes('VITE_MONGODB_URI') || errorMessage.includes('MONGODB_URI')) {
+        showError(
+          'MongoDB is not configured. Please add VITE_MONGODB_URI to your .env file. ' +
+          'Get your connection string from MongoDB Atlas.'
+        );
+      } else if (errorMessage.includes('VITE_SUPABASE') || errorMessage.includes('anonymous key is not configured')) {
         showError(
           'Supabase is not configured. Please add VITE_SUPABASE_ANON_KEY to your .env file. ' +
           'Get your key from Supabase project settings → API.'
         );
       } else {
-        showError(errorMessage);
+        showError(`Sync failed: ${errorMessage}`);
       }
     } finally {
       setIsSyncing(false);
@@ -871,12 +896,21 @@ export function Profile() {
             {/* Manual Sync Button */}
             <button
               onClick={handleManualSync}
-              disabled={isSyncing || !profile?.id}
+              disabled={isSyncing || !profile?.id || isLoading}
               className={cn(
                 'w-full flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border',
                 'hover:bg-gray-50 dark:hover:bg-surface-dark-light transition-colors',
                 'disabled:opacity-50 disabled:cursor-not-allowed'
               )}
+              title={
+                isLoading
+                  ? 'Loading profile...'
+                  : !profile?.id
+                  ? 'Please wait for profile to load'
+                  : isSyncing
+                  ? 'Sync in progress...'
+                  : 'Sync your data to MongoDB'
+              }
             >
               <div className="flex items-center gap-3">
                 {isSyncing ? (
@@ -885,11 +919,19 @@ export function Profile() {
                   <RefreshCw className="w-5 h-5 text-slate-400" />
                 )}
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                  {isSyncing ? 'Syncing...' : 'Sync Now'}
+                  {isSyncing
+                    ? 'Syncing...'
+                    : isLoading
+                    ? 'Loading...'
+                    : !profile?.id
+                    ? 'Waiting for profile...'
+                    : 'Sync Now'}
                 </span>
               </div>
               {isSyncing ? (
                 <LoadingSpinner size="sm" />
+              ) : isLoading || !profile?.id ? (
+                <Clock className="w-4 h-4 text-slate-400" />
               ) : (
                 <ArrowRight className="w-4 h-4 text-slate-400" />
               )}

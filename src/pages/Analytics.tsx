@@ -55,38 +55,38 @@ export function Analytics() {
   const { profile } = useUserStore();
 
   useEffect(() => {
-    if (profile) {
+    if (profile?.id) {
       loadWorkouts(profile.id);
     }
-  }, [profile, loadWorkouts]);
+  }, [profile?.id, loadWorkouts]);
 
   const filteredWorkouts = useMemo(() => {
     // If custom date range is set, use it; otherwise use the standard date range
     if (customDateRange) {
-      return workouts.filter((w) => {
+      return (workouts ?? []).filter((w) => {
         const workoutDate = new Date(w.date);
         return workoutDate >= customDateRange.start && workoutDate <= customDateRange.end;
       });
     }
-    return filterWorkoutsByDateRange(workouts, dateRange);
+    return filterWorkoutsByDateRange(workouts ?? [], dateRange);
   }, [workouts, dateRange, customDateRange]);
 
   // Load metrics asynchronously to include sleep/recovery data
   useEffect(() => {
     async function fetchMetrics() {
-      if (!profile) return;
+      if (!profile?.id) return;
       const data = await analyticsService.getAllMetrics(filteredWorkouts, dateRange, profile.id);
       setMetrics(data);
     }
     fetchMetrics();
-  }, [filteredWorkouts, dateRange, profile]);
+  }, [filteredWorkouts, dateRange, profile?.id]);
 
   const hasEnoughWorkouts = useMemo(() => {
-    return hasEnoughWorkoutsForAverages(workouts);
+    return hasEnoughWorkoutsForAverages(workouts ?? []);
   }, [workouts]);
 
   const currentStreak = useMemo(() => {
-    const workoutDates = workouts.map((w) => new Date(w.date));
+    const workoutDates = (workouts ?? []).map((w) => new Date(w.date));
     return calculateStreak(workoutDates);
   }, [workouts]);
 
@@ -94,7 +94,7 @@ export function Analytics() {
     const now = new Date();
     const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
-    const lastMonthWorkouts = workouts.filter((w) => {
+    const lastMonthWorkouts = (workouts ?? []).filter((w) => {
       const workoutDate = new Date(w.date);
       return workoutDate >= lastMonthStart && workoutDate <= lastMonthEnd;
     });
@@ -107,7 +107,7 @@ export function Analytics() {
   }, [metrics, previousMonthVolume]);
 
   const topMuscle = useMemo(() => {
-    const topMuscleNames = analyticsService.getMostActiveMuscleNames(workouts, 1);
+    const topMuscleNames = analyticsService.getMostActiveMuscleNames(workouts ?? [], 1);
     return topMuscleNames[0] || 'chest';
   }, [workouts]);
 
@@ -164,7 +164,7 @@ export function Analytics() {
 
   useEffect(() => {
     if (view === 'muscle' && metrics && metrics.focusDistribution) {
-      const topMuscleNames = analyticsService.getMostActiveMuscleNames(workouts, 2);
+      const topMuscleNames = analyticsService.getMostActiveMuscleNames(workouts ?? [], 2);
       const currentMetrics = {
         focusDistribution: metrics.focusDistribution,
         symmetryScore: metrics.symmetryScore,

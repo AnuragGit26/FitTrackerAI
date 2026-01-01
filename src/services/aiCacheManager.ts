@@ -31,7 +31,7 @@ class AICacheManager {
     async updateCacheMetadata(
         insightType: InsightType,
         fingerprint: string,
-        lastWorkoutId: number | null,
+        lastWorkoutId: string | null,
         userId?: string
     ): Promise<void> {
         try {
@@ -83,7 +83,7 @@ class AICacheManager {
      */
     async hasNewWorkouts(
         insightType: InsightType,
-        currentWorkoutId: number | null,
+        currentWorkoutId: string | null,
         userId?: string
     ): Promise<boolean> {
         const metadata = await this.getCacheMetadata(insightType, userId);
@@ -96,7 +96,9 @@ class AICacheManager {
             return false; // No current workout
         }
 
-        return currentWorkoutId > metadata.lastWorkoutId;
+        // Compare string IDs - if they're different, there's a new workout
+        // Since workout IDs now include datetime, different IDs mean different workouts
+        return currentWorkoutId !== metadata.lastWorkoutId;
     }
 
     /**
@@ -104,7 +106,7 @@ class AICacheManager {
      */
     async shouldRefresh(
         insightType: InsightType,
-        currentWorkoutId: number | null,
+        currentWorkoutId: string | null,
         fingerprint: string,
         userId?: string
     ): Promise<{ shouldRefresh: boolean; reason?: string }> {
@@ -151,7 +153,7 @@ class AICacheManager {
     async getLastWorkoutId(
         insightType: InsightType,
         userId?: string
-    ): Promise<number | null> {
+    ): Promise<string | null> {
         const metadata = await this.getCacheMetadata(insightType, userId);
         return metadata?.lastWorkoutId || null;
     }

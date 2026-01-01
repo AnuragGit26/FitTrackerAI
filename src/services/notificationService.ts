@@ -2,11 +2,9 @@ import { PlannedWorkout } from '@/types/workout';
 import { MuscleStatus } from '@/types/muscle';
 import type { Notification, NotificationCreateInput, NotificationFilters, NotificationType } from '@/types/notification';
 import { dbHelpers } from './database';
-import { getSupabaseClientWithAuth } from './supabaseClient';
-import { connectToMongoDB } from './mongodbClient';
+import { prisma } from './prismaClient';
 import { userScopedFilter } from './mongodbQueryBuilder';
 import { requireUserId } from '@/utils/userIdValidation';
-import { Notification as NotificationModel } from './mongodb/schemas';
 
 interface ScheduledNotification {
   id: string;
@@ -414,10 +412,8 @@ class NotificationService {
         additionalInfo: { notificationId: notification.id },
       });
 
-      await connectToMongoDB();
-
       const mongoNotification = {
-        id: notification.id,
+        notificationId: notification.id,
         userId: userId,
         type: notification.type,
         title: notification.title,
@@ -427,14 +423,16 @@ class NotificationService {
         readAt: notification.readAt ? new Date(notification.readAt) : null,
         version: notification.version || 1,
         deletedAt: notification.deletedAt ? new Date(notification.deletedAt) : null,
-        createdAt: new Date(notification.createdAt),
       };
 
-      await NotificationModel.findOneAndUpdate(
-        { id: notification.id, userId: userId },
-        mongoNotification,
-        { upsert: true, new: true }
-      );
+      await prisma.notification.upsert({
+        where: { notificationId: notification.id },
+        update: {
+          ...mongoNotification,
+          version: { increment: 1 },
+        },
+        create: mongoNotification as never,
+      });
     } catch (error) {
       console.error('[NotificationService] Failed to sync notification to MongoDB:', error);
     }
@@ -458,22 +456,21 @@ class NotificationService {
         additionalInfo: { operation: 'pull_notifications' },
       });
 
-      await connectToMongoDB();
-
       // Get all notifications from MongoDB using user-scoped query
       // Only get unread notifications or notifications from last 7 days
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-      const filter = {
+      const where = {
         ...userScopedFilter(validatedUserId, 'notifications'),
         deletedAt: null,
-        createdAt: { $gte: sevenDaysAgo },
-      };
+        createdAt: { gte: sevenDaysAgo },
+      } as never;
 
-      const data = await NotificationModel.find(filter)
-        .sort({ createdAt: -1 })
-        .lean();
+      const data = await prisma.notification.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+      });
 
       if (!data || data.length === 0) {
         return 0;

@@ -1,0 +1,413 @@
+// Prisma schema for FitTrackAI MongoDB database
+// Using Prisma Accelerate for browser-based access
+
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["mongoDb"]
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model Workout {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId         String   @map("userId")
+  date           DateTime
+  startTime      DateTime @map("startTime")
+  endTime        DateTime? @map("endTime")
+  exercises      Json[]   @default([])
+  totalDuration  Int      @default(0) @map("totalDuration")
+  totalVolume    Float    @default(0) @map("totalVolume")
+  calories       Int?     @map("calories")
+  notes          String?  @map("notes")
+  musclesTargeted String[] @default([]) @map("musclesTargeted")
+  workoutType    String   @map("workoutType")
+  mood           WorkoutMood? @map("mood")
+  version        Int      @default(1) @map("version")
+  deletedAt      DateTime? @map("deletedAt")
+  createdAt      DateTime @default(now()) @map("createdAt")
+  updatedAt      DateTime @updatedAt @map("updatedAt")
+
+  @@index([userId, date])
+  @@index([userId, updatedAt(sort: Desc)])
+  @@index([userId, deletedAt])
+  @@map("workouts")
+}
+
+enum WorkoutMood {
+  great
+  good
+  okay
+  tired
+  exhausted
+}
+
+model Exercise {
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  exerciseId       String        @unique @map("id")
+  userId           String?       @map("userId")
+  name             String        @map("name")
+  category         ExerciseCategory @map("category")
+  primaryMuscles   String[]      @default([]) @map("primaryMuscles")
+  secondaryMuscles String[]      @default([]) @map("secondaryMuscles")
+  equipment        String[]      @default([]) @map("equipment")
+  difficulty       ExerciseDifficulty @map("difficulty")
+  instructions     String[]      @default([]) @map("instructions")
+  videoUrl         String?       @map("videoUrl")
+  isCustom         Boolean       @default(false) @map("isCustom")
+  trackingType     TrackingType @map("trackingType")
+  anatomyImageUrl  String?       @map("anatomyImageUrl")
+  strengthlogUrl   String?       @map("strengthlogUrl")
+  strengthlogSlug  String?       @map("strengthlogSlug")
+  advancedDetails  Json?         @map("advancedDetails")
+  muscleCategory   String?       @map("muscleCategory")
+  version          Int           @default(1) @map("version")
+  deletedAt        DateTime?     @map("deletedAt")
+  createdAt        DateTime      @default(now()) @map("createdAt")
+  updatedAt        DateTime      @updatedAt @map("updatedAt")
+
+  @@index([userId, isCustom])
+  @@index([category])
+  @@index([userId, updatedAt(sort: Desc)])
+  @@index([userId, deletedAt])
+  @@map("exercises")
+}
+
+enum ExerciseCategory {
+  strength
+  cardio
+  flexibility
+  olympic
+  plyometric
+}
+
+enum ExerciseDifficulty {
+  beginner
+  intermediate
+  advanced
+}
+
+enum TrackingType {
+  weight_reps
+  reps_only
+  cardio
+  duration
+}
+
+model WorkoutTemplate {
+  id               String              @id @default(auto()) @map("_id") @db.ObjectId
+  templateId       String              @unique @map("id")
+  userId            String              @map("userId")
+  name              String              @map("name")
+  category          TemplateCategory    @map("category")
+  description       String?             @map("description")
+  imageUrl          String?             @map("imageUrl")
+  difficulty        TemplateDifficulty? @map("difficulty")
+  daysPerWeek       Int?                @map("daysPerWeek")
+  exercises         Json[]             @default([]) @map("exercises")
+  estimatedDuration Int                 @map("estimatedDuration")
+  musclesTargeted   String[]            @default([]) @map("musclesTargeted")
+  isFeatured        Boolean             @default(false) @map("isFeatured")
+  isTrending        Boolean             @default(false) @map("isTrending")
+  matchPercentage   Int?                @map("matchPercentage")
+  version           Int                 @default(1) @map("version")
+  deletedAt         DateTime?           @map("deletedAt")
+  createdAt         DateTime            @default(now()) @map("createdAt")
+  updatedAt         DateTime            @updatedAt @map("updatedAt")
+
+  @@index([userId, category])
+  @@index([userId, updatedAt(sort: Desc)])
+  @@index([userId, deletedAt])
+  @@map("workouttemplates")
+}
+
+enum TemplateCategory {
+  strength
+  hypertrophy
+  cardio
+  home
+  flexibility
+}
+
+enum TemplateDifficulty {
+  beginner
+  intermediate
+  advanced
+}
+
+model PlannedWorkout {
+  id                 String              @id @default(auto()) @map("_id") @db.ObjectId
+  plannedWorkoutId    String              @unique @map("id")
+  userId              String              @map("userId")
+  scheduledDate       DateTime            @map("scheduledDate")
+  scheduledTime       DateTime?           @map("scheduledTime")
+  templateId          String?             @map("templateId")
+  workoutName         String              @map("workoutName")
+  category            TemplateCategory    @map("category")
+  estimatedDuration   Int                 @map("estimatedDuration")
+  exercises           Json[]             @default([]) @map("exercises")
+  musclesTargeted     String[]            @default([]) @map("musclesTargeted")
+  notes               String?             @map("notes")
+  isCompleted         Boolean            @default(false) @map("isCompleted")
+  completedWorkoutId  Int?                @map("completedWorkoutId")
+  version             Int                 @default(1) @map("version")
+  deletedAt           DateTime?           @map("deletedAt")
+  createdAt           DateTime            @default(now()) @map("createdAt")
+  updatedAt           DateTime            @updatedAt @map("updatedAt")
+
+  @@index([userId, scheduledDate])
+  @@index([userId, updatedAt(sort: Desc)])
+  @@index([userId, deletedAt])
+  @@map("plannedworkouts")
+}
+
+model MuscleStatus {
+  id                  String            @id @default(auto()) @map("_id") @db.ObjectId
+  userId              String            @map("userId")
+  muscle              String            @map("muscle")
+  lastWorked          DateTime?         @map("lastWorked")
+  recoveryStatus      RecoveryStatus    @map("recoveryStatus")
+  recoveryPercentage  Int               @map("recoveryPercentage")
+  workloadScore        Float             @default(0) @map("workloadScore")
+  recommendedRestDays Int             @default(0) @map("recommendedRestDays")
+  totalVolumeLast7Days Float            @default(0) @map("totalVolumeLast7Days")
+  trainingFrequency    Float            @default(0) @map("trainingFrequency")
+  version             Int               @default(1) @map("version")
+  deletedAt           DateTime?         @map("deletedAt")
+  createdAt           DateTime          @default(now()) @map("createdAt")
+  updatedAt           DateTime          @updatedAt @map("updatedAt")
+
+  @@unique([userId, muscle])
+  @@index([userId, updatedAt(sort: Desc)])
+  @@index([userId, deletedAt])
+  @@map("musclestatuses")
+}
+
+enum RecoveryStatus {
+  fresh
+  recovering
+  sore
+  ready
+  overworked
+}
+
+model UserProfile {
+  id                String            @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String            @unique @map("userId")
+  name              String            @map("name")
+  experienceLevel   ExperienceLevel?  @map("experienceLevel")
+  goals             String[]         @default([]) @map("goals")
+  equipment         String[]         @default([]) @map("equipment")
+  workoutFrequency  Int?             @map("workoutFrequency")
+  preferredUnit     PreferredUnit?   @map("preferredUnit")
+  defaultRestTime   Int?             @map("defaultRestTime")
+  age               Int?             @map("age")
+  gender            Gender?          @map("gender")
+  weight            Float?            @map("weight")
+  height            Float?            @map("height")
+  profilePicture    String?          @map("profilePicture")
+  version           Int               @default(1) @map("version")
+  deletedAt         DateTime?        @map("deletedAt")
+  createdAt         DateTime         @default(now()) @map("createdAt")
+  updatedAt         DateTime         @updatedAt @map("updatedAt")
+
+  @@map("userprofiles")
+}
+
+enum ExperienceLevel {
+  beginner
+  intermediate
+  advanced
+}
+
+enum PreferredUnit {
+  kg
+  lbs
+}
+
+enum Gender {
+  male
+  female
+  other
+}
+
+model Setting {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @map("userId")
+  key       String   @map("key")
+  value     Json     @map("value")
+  version   Int      @default(1) @map("version")
+  deletedAt DateTime? @map("deletedAt")
+  createdAt DateTime @default(now()) @map("createdAt")
+  updatedAt DateTime @updatedAt @map("updatedAt")
+
+  @@unique([userId, key])
+  @@index([userId, updatedAt(sort: Desc)])
+  @@index([userId, deletedAt])
+  @@map("settings")
+}
+
+model Notification {
+  id        String           @id @default(auto()) @map("_id") @db.ObjectId
+  notificationId String      @unique @map("id")
+  userId    String           @map("userId")
+  type      NotificationType @map("type")
+  title     String           @map("title")
+  message   String           @map("message")
+  data      Json?            @map("data")
+  isRead    Boolean          @default(false) @map("isRead")
+  readAt    DateTime?        @map("readAt")
+  version   Int              @default(1) @map("version")
+  deletedAt DateTime?        @map("deletedAt")
+  createdAt DateTime         @default(now()) @map("createdAt")
+  updatedAt DateTime         @updatedAt @map("updatedAt")
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, isRead])
+  @@index([userId, updatedAt(sort: Desc)])
+  @@index([userId, deletedAt])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  workout_reminder
+  muscle_recovery
+  ai_insight
+  system
+  achievement
+}
+
+model SleepLog {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String    @map("userId")
+  date      DateTime  @map("date")
+  bedtime   DateTime  @map("bedtime")
+  wakeTime  DateTime  @map("wakeTime")
+  duration  Int       @map("duration")
+  quality   Int       @map("quality")
+  notes     String?   @map("notes")
+  version   Int       @default(1) @map("version")
+  deletedAt DateTime? @map("deletedAt")
+  createdAt DateTime  @default(now()) @map("createdAt")
+  updatedAt DateTime  @updatedAt @map("updatedAt")
+
+  @@unique([userId, date])
+  @@index([userId, updatedAt(sort: Desc)])
+  @@index([userId, deletedAt])
+  @@map("sleeplogs")
+}
+
+model RecoveryLog {
+  id                String            @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String            @map("userId")
+  date              DateTime          @map("date")
+  overallRecovery   Int               @map("overallRecovery")
+  stressLevel       Int               @map("stressLevel")
+  energyLevel       Int               @map("energyLevel")
+  soreness          Int               @map("soreness")
+  readinessToTrain  ReadinessToTrain  @map("readinessToTrain")
+  notes             String?           @map("notes")
+  version           Int               @default(1) @map("version")
+  deletedAt         DateTime?         @map("deletedAt")
+  createdAt         DateTime          @default(now()) @map("createdAt")
+  updatedAt         DateTime          @updatedAt @map("updatedAt")
+
+  @@unique([userId, date])
+  @@index([userId, updatedAt(sort: Desc)])
+  @@index([userId, deletedAt])
+  @@map("recoverylogs")
+}
+
+enum ReadinessToTrain {
+  full_power
+  light
+  rest_day
+}
+
+model ErrorLog {
+  id          String          @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String          @map("userId")
+  errorType   ErrorType       @map("errorType")
+  errorMessage String         @map("errorMessage")
+  errorStack  String?         @map("errorStack")
+  context     Json?           @map("context")
+  tableName   String?         @map("tableName")
+  recordId    Json?           @map("recordId")
+  operation   Operation?      @map("operation")
+  severity    Severity        @default(error) @map("severity")
+  resolved    Boolean         @default(false) @map("resolved")
+  resolvedAt  DateTime?       @map("resolvedAt")
+  resolvedBy  String?         @map("resolvedBy")
+  version     Int             @default(1) @map("version")
+  deletedAt   DateTime?       @map("deletedAt")
+  createdAt   DateTime        @default(now()) @map("createdAt")
+  updatedAt   DateTime        @updatedAt @map("updatedAt")
+
+  @@index([userId, errorType])
+  @@index([userId, severity])
+  @@index([userId, resolved])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, updatedAt(sort: Desc)])
+  @@index([userId, deletedAt])
+  @@index([tableName])
+  @@map("errorlogs")
+}
+
+enum ErrorType {
+  sync_error
+  workout_error
+  database_error
+  network_error
+  validation_error
+  application_error
+  unknown_error
+}
+
+enum Operation {
+  create
+  update
+  delete
+  read
+  sync
+  other
+}
+
+enum Severity {
+  info
+  warning
+  error
+  critical
+}
+
+model SyncMetadata {
+  id            String        @id @default(auto()) @map("_id") @db.ObjectId
+  tableName     String        @map("tableName")
+  userId        String        @map("userId")
+  lastSyncAt    DateTime?     @map("lastSyncAt")
+  lastPushAt    DateTime?     @map("lastPushAt")
+  lastPullAt    DateTime?     @map("lastPullAt")
+  syncStatus    SyncStatus    @default(idle) @map("syncStatus")
+  conflictCount Int           @default(0) @map("conflictCount")
+  errorMessage  String?       @map("errorMessage")
+  lastErrorAt   DateTime?     @map("lastErrorAt")
+  recordCount   Int?          @map("recordCount")
+  syncToken     String?       @map("syncToken")
+  version       Int           @default(1) @map("version")
+  createdAt     DateTime      @default(now()) @map("createdAt")
+  updatedAt     DateTime      @updatedAt @map("updatedAt")
+
+  @@unique([tableName, userId])
+  @@index([userId, updatedAt(sort: Desc)])
+  @@map("syncmetadatas")
+}
+
+enum SyncStatus {
+  idle
+  syncing
+  success
+  error
+  conflict
+}
+

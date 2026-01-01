@@ -60,7 +60,7 @@ class PlannedWorkoutService {
 
   async markAsCompleted(
     id: string,
-    completedWorkoutId: number
+    completedWorkoutId: string
   ): Promise<void> {
     await dbHelpers.markPlannedWorkoutCompleted(id, completedWorkoutId);
   }
