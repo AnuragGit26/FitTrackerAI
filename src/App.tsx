@@ -68,7 +68,6 @@ function SsoCallbackHandler() {
 
 function App() {
   const [isInitializing, setIsInitializing] = useState(true);
-  const initializeUser = useUserStore((state) => state.initializeUser);
   const loadSettings = useSettingsStore((state) => state.loadSettings);
   const settings = useSettingsStore((state) => state.settings);
 
@@ -113,8 +112,8 @@ function App() {
         // Initialize database and exercise library
         await exerciseLibrary.initialize();
         
-        // Initialize user and settings
-        await Promise.all([initializeUser(), loadSettings()]);
+        // Initialize settings (user initialization happens in AppRoutes when Auth0 user is available)
+        await loadSettings();
         
         // Initialize data synchronization
         dataSync.initialize();
@@ -290,7 +289,7 @@ function App() {
     return () => {
       dataSync.destroy();
     };
-  }, [initializeUser, loadSettings]);
+  }, [loadSettings]);
 
   useEffect(() => {
     // Apply theme
