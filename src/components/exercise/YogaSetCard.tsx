@@ -99,11 +99,16 @@ export function YogaSetCard({
       }, 1200);
     }
 
-    if (set.duration !== undefined && set.duration > 0) {
+    // Only sync duration from props if it differs from current local state
+    if (set.duration !== undefined) {
       const totalSeconds = set.duration;
-      setDurationMinutes(Math.floor(totalSeconds / 60).toString());
-      setDurationSeconds((totalSeconds % 60).toString().padStart(2, '0'));
-    } else {
+      const propMinutes = Math.floor(totalSeconds / 60).toString();
+      const propSeconds = (totalSeconds % 60).toString().padStart(2, '0');
+      if (durationMinutes !== propMinutes || durationSeconds !== propSeconds) {
+        setDurationMinutes(propMinutes);
+        setDurationSeconds(propSeconds);
+      }
+    } else if (durationMinutes !== '' || durationSeconds !== '') {
       setDurationMinutes('');
       setDurationSeconds('');
     }
@@ -116,20 +121,24 @@ export function YogaSetCard({
     if (set.breathWorkType) {
       setBreathWorkType(set.breathWorkType);
     }
-  }, [set.duration, set.notes, set.focusAreas, set.breathWorkType, setNumber]);
+  }, [set.duration, set.notes, set.focusAreas, set.breathWorkType, setNumber, durationMinutes, durationSeconds]);
 
   const shouldReduceMotion = prefersReducedMotion();
 
   const handleDurationChange = (minutes: string, seconds: string) => {
     setDurationMinutes(minutes);
     setDurationSeconds(seconds);
-    // Only update if at least one value is provided
-    const minutesNum = minutes ? parseInt(minutes) : 0;
-    const secondsNum = seconds ? parseInt(seconds) : 0;
+    // Parse values - treat empty strings as 0 for calculation
+    const minutesNum = minutes === '' ? 0 : (parseInt(minutes) || 0);
+    const secondsNum = seconds === '' ? 0 : (parseInt(seconds) || 0);
     const totalSeconds = minutesNum * 60 + secondsNum;
     
-    if (totalSeconds > 0 || (minutes === '' && seconds === '')) {
-      onUpdate({ duration: totalSeconds > 0 ? totalSeconds : undefined });
+    // Always update parent state when user enters values (even if 0)
+    // Only use undefined when both fields are truly empty
+    if (minutes === '' && seconds === '') {
+      onUpdate({ duration: undefined });
+    } else {
+      onUpdate({ duration: totalSeconds });
     }
   };
 

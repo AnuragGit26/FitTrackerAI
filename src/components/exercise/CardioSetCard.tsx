@@ -160,18 +160,26 @@ export function CardioSetCard({
     }
 
     if (set.distance !== undefined) {
-      setDistance(set.distance.toString());
-    } else {
+      const propDistance = set.distance.toString();
+      if (distance !== propDistance) {
+        setDistance(propDistance);
+      }
+    } else if (distance !== '') {
       setDistance('');
     }
     if (set.distanceUnit) {
       setDistanceUnit(set.distanceUnit);
     }
-    if (set.time !== undefined && set.time > 0) {
+    // Only sync time from props if it differs from current local state
+    if (set.time !== undefined) {
       const totalSeconds = set.time;
-      setTimeMinutes(Math.floor(totalSeconds / 60).toString());
-      setTimeSeconds((totalSeconds % 60).toString().padStart(2, '0'));
-    } else {
+      const propMinutes = Math.floor(totalSeconds / 60).toString();
+      const propSeconds = (totalSeconds % 60).toString().padStart(2, '0');
+      if (timeMinutes !== propMinutes || timeSeconds !== propSeconds) {
+        setTimeMinutes(propMinutes);
+        setTimeSeconds(propSeconds);
+      }
+    } else if (timeMinutes !== '' || timeSeconds !== '') {
       setTimeMinutes('');
       setTimeSeconds('');
     }
@@ -184,7 +192,7 @@ export function CardioSetCard({
     if (set.steps !== undefined) {
       setSteps(set.steps.toString());
     }
-  }, [set.distance, set.distanceUnit, set.time, set.heartRate, set.calories, set.steps, setNumber]);
+  }, [set.distance, set.distanceUnit, set.time, set.heartRate, set.calories, set.steps, setNumber, distance, timeMinutes, timeSeconds]);
 
   const shouldReduceMotion = prefersReducedMotion();
 
@@ -218,13 +226,17 @@ export function CardioSetCard({
   const handleTimeChange = (minutes: string, seconds: string) => {
     setTimeMinutes(minutes);
     setTimeSeconds(seconds);
-    // Only update if at least one value is provided
-    const minutesNum = minutes ? parseInt(minutes) : 0;
-    const secondsNum = seconds ? parseInt(seconds) : 0;
+    // Parse values - treat empty strings as 0 for calculation
+    const minutesNum = minutes === '' ? 0 : (parseInt(minutes) || 0);
+    const secondsNum = seconds === '' ? 0 : (parseInt(seconds) || 0);
     const totalSeconds = minutesNum * 60 + secondsNum;
     
-    if (totalSeconds > 0 || (minutes === '' && seconds === '')) {
-      onUpdate({ time: totalSeconds > 0 ? totalSeconds : undefined });
+    // Always update parent state when user enters values (even if 0)
+    // Only use undefined when both fields are truly empty
+    if (minutes === '' && seconds === '') {
+      onUpdate({ time: undefined });
+    } else {
+      onUpdate({ time: totalSeconds });
     }
   };
 
