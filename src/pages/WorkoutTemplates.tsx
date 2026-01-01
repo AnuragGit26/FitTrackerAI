@@ -183,7 +183,6 @@ export function WorkoutTemplates() {
                     {CATEGORIES.map((category) => (
                         <CategoryChip
                             key={category.value}
-                            category={category.value}
                             label={category.label}
                             isActive={selectedCategory === category.value}
                             onClick={() => handleCategorySelect(category.value)}

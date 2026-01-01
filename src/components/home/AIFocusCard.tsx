@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Timer, Signal, ChevronRight, Bot, CheckCircle2, Activity, Dumbbell, Moon } from 'lucide-react';
+import { ChevronRight, Bot, CheckCircle2, Activity, Dumbbell, Moon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAIInsights } from '@/hooks/useAIInsights';
 import { useWorkoutStore } from '@/store/workoutStore';
@@ -16,23 +16,23 @@ export function AIFocusCard() {
   const { workouts } = useWorkoutStore();
 
   useEffect(() => {
-    if (workouts.length > 0) {
+    if ((workouts ?? []).length > 0) {
       generateInsights();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workouts.length]);
+  }, [(workouts ?? []).length]);
 
   // Analyze workout patterns to check if workout completed today
   const patternAnalysis = useMemo(() => {
-    if (workouts.length === 0) return null;
-    return workoutAnalysisService.analyzeWorkoutPatterns(workouts);
+    if ((workouts ?? []).length === 0) return null;
+    return workoutAnalysisService.analyzeWorkoutPatterns(workouts ?? []);
   }, [workouts]);
 
   const hasWorkoutToday = patternAnalysis?.hasWorkoutToday ?? false;
   const todayWorkout = patternAnalysis?.todayWorkout ?? null;
 
   // Show loading skeleton while insights are being generated
-  if (isLoading && workouts.length > 0) {
+  if (isLoading && (workouts ?? []).length > 0) {
     return (
       <div className="px-5 mt-6">
         <div className="flex items-center gap-2 mb-3">
@@ -47,7 +47,7 @@ export function AIFocusCard() {
   }
 
   // Show empty state only if not loading and no data
-  if (workouts.length === 0 || (!isLoading && !insights?.recommendations?.[0])) {
+  if ((workouts ?? []).length === 0 || (!isLoading && !insights?.recommendations?.[0])) {
     return (
       <div className="px-5 mt-6">
         <div className="flex items-center gap-2 mb-3">
@@ -75,8 +75,8 @@ export function AIFocusCard() {
   }
 
   // Clean AI-generated text to remove markdown formatting and gibberish
-  const cleanedTitle = cleanPlainTextResponse(insights.recommendations[0] || '');
-  const cleanedDescription = cleanPlainTextResponse(insights.analysis || 'Based on your recent training patterns and recovery status.');
+  const cleanedTitle = cleanPlainTextResponse(insights?.recommendations?.[0] || '');
+  const cleanedDescription = cleanPlainTextResponse(insights?.analysis || 'Based on your recent training patterns and recovery status.');
 
   // Determine recommendation type from title
   const getRecommendationType = (title: string): 'rest' | 'cardio' | 'strength' | 'light_activity' => {
@@ -173,7 +173,7 @@ export function AIFocusCard() {
               <div className="flex items-center gap-1.5 text-primary text-xs">
                 <Activity className="w-3 h-3" />
                 <span className="font-medium">
-                  {todayWorkout.exercises.length} exercise{todayWorkout.exercises.length !== 1 ? 's' : ''} • {todayWorkout.totalDuration} min
+                  {(todayWorkout.exercises ?? []).length} exercise{(todayWorkout.exercises ?? []).length !== 1 ? 's' : ''} • {todayWorkout.totalDuration} min
                 </span>
               </div>
               {todayWorkout.totalVolume > 0 && (
@@ -186,7 +186,7 @@ export function AIFocusCard() {
           )}
           {!hasWorkoutToday && (
             <div className="flex items-center gap-4 mt-1">
-              {insights.tip && (
+              {insights?.tip && (
                 <div className="flex items-start gap-1.5 bg-primary/10 px-2 py-1.5 rounded-lg border border-primary/20">
                   <Bot className="text-primary w-3 h-3 mt-0.5 flex-shrink-0" />
                   <span className="text-primary/90 text-xs leading-relaxed">{insights.tip}</span>

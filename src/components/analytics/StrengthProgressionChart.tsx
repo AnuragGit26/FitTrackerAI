@@ -221,7 +221,7 @@ export function StrengthProgressionChart({ progressions }: StrengthProgressionCh
                   stroke={colors[prog.exerciseName as keyof typeof colors] || '#0df269'}
                   strokeWidth={3}
                   strokeLinecap="round"
-                  dot={<CustomDot />}
+                  dot={(props) => <CustomDot {...props} />}
                   activeDot={{ r: 6, strokeWidth: 2 }}
                 />
               );

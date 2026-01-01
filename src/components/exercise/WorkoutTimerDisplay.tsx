@@ -7,7 +7,7 @@ interface WorkoutTimerDisplayProps {
 
 export function WorkoutTimerDisplay({ className }: WorkoutTimerDisplayProps) {
   const workoutTimerStartTime = useWorkoutStore((state) => state.workoutTimerStartTime);
-  const { formattedTime } = useWorkoutDuration(workoutTimerStartTime);
+  const { formattedTime } = useWorkoutDuration(!!workoutTimerStartTime);
 
   if (!workoutTimerStartTime) {
     return null;
