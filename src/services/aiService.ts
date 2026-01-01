@@ -16,7 +16,7 @@ import { aiDataProcessor } from './aiDataProcessor';
 import { parseAIJSON, sanitizeAIResponse, cleanPlainTextResponse } from '@/utils/aiResponseCleaner';
 import { logError } from '@/utils/errorHandler';
 import { addDays, format, differenceInHours } from 'date-fns';
-import { categorizeMuscleGroup } from '@/utils/analyticsHelpers';
+import { categorizeMuscleGroup, calculateMuscleImbalances } from '@/utils/analyticsHelpers';
 import { WorkoutPatternAnalysis, WorkoutRecommendation as PatternRecommendation } from './workoutAnalysisService';
 
 interface AIAnalysisContext {
@@ -67,19 +67,19 @@ export const aiService = {
       const muscleSummary = formatMuscleStatus(context.muscleStatuses);
       
       // Calculate readiness score if not provided
-      const readinessScore = context.readinessScore ?? (context.muscleStatuses.length > 0
-        ? Math.round(context.muscleStatuses.reduce((sum, m) => sum + m.recoveryPercentage, 0) / context.muscleStatuses.length)
+      const readinessScore = context.readinessScore ?? ((context.muscleStatuses ?? []).length > 0
+        ? Math.round((context.muscleStatuses ?? []).reduce((sum, m) => sum + m.recoveryPercentage, 0) / (context.muscleStatuses ?? []).length)
         : 85);
       
       // Build comprehensive context
-      const prSummary = context.personalRecords && context.personalRecords.length > 0
-        ? `\nRecent Personal Records:\n${context.personalRecords.slice(0, 5).map(pr => 
+      const prSummary = context.personalRecords && (context.personalRecords ?? []).length > 0
+        ? `\nRecent Personal Records:\n${(context.personalRecords ?? []).slice(0, 5).map(pr => 
             `${pr.exerciseName}: ${pr.maxWeight}kg x ${pr.maxReps} reps (${new Date(pr.date).toLocaleDateString()})`
           ).join('\n')}`
         : '';
       
-      const volumeInfo = context.volumeTrend && context.volumeTrend.length > 0
-        ? `\nVolume Trend: Current ${Math.round(context.volumeTrend[context.volumeTrend.length - 1]?.totalVolume || 0)}kg, Previous ${Math.round(context.volumeTrend[0]?.totalVolume || 0)}kg${context.volumeTrend.length > 1 ? ` (${context.volumeTrend[0]?.totalVolume > 0 ? Math.round(((context.volumeTrend[context.volumeTrend.length - 1].totalVolume - context.volumeTrend[0].totalVolume) / context.volumeTrend[0].totalVolume) * 100) : 0}% change)` : ''}`
+      const volumeInfo = context.volumeTrend && (context.volumeTrend ?? []).length > 0
+        ? `\nVolume Trend: Current ${Math.round((context.volumeTrend ?? [])[(context.volumeTrend ?? []).length - 1]?.totalVolume || 0)}kg, Previous ${Math.round((context.volumeTrend ?? [])[0]?.totalVolume || 0)}kg${(context.volumeTrend ?? []).length > 1 ? ` (${(context.volumeTrend ?? [])[0]?.totalVolume > 0 ? Math.round((((context.volumeTrend ?? [])[(context.volumeTrend ?? []).length - 1].totalVolume - (context.volumeTrend ?? [])[0].totalVolume) / (context.volumeTrend ?? [])[0].totalVolume) * 100) : 0}% change)` : ''}`
         : '';
       
       const consistencyInfo = context.consistencyScore !== undefined
@@ -102,8 +102,8 @@ export const aiService = {
         ? `\nWorkouts This Month: ${context.workoutCount}`
         : '';
       
-      const equipmentInfo = context.equipment && context.equipment.length > 0
-        ? `\nAvailable Equipment: ${context.equipment.join(', ')}`
+      const equipmentInfo = context.equipment && (context.equipment ?? []).length > 0
+        ? `\nAvailable Equipment: ${(context.equipment ?? []).join(', ')}`
         : '';
       
       const frequencyInfo = context.workoutFrequency !== undefined
@@ -157,8 +157,8 @@ Readiness Score: ${readinessScore}%${volumeInfo}${consistencyInfo}${focusInfo}${
 
 User Profile:
 - Experience Level: ${context.userLevel}
-- Goals: ${context.userGoals.join(', ')}${equipmentInfo}${frequencyInfo}
-- Identified Weak Points: ${context.weakPoints.join(', ') || 'None identified'}
+- Goals: ${(context.userGoals ?? []).join(', ')}${equipmentInfo}${frequencyInfo}
+- Identified Weak Points: ${(context.weakPoints ?? []).join(', ') || 'None identified'}
 
 CRITICAL DECISION LOGIC:
 ${context.patternAnalysis?.hasWorkoutToday 
@@ -353,21 +353,21 @@ CRITICAL OUTPUT REQUIREMENTS:
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-      const workoutSummary = formatWorkoutSummary(workouts, personalRecords);
-      const prSummary = personalRecords.length > 0
-        ? personalRecords.slice(0, 10).map(pr => `${pr.exerciseName}: ${pr.maxWeight}kg x ${pr.maxReps} reps (${new Date(pr.date).toLocaleDateString()})`).join('\n')
+      const workoutSummary = formatWorkoutSummary(workouts ?? [], personalRecords ?? []);
+      const prSummary = (personalRecords ?? []).length > 0
+        ? (personalRecords ?? []).slice(0, 10).map(pr => `${pr.exerciseName}: ${pr.maxWeight}kg x ${pr.maxReps} reps (${new Date(pr.date).toLocaleDateString()})`).join('\n')
         : 'No PRs yet';
-      const volumeTrendSummary = volumeTrend.length > 20
-        ? `${volumeTrend.slice(0, 10).map(v => `${v.date}: ${v.totalVolume}kg`).join(', ')}... (${volumeTrend.length} total weeks)`
-        : volumeTrend.map(v => `${v.date}: ${v.totalVolume}kg`).join(', ');
+      const volumeTrendSummary = (volumeTrend ?? []).length > 20
+        ? `${(volumeTrend ?? []).slice(0, 10).map(v => `${v.date}: ${v.totalVolume}kg`).join(', ')}... (${(volumeTrend ?? []).length} total weeks)`
+        : (volumeTrend ?? []).map(v => `${v.date}: ${v.totalVolume}kg`).join(', ');
       
-      const volumeChange = volumeTrend.length > 1 && volumeTrend[0].totalVolume > 0
-        ? Math.round(((volumeTrend[volumeTrend.length - 1].totalVolume - volumeTrend[0].totalVolume) / volumeTrend[0].totalVolume) * 100)
+      const volumeChange = (volumeTrend ?? []).length > 1 && (volumeTrend ?? [])[0]?.totalVolume > 0
+        ? Math.round((((volumeTrend ?? [])[(volumeTrend ?? []).length - 1].totalVolume - (volumeTrend ?? [])[0].totalVolume) / (volumeTrend ?? [])[0].totalVolume) * 100)
         : 0;
       const consistencyChange = consistencyScore - previousConsistencyScore;
       const workoutCountChange = workoutCount - previousWorkoutCount;
-      const prCount = personalRecords.length;
-      const recentPRs = personalRecords.filter(pr => {
+      const prCount = (personalRecords ?? []).length;
+      const recentPRs = (personalRecords ?? []).filter(pr => {
         const prDate = new Date(pr.date);
         const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
         return prDate >= sevenDaysAgo;
@@ -389,7 +389,7 @@ CRITICAL OUTPUT REQUIREMENTS:
 Performance Metrics:
 - Consistency Score: ${consistencyScore}% (${consistencyChange >= 0 ? '+' : ''}${consistencyChange}% change from previous period)
 - Workout Count: ${workoutCount} workouts this month (${workoutCountChange >= 0 ? '+' : ''}${workoutCountChange} vs previous)
-- Volume Trend: ${volumeChange >= 0 ? '+' : ''}${volumeChange}% change (Current: ${Math.round(volumeTrend[volumeTrend.length - 1]?.totalVolume || 0)}kg, Previous: ${Math.round(volumeTrend[0]?.totalVolume || 0)}kg)
+- Volume Trend: ${volumeChange >= 0 ? '+' : ''}${volumeChange}% change (Current: ${Math.round((volumeTrend ?? [])[(volumeTrend ?? []).length - 1]?.totalVolume || 0)}kg, Previous: ${Math.round((volumeTrend ?? [])[0]?.totalVolume || 0)}kg)
 - Personal Records: ${prCount} total PRs, ${recentPRs} in last 7 days
 
 Workout Data:
@@ -398,7 +398,7 @@ ${workoutSummary}
 Personal Records:
 ${prSummary}
 
-Volume Trend (${volumeTrend.length} data points):
+Volume Trend (${(volumeTrend ?? []).length} data points):
 ${volumeTrendSummary}
 
 CRITICAL OUTPUT REQUIREMENTS:
@@ -435,12 +435,12 @@ CRITICAL OUTPUT REQUIREMENTS:
           workoutCount,
           workoutCountChange: workoutCount - previousWorkoutCount,
           volumeTrend: {
-            current: volumeTrend[volumeTrend.length - 1]?.totalVolume || 0,
-            previous: volumeTrend[0]?.totalVolume || 0,
-            changePercent: volumeTrend.length > 1
-              ? ((volumeTrend[volumeTrend.length - 1].totalVolume - volumeTrend[0].totalVolume) / volumeTrend[0].totalVolume) * 100
+            current: (volumeTrend ?? [])[(volumeTrend ?? []).length - 1]?.totalVolume || 0,
+            previous: (volumeTrend ?? [])[0]?.totalVolume || 0,
+            changePercent: (volumeTrend ?? []).length > 1
+              ? (((volumeTrend ?? [])[(volumeTrend ?? []).length - 1].totalVolume - (volumeTrend ?? [])[0].totalVolume) / (volumeTrend ?? [])[0].totalVolume) * 100
               : 0,
-            weeklyData: volumeTrend.map((v, i) => ({ week: `WEEK ${i + 1}`, volume: v.totalVolume })),
+            weeklyData: (volumeTrend ?? []).map((v, i) => ({ week: `WEEK ${i + 1}`, volume: v.totalVolume })),
           },
           plateaus: (Array.isArray(cleaned.plateaus) ? cleaned.plateaus : []).map((p: unknown) => {
             const plateau = p as Record<string, unknown>;
@@ -505,17 +505,17 @@ CRITICAL OUTPUT REQUIREMENTS:
       const workoutSummary = formatWorkoutSummary(workouts);
       
       // Calculate recovery details
-      const overworkedMuscles = muscleStatuses.filter(m => m.recoveryStatus === 'overworked');
-      const readyMuscles = muscleStatuses.filter(m => m.recoveryStatus === 'ready');
-      const avgRecovery = muscleStatuses.length > 0
-        ? Math.round(muscleStatuses.reduce((sum, m) => sum + m.recoveryPercentage, 0) / muscleStatuses.length)
+      const overworkedMuscles = (muscleStatuses ?? []).filter(m => m.recoveryStatus === 'overworked');
+      const readyMuscles = (muscleStatuses ?? []).filter(m => m.recoveryStatus === 'ready');
+      const avgRecovery = (muscleStatuses ?? []).length > 0
+        ? Math.round((muscleStatuses ?? []).reduce((sum, m) => sum + m.recoveryPercentage, 0) / (muscleStatuses ?? []).length)
         : 85;
-      const avgWorkload = muscleStatuses.length > 0
-        ? Math.round(muscleStatuses.reduce((sum, m) => sum + m.workloadScore, 0) / muscleStatuses.length)
+      const avgWorkload = (muscleStatuses ?? []).length > 0
+        ? Math.round((muscleStatuses ?? []).reduce((sum, m) => sum + m.workloadScore, 0) / (muscleStatuses ?? []).length)
         : 0;
       
       // Get recent workout intensity
-      const recentWorkouts = workouts.slice(0, 5);
+      const recentWorkouts = (workouts ?? []).slice(0, 5);
       const avgRecentVolume = recentWorkouts.length > 0
         ? Math.round(recentWorkouts.reduce((sum, w) => sum + w.totalVolume, 0) / recentWorkouts.length)
         : 0;
@@ -634,7 +634,7 @@ CRITICAL OUTPUT REQUIREMENTS:
       const muscleSummary = formatMuscleStatus(muscleStatuses);
       
       // Get ready muscle groups with recovery percentages
-      const readyMuscles = muscleStatuses
+      const readyMuscles = (muscleStatuses ?? [])
         .filter(m => m.recoveryPercentage >= 75)
         .sort((a, b) => b.recoveryPercentage - a.recoveryPercentage)
         .slice(0, 10);
@@ -643,8 +643,8 @@ CRITICAL OUTPUT REQUIREMENTS:
         : 'None ready';
       
       // Get recent workout types to avoid repetition
-      const recentWorkoutTypes = workouts.slice(0, 5).map(w => {
-        const exercises = w.exercises.map(e => e.exerciseName).join(', ');
+      const recentWorkoutTypes = (workouts ?? []).slice(0, 5).map(w => {
+        const exercises = (w.exercises ?? []).map(e => e.exerciseName).join(', ');
         return `${new Date(w.date).toLocaleDateString()}: ${exercises.substring(0, 50)}...`;
       }).join('\n');
 

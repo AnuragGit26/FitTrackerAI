@@ -22,7 +22,7 @@ class AIRefreshService {
   async shouldRefresh(
     insightType: InsightType,
     fingerprint: string,
-    currentWorkoutId: number | null,
+    currentWorkoutId: string | null,
     userId?: string
   ): Promise<{ shouldRefresh: boolean; reason?: string }> {
     return aiCacheManager.shouldRefresh(
@@ -99,7 +99,7 @@ class AIRefreshService {
     insightType: InsightType,
     fingerprint: string,
     generateFn: () => Promise<T>,
-    currentWorkoutId: number | null,
+    currentWorkoutId: string | null,
     userId?: string,
     priority: number = 0
   ): Promise<T> {

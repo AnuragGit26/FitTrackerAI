@@ -10,13 +10,14 @@ import {
   aggregateVolumeByMuscleGroup,
   calculateConsistencyScore,
   hasEnoughWorkoutsForAverages,
+  getWeeklyWorkoutDays,
   DateRange,
 } from '@/utils/analyticsHelpers';
 import { calculateEstimatedOneRepMax } from '@/utils/calculations';
 
 export const analyticsService = {
   calculateTotalVolume(workouts: Workout[]): number {
-    return workouts.reduce((sum, w) => sum + w.totalVolume, 0);
+    return (workouts ?? []).reduce((sum, w) => sum + w.totalVolume, 0);
   },
 
   calculateVolumeTrend(workouts: Workout[], range: DateRange = '30d'): VolumeData[] {
@@ -92,16 +93,16 @@ export const analyticsService = {
 
     exerciseNames.forEach((exerciseName) => {
       const dataPoints: StrengthProgression['dataPoints'] = [];
-      const exerciseWorkouts = workouts
+      const exerciseWorkouts = (workouts ?? [])
         .flatMap((w) =>
-          w.exercises
+          (w.exercises ?? [])
             .filter((e) => e.exerciseName === exerciseName)
             .map((e) => ({ workout: w, exercise: e }))
         )
         .sort((a, b) => new Date(a.workout.date).getTime() - new Date(b.workout.date).getTime());
 
       exerciseWorkouts.forEach(({ workout, exercise }) => {
-        const maxSet = exercise.sets
+        const maxSet = (exercise.sets ?? [])
           .filter((s) => s.completed && s.weight !== undefined && s.reps !== undefined)
           .reduce(
             (max, set) => {
@@ -167,11 +168,11 @@ export const analyticsService = {
 
   calculateSymmetryScore(workouts: Workout[]): number {
     // Only calculate averages if user has enough workouts
-    if (!hasEnoughWorkoutsForAverages(workouts)) {
+    if (!hasEnoughWorkoutsForAverages(workouts ?? [])) {
       return 85; // Default score for new users
     }
 
-    const muscleVolume = aggregateVolumeByMuscleGroup(workouts);
+    const muscleVolume = aggregateVolumeByMuscleGroup(workouts ?? []);
     
     const leftRightPairs: Array<[MuscleGroup, MuscleGroup]> = [
       [MuscleGroup.QUADS, MuscleGroup.QUADS],
@@ -200,7 +201,7 @@ export const analyticsService = {
   },
 
   getMostActiveMuscles(workouts: Workout[], count: number = 3): MuscleGroup[] {
-    const muscleVolume = aggregateVolumeByMuscleGroup(workouts);
+    const muscleVolume = aggregateVolumeByMuscleGroup(workouts ?? []);
     return Array.from(muscleVolume.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, count)
@@ -241,17 +242,17 @@ export const analyticsService = {
     weeklyDays: boolean[][];
   } {
     return {
-      score: calculateConsistencyScore(workouts),
-      weeklyDays: getWeeklyWorkoutDays(workouts),
+      score: calculateConsistencyScore(workouts ?? []),
+      weeklyDays: getWeeklyWorkoutDays(workouts ?? []),
     };
   },
 
   calculateTotalCalories(workouts: Workout[]): number {
-    return workouts.reduce((sum, w) => sum + (w.calories || 0), 0);
+    return (workouts ?? []).reduce((sum, w) => sum + (w.calories || 0), 0);
   },
 
   calculateAverageCalories(workouts: Workout[]): number {
-    const workoutsWithCalories = workouts.filter(w => w.calories !== undefined && w.calories > 0);
+    const workoutsWithCalories = (workouts ?? []).filter(w => w.calories !== undefined && w.calories > 0);
     if (workoutsWithCalories.length === 0) return 0;
     return Math.round(this.calculateTotalCalories(workoutsWithCalories) / workoutsWithCalories.length);
   },
