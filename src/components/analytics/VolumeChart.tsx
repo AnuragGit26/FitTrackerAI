@@ -1,7 +1,6 @@
 import { useMemo, memo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useWorkoutStore } from '@/store/workoutStore';
-import { useUserStore } from '@/store/userStore';
 import { formatDateShort } from '@/utils/dateHelpers';
 
 export const VolumeChart = memo(function VolumeChart() {

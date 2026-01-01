@@ -5,7 +5,6 @@ import { useUserStore } from '@/store/userStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useMemo } from 'react';
 import { subDays, differenceInHours } from 'date-fns';
-import { calculateRecoveryStatus } from '@/services/recoveryCalculator';
 import { DEFAULT_RECOVERY_SETTINGS } from '@/types/muscle';
 
 export function RecoveryStatusHeader() {

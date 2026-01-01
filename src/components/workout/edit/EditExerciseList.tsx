@@ -67,11 +67,11 @@ export function EditExerciseList({ exercises, onExercisesChange }: EditExerciseL
         exerciseName: exercise.name,
         sets: initialSets,
         totalVolume,
-        musclesWorked: [...exercise.primaryMuscles, ...exercise.secondaryMuscles],
+        musclesWorked: [...(exercise.primaryMuscles ?? []), ...(exercise.secondaryMuscles ?? [])],
         timestamp: new Date(),
       };
 
-      onExercisesChange([...exercises, newExercise]);
+      onExercisesChange([...(exercises ?? []), newExercise]);
       setShowAddExercise(false);
     } catch (err) {
       console.error('Failed to add exercise:', err);
@@ -91,6 +91,44 @@ export function EditExerciseList({ exercises, onExercisesChange }: EditExerciseL
     );
   };
 
+  const handleDuplicateExercise = (exerciseId: string) => {
+    const exerciseToDuplicate = exercises.find(ex => ex.id === exerciseId);
+    if (!exerciseToDuplicate) return;
+
+    const duplicatedExercise: WorkoutExercise = {
+      ...exerciseToDuplicate,
+      id: `exercise-${Date.now()}`,
+      sets: exerciseToDuplicate.sets.map(set => ({
+        ...set,
+        completed: false, // Reset completed state for duplicated sets
+        setDuration: undefined,
+        setStartTime: undefined,
+        setEndTime: undefined,
+      })),
+      timestamp: new Date(),
+    };
+
+    const exerciseIndex = exercises.findIndex(ex => ex.id === exerciseId);
+    const newExercises = [...exercises];
+    newExercises.splice(exerciseIndex + 1, 0, duplicatedExercise);
+    onExercisesChange(newExercises);
+  };
+
+  const handleMoveExercise = (exerciseId: string, direction: 'up' | 'down') => {
+    const exerciseIndex = exercises.findIndex(ex => ex.id === exerciseId);
+    if (exerciseIndex === -1) return;
+
+    const newIndex = direction === 'up' ? exerciseIndex - 1 : exerciseIndex + 1;
+    if (newIndex < 0 || newIndex >= exercises.length) return;
+
+    const newExercises = [...exercises];
+    [newExercises[exerciseIndex], newExercises[newIndex]] = [
+      newExercises[newIndex],
+      newExercises[exerciseIndex],
+    ];
+    onExercisesChange(newExercises);
+  };
+
   return (
     <div className="space-y-4">
       {exercises.map((exercise, index) => (
@@ -100,6 +138,9 @@ export function EditExerciseList({ exercises, onExercisesChange }: EditExerciseL
           index={index}
           onUpdate={(updated) => handleExerciseUpdate(exercise.id, updated)}
           onRemove={() => handleRemoveExercise(exercise.id)}
+          onDuplicate={() => handleDuplicateExercise(exercise.id)}
+          onMoveUp={index > 0 ? () => handleMoveExercise(exercise.id, 'up') : undefined}
+          onMoveDown={index < exercises.length - 1 ? () => handleMoveExercise(exercise.id, 'down') : undefined}
         />
       ))}
 

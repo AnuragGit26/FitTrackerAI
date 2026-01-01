@@ -15,23 +15,23 @@ export function StatsCarousel() {
   const navigate = useNavigate();
 
   // Calculate values (hooks must be called unconditionally)
-  const totalVolume = workouts.reduce((sum, w) => sum + w.totalVolume, 0);
-  const workoutDates = workouts.map(w => w.date);
+  const totalVolume = (workouts ?? []).reduce((sum, w) => sum + w.totalVolume, 0);
+  const workoutDates = (workouts ?? []).map(w => w.date);
   const streak = calculateStreak(workoutDates);
-  const energy = estimateEnergy(workouts);
+  const energy = estimateEnergy(workouts ?? []);
 
   // Only calculate change percentages if user has enough workouts for meaningful averages
-  const hasEnoughWorkouts = hasEnoughWorkoutsForAverages(workouts);
+  const hasEnoughWorkouts = hasEnoughWorkoutsForAverages(workouts ?? []);
   
-  const previousVolume = hasEnoughWorkouts && workouts.length > 1
-    ? workouts.slice(0, Math.floor(workouts.length / 2)).reduce((sum, w) => sum + w.totalVolume, 0)
+  const previousVolume = hasEnoughWorkouts && (workouts ?? []).length > 1
+    ? (workouts ?? []).slice(0, Math.floor((workouts ?? []).length / 2)).reduce((sum, w) => sum + w.totalVolume, 0)
     : totalVolume * 0.95;
   const volumeChange = hasEnoughWorkouts && previousVolume > 0 
     ? ((totalVolume - previousVolume) / previousVolume) * 100 
     : 0;
 
-  const previousEnergy = hasEnoughWorkouts && workouts.length > 1
-    ? estimateEnergy(workouts.slice(0, Math.floor(workouts.length / 2)))
+  const previousEnergy = hasEnoughWorkouts && (workouts ?? []).length > 1
+    ? estimateEnergy((workouts ?? []).slice(0, Math.floor((workouts ?? []).length / 2)))
     : energy * 0.88;
   const energyChange = hasEnoughWorkouts && previousEnergy > 0
     ? ((energy - previousEnergy) / previousEnergy) * 100
@@ -43,7 +43,7 @@ export function StatsCarousel() {
   const energyCount = useCountUp(energy, 0, { duration: 1.5, decimals: 0 });
 
   // Early return AFTER all hooks
-  if (workouts.length === 0) {
+  if ((workouts ?? []).length === 0) {
     return (
       <div className="w-full px-5 pb-2">
         <EmptyState

@@ -48,12 +48,6 @@ export function SessionTrends({ trends }: SessionTrendsProps) {
     }
   };
 
-  const formatVolume = (volume: number): string => {
-    if (volume >= 1000) {
-      return `${(volume / 1000).toFixed(1)}k`;
-    }
-    return Math.round(volume).toString();
-  };
 
   return (
     <div className="px-4 pb-6">

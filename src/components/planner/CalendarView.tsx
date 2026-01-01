@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { addMonths, subMonths, addWeeks, subWeeks, startOfDay } from 'date-fns';
+import { addMonths, subMonths, addWeeks, subWeeks } from 'date-fns';
 import { MonthView } from './MonthView';
 import { WeekView } from './WeekView';
 import { CustomRangeView } from './CustomRangeView';

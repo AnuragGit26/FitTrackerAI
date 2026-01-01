@@ -1,10 +1,8 @@
-import { useState } from 'react';
-import { Activity, TrendingUp } from 'lucide-react';
+import { Activity } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { sleepRecoveryService } from '@/services/sleepRecoveryService';
 import { RecoveryLog, RecoveryMetrics } from '@/types/sleep';
 import { DateRange } from '@/utils/analyticsHelpers';
-import { cn } from '@/utils/cn';
 
 interface RecoveryAnalyticsCardProps {
   recoveryLogs: RecoveryLog[];
@@ -13,7 +11,7 @@ interface RecoveryAnalyticsCardProps {
 
 const COLORS = ['#0df269', '#fbbf24', '#ef4444'];
 
-export function RecoveryAnalyticsCard({ recoveryLogs, dateRange }: RecoveryAnalyticsCardProps) {
+export function RecoveryAnalyticsCard({ recoveryLogs, dateRange: _dateRange }: RecoveryAnalyticsCardProps) {
   const metrics: RecoveryMetrics = sleepRecoveryService.calculateRecoveryMetrics(recoveryLogs);
 
   const readinessData = [
@@ -145,7 +143,7 @@ export function RecoveryAnalyticsCard({ recoveryLogs, dateRange }: RecoveryAnaly
                 fill="#8884d8"
                 dataKey="value"
               >
-                {readinessData.map((entry, index) => (
+                {readinessData.map((_entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>

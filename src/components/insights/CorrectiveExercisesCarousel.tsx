@@ -5,7 +5,6 @@ import { useUserStore } from '@/store/userStore';
 import { usePlannedWorkoutStore } from '@/store/plannedWorkoutStore';
 import { useToast } from '@/hooks/useToast';
 import { addDays } from 'date-fns';
-import { MuscleGroup } from '@/types/muscle';
 
 interface CorrectiveExercisesCarouselProps {
   exercises: CorrectiveExercise[];

@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import { startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, format, addWeeks, subWeeks } from 'date-fns';
-import { motion } from 'framer-motion';
 import { PlannedWorkout } from '@/types/workout';
 import { cn } from '@/utils/cn';
 import { ChevronLeft, ChevronRight } from 'lucide-react';

@@ -1,4 +1,3 @@
-import { AlertCircle } from 'lucide-react';
 import { SmartAlerts } from '@/types/insights';
 
 interface SystemStatusCardProps {

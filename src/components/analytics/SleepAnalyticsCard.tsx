@@ -1,17 +1,15 @@
-import { useState } from 'react';
 import { Moon, TrendingUp, TrendingDown } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { sleepRecoveryService } from '@/services/sleepRecoveryService';
 import { SleepLog, SleepMetrics } from '@/types/sleep';
 import { DateRange } from '@/utils/analyticsHelpers';
-import { cn } from '@/utils/cn';
 
 interface SleepAnalyticsCardProps {
   sleepLogs: SleepLog[];
   dateRange: DateRange;
 }
 
-export function SleepAnalyticsCard({ sleepLogs, dateRange }: SleepAnalyticsCardProps) {
+export function SleepAnalyticsCard({ sleepLogs, dateRange: _dateRange }: SleepAnalyticsCardProps) {
   const metrics: SleepMetrics = sleepRecoveryService.calculateSleepMetrics(sleepLogs);
 
   const averageHours = metrics.averageDuration / 60;

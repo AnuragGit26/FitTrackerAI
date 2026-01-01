@@ -26,21 +26,21 @@ export function RecommendedWorkoutCard({ workout }: RecommendedWorkoutCardProps)
     try {
       // Get exercises that match recommended muscle groups
       const allExercises = await exerciseLibrary.getAllExercises();
-      const matchingExercises = allExercises.filter(ex => {
+      const matchingExercises = (allExercises ?? []).filter(ex => {
         // Check if exercise targets any of the recommended muscle groups
-        const primaryMatch = ex.primaryMuscles.some(m => workout.muscleGroups.includes(m));
-        const secondaryMatch = ex.secondaryMuscles.some(m => workout.muscleGroups.includes(m));
+        const primaryMatch = (ex.primaryMuscles ?? []).some(m => (workout.muscleGroups ?? []).includes(m));
+        const secondaryMatch = (ex.secondaryMuscles ?? []).some(m => (workout.muscleGroups ?? []).includes(m));
         return primaryMatch || secondaryMatch;
       });
 
       // Filter exercises based on muscle recovery - only include if muscles are ready (>=75%)
-      const readyMuscles = muscleStatuses
+      const readyMuscles = (muscleStatuses ?? [])
         .filter(s => s.recoveryPercentage >= 75)
         .map(s => s.muscle);
       
       const readyExercises = matchingExercises.filter(ex => {
-        return ex.primaryMuscles.some(m => readyMuscles.includes(m)) ||
-               ex.secondaryMuscles.some(m => readyMuscles.includes(m));
+        return (ex.primaryMuscles ?? []).some(m => readyMuscles.includes(m)) ||
+               (ex.secondaryMuscles ?? []).some(m => readyMuscles.includes(m));
       });
 
       // Use ready exercises if available, otherwise use all matching exercises

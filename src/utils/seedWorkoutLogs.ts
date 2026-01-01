@@ -2,7 +2,6 @@ import { dataService } from '@/services/dataService';
 import { exerciseLibrary } from '@/services/exerciseLibrary';
 import { Workout } from '@/types/workout';
 import { WorkoutExercise, WorkoutSet } from '@/types/exercise';
-import { MuscleGroup } from '@/types/muscle';
 import { logger } from '@/utils/logger';
 
 /**

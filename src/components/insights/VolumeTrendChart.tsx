@@ -9,7 +9,7 @@ interface VolumeTrendChartProps {
 
 export function VolumeTrendChart({
   currentVolume,
-  previousVolume,
+  previousVolume: _previousVolume,
   changePercent,
   weeklyData,
 }: VolumeTrendChartProps) {
@@ -32,7 +32,6 @@ export function VolumeTrendChart({
   const generateAreaPath = (data: typeof normalizedData) => {
     if (data.length === 0) return '';
     const path = generatePath(data);
-    const lastPoint = data[data.length - 1];
     const x = ((data.length - 1) / (data.length - 1 || 1)) * 100;
     return `${path} L${x},100 L0,100 Z`;
   };

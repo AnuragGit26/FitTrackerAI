@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { WorkoutSet } from '@/types/exercise';
 
 interface EditSetListProps {
@@ -39,22 +38,6 @@ export function EditSetList({ sets, onSetsChange }: EditSetListProps) {
     onSetsChange([...sets, newSet]);
   };
 
-  const handleRemoveSet = (setNumber: number) => {
-    if (sets.length <= 1) {
-      alert('At least one set is required');
-      return;
-    }
-
-    if (window.confirm('Are you sure you want to remove this set?')) {
-      const updatedSets = sets
-        .filter(set => set.setNumber !== setNumber)
-        .map((set, index) => ({
-          ...set,
-          setNumber: index + 1,
-        }));
-      onSetsChange(updatedSets);
-    }
-  };
 
   const inferTrackingType = (set: WorkoutSet): 'weight_reps' | 'reps_only' | 'cardio' | 'duration' => {
     if (set.weight !== undefined || (set.reps !== undefined && set.weight !== undefined)) {

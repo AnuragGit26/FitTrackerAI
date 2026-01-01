@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { CheckCircle, ArrowRight, Sparkles, Timer, Target, Wind, BookOpen } from 'lucide-react';
+import { CheckCircle, ArrowRight, Sparkles, Timer, Target, Wind, BookOpen, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { WorkoutSet } from '@/types/exercise';
 import { cn } from '@/utils/cn';
@@ -11,6 +11,7 @@ interface YogaSetCardProps {
   onUpdate: (updates: Partial<WorkoutSet>) => void;
   onLogSet: () => void;
   onAddSet?: () => void;
+  onCancelSet?: () => void;
   disabled?: boolean;
   nextExerciseName?: string;
   isLastInSuperset?: boolean;
@@ -51,6 +52,7 @@ export function YogaSetCard({
   onUpdate,
   onLogSet,
   onAddSet,
+  onCancelSet,
   disabled = false,
   nextExerciseName,
   isLastInSuperset = false,
@@ -75,6 +77,8 @@ export function YogaSetCard({
   const [isNewSet, setIsNewSet] = useState(false);
   const [showButtonAnimation, setShowButtonAnimation] = useState(false);
   const [showParticles, setShowParticles] = useState(false);
+  const [isLogging, setIsLogging] = useState(false);
+  const [showRipple, setShowRipple] = useState(false);
   const previousSetNumberRef = useRef(setNumber);
 
   // Sync local state with prop changes
@@ -143,10 +147,41 @@ export function YogaSetCard({
   const totalDurationSeconds = (parseInt(durationMinutes) || 0) * 60 + (parseInt(durationSeconds) || 0);
   const canLogSet = totalDurationSeconds > 0;
 
+  const handleLogSetClick = () => {
+    if (!canLogSet || disabled) return;
+    
+    // Trigger celebration animations
+    setIsLogging(true);
+    setShowRipple(true);
+    setShowParticles(true);
+    
+    // Call the actual log set handler
+    onLogSet();
+    
+    // Reset animation states after animation completes
+    setTimeout(() => {
+      setIsLogging(false);
+      setShowRipple(false);
+      setShowParticles(false);
+    }, 1200);
+  };
+
   return (
     <div className="relative mt-2 flex flex-col rounded-2xl bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-950/30 dark:to-indigo-950/30 p-1 shadow-lg border-2 border-purple-200/50 dark:border-purple-800/50">
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-4 pb-2 relative">
+        {/* Cancel Button - Top Right */}
+        {onCancelSet && !disabled && (
+          <motion.button
+            onClick={onCancelSet}
+            className="absolute top-2 right-2 z-20 p-2 rounded-full text-slate-400 hover:text-red-500 dark:text-slate-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+            aria-label={`Cancel set ${setNumber}`}
+            whileHover={!shouldReduceMotion ? { scale: 1.1 } : {}}
+            whileTap={!shouldReduceMotion ? { scale: 0.9 } : {}}
+          >
+            <X className="w-5 h-5" />
+          </motion.button>
+        )}
         {showParticles && !shouldReduceMotion && (
           <>
             {[...Array(8)].map((_, i) => {
@@ -346,32 +381,33 @@ export function YogaSetCard({
       </div>
 
       {/* Log Button */}
-      <div className="p-2 relative">
+      <div className="p-2 relative overflow-hidden">
+        {/* Celebration Particle Effects */}
         {showParticles && !shouldReduceMotion && (
           <>
-            {[...Array(6)].map((_, i) => {
-              const angle = (i * 360) / 6;
-              const radius = 50;
+            {[...Array(12)].map((_, i) => {
+              const angle = (i * 360) / 12;
+              const radius = 60;
               const x = Math.cos((angle * Math.PI) / 180) * radius;
               const y = Math.sin((angle * Math.PI) / 180) * radius;
               return (
                 <motion.div
-                  key={`button-sparkle-${i}`}
-                  className="absolute w-1.5 h-1.5 rounded-full bg-purple-500"
+                  key={`celebration-particle-${i}`}
+                  className="absolute w-2 h-2 rounded-full bg-purple-500"
                   style={{ left: '50%', top: '50%', x: 0, y: 0 }}
                   initial={{ scale: 0, opacity: 0, x: 0, y: 0 }}
-                  animate={{
-                    scale: [0, 2, 0],
-                    opacity: [0, 0.9, 0],
-                    x: [0, x, x * 1.3],
-                    y: [0, y, y * 1.3],
+                  animate={isLogging ? {
+                    scale: [0, 1.8, 0],
+                    opacity: [0, 1, 0],
+                    x: [0, x, x * 1.5],
+                    y: [0, y, y * 1.5],
                     rotate: [0, 180, 360],
-                  }}
+                  } : {}}
                   transition={{
-                    duration: 0.9,
+                    duration: 1.2,
                     times: [0, 0.5, 1],
                     ease: 'easeOut',
-                    delay: 0.25 + (i * 0.05),
+                    delay: i * 0.03,
                   }}
                 />
               );
@@ -379,42 +415,114 @@ export function YogaSetCard({
           </>
         )}
         
+        {/* Ripple Effect */}
+        {showRipple && !shouldReduceMotion && (
+          <motion.div
+            className="absolute inset-0 rounded-xl bg-purple-500/30"
+            initial={{ scale: 0, opacity: 0.8 }}
+            animate={{
+              scale: [0, 2, 3],
+              opacity: [0.8, 0.4, 0],
+            }}
+            transition={{
+              duration: 0.6,
+              times: [0, 0.5, 1],
+              ease: 'easeOut',
+            }}
+            style={{ left: '50%', top: '50%', x: '-50%', y: '-50%' }}
+          />
+        )}
+        
         <motion.button
           key={`button-${setNumber}`}
-          onClick={onLogSet}
+          onClick={handleLogSetClick}
           disabled={!canLogSet || disabled}
           className={cn(
-            'flex w-full items-center justify-center gap-2 rounded-xl h-14 shadow-[0_0_20px_rgba(168,85,247,0.15)] transition-all relative z-10',
+            'flex w-full items-center justify-center gap-2 rounded-xl h-14 shadow-[0_0_20px_rgba(168,85,247,0.15)] transition-all relative z-10 overflow-hidden',
             canLogSet && !disabled
               ? 'bg-purple-500 hover:bg-purple-600 text-white active:scale-[0.98]'
               : 'bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
           )}
           initial={false}
-          animate={showButtonAnimation && !shouldReduceMotion ? {
-            scale: [1, 0.85, 1.08, 0.98, 1],
-            opacity: [1, 0.5, 1, 1, 1],
-            y: [0, 12, -4, 1, 0],
+          animate={(showButtonAnimation || isLogging) && !shouldReduceMotion ? {
+            scale: [1, 0.85, 1.12, 1.02, 1],
+            opacity: [1, 0.6, 1, 1, 1],
+            y: [0, 12, -6, 2, 0],
           } : {}}
-          transition={showButtonAnimation && !shouldReduceMotion ? {
-            duration: 0.9,
-            times: [0, 0.25, 0.5, 0.75, 1],
+          transition={(showButtonAnimation || isLogging) && !shouldReduceMotion ? {
+            duration: 1.0,
+            times: [0, 0.2, 0.5, 0.8, 1],
             ease: [0.34, 1.56, 0.64, 1],
-            delay: 0.25,
+            delay: isLogging ? 0 : 0.25,
           } : {}}
-          whileHover={canLogSet && !disabled && !shouldReduceMotion ? { scale: 1.02 } : {}}
+          whileHover={canLogSet && !disabled && !shouldReduceMotion && !isLogging ? { 
+            scale: 1.02,
+            boxShadow: '0 0 30px rgba(168, 85, 247, 0.4)',
+          } : {}}
           whileTap={canLogSet && !disabled && !shouldReduceMotion ? { scale: 0.98 } : {}}
         >
           {nextExerciseName && !isLastInSuperset ? (
             <>
-              <motion.span className="text-lg font-bold tracking-wide uppercase">
+              <motion.span 
+                className="text-lg font-bold tracking-wide uppercase"
+                animate={(showButtonAnimation || isLogging) && !shouldReduceMotion ? {
+                  scale: [1, 1.15, 1.05, 1],
+                  x: [0, 2, 0, 0],
+                } : {}}
+                transition={{ 
+                  duration: 1.0, 
+                  times: [0, 0.3, 0.7, 1],
+                  delay: isLogging ? 0 : 0,
+                  ease: [0.34, 1.56, 0.64, 1],
+                }}
+              >
                 Next: {nextExerciseName}
               </motion.span>
-              <ArrowRight className="w-6 h-6 font-bold" />
+              <motion.div
+                animate={(showButtonAnimation || isLogging) && !shouldReduceMotion ? {
+                  x: [0, 8, -2, 0],
+                  scale: [1, 1.2, 1.1, 1],
+                  rotate: [0, 15, -5, 0],
+                } : {}}
+                transition={{ 
+                  duration: 1.0, 
+                  times: [0, 0.3, 0.7, 1],
+                  delay: isLogging ? 0 : 0,
+                  ease: [0.34, 1.56, 0.64, 1],
+                }}
+              >
+                <ArrowRight className="w-6 h-6 font-bold" />
+              </motion.div>
             </>
           ) : (
             <>
-              <CheckCircle className="w-6 h-6 font-bold" />
-              <motion.span className="text-lg font-bold tracking-wide uppercase">
+              <motion.div
+                animate={(showButtonAnimation || isLogging) && !shouldReduceMotion ? {
+                  scale: [1, 1.5, 1.2, 1],
+                  rotate: [0, 25, -10, 0],
+                } : {}}
+                transition={{ 
+                  duration: 1.0, 
+                  times: [0, 0.3, 0.7, 1],
+                  delay: isLogging ? 0 : 0,
+                  ease: [0.34, 1.56, 0.64, 1],
+                }}
+              >
+                <CheckCircle className="w-6 h-6 font-bold" />
+              </motion.div>
+              <motion.span 
+                className="text-lg font-bold tracking-wide uppercase"
+                animate={(showButtonAnimation || isLogging) && !shouldReduceMotion ? {
+                  scale: [1, 1.15, 1.05, 1],
+                  x: [0, 2, 0, 0],
+                } : {}}
+                transition={{ 
+                  duration: 1.0, 
+                  times: [0, 0.3, 0.7, 1],
+                  delay: isLogging ? 0 : 0,
+                  ease: [0.34, 1.56, 0.64, 1],
+                }}
+              >
                 Log Session
               </motion.span>
             </>
@@ -430,15 +538,39 @@ export function YogaSetCard({
             onClick={onAddSet}
             disabled={disabled}
             className={cn(
-              'flex w-full items-center justify-center gap-2 rounded-xl h-12 mt-3 border-2 transition-all',
+              'flex w-full items-center justify-center gap-2 rounded-xl h-12 mt-3 border-2 transition-all relative overflow-hidden',
               !disabled
                 ? 'border-purple-500/30 bg-purple-500/5 hover:bg-purple-500/10 text-purple-600 dark:text-purple-400 active:scale-[0.98]'
                 : 'border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
             )}
-            whileHover={!disabled && !shouldReduceMotion ? { scale: 1.02 } : {}}
+            initial={false}
+            animate={isNewSet && !shouldReduceMotion ? {
+              scale: [1, 1.05, 1],
+              y: [0, -2, 0],
+            } : {}}
+            transition={isNewSet && !shouldReduceMotion ? {
+              duration: 0.5,
+              times: [0, 0.5, 1],
+              ease: 'easeOut',
+            } : {}}
+            whileHover={!disabled && !shouldReduceMotion ? { 
+              scale: 1.02,
+              borderColor: 'rgba(168, 85, 247, 0.5)',
+            } : {}}
             whileTap={!disabled && !shouldReduceMotion ? { scale: 0.98 } : {}}
           >
-            <span className="text-sm font-semibold tracking-wide">Add Session</span>
+            <motion.span 
+              className="text-sm font-semibold tracking-wide relative z-10"
+              animate={isNewSet && !shouldReduceMotion ? {
+                scale: [1, 1.1, 1],
+              } : {}}
+              transition={isNewSet && !shouldReduceMotion ? {
+                duration: 0.5,
+                times: [0, 0.5, 1],
+              } : {}}
+            >
+              Add Session
+            </motion.span>
           </motion.button>
         )}
       </div>

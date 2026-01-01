@@ -4,7 +4,6 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { rpeService, RPEMetrics } from '@/services/rpeService';
 import { Workout } from '@/types/workout';
 import { DateRange } from '@/utils/analyticsHelpers';
-import { cn } from '@/utils/cn';
 import { getRpeColor } from '@/utils/rpeHelpers';
 
 interface RPEAnalyticsCardProps {
@@ -13,7 +12,7 @@ interface RPEAnalyticsCardProps {
 }
 
 export function RPEAnalyticsCard({ workouts, dateRange }: RPEAnalyticsCardProps) {
-  const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
+  const [selectedExercise] = useState<string | null>(null);
 
   const metrics: RPEMetrics = rpeService.getAllMetrics(workouts, dateRange);
   const trend = rpeService.detectTrend(metrics.trend);

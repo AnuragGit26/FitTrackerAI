@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Calendar, Clock, Plus, Trash2, X, Dumbbell } from 'lucide-react';
+import { Calendar, Clock, Plus, Trash2, Dumbbell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Modal } from '@/components/common/Modal';
 import { useTemplateStore } from '@/store/templateStore';
 import { useUserStore } from '@/store/userStore';
 import { usePlannedWorkoutStore } from '@/store/plannedWorkoutStore';
-import { TemplateCategory, PlannedWorkout, PlannedExercise } from '@/types/workout';
+import { TemplateCategory, PlannedExercise } from '@/types/workout';
 import { TemplateListCard } from '@/components/template/TemplateListCard';
 import { ExerciseSelectorDropdown } from '@/components/exercise/ExerciseSelectorDropdown';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';

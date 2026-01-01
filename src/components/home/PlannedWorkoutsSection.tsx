@@ -9,31 +9,29 @@ import { useWorkoutStore } from '@/store/workoutStore';
 import { useToast } from '@/hooks/useToast';
 import { addDays, isAfter, startOfDay } from 'date-fns';
 import { PlannedWorkout } from '@/types/workout';
-import { plannedWorkoutService } from '@/services/plannedWorkoutService';
 import { slideUp, prefersReducedMotion } from '@/utils/animations';
 
 export function PlannedWorkoutsSection() {
   const navigate = useNavigate();
   const { profile } = useUserStore();
   const { plannedWorkouts, loadPlannedWorkoutsByDateRange } = usePlannedWorkoutStore();
-  const { startWorkoutFromTemplate } = useWorkoutStore();
   const { success, error: showError } = useToast();
 
   // Load upcoming planned workouts (next 7 days)
   useEffect(() => {
-    if (!profile) return;
+    if (!profile?.id) return;
 
     const today = startOfDay(new Date());
     const nextWeek = addDays(today, 7);
 
     loadPlannedWorkoutsByDateRange(profile.id, today, nextWeek);
-  }, [profile, loadPlannedWorkoutsByDateRange]);
+  }, [profile?.id, loadPlannedWorkoutsByDateRange]);
 
   const upcomingWorkouts = useMemo(() => {
     const today = startOfDay(new Date());
     const nextWeek = addDays(today, 7);
 
-    return plannedWorkouts
+    return (plannedWorkouts ?? [])
       .filter((pw) => {
         const scheduledDate = startOfDay(new Date(pw.scheduledDate));
         return (
@@ -51,7 +49,7 @@ export function PlannedWorkoutsSection() {
   }, [plannedWorkouts]);
 
   const handleStartWorkout = async (plannedWorkout: PlannedWorkout) => {
-    if (!profile) return;
+    if (!profile?.id) return;
 
     try {
       const { startWorkoutFromPlanned } = useWorkoutStore.getState();

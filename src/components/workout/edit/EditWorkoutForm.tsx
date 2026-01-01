@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Workout, WorkoutMood } from '@/types/workout';
 import { EditExerciseList } from './EditExerciseList';
 import { formatDuration } from '@/utils/calculations';
+import { validateWorkoutDateAndTime, validateWorkoutEndTime, adjustStartTimeToMatchDate } from '@/utils/validators';
+import { useToast } from '@/hooks/useToast';
 
 interface EditWorkoutFormProps {
   workout: Workout;
@@ -10,18 +12,29 @@ interface EditWorkoutFormProps {
   isSaving: boolean;
 }
 
+// Helper function to format date for datetime-local input (local time, not UTC)
+function formatDateTimeLocal(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
 export function EditWorkoutForm({ workout, onSave, onCancel, isSaving }: EditWorkoutFormProps) {
+  const { error: showError } = useToast();
   const [workoutType, setWorkoutType] = useState(workout.workoutType || '');
   const [date, setDate] = useState(new Date(workout.date).toISOString().split('T')[0]);
   const [startTime, setStartTime] = useState(
-    workout.startTime ? new Date(workout.startTime).toISOString().slice(0, 16) : ''
+    workout.startTime ? formatDateTimeLocal(new Date(workout.startTime)) : ''
   );
   const [endTime, setEndTime] = useState(
-    workout.endTime ? new Date(workout.endTime).toISOString().slice(0, 16) : ''
+    workout.endTime ? formatDateTimeLocal(new Date(workout.endTime)) : ''
   );
   const [notes, setNotes] = useState(workout.notes || '');
-  const [mood, setMood] = useState<WorkoutMood | ''>(workout.mood || '');
-  const [calories, setCalories] = useState(workout.calories?.toString() || '');
+  const [mood] = useState<WorkoutMood | ''>(workout.mood || '');
+  const [calories] = useState(workout.calories?.toString() || '');
   const [exercises, setExercises] = useState(workout.exercises || []);
 
   // Calculate duration from start/end times
@@ -29,13 +42,104 @@ export function EditWorkoutForm({ workout, onSave, onCancel, isSaving }: EditWor
     ? Math.round((new Date(endTime).getTime() - new Date(startTime).getTime()) / 60000)
     : workout.totalDuration;
 
+  // Auto-adjust startTime when date changes
+  useEffect(() => {
+    if (startTime && date) {
+      const startTimeDate = new Date(startTime);
+      const workoutDate = new Date(date);
+      const validation = validateWorkoutDateAndTime(workoutDate, startTimeDate);
+      
+      if (!validation.valid && validation.adjustedStartTime) {
+        // Silently adjust startTime to match date
+        setStartTime(formatDateTimeLocal(validation.adjustedStartTime));
+      }
+    }
+  }, [date, startTime]);
+
+  const handleDateChange = (newDate: string) => {
+    setDate(newDate);
+    
+    // Auto-adjust startTime if it exists
+    if (startTime) {
+      const workoutDate = new Date(newDate);
+      const currentStartTime = new Date(startTime);
+      const adjusted = adjustStartTimeToMatchDate(workoutDate, currentStartTime);
+      setStartTime(formatDateTimeLocal(adjusted));
+    }
+  };
+
+  const handleStartTimeChange = (newStartTime: string) => {
+    setStartTime(newStartTime);
+    
+    // Validate startTime is on same day as date
+    if (newStartTime && date) {
+      const workoutDate = new Date(date);
+      const startTimeDate = new Date(newStartTime);
+      const validation = validateWorkoutDateAndTime(workoutDate, startTimeDate);
+      
+      if (!validation.valid) {
+        if (validation.adjustedStartTime) {
+          setStartTime(formatDateTimeLocal(validation.adjustedStartTime));
+          showError('Start time adjusted to match workout date');
+        } else {
+          showError(validation.error || 'Invalid start time');
+        }
+      }
+    }
+  };
+
   const handleSave = async () => {
+    // Validate date and times
+    const workoutDate = new Date(date);
+    const startTimeDate = startTime ? new Date(startTime) : workout.startTime;
+    const endTimeDate = endTime ? new Date(endTime) : workout.endTime;
+
+    if (!startTimeDate) {
+      showError('Start time is required');
+      return;
+    }
+
+    // Validate startTime is on same day as workout date
+    const dateValidation = validateWorkoutDateAndTime(workoutDate, startTimeDate);
+    if (!dateValidation.valid) {
+      if (dateValidation.adjustedStartTime) {
+        // Auto-adjust and continue
+        const adjusted = dateValidation.adjustedStartTime;
+        const updatedWorkout: Workout = {
+          ...workout,
+          workoutType: workoutType || 'Workout',
+          date: workoutDate,
+          startTime: adjusted,
+          endTime: endTimeDate,
+          totalDuration: calculatedDuration,
+          notes: notes.trim() || undefined,
+          mood: mood || undefined,
+          calories: calories ? parseInt(calories, 10) : undefined,
+          exercises,
+        };
+        await onSave(updatedWorkout);
+        return;
+      } else {
+        showError(dateValidation.error || 'Invalid date/time');
+        return;
+      }
+    }
+
+    // Validate endTime if present
+    if (endTimeDate) {
+      const endTimeValidation = validateWorkoutEndTime(startTimeDate, endTimeDate);
+      if (!endTimeValidation.valid) {
+        showError(endTimeValidation.error || 'Invalid end time');
+        return;
+      }
+    }
+
     const updatedWorkout: Workout = {
       ...workout,
       workoutType: workoutType || 'Workout',
-      date: new Date(date),
-      startTime: startTime ? new Date(startTime) : workout.startTime,
-      endTime: endTime ? new Date(endTime) : workout.endTime,
+      date: workoutDate,
+      startTime: startTimeDate,
+      endTime: endTimeDate,
       totalDuration: calculatedDuration,
       notes: notes.trim() || undefined,
       mood: mood || undefined,
@@ -74,6 +178,57 @@ export function EditWorkoutForm({ workout, onSave, onCancel, isSaving }: EditWor
             </span>
           </div>
         </div>
+
+        {/* Date and Time Section */}
+        <div className="grid grid-cols-1 gap-4">
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-slate-500 dark:text-[#90cba8] ml-1" htmlFor="workout-date">
+              Workout Date
+            </label>
+            <input
+              id="workout-date"
+              type="date"
+              value={date}
+              onChange={(e) => handleDateChange(e.target.value)}
+              className="w-full bg-white dark:bg-[#224932] border-transparent focus:border-primary focus:ring-0 rounded-xl px-4 py-3 text-base font-normal text-slate-900 dark:text-white shadow-sm"
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-slate-500 dark:text-[#90cba8] ml-1" htmlFor="workout-start-time">
+              Start Time
+            </label>
+            <input
+              id="workout-start-time"
+              type="datetime-local"
+              value={startTime}
+              onChange={(e) => handleStartTimeChange(e.target.value)}
+              className="w-full bg-white dark:bg-[#224932] border-transparent focus:border-primary focus:ring-0 rounded-xl px-4 py-3 text-base font-normal text-slate-900 dark:text-white shadow-sm"
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-slate-500 dark:text-[#90cba8] ml-1" htmlFor="workout-end-time">
+              End Time (Optional)
+            </label>
+            <input
+              id="workout-end-time"
+              type="datetime-local"
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+              className="w-full bg-white dark:bg-[#224932] border-transparent focus:border-primary focus:ring-0 rounded-xl px-4 py-3 text-base font-normal text-slate-900 dark:text-white shadow-sm"
+            />
+          </div>
+          {calculatedDuration > 0 && (
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-slate-500 dark:text-[#90cba8] ml-1">
+                Duration
+              </label>
+              <div className="w-full bg-white dark:bg-[#224932] rounded-xl px-4 py-3 text-base font-normal text-slate-900 dark:text-white shadow-sm">
+                {formatDuration(calculatedDuration)}
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="flex flex-col gap-2">
           <label className="text-sm font-medium text-slate-500 dark:text-[#90cba8] ml-1" htmlFor="workout-desc">
             Description (Optional)

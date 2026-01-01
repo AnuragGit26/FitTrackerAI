@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isSameMonth, format } from 'date-fns';
-import { motion } from 'framer-motion';
 import { PlannedWorkout } from '@/types/workout';
 import { cn } from '@/utils/cn';
 

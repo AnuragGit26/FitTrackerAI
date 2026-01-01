@@ -17,7 +17,7 @@ import { logger } from '@/utils/logger';
 import type { UserProfile } from '@/store/userStore';
 
 const AUTH0_DOMAIN = import.meta.env.VITE_AUTH0_DOMAIN;
-const AUTH0_CLIENT_ID = import.meta.env.VITE_AUTH0_CLIENT_ID;
+// const AUTH0_CLIENT_ID = import.meta.env.VITE_AUTH0_CLIENT_ID; // Unused
 const MANAGEMENT_API_AUDIENCE = import.meta.env.VITE_AUTH0_MANAGEMENT_API_AUDIENCE || `https://${AUTH0_DOMAIN}/api/v2/`;
 const DELEGATION_ENDPOINT = import.meta.env.VITE_AUTH0_DELEGATION_ENDPOINT;
 
@@ -112,7 +112,7 @@ class Auth0ManagementService {
   /**
    * Map UserProfile to Auth0 user_metadata
    */
-  private mapProfileToMetadata(profile: UserProfile): Auth0UserMetadata {
+  private _mapProfileToMetadata(profile: UserProfile): Auth0UserMetadata {
     return {
       age: profile.age,
       gender: profile.gender,

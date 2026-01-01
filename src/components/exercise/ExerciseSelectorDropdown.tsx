@@ -5,7 +5,7 @@ import { Exercise, ExerciseCategory } from '@/types/exercise';
 import { exerciseLibrary, EquipmentCategory, getEquipmentCategories } from '@/services/exerciseLibrary';
 import { cn } from '@/utils/cn';
 import { slideDown, staggerContainerFast, prefersReducedMotion } from '@/utils/animations';
-import { MuscleGroupCategory, exerciseTargetsMuscleCategory, getMuscleGroupsInCategory } from '@/utils/muscleGroupCategories';
+import { MuscleGroupCategory, exerciseTargetsMuscleCategory } from '@/utils/muscleGroupCategories';
 import { searchExercises } from '@/utils/exerciseSearch';
 import { SearchHighlight } from './SearchHighlight';
 
@@ -39,23 +39,6 @@ export function ExerciseSelectorDropdown({
     loadExercises();
   }, []);
 
-  // Fast counter for immediate UI feedback (simple filter, no ranking)
-  const fastFilteredCount = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return exercises.length;
-    }
-    const query = searchQuery.toLowerCase();
-    return exercises.filter((ex) => {
-      if (selectedCategory && ex.category !== selectedCategory) return false;
-      if (selectedMuscleGroups.length > 0 && 
-          !exerciseTargetsMuscleCategory(ex.primaryMuscles, ex.secondaryMuscles, selectedMuscleGroups)) {
-        return false;
-      }
-      return ex.name.toLowerCase().includes(query) ||
-             ex.category.toLowerCase().includes(query) ||
-             ex.equipment.some((eq) => eq.toLowerCase().includes(query));
-    }).length;
-  }, [searchQuery, exercises, selectedCategory, selectedMuscleGroups]);
 
   // Memoize filtered exercises to prevent unnecessary recalculations
   // Use deferredSearchQuery for expensive search computation

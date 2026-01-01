@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { CheckCircle, ArrowRight, Activity, Timer, MapPin, Flame, Footprints, Sparkles } from 'lucide-react';
+import { CheckCircle, ArrowRight, Activity, Timer, MapPin, Flame, Footprints, Sparkles, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { WorkoutSet, DistanceUnit } from '@/types/exercise';
 import { cn } from '@/utils/cn';
@@ -12,6 +12,7 @@ interface CardioSetCardProps {
   onUpdate: (updates: Partial<WorkoutSet>) => void;
   onLogSet: () => void;
   onAddSet?: () => void;
+  onCancelSet?: () => void;
   disabled?: boolean;
   nextExerciseName?: string;
   isLastInSuperset?: boolean;
@@ -24,6 +25,7 @@ export function CardioSetCard({
   onUpdate,
   onLogSet,
   onAddSet,
+  onCancelSet,
   disabled = false,
   nextExerciseName,
   isLastInSuperset = false,
@@ -45,6 +47,8 @@ export function CardioSetCard({
   const [isNewSet, setIsNewSet] = useState(false);
   const [showButtonAnimation, setShowButtonAnimation] = useState(false);
   const [showParticles, setShowParticles] = useState(false);
+  const [isLogging, setIsLogging] = useState(false);
+  const [showRipple, setShowRipple] = useState(false);
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
   const [hasValidData, setHasValidData] = useState(false);
   const previousSetNumberRef = useRef(setNumber);
@@ -220,6 +224,25 @@ export function CardioSetCard({
 
   const canLogSet = distanceNum > 0 && totalTimeSeconds > 0;
 
+  const handleLogSetClick = () => {
+    if (!canLogSet || disabled) return;
+    
+    // Trigger celebration animations
+    setIsLogging(true);
+    setShowRipple(true);
+    setShowParticles(true);
+    
+    // Call the actual log set handler
+    onLogSet();
+    
+    // Reset animation states after animation completes
+    setTimeout(() => {
+      setIsLogging(false);
+      setShowRipple(false);
+      setShowParticles(false);
+    }, 1200);
+  };
+
   return (
     <motion.div
       ref={cardRef}
@@ -249,6 +272,18 @@ export function CardioSetCard({
       )}
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-4 pb-2 relative z-10">
+        {/* Cancel Button - Top Right */}
+        {onCancelSet && !disabled && (
+          <motion.button
+            onClick={onCancelSet}
+            className="absolute top-2 right-2 z-20 p-2 rounded-full text-slate-400 hover:text-red-500 dark:text-slate-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+            aria-label={`Cancel set ${setNumber}`}
+            whileHover={!shouldReduceMotion ? { scale: 1.1 } : {}}
+            whileTap={!shouldReduceMotion ? { scale: 0.9 } : {}}
+          >
+            <X className="w-5 h-5" />
+          </motion.button>
+        )}
         {showParticles && !shouldReduceMotion && (
           <>
             {[...Array(12)].map((_, i) => {
@@ -706,34 +741,35 @@ export function CardioSetCard({
 
       {/* Log Button */}
       <div 
-        className="px-4 py-4 pb-8 relative" 
+        className="px-4 py-4 pb-8 relative overflow-hidden" 
         style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom, 0px) + 2rem)' }}
       >
+        {/* Celebration Particle Effects */}
         {showParticles && !shouldReduceMotion && (
           <>
-            {[...Array(6)].map((_, i) => {
-              const angle = (i * 360) / 6;
-              const radius = 50;
+            {[...Array(12)].map((_, i) => {
+              const angle = (i * 360) / 12;
+              const radius = 60;
               const x = Math.cos((angle * Math.PI) / 180) * radius;
               const y = Math.sin((angle * Math.PI) / 180) * radius;
               return (
                 <motion.div
-                  key={`button-sparkle-${i}`}
-                  className="absolute w-1.5 h-1.5 rounded-full bg-blue-500"
+                  key={`celebration-particle-${i}`}
+                  className="absolute w-2 h-2 rounded-full bg-blue-500"
                   style={{ left: '50%', top: '50%', x: 0, y: 0 }}
                   initial={{ scale: 0, opacity: 0, x: 0, y: 0 }}
-                  animate={{
-                    scale: [0, 2, 0],
-                    opacity: [0, 0.9, 0],
-                    x: [0, x, x * 1.3],
-                    y: [0, y, y * 1.3],
+                  animate={isLogging ? {
+                    scale: [0, 1.8, 0],
+                    opacity: [0, 1, 0],
+                    x: [0, x, x * 1.5],
+                    y: [0, y, y * 1.5],
                     rotate: [0, 180, 360],
-                  }}
+                  } : {}}
                   transition={{
-                    duration: 0.9,
+                    duration: 1.2,
                     times: [0, 0.5, 1],
                     ease: 'easeOut',
-                    delay: 0.25 + (i * 0.05),
+                    delay: i * 0.03,
                   }}
                 />
               );
@@ -741,9 +777,27 @@ export function CardioSetCard({
           </>
         )}
         
+        {/* Ripple Effect */}
+        {showRipple && !shouldReduceMotion && (
+          <motion.div
+            className="absolute inset-0 rounded-xl bg-blue-500/30"
+            initial={{ scale: 0, opacity: 0.8 }}
+            animate={{
+              scale: [0, 2, 3],
+              opacity: [0.8, 0.4, 0],
+            }}
+            transition={{
+              duration: 0.6,
+              times: [0, 0.5, 1],
+              ease: 'easeOut',
+            }}
+            style={{ left: '50%', top: '50%', x: '-50%', y: '-50%' }}
+          />
+        )}
+        
         <motion.button
           key={`button-${setNumber}`}
-          onClick={onLogSet}
+          onClick={handleLogSetClick}
           disabled={!canLogSet || disabled}
           className={cn(
             'flex w-full items-center justify-center gap-2 rounded-xl h-14 shadow-[0_0_20px_rgba(59,130,246,0.15)] transition-all relative z-10 overflow-hidden',
@@ -752,18 +806,18 @@ export function CardioSetCard({
               : 'bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
           )}
           initial={false}
-          animate={showButtonAnimation && !shouldReduceMotion ? {
-            scale: [1, 0.85, 1.08, 0.98, 1],
-            opacity: [1, 0.5, 1, 1, 1],
-            y: [0, 12, -4, 1, 0],
+          animate={(showButtonAnimation || isLogging) && !shouldReduceMotion ? {
+            scale: [1, 0.85, 1.12, 1.02, 1],
+            opacity: [1, 0.6, 1, 1, 1],
+            y: [0, 12, -6, 2, 0],
           } : {}}
-          transition={showButtonAnimation && !shouldReduceMotion ? {
-            duration: 0.9,
-            times: [0, 0.25, 0.5, 0.75, 1],
+          transition={(showButtonAnimation || isLogging) && !shouldReduceMotion ? {
+            duration: 1.0,
+            times: [0, 0.2, 0.5, 0.8, 1],
             ease: [0.34, 1.56, 0.64, 1],
-            delay: 0.25,
+            delay: isLogging ? 0 : 0.25,
           } : {}}
-          whileHover={canLogSet && !disabled && !shouldReduceMotion ? { 
+          whileHover={canLogSet && !disabled && !shouldReduceMotion && !isLogging ? { 
             scale: 1.02,
             boxShadow: '0 0 30px rgba(59, 130, 246, 0.4)',
           } : {}}
@@ -805,20 +859,43 @@ export function CardioSetCard({
           ) : (
             <>
               <motion.div
-                animate={canLogSet && !shouldReduceMotion ? {
+                animate={(showButtonAnimation || isLogging) && !shouldReduceMotion ? {
+                  scale: [1, 1.5, 1.2, 1],
+                  rotate: [0, 25, -10, 0],
+                } : canLogSet && !shouldReduceMotion ? {
                   scale: [1, 1.2, 1],
                   rotate: [0, 10, -10, 0],
                 } : {}}
-                transition={{ duration: 0.6, repeat: Infinity, repeatDelay: 2 }}
+                transition={(showButtonAnimation || isLogging) && !shouldReduceMotion ? {
+                  duration: 1.0,
+                  times: [0, 0.3, 0.7, 1],
+                  delay: isLogging ? 0 : 0,
+                  ease: [0.34, 1.56, 0.64, 1],
+                } : canLogSet && !shouldReduceMotion ? {
+                  duration: 0.6,
+                  repeat: Infinity,
+                  repeatDelay: 2,
+                } : {}}
               >
                 <CheckCircle className="w-6 h-6 font-bold relative z-10" />
               </motion.div>
               <motion.span
                 className="text-lg font-bold tracking-wide uppercase relative z-10"
-                animate={canLogSet && !shouldReduceMotion ? {
+                animate={(showButtonAnimation || isLogging) && !shouldReduceMotion ? {
+                  scale: [1, 1.15, 1.05, 1],
+                  x: [0, 2, 0, 0],
+                } : canLogSet && !shouldReduceMotion ? {
                   opacity: [1, 0.8, 1],
                 } : {}}
-                transition={{ duration: 1.5, repeat: Infinity }}
+                transition={(showButtonAnimation || isLogging) && !shouldReduceMotion ? {
+                  duration: 1.0,
+                  times: [0, 0.3, 0.7, 1],
+                  delay: isLogging ? 0 : 0,
+                  ease: [0.34, 1.56, 0.64, 1],
+                } : canLogSet && !shouldReduceMotion ? {
+                  duration: 1.5,
+                  repeat: Infinity,
+                } : {}}
               >
                 Log Set
               </motion.span>
@@ -840,6 +917,16 @@ export function CardioSetCard({
                 ? 'border-blue-500/30 bg-blue-500/5 hover:bg-blue-500/10 text-blue-600 dark:text-blue-400'
                 : 'border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
             )}
+            initial={false}
+            animate={isNewSet && !shouldReduceMotion ? {
+              scale: [1, 1.05, 1],
+              y: [0, -2, 0],
+            } : {}}
+            transition={isNewSet && !shouldReduceMotion ? {
+              duration: 0.5,
+              times: [0, 0.5, 1],
+              ease: 'easeOut',
+            } : {}}
             whileHover={!disabled && !shouldReduceMotion ? { 
               scale: 1.02,
               borderColor: 'rgba(59, 130, 246, 0.5)',
@@ -859,7 +946,18 @@ export function CardioSetCard({
                 }}
               />
             )}
-            <span className="text-sm font-semibold tracking-wide relative z-10">Add Set</span>
+            <motion.span 
+              className="text-sm font-semibold tracking-wide relative z-10"
+              animate={isNewSet && !shouldReduceMotion ? {
+                scale: [1, 1.1, 1],
+              } : {}}
+              transition={isNewSet && !shouldReduceMotion ? {
+                duration: 0.5,
+                times: [0, 0.5, 1],
+              } : {}}
+            >
+              Add Set
+            </motion.span>
           </motion.button>
         )}
       </div>

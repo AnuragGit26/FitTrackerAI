@@ -239,6 +239,7 @@ export function findMatches(text: string, query: string): Array<{ start: number;
   
   // Find all occurrences
   let startIndex = 0;
+  // eslint-disable-next-line no-constant-condition
   while (true) {
     const index = textLower.indexOf(queryLower, startIndex);
     if (index === -1) break;

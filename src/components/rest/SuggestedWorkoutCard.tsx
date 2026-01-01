@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMuscleRecovery } from '@/hooks/useMuscleRecovery';
 import { MuscleGroup } from '@/types/muscle';
-import { cn } from '@/utils/cn';
 import { Dumbbell, ArrowRight, CheckCircle2 } from 'lucide-react';
 
 interface SuggestedExercise {

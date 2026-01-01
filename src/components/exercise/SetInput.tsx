@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Minus, Plus, Trash2 } from 'lucide-react';
 import { WorkoutSet } from '@/types/exercise';
-import { Button } from '@/components/common/Button';
 import { cn } from '@/utils/cn';
 
 interface SetInputProps {
@@ -12,7 +11,7 @@ interface SetInputProps {
   previousSet?: WorkoutSet;
 }
 
-export function SetInput({ set, onUpdate, onDelete, unit, previousSet }: SetInputProps) {
+export function SetInput({ set, onUpdate, onDelete, unit, previousSet: _previousSet }: SetInputProps) {
   const [isCompleted, setIsCompleted] = useState(set.completed);
 
   const handleComplete = () => {

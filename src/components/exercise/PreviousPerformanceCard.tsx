@@ -1,4 +1,3 @@
-import { WorkoutSet } from '@/types/exercise';
 import { PreviousWorkoutData } from '@/services/workoutHistoryService';
 import { formatWorkoutDate, formatWeightReps, formatSetsForGrid } from '@/utils/workoutHistoryHelpers';
 import { TrendingUp } from 'lucide-react';

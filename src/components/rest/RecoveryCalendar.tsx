@@ -3,9 +3,8 @@ import { useMuscleRecovery } from '@/hooks/useMuscleRecovery';
 import { useWorkoutStore } from '@/store/workoutStore';
 import { useUserStore } from '@/store/userStore';
 import { useSettingsStore } from '@/store/settingsStore';
-import { calculateRecoveryStatus } from '@/services/recoveryCalculator';
 import { DEFAULT_RECOVERY_SETTINGS } from '@/types/muscle';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isToday, differenceInHours, isBefore, isAfter } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isToday, differenceInHours, isAfter } from 'date-fns';
 
 export function RecoveryCalendar() {
   const { muscleStatuses } = useMuscleRecovery();
@@ -30,7 +29,6 @@ export function RecoveryCalendar() {
     }
 
     return daysInMonth.map((day) => {
-      const isPast = isBefore(day, today) && !isToday(day);
       const isFuture = isAfter(day, today);
 
       if (isFuture) {
@@ -99,15 +97,7 @@ export function RecoveryCalendar() {
         }
 
         // Calculate what recovery would have been on this date
-        const calculatedStatus = calculateRecoveryStatus({
-          muscle: status.muscle,
-          lastWorkout: lastWorked,
-          workloadScore: status.workloadScore,
-          userLevel: profile.experienceLevel,
-          totalVolumeLast7Days: status.totalVolumeLast7Days,
-          trainingFrequency: status.trainingFrequency,
-          baseRestInterval: settings.baseRestInterval,
-        });
+        // Note: Recovery calculation logic is applied below
 
         // Adjust for the specific date
         const recoverySettings = DEFAULT_RECOVERY_SETTINGS;
@@ -145,7 +135,7 @@ export function RecoveryCalendar() {
         needsRest: avgRecovery < 50,
       };
     });
-  }, [daysInMonth, muscleStatuses, workouts, profile, settings.baseRestInterval]);
+  }, [daysInMonth, muscleStatuses, workouts, profile, settings.baseRestInterval, today]);
 
   const weekDays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
   const monthName = format(today, 'MMMM');

@@ -33,11 +33,11 @@ export function PreviousWorkoutTable({ exerciseId, className }: PreviousWorkoutT
     loadPreviousWorkout();
   }, [profile?.id, exerciseId]);
 
-  if (isLoading || !previousWorkout || previousWorkout.sets.length === 0) {
+  if (isLoading || !previousWorkout || (previousWorkout.sets ?? []).length === 0) {
     return null;
   }
 
-  const completedSets = previousWorkout.sets.filter((s) => s.completed);
+  const completedSets = (previousWorkout.sets ?? []).filter((s) => s.completed);
   const bestSet = completedSets.reduce((best, set) => {
     const setVolume = (set.weight || 0) * (set.reps || 0);
     const bestVolume = (best.weight || 0) * (best.reps || 0);

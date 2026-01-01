@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Loader2, ArrowLeft } from 'lucide-react';
+import { Loader2, ArrowLeft, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useWorkoutStore } from '@/store/workoutStore';
 import { useUserStore } from '@/store/userStore';
@@ -28,25 +28,14 @@ import { sanitizeNotes } from '@/utils/sanitize';
 import { prefersReducedMotion } from '@/utils/animations';
 import { useSetDuration } from '@/hooks/useSetDuration';
 import { useSettingsStore } from '@/store/settingsStore';
-import { saveLogWorkoutState, saveLogExerciseState, loadLogExerciseState, clearLogExerciseState } from '@/utils/workoutStatePersistence';
+import { saveLogWorkoutState, saveLogExerciseState, loadLogExerciseState, clearLogExerciseState, saveWorkoutState } from '@/utils/workoutStatePersistence';
 import { trapFocus, restoreFocus } from '@/utils/accessibility';
 import { supersetService, SupersetGroup } from '@/services/supersetService';
 import { Modal } from '@/components/common/Modal';
 import { detectHIIT } from '@/utils/exerciseHelpers';
 
 // Constants
-const SAVE_ANIMATION_DURATION = 2000; // ms
 const MODAL_CLOSE_DELAY = 500; // ms
-
-// Helper function to format date for datetime-local input (local time, not UTC)
-function formatDateTimeLocal(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${year}-${month}-${day}T${hours}:${minutes}`;
-}
 
 interface LogExerciseProps {
   isOpen: boolean;
@@ -81,17 +70,19 @@ export function LogExercise({
 
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
   const [sets, setSets] = useState<WorkoutSet[]>([]);
-  const [restTimerEnabled, setRestTimerEnabled] = useState(false);
+  const restTimerEnabled = false; // Rest timer is always enabled when auto-start is on
   const [workoutDate, setWorkoutDate] = useState<Date>(new Date());
   const [notes, setNotes] = useState('');
   const [showAdditionalDetails, setShowAdditionalDetails] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingExercise, setIsLoadingExercise] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
-  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showSaveConfirmModal, setShowSaveConfirmModal] = useState(false);
   const [justCompletedSetNumber, setJustCompletedSetNumber] = useState<number | null>(null);
+  const [showCancelSetModal, setShowCancelSetModal] = useState(false);
+  const [setToCancelNumber, setSetToCancelNumber] = useState<number | null>(null);
+  const [showMinimumSetWarning, setShowMinimumSetWarning] = useState(false);
 
   // Rest timer state
   const [restTimerVisible, setRestTimerVisible] = useState(false);
@@ -193,7 +184,7 @@ export function LogExercise({
         
         setIsLoadingExercise(true);
         try {
-          const workoutExercise = workout.exercises.find((ex) => ex.id === exerciseId);
+          const workoutExercise = (workout.exercises ?? []).find((ex) => ex.id === exerciseId);
           if (!workoutExercise) {
             showError('Exercise no longer exists in workout');
             handleForceClose();
@@ -202,7 +193,7 @@ export function LogExercise({
 
           const exerciseData = await exerciseLibrary.getExerciseById(workoutExercise.exerciseId);
           if (exerciseData) {
-            const loadedSets = workoutExercise.sets.map((set, index) => ({
+            const loadedSets = (workoutExercise.sets ?? []).map((set, index) => ({
               ...set,
               setNumber: index + 1,
             }));
@@ -644,22 +635,6 @@ export function LogExercise({
     }
   };
 
-  const handleDeleteSet = (setNumber: number) => {
-    if (sets.length <= 1) {
-      showError('At least one set is required');
-      return;
-    }
-
-    const updatedSets = sets
-      .filter((set) => set.setNumber !== setNumber)
-      .map((set, index) => ({
-        ...set,
-        setNumber: index + 1,
-      }));
-    setSets(updatedSets);
-    setValidationErrors((prev) => ({ ...prev, sets: '' }));
-  };
-
   const handleUpdateSet = (setNumber: number, updates: Partial<WorkoutSet>) => {
     setSets((prevSets) => {
       const updated = prevSets.map((set) => {
@@ -761,8 +736,8 @@ export function LogExercise({
       if (sets.length === 0) {
         errors.sets = 'At least one set is required';
       } else {
-        const completedSets = sets.filter((s) => s.completed);
-        const incompleteSets = sets.filter((s) => !s.completed);
+        const completedSets = (sets ?? []).filter((s) => s.completed);
+        const incompleteSets = (sets ?? []).filter((s) => !s.completed);
 
         if (completedSets.length === 0) {
           errors.sets = 'At least one set must be completed';
@@ -876,21 +851,20 @@ export function LogExercise({
         notes: notes.trim() ? sanitizeNotes(notes.trim()) : undefined,
       };
 
-      // Ensure we have the latest workout state
+      // Use the workout that was already ensured to exist above
+      // Get the latest workout state to ensure we have the most up-to-date version
       const latestWorkout = useWorkoutStore.getState().currentWorkout;
       if (!latestWorkout) {
-        throw new Error('Workout not available');
+        // If workout is still null after starting, something went wrong
+        showError('Workout not available. Please try again.');
+        return;
       }
 
       if (exerciseId) {
         updateExercise(exerciseId, workoutExercise);
-        setShowSuccessAnimation(true);
-        setTimeout(() => setShowSuccessAnimation(false), SAVE_ANIMATION_DURATION);
         success('Exercise updated successfully');
       } else {
         addExercise(workoutExercise);
-        setShowSuccessAnimation(true);
-        setTimeout(() => setShowSuccessAnimation(false), SAVE_ANIMATION_DURATION);
         success('Exercise added successfully');
       }
 
@@ -1042,11 +1016,16 @@ export function LogExercise({
 
     handleUpdateSet(setToComplete.setNumber, setUpdates);
     
-    // Trigger completion animation
-    setJustCompletedSetNumber(setToComplete.setNumber);
-    setTimeout(() => {
-      setJustCompletedSetNumber(null);
-    }, 1000);
+    // Trigger completion animation - ensure it triggers properly
+    setJustCompletedSetNumber(null); // Reset first to ensure animation triggers
+    // Use requestAnimationFrame to ensure state update happens after render
+    requestAnimationFrame(() => {
+      setJustCompletedSetNumber(setToComplete.setNumber);
+      // Keep animation state longer for better visibility
+      setTimeout(() => {
+        setJustCompletedSetNumber(null);
+      }, 1500);
+    });
 
     // If in superset and has next exercise, show group rest timer
     if (isInSuperset && nextExercise && !isLastInSuperset) {
@@ -1102,7 +1081,89 @@ export function LogExercise({
     handleGroupRestComplete();
   };
 
-  const activeSetNumber = sets.find((set) => !set.completed)?.setNumber || sets.length;
+  // Handle canceling/deleting a set (completed or current)
+  const handleCancelSet = (setNumber: number) => {
+    const setToCancel = sets.find((s) => s.setNumber === setNumber);
+    if (!setToCancel) {
+      return;
+    }
+
+    // Validate: ensure at least one set remains
+    if (sets.length <= 1) {
+      setShowMinimumSetWarning(true);
+      return;
+    }
+
+    // Show confirmation modal
+    setSetToCancelNumber(setNumber);
+    setShowCancelSetModal(true);
+  };
+
+  // Confirm and actually delete the set
+  const handleConfirmCancelSet = () => {
+    if (setToCancelNumber === null) return;
+
+    const setToDelete = sets.find((s) => s.setNumber === setToCancelNumber);
+    if (!setToDelete) {
+      setShowCancelSetModal(false);
+      setSetToCancelNumber(null);
+      return;
+    }
+
+    // Delete set from local state and re-index
+    const updatedSets = sets
+      .filter((s) => s.setNumber !== setToCancelNumber)
+      .map((set, index) => ({
+        ...set,
+        setNumber: index + 1,
+      }));
+
+    // Handle two scenarios:
+    // 1. New exercise (no exerciseId): Update local state only
+    // 2. Existing exercise (has exerciseId): Update both store and local state
+    if (exerciseId && currentWorkout) {
+      // Calculate new volume after deletion
+      const totalVolume = calculateVolume(updatedSets);
+      
+      // Update exercise with new sets array and recalculated volume
+      updateExercise(exerciseId, {
+        sets: updatedSets,
+        totalVolume,
+      });
+      
+      // Manually save workout state since updateExercise doesn't persist
+      const { templateId, plannedWorkoutId } = useWorkoutStore.getState();
+      const updatedWorkout = useWorkoutStore.getState().currentWorkout;
+      if (updatedWorkout) {
+        saveWorkoutState({ 
+          currentWorkout: updatedWorkout, 
+          templateId, 
+          plannedWorkoutId 
+        });
+      }
+    }
+
+    // Update local state
+    setSets(updatedSets);
+
+    // Clear animation state
+    if (justCompletedSetNumber === setToCancelNumber) {
+      setJustCompletedSetNumber(null);
+    }
+
+    // Reset set duration tracking if this was the current set
+    if (currentSet && currentSet.setNumber === setToCancelNumber) {
+      resetSetDuration();
+      currentSetStartTimeRef.current = new Date();
+      startSet();
+    }
+
+    // Close modal and reset state
+    setShowCancelSetModal(false);
+    setSetToCancelNumber(null);
+    success('Set deleted');
+  };
+
   const hasIncompleteSets = sets.length > 0 && sets.some((set) => !set.completed);
   const isSaveButtonDisabled = !selectedExercise || sets.length === 0 || isSaving || hasIncompleteSets;
 
@@ -1139,7 +1200,7 @@ export function LogExercise({
 
   // Group rest timer state
   const [groupRestTimerVisible, setGroupRestTimerVisible] = useState(false);
-  const [groupRestTimerDuration, setGroupRestTimerDuration] = useState(45); // Default 45s
+  const groupRestTimerDuration = 45; // Default 45s
 
   // Workout timer access
   const workoutTimerStartTime = useWorkoutStore((state) => state.workoutTimerStartTime);
@@ -1155,15 +1216,8 @@ export function LogExercise({
   }, [currentSet, sets.length]);
 
   const completedSets = useMemo(() => {
-    return sets.filter((set) => set.completed);
+    return (sets ?? []).filter((set) => set.completed);
   }, [sets]);
-
-  // Get previous workout data for current set
-  const previousSetData = useMemo(() => {
-    if (!currentSet || !currentExercise) return null;
-    // This will be loaded by PreviousWorkoutTable component
-    return null;
-  }, [currentSet, currentExercise]);
 
   // Lock body scroll and manage focus when modal is open
   useEffect(() => {
@@ -1360,6 +1414,7 @@ export function LogExercise({
                     onUpdate={(updates) => handleUpdateSet(currentSet.setNumber, updates)}
                     onLogSet={handleLogCurrentSet}
                     onAddSet={handleAddSet}
+                    onCancelSet={() => handleCancelSet(currentSet.setNumber)}
                     nextExerciseName={nextExercise?.exerciseName}
                     isLastInSuperset={isLastInSuperset}
                     showGroupRestMessage={isInSuperset && !!nextExercise && !isLastInSuperset}
@@ -1376,6 +1431,7 @@ export function LogExercise({
                     onUpdate={(updates) => handleUpdateSet(currentSet.setNumber, updates)}
                     onLogSet={handleLogCurrentSet}
                     onAddSet={handleAddSet}
+                    onCancelSet={() => handleCancelSet(currentSet.setNumber)}
                     nextExerciseName={nextExercise?.exerciseName}
                     isLastInSuperset={isLastInSuperset}
                     showGroupRestMessage={isInSuperset && !!nextExercise && !isLastInSuperset}
@@ -1392,6 +1448,7 @@ export function LogExercise({
                     onUpdate={(updates) => handleUpdateSet(currentSet.setNumber, updates)}
                     onLogSet={handleLogCurrentSet}
                     onAddSet={handleAddSet}
+                    onCancelSet={() => handleCancelSet(currentSet.setNumber)}
                     nextExerciseName={nextExercise?.exerciseName}
                     isLastInSuperset={isLastInSuperset}
                     showGroupRestMessage={isInSuperset && !!nextExercise && !isLastInSuperset}
@@ -1414,6 +1471,7 @@ export function LogExercise({
                   onUpdate={(updates) => handleUpdateSet(currentSet.setNumber, updates)}
                   onLogSet={handleLogCurrentSet}
                   onAddSet={handleAddSet}
+                  onCancelSet={() => handleCancelSet(currentSet.setNumber)}
                   nextExerciseName={nextExercise?.exerciseName}
                   isLastInSuperset={isLastInSuperset}
                   showGroupRestMessage={isInSuperset && !!nextExercise && !isLastInSuperset}
@@ -1477,10 +1535,12 @@ export function LogExercise({
                       <CompletedSetItem
                         set={set}
                         unit={profile?.preferredUnit || 'kg'}
+                        isJustCompleted={justCompletedSetNumber === set.setNumber}
                         onEdit={() => {
                           // Uncomplete set to edit
                           handleUpdateSet(set.setNumber, { completed: false });
                         }}
+                        onCancel={() => handleCancelSet(set.setNumber)}
                       />
                     </motion.div>
                   ))}
@@ -1557,6 +1617,128 @@ export function LogExercise({
               Save
             </button>
           </div>
+        </div>
+      </Modal>
+
+      {/* Cancel Set Confirmation Modal */}
+      <Modal
+        isOpen={showCancelSetModal}
+        onClose={() => {
+          setShowCancelSetModal(false);
+          setSetToCancelNumber(null);
+        }}
+        title="Delete Set"
+      >
+        <div className="space-y-4">
+          {setToCancelNumber !== null && (() => {
+            const setToDelete = sets.find((s) => s.setNumber === setToCancelNumber);
+            if (!setToDelete) return null;
+
+            const isCardio = setToDelete.distance !== undefined || setToDelete.time !== undefined;
+            const isHIIT = setToDelete.workDuration !== undefined || setToDelete.rounds !== undefined;
+            const isYoga = setToDelete.duration !== undefined && !setToDelete.weight && !setToDelete.reps && !setToDelete.distance;
+
+            const formatTime = (seconds: number): string => {
+              const mins = Math.floor(seconds / 60);
+              const secs = seconds % 60;
+              return `${mins}:${secs.toString().padStart(2, '0')}`;
+            };
+
+            return (
+              <>
+                <p className="text-gray-700 dark:text-gray-300">
+                  Are you sure you want to delete Set {setToCancelNumber}? This action cannot be undone.
+                </p>
+                <div className="bg-slate-50 dark:bg-[#102217] rounded-lg p-4 border border-slate-200 dark:border-white/10">
+                  <p className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-2">Set Details:</p>
+                  {isCardio && (
+                    <div className="text-slate-900 dark:text-white">
+                      <p className="font-medium">
+                        {setToDelete.distance || 0} {setToDelete.distanceUnit || 'km'}
+                        {setToDelete.time ? ` • ${formatTime(setToDelete.time)}` : ''}
+                      </p>
+                      {setToDelete.calories && (
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{setToDelete.calories} calories</p>
+                      )}
+                    </div>
+                  )}
+                  {isHIIT && (
+                    <div className="text-slate-900 dark:text-white">
+                      <p className="font-medium">
+                        {setToDelete.rounds || 1} round{setToDelete.rounds !== 1 ? 's' : ''}
+                        {setToDelete.workDuration ? ` • ${formatTime(setToDelete.workDuration)} work` : ''}
+                      </p>
+                    </div>
+                  )}
+                  {isYoga && (
+                    <div className="text-slate-900 dark:text-white">
+                      <p className="font-medium">
+                        {setToDelete.duration ? formatTime(setToDelete.duration) : '0:00'}
+                      </p>
+                    </div>
+                  )}
+                  {!isCardio && !isHIIT && !isYoga && (
+                    <div className="text-slate-900 dark:text-white">
+                      <p className="font-medium">
+                        {setToDelete.weight || 0}{setToDelete.unit || 'kg'} × {setToDelete.reps || 0} reps
+                      </p>
+                      {setToDelete.rpe && (
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">RPE {setToDelete.rpe.toFixed(1)}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </>
+            );
+          })()}
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={() => {
+                setShowCancelSetModal(false);
+                setSetToCancelNumber(null);
+              }}
+              className="flex-1 h-12 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirmCancelSet}
+              className="flex-1 h-12 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold transition-colors flex items-center justify-center gap-2"
+            >
+              <X className="w-5 h-5" />
+              Delete Set
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Minimum Set Warning Modal */}
+      <Modal
+        isOpen={showMinimumSetWarning}
+        onClose={() => setShowMinimumSetWarning(false)}
+        title="Cannot Delete Set"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+              <X className="w-5 h-5 text-red-600 dark:text-red-400" />
+            </div>
+            <div className="flex-1">
+              <p className="text-gray-900 dark:text-white font-medium mb-1">
+                At least one set is required
+              </p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                A workout exercise must have at least one set. Please add another set before deleting this one.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowMinimumSetWarning(false)}
+            className="w-full h-12 rounded-lg bg-primary hover:bg-primary/90 text-white font-bold transition-colors"
+          >
+            Got it
+          </button>
         </div>
       </Modal>
     </div>

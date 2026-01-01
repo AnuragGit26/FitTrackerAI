@@ -10,7 +10,7 @@ import { format } from 'date-fns';
 interface WorkoutErrorRecoveryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onWorkoutRecovered?: (workoutId: number) => void;
+  onWorkoutRecovered?: (workoutId: string) => void;
 }
 
 export function WorkoutErrorRecoveryModal({ isOpen, onClose, onWorkoutRecovered }: WorkoutErrorRecoveryModalProps) {
@@ -122,7 +122,7 @@ export function WorkoutErrorRecoveryModal({ isOpen, onClose, onWorkoutRecovered 
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Recover Failed Workouts">
-      <div className="space-y-4">
+      <div className="space-y-6">
         {failedWorkouts.length === 0 ? (
           <div className="text-center py-8">
             <div className="mx-auto w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/20 flex items-center justify-center mb-4">
@@ -132,7 +132,7 @@ export function WorkoutErrorRecoveryModal({ isOpen, onClose, onWorkoutRecovered 
           </div>
         ) : (
           <>
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-4">
               <div className="flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
                 <div className="flex-1">
@@ -147,14 +147,14 @@ export function WorkoutErrorRecoveryModal({ isOpen, onClose, onWorkoutRecovered 
             </div>
 
             {/* Failed Workouts List */}
-            <div className="space-y-3 max-h-96 overflow-y-auto">
+            <div className="space-y-4 max-h-96 overflow-y-auto">
               {failedWorkouts.map((fw) => (
                 <div
                   key={fw.id}
-                  className={`border rounded-lg p-4 transition-colors ${
+                  className={`border rounded-xl p-4 transition-all cursor-pointer ${
                     selectedWorkout?.id === fw.id
-                      ? 'border-primary bg-primary/5'
-                      : 'border-gray-200 dark:border-[#316847] bg-white dark:bg-surface-dark'
+                      ? 'border-primary bg-primary/10 dark:bg-primary/20'
+                      : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-4">
@@ -194,7 +194,7 @@ export function WorkoutErrorRecoveryModal({ isOpen, onClose, onWorkoutRecovered 
                       <button
                         onClick={() => handleRetry(fw)}
                         disabled={isRetrying || isDeleting === fw.id}
-                        className="px-3 py-2 rounded-lg bg-primary text-white font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        className="px-4 py-2 rounded-xl bg-primary hover:bg-[#0be060] text-black font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 min-h-[44px] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
                       >
                         {isRetrying && selectedWorkout?.id === fw.id ? (
                           <>
@@ -211,7 +211,7 @@ export function WorkoutErrorRecoveryModal({ isOpen, onClose, onWorkoutRecovered 
                       <button
                         onClick={() => handleDelete(fw.id)}
                         disabled={isRetrying || isDeleting === fw.id}
-                        className="p-2 rounded-lg bg-error/10 text-error hover:bg-error/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="p-2 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[44px] min-h-[44px] flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
                         aria-label="Delete failed workout"
                       >
                         {isDeleting === fw.id ? (
@@ -225,7 +225,7 @@ export function WorkoutErrorRecoveryModal({ isOpen, onClose, onWorkoutRecovered 
 
                   {/* Expanded Details */}
                   {selectedWorkout?.id === fw.id && (
-                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-[#316847]">
+                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                       <div className="space-y-3">
                         <div>
                           <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
@@ -244,7 +244,7 @@ export function WorkoutErrorRecoveryModal({ isOpen, onClose, onWorkoutRecovered 
                             <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
                               Error Details:
                             </h4>
-                            <pre className="text-xs bg-gray-100 dark:bg-gray-800 p-2 rounded overflow-auto max-h-32 text-gray-700 dark:text-gray-300">
+                            <pre className="text-xs bg-gray-100 dark:bg-gray-800 p-3 rounded-xl overflow-auto max-h-32 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
                               {fw.errorDetails}
                             </pre>
                           </div>

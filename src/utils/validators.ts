@@ -175,3 +175,68 @@ export function validateExerciseSets(
   return { valid: true };
 }
 
+/**
+ * Validates that startTime is on the same calendar day as workout date
+ */
+export function validateWorkoutDateAndTime(
+  workoutDate: Date,
+  startTime: Date
+): { valid: boolean; error?: string; adjustedStartTime?: Date } {
+  const dateStr = workoutDate.toISOString().split('T')[0];
+  const startTimeStr = startTime.toISOString().split('T')[0];
+  
+  if (dateStr !== startTimeStr) {
+    // Auto-adjust startTime to match workout date
+    const adjusted = new Date(workoutDate);
+    adjusted.setHours(startTime.getHours());
+    adjusted.setMinutes(startTime.getMinutes());
+    adjusted.setSeconds(startTime.getSeconds());
+    adjusted.setMilliseconds(startTime.getMilliseconds());
+    
+    return {
+      valid: false,
+      error: 'Start time must be on the same day as workout date',
+      adjustedStartTime: adjusted,
+    };
+  }
+  
+  return { valid: true };
+}
+
+/**
+ * Validates workout endTime is after startTime and on same or next day
+ */
+export function validateWorkoutEndTime(
+  startTime: Date,
+  endTime: Date
+): { valid: boolean; error?: string } {
+  if (endTime <= startTime) {
+    return { valid: false, error: 'End time must be after start time' };
+  }
+  
+  // Allow endTime to be on next day (for late-night workouts)
+  const startDate = startTime.toISOString().split('T')[0];
+  const endDate = endTime.toISOString().split('T')[0];
+  const startDateObj = new Date(startDate);
+  const endDateObj = new Date(endDate);
+  const daysDiff = Math.floor((endDateObj.getTime() - startDateObj.getTime()) / (1000 * 60 * 60 * 24));
+  
+  if (daysDiff > 1) {
+    return { valid: false, error: 'End time cannot be more than 1 day after start time' };
+  }
+  
+  return { valid: true };
+}
+
+/**
+ * Adjusts startTime to match workout date while preserving time
+ */
+export function adjustStartTimeToMatchDate(workoutDate: Date, startTime: Date): Date {
+  const adjusted = new Date(workoutDate);
+  adjusted.setHours(startTime.getHours());
+  adjusted.setMinutes(startTime.getMinutes());
+  adjusted.setSeconds(startTime.getSeconds());
+  adjusted.setMilliseconds(startTime.getMilliseconds());
+  return adjusted;
+}
+

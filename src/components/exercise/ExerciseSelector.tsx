@@ -25,18 +25,6 @@ export function ExerciseSelector({ onSelect, onClose }: ExerciseSelectorProps) {
     loadExercises();
   }, []);
 
-  // Fast counter for immediate UI feedback (simple filter, no ranking)
-  const fastFilteredCount = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return exercises.length;
-    }
-    const query = searchQuery.toLowerCase();
-    return exercises.filter((ex) => {
-      return ex.name.toLowerCase().includes(query) ||
-             ex.category.toLowerCase().includes(query) ||
-             ex.equipment.some((eq) => eq.toLowerCase().includes(query));
-    }).length;
-  }, [searchQuery, exercises]);
 
   // Memoize filtered exercises to prevent unnecessary recalculations
   // Use deferredSearchQuery for expensive search computation

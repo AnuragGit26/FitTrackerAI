@@ -2,16 +2,14 @@ import { useState, useEffect } from 'react';
 import { X, Save, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWorkoutStore } from '@/store/workoutStore';
-import { dataService } from '@/services/dataService';
 import { useUserStore } from '@/store/userStore';
 import { useToast } from '@/hooks/useToast';
 import { WorkoutExercise, WorkoutSet, DistanceUnit } from '@/types/exercise';
-import { Workout } from '@/types/workout';
 import { calculateVolume, estimateCaloriesFromSteps } from '@/utils/calculations';
 import { exerciseLibrary } from '@/services/exerciseLibrary';
 import { MuscleGroup } from '@/types/muscle';
 import { cn } from '@/utils/cn';
-import { prefersReducedMotion } from '@/utils/animations';
+import { generateCustomExerciseId } from '@/utils/idGenerator';
 
 interface QuickCardioLogProps {
   isOpen: boolean;
@@ -33,7 +31,6 @@ export function QuickCardioLog({ isOpen, onClose, onSaved }: QuickCardioLogProps
   const { profile } = useUserStore();
   const { finishWorkout, startWorkout, addExercise } = useWorkoutStore();
   const { success, error: showError } = useToast();
-  const shouldReduceMotion = prefersReducedMotion();
 
   const [activityType, setActivityType] = useState<string>('Running');
   const [customActivityName, setCustomActivityName] = useState('');
@@ -106,7 +103,7 @@ export function QuickCardioLog({ isOpen, onClose, onSaved }: QuickCardioLogProps
 
       if (activityType === 'Custom') {
         exerciseName = customActivityName.trim();
-        exerciseId = `custom-${Date.now()}`;
+        exerciseId = generateCustomExerciseId();
       } else {
         const activity = CARDIO_ACTIVITIES.find(a => a.name === activityType);
         if (activity?.exerciseId) {

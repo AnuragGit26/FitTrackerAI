@@ -13,7 +13,8 @@ interface ProcessedMuscleData {
   tokenEstimate: number;
 }
 
-const TOKEN_LIMIT = 100000; // Target: Stay under 100K tokens for safety
+// Token limit constants (used for validation)
+// const TOKEN_LIMIT = 100000; // Target: Stay under 100K tokens for safety
 const TOKEN_WARNING_THRESHOLD = 80000; // 80% of limit
 
 // Rough token estimation: ~4 tokens per word, ~1.3 tokens per character
@@ -86,7 +87,7 @@ class AIDataProcessor {
       w => new Date(w.date) >= fourteenDaysAgo && new Date(w.date) < sevenDaysAgo
     );
     const olderWorkouts = workouts.filter(w => new Date(w.date) < fourteenDaysAgo);
-    const prWorkouts = workouts.filter(w => 
+    const _prWorkouts = workouts.filter(w => 
       prWorkoutDates.has(new Date(w.date).toISOString().split('T')[0])
     );
 
@@ -158,7 +159,7 @@ class AIDataProcessor {
         })
         .slice(0, 8)
         .map(([week, data]) => {
-          const avgDate = new Date(
+          const _avgDate = new Date(
             data.dates.reduce((sum, d) => sum + d.getTime(), 0) / data.dates.length
           );
           return `${week}: ${data.count} workouts, ${Math.round(data.volume)}kg total`;

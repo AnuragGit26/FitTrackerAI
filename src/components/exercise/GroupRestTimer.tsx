@@ -1,8 +1,4 @@
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import { useRestTimer } from '@/hooks/useRestTimer';
-import { cn } from '@/utils/cn';
-import { prefersReducedMotion } from '@/utils/animations';
 
 interface GroupRestTimerProps {
   duration: number; // seconds
@@ -19,13 +15,11 @@ export function GroupRestTimer({
   isVisible,
   groupType = 'superset',
 }: GroupRestTimerProps) {
-  const { remaining, formattedTime, progress, isPaused, start, pause, resume, addTime } = useRestTimer({
+  const { remaining, formattedTime, isPaused, pause, resume, addTime } = useRestTimer({
     duration,
     autoStart: true,
     onComplete,
   });
-
-  const shouldReduceMotion = prefersReducedMotion();
   const progressPercentage = (remaining / duration) * 100;
   const dashArray = `${progressPercentage}, 100`;
 

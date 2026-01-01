@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { RecoveryLogData } from '@/types/workoutSummary';
 
 interface RecoveryLogProps {
-  workoutId: number;
+  workoutId: string;
   initialData?: RecoveryLogData;
   onSave: (data: RecoveryLogData) => Promise<void>;
 }
 
-export function RecoveryLog({ workoutId, initialData, onSave }: RecoveryLogProps) {
+export function RecoveryLog({ workoutId: _workoutId, initialData, onSave }: RecoveryLogProps) {
   const [mood, setMood] = useState<RecoveryLogData['mood']>(initialData?.mood);
   const [soreness, setSoreness] = useState<number>(initialData?.predictedSoreness || 60);
   const [isSaving, setIsSaving] = useState(false);

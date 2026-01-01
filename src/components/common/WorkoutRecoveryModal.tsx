@@ -87,10 +87,61 @@ export function WorkoutRecoveryModal({
   if (!isOpen) return null;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Recovered Workout Found">
-      <div className="space-y-4">
+    <Modal 
+      isOpen={isOpen} 
+      onClose={onClose} 
+      title="Recovered Workout Found"
+      footer={
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={handleResume}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-primary hover:bg-[#0be060] text-black rounded-xl font-medium transition-colors min-h-[44px] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+          >
+            <RotateCcw className="w-4 h-4" />
+            Resume Workout
+          </button>
+
+          <button
+            onClick={handleSaveNow}
+            disabled={isSaving || isDiscarding}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+          >
+            {isSaving ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                Save Now
+              </>
+            )}
+          </button>
+
+          <button
+            onClick={handleDiscard}
+            disabled={isSaving || isDiscarding}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+          >
+            {isDiscarding ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Discarding...
+              </>
+            ) : (
+              <>
+                <Trash2 className="w-4 h-4" />
+                Discard
+              </>
+            )}
+          </button>
+        </div>
+      }
+    >
+      <div className="space-y-6">
         {isStale && (
-          <div className="flex items-start gap-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+          <div className="flex items-start gap-3 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl">
             <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
               <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
@@ -103,7 +154,7 @@ export function WorkoutRecoveryModal({
           </div>
         )}
 
-        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-3">
+        <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 space-y-3">
           <div className="flex items-center gap-2 text-sm">
             <Calendar className="w-4 h-4 text-gray-500 dark:text-gray-400" />
             <span className="text-gray-700 dark:text-gray-300">
@@ -129,53 +180,7 @@ export function WorkoutRecoveryModal({
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-2 pt-2">
-          <button
-            onClick={handleResume}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
-          >
-            <RotateCcw className="w-4 h-4" />
-            Resume Workout
-          </button>
-
-          <button
-            onClick={handleSaveNow}
-            disabled={isSaving || isDiscarding}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSaving ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4" />
-                Save Now
-              </>
-            )}
-          </button>
-
-          <button
-            onClick={handleDiscard}
-            disabled={isSaving || isDiscarding}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isDiscarding ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Discarding...
-              </>
-            ) : (
-              <>
-                <Trash2 className="w-4 h-4" />
-                Discard
-              </>
-            )}
-          </button>
-        </div>
-
-        <p className="text-xs text-gray-500 dark:text-gray-400 text-center pt-2">
+        <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
           This workout was recovered from your previous session. Choose an option above.
         </p>
       </div>

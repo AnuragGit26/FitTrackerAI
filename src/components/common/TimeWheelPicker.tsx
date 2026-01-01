@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
 import { cn } from '@/utils/cn';
-import { prefersReducedMotion } from '@/utils/animations';
 
 interface TimeWheelPickerProps {
   minutes: number;
@@ -22,7 +20,6 @@ export function TimeWheelPicker({
   const [seconds, setSeconds] = useState(initialSeconds);
   const minutesRef = useRef<HTMLDivElement>(null);
   const secondsRef = useRef<HTMLDivElement>(null);
-  const shouldReduceMotion = prefersReducedMotion();
 
   useEffect(() => {
     setMinutes(initialMinutes);

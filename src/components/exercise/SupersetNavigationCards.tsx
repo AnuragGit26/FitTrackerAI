@@ -1,5 +1,4 @@
 import { WorkoutExercise } from '@/types/exercise';
-import { supersetService } from '@/services/supersetService';
 import { cn } from '@/utils/cn';
 
 interface SupersetNavigationCardsProps {
@@ -12,7 +11,7 @@ interface SupersetNavigationCardsProps {
 export function SupersetNavigationCards({
   currentExerciseId,
   groupExercises,
-  groupType,
+  groupType: _groupType,
   onExerciseClick,
 }: SupersetNavigationCardsProps) {
   const currentIndex = groupExercises.findIndex((ex) => ex.id === currentExerciseId);
@@ -29,13 +28,6 @@ export function SupersetNavigationCards({
     return { currentSet, totalSets, completedSets };
   };
 
-  const getGroupLabel = (index: number) => {
-    if (groupType === 'superset') {
-      const groupLetters = ['A', 'B', 'C', 'D', 'E'];
-      return `Superset ${groupLetters[index] || String(index + 1)}`;
-    }
-    return `Circuit ${index + 1}`;
-  };
 
   return (
     <div className="w-full overflow-x-auto no-scrollbar pb-2">

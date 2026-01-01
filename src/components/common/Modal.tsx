@@ -1,4 +1,4 @@
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/utils/cn';
@@ -11,6 +11,9 @@ interface ModalProps {
   children: ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
   showCloseButton?: boolean;
+  header?: ReactNode;
+  footer?: ReactNode;
+  closeOnBackdropClick?: boolean;
 }
 
 export function Modal({
@@ -20,17 +23,30 @@ export function Modal({
   children,
   size = 'md',
   showCloseButton = true,
+  header,
+  footer,
+  closeOnBackdropClick = true,
 }: ModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const previousActiveElement = useRef<HTMLElement | null>(null);
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
+      previousActiveElement.current = document.activeElement as HTMLElement;
       // Focus trap: focus the modal when it opens
-      const modalElement = document.querySelector('[role="dialog"]') as HTMLElement;
-      if (modalElement) {
-        modalElement.focus();
-      }
+      setTimeout(() => {
+        const modalElement = modalRef.current;
+        if (modalElement) {
+          modalElement.focus();
+        }
+      }, 100);
     } else {
       document.body.style.overflow = '';
+      // Restore focus to previous element
+      if (previousActiveElement.current) {
+        previousActiveElement.current.focus();
+      }
     }
     return () => {
       document.body.style.overflow = '';
@@ -47,36 +63,76 @@ export function Modal({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen, onClose]);
 
+  // Focus trap: keep focus within modal
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleTabKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+
+      const modal = modalRef.current;
+      if (!modal) return;
+
+      const focusableElements = modal.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+
+      if (e.shiftKey) {
+        if (document.activeElement === firstElement) {
+          e.preventDefault();
+          lastElement?.focus();
+        }
+      } else {
+        if (document.activeElement === lastElement) {
+          e.preventDefault();
+          firstElement?.focus();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleTabKey);
+    return () => document.removeEventListener('keydown', handleTabKey);
+  }, [isOpen]);
+
   const sizes = {
     sm: 'max-w-md',
-    md: 'max-w-md',
-    lg: 'max-w-md',
-    xl: 'max-w-md',
+    md: 'max-w-lg',
+    lg: 'max-w-2xl',
+    xl: 'max-w-4xl',
     full: 'max-w-full mx-4',
   };
 
   const shouldReduceMotion = prefersReducedMotion();
 
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (closeOnBackdropClick && e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-          onClick={onClose}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm safe-area-inset"
+          onClick={handleBackdropClick}
           variants={shouldReduceMotion ? {} : modalBackdrop}
           initial="initial"
           animate="animate"
           exit="exit"
         >
           <motion.div
+            ref={modalRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby={title ? 'modal-title' : undefined}
             tabIndex={-1}
             className={cn(
-              'bg-white dark:bg-[#1c2e24] rounded-xl shadow-2xl border border-gray-200 dark:border-[#316847]/50 w-full focus:outline-none',
+              'bg-white dark:bg-[#1c2e24] rounded-2xl shadow-2xl border border-gray-200 dark:border-[#316847]/50 w-full focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
               sizes[size],
-              'max-h-[90vh] overflow-y-auto'
+              'max-h-[90vh] overflow-hidden flex flex-col'
             )}
             onClick={(e) => e.stopPropagation()}
             variants={shouldReduceMotion ? {} : modalContent}
@@ -84,29 +140,40 @@ export function Modal({
             animate="animate"
             exit="exit"
           >
-        <div className="relative">
-          {(title || showCloseButton) && (
-            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-              {title && (
-                <h2 id="modal-title" className="text-xl font-semibold text-gray-900 dark:text-white">
-                  {title}
-                </h2>
-              )}
-              {showCloseButton && (
-                <button
-                  onClick={onClose}
-                  className="absolute top-3 right-3 p-2 rounded-full text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center touch-manipulation"
-                  aria-label="Close modal"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              )}
+            {(title || showCloseButton || header) && (
+              <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+                {header ? (
+                  header
+                ) : (
+                  <>
+                    {title && (
+                      <h2 id="modal-title" className="text-xl font-bold text-gray-900 dark:text-white pr-8">
+                        {title}
+                      </h2>
+                    )}
+                    {showCloseButton && (
+                      <button
+                        onClick={onClose}
+                        className="absolute top-4 right-4 sm:top-6 sm:right-6 p-2 rounded-full text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center touch-manipulation focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                        aria-label="Close modal"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+              {children}
             </div>
-          )}
-          <div className="p-4">{children}</div>
-        </div>
-      </motion.div>
-    </motion.div>
+            {footer && (
+              <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 p-4 sm:p-6">
+                {footer}
+              </div>
+            )}
+          </motion.div>
+        </motion.div>
       )}
     </AnimatePresence>
   );

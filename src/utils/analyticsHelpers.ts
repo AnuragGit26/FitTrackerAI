@@ -41,7 +41,7 @@ export function filterWorkoutsByDateRange(
   range: DateRange
 ): Workout[] {
   const { start, end } = getDateRange(range);
-  return workouts.filter((w) => {
+  return (workouts ?? []).filter((w) => {
     const workoutDate = new Date(w.date);
     return workoutDate >= start && workoutDate <= end;
   });
@@ -50,12 +50,12 @@ export function filterWorkoutsByDateRange(
 export function calculatePersonalRecords(workouts: Workout[]): PersonalRecord[] {
   const records: Map<string, PersonalRecord> = new Map();
 
-  workouts.forEach((workout) => {
-    workout.exercises.forEach((exercise) => {
+  (workouts ?? []).forEach((workout) => {
+    (workout.exercises ?? []).forEach((exercise) => {
       const exerciseName = exercise.exerciseName;
       const existingRecord = records.get(exerciseName);
 
-      exercise.sets.forEach((set) => {
+      (exercise.sets ?? []).forEach((set) => {
         if (!set.completed) return;
         if (set.weight === undefined || set.reps === undefined) return;
 
@@ -128,8 +128,8 @@ export function categorizeMuscleGroup(muscle: MuscleGroup): 'legs' | 'push' | 'p
 export function aggregateVolumeByMuscleGroup(workouts: Workout[]): Map<MuscleGroup, number> {
   const volumeMap = new Map<MuscleGroup, number>();
 
-  workouts.forEach((workout) => {
-    workout.exercises.forEach((exercise) => {
+  (workouts ?? []).forEach((workout) => {
+    (workout.exercises ?? []).forEach((exercise) => {
       const mapping = exerciseMuscleMap[exercise.exerciseName];
       const exerciseVolume = exercise.totalVolume;
       
@@ -175,10 +175,10 @@ function getMondayOfWeek(date: Date): Date {
  * Score = (consistent_weeks / total_weeks) * 100
  */
 export function calculateConsistencyScore(workouts: Workout[], days: number = 30): number {
-  if (workouts.length === 0) return 0;
+  if ((workouts ?? []).length === 0) return 0;
 
   // Use all available workout data (no date filtering)
-  const sortedWorkouts = [...workouts].sort(
+  const sortedWorkouts = [...(workouts ?? [])].sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
   );
 
@@ -241,10 +241,10 @@ export function calculateConsistencyScore(workouts: Workout[], days: number = 30
  * Returns a 2D array where each inner array represents a week (Monday to Sunday).
  */
 export function getWeeklyWorkoutDays(workouts: Workout[]): boolean[][] {
-  if (workouts.length === 0) return [];
+  if ((workouts ?? []).length === 0) return [];
 
   // Get date range from workouts
-  const workoutDates = workouts.map((w) => new Date(w.date));
+  const workoutDates = (workouts ?? []).map((w) => new Date(w.date));
   const minDate = new Date(Math.min(...workoutDates.map((d) => d.getTime())));
   const maxDate = new Date(Math.max(...workoutDates.map((d) => d.getTime())));
 
@@ -273,7 +273,7 @@ export function getWeeklyWorkoutDays(workouts: Workout[]): boolean[][] {
       checkDate.setDate(checkDate.getDate() + day);
       checkDate.setHours(0, 0, 0, 0);
 
-      const hasWorkout = workouts.some((w) => {
+      const hasWorkout = (workouts ?? []).some((w) => {
         const workoutDate = new Date(w.date);
         workoutDate.setHours(0, 0, 0, 0);
         return workoutDate.getTime() === checkDate.getTime();
@@ -291,7 +291,7 @@ export function getWeeklyWorkoutDays(workouts: Workout[]): boolean[][] {
  * Averages should only be calculated when at least 7 workouts are recorded
  */
 export function hasEnoughWorkoutsForAverages(workouts: Workout[]): boolean {
-  return workouts.length >= 7;
+  return (workouts ?? []).length >= 7;
 }
 
 /**
@@ -307,9 +307,9 @@ export function calculateMuscleImbalances(workouts: Workout[]): Array<{
   imbalancePercent: number;
   status: 'balanced' | 'imbalanced';
 }> {
-  if (workouts.length < 7) return []; // Need enough data for meaningful analysis
+  if ((workouts ?? []).length < 7) return []; // Need enough data for meaningful analysis
 
-  const muscleVolume = aggregateVolumeByMuscleGroup(workouts);
+  const muscleVolume = aggregateVolumeByMuscleGroup(workouts ?? []);
   const imbalances: Array<{
     muscle: MuscleGroup;
     leftVolume: number;
@@ -332,9 +332,9 @@ export function calculateMuscleImbalances(workouts: Workout[]): Array<{
 
     // Calculate volume per workout to detect consistency
     const volumesPerWorkout: number[] = [];
-    workouts.forEach((w) => {
+    (workouts ?? []).forEach((w) => {
       let workoutVolume = 0;
-      w.exercises.forEach((ex) => {
+      (w.exercises ?? []).forEach((ex) => {
         const mapping = exerciseMuscleMap[ex.exerciseName];
         if (mapping) {
           const isPrimary = mapping.primary.includes(muscle);
