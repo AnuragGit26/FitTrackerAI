@@ -53,6 +53,6 @@ export interface RecoveryMetrics {
     'rest-day': number;
   };
   recoveryTrend: Array<{ date: string; recovery: number }>;
-  correlationWithSleep: number; // Correlation coefficient
+  correlationWithSleep: number | null; // Correlation coefficient, null if insufficient data
 }
 

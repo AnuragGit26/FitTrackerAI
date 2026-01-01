@@ -59,12 +59,16 @@ export function YogaSetCard({
   showGroupRestMessage = false,
 }: YogaSetCardProps) {
   const [durationMinutes, setDurationMinutes] = useState(() => {
-    const totalSeconds = set.duration || 0;
-    return Math.floor(totalSeconds / 60).toString();
+    if (set.duration !== undefined && set.duration > 0) {
+      return Math.floor(set.duration / 60).toString();
+    }
+    return '';
   });
   const [durationSeconds, setDurationSeconds] = useState(() => {
-    const totalSeconds = set.duration || 0;
-    return (totalSeconds % 60).toString().padStart(2, '0');
+    if (set.duration !== undefined && set.duration > 0) {
+      return (set.duration % 60).toString().padStart(2, '0');
+    }
+    return '';
   });
   const [posesSequence, setPosesSequence] = useState(() => set.notes || '');
   const [focusAreas, setFocusAreas] = useState<string[]>(() => set.focusAreas || []);
@@ -95,10 +99,13 @@ export function YogaSetCard({
       }, 1200);
     }
 
-    if (set.duration !== undefined) {
+    if (set.duration !== undefined && set.duration > 0) {
       const totalSeconds = set.duration;
       setDurationMinutes(Math.floor(totalSeconds / 60).toString());
       setDurationSeconds((totalSeconds % 60).toString().padStart(2, '0'));
+    } else {
+      setDurationMinutes('');
+      setDurationSeconds('');
     }
     if (set.notes) {
       setPosesSequence(set.notes);
@@ -116,8 +123,14 @@ export function YogaSetCard({
   const handleDurationChange = (minutes: string, seconds: string) => {
     setDurationMinutes(minutes);
     setDurationSeconds(seconds);
-    const totalSeconds = (parseInt(minutes) || 0) * 60 + (parseInt(seconds) || 0);
-    onUpdate({ duration: totalSeconds });
+    // Only update if at least one value is provided
+    const minutesNum = minutes ? parseInt(minutes) : 0;
+    const secondsNum = seconds ? parseInt(seconds) : 0;
+    const totalSeconds = minutesNum * 60 + secondsNum;
+    
+    if (totalSeconds > 0 || (minutes === '' && seconds === '')) {
+      onUpdate({ duration: totalSeconds > 0 ? totalSeconds : undefined });
+    }
   };
 
   const handlePosesSequenceChange = (value: string) => {
@@ -144,7 +157,9 @@ export function YogaSetCard({
     onUpdate({ breathWorkType: type === 'None' ? undefined : type });
   };
 
-  const totalDurationSeconds = (parseInt(durationMinutes) || 0) * 60 + (parseInt(durationSeconds) || 0);
+  const minutesNum = durationMinutes ? parseInt(durationMinutes) : 0;
+  const secondsNum = durationSeconds ? parseInt(durationSeconds) : 0;
+  const totalDurationSeconds = minutesNum * 60 + secondsNum;
   const canLogSet = totalDurationSeconds > 0;
 
   const handleLogSetClick = () => {
@@ -252,7 +267,8 @@ export function YogaSetCard({
               value={durationMinutes}
               onChange={(e) => {
                 const mins = e.target.value;
-                if (mins === '' || (parseInt(mins) >= 0 && parseInt(mins) <= 59)) {
+                // Allow empty string or valid numbers 0-59
+                if (mins === '' || (!isNaN(parseInt(mins)) && parseInt(mins) >= 0 && parseInt(mins) <= 59)) {
                   handleDurationChange(mins, durationSeconds);
                 }
               }}
@@ -268,9 +284,15 @@ export function YogaSetCard({
               max="59"
               value={durationSeconds}
               onChange={(e) => {
-                const secs = e.target.value.padStart(2, '0');
-                if (secs === '' || (parseInt(secs) >= 0 && parseInt(secs) <= 59)) {
-                  handleDurationChange(durationMinutes, secs);
+                const value = e.target.value;
+                // Allow empty string, otherwise pad and validate
+                if (value === '') {
+                  handleDurationChange(durationMinutes, '');
+                } else {
+                  const secs = value.padStart(2, '0');
+                  if (!isNaN(parseInt(secs)) && parseInt(secs) >= 0 && parseInt(secs) <= 59) {
+                    handleDurationChange(durationMinutes, secs);
+                  }
                 }
               }}
               disabled={disabled}

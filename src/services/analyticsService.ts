@@ -259,10 +259,39 @@ export const analyticsService = {
 
   calculateCaloriesTrend(workouts: Workout[], range: DateRange = '30d'): Array<{ date: string; calories: number }> {
     const filtered = filterWorkoutsByDateRange(workouts, range);
-    const { start } = getDateRange(range);
-    const weekCount = range === '30d' ? 4 : range === '90d' ? 12 : 52;
+    const { start, end } = getDateRange(range);
 
+    // For 7d range, show daily data instead of weekly
+    if (range === '7d') {
+      const dailyData: Map<string, number> = new Map();
+      const currentDate = new Date(start);
+      
+      while (currentDate <= end) {
+        const dateKey = currentDate.toISOString().split('T')[0];
+        const dayCalories = filtered
+          .filter((w) => {
+            const workoutDate = new Date(w.date);
+            return (
+              workoutDate.getDate() === currentDate.getDate() &&
+              workoutDate.getMonth() === currentDate.getMonth() &&
+              workoutDate.getFullYear() === currentDate.getFullYear()
+            );
+          })
+          .reduce((sum, w) => sum + (w.calories || 0), 0);
+        
+        dailyData.set(dateKey, dayCalories);
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+
+      return Array.from(dailyData.entries()).map(([date, calories]) => ({
+        date,
+        calories,
+      }));
+    }
+
+    // For other ranges, use weekly aggregation
     const weeklyData: Map<string, number> = new Map();
+    const weekCount = range === '30d' ? 4 : range === '90d' ? 12 : 52;
 
     for (let week = 0; week < weekCount; week++) {
       const weekStart = new Date(start);

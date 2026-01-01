@@ -37,9 +37,18 @@ export function HIITSetCard({
   isLastInSuperset = false,
   showGroupRestMessage = false,
 }: HIITSetCardProps) {
-  const [workDuration, setWorkDuration] = useState(() => (set.workDuration || set.duration || 0).toString());
-  const [restDuration, setRestDuration] = useState(() => (set.restTime || 0).toString());
-  const [rounds, setRounds] = useState(() => (set.rounds || 1).toString());
+  const [workDuration, setWorkDuration] = useState(() => {
+    const value = set.workDuration || set.duration;
+    return value !== undefined ? value.toString() : '';
+  });
+  const [restDuration, setRestDuration] = useState(() => {
+    const value = set.restTime;
+    return value !== undefined ? value.toString() : '';
+  });
+  const [rounds, setRounds] = useState(() => {
+    const value = set.rounds;
+    return value !== undefined ? value.toString() : '1';
+  });
   const [heartRate, setHeartRate] = useState(() => (set.heartRate || '').toString());
   const [intensityLevel, setIntensityLevel] = useState<'low' | 'moderate' | 'high' | 'max' | undefined>(
     set.intensityLevel || undefined
@@ -69,12 +78,18 @@ export function HIITSetCard({
       setWorkDuration(set.workDuration.toString());
     } else if (set.duration !== undefined) {
       setWorkDuration(set.duration.toString());
+    } else {
+      setWorkDuration('');
     }
     if (set.restTime !== undefined) {
       setRestDuration(set.restTime.toString());
+    } else {
+      setRestDuration('');
     }
     if (set.rounds !== undefined) {
       setRounds(set.rounds.toString());
+    } else {
+      setRounds('1');
     }
     if (set.heartRate !== undefined) {
       setHeartRate(set.heartRate.toString());
@@ -88,20 +103,44 @@ export function HIITSetCard({
 
   const handleWorkDurationChange = (value: string) => {
     setWorkDuration(value);
-    const numValue = parseInt(value) || 0;
-    onUpdate({ workDuration: numValue, duration: numValue });
+    // Allow empty string, otherwise validate and update
+    if (value === '' || value === '-') {
+      onUpdate({ workDuration: undefined, duration: undefined });
+    } else {
+      const numValue = parseInt(value);
+      if (!isNaN(numValue) && numValue >= 0) {
+        onUpdate({ workDuration: numValue, duration: numValue });
+      }
+      // If invalid, keep the display value but don't update the set
+    }
   };
 
   const handleRestDurationChange = (value: string) => {
     setRestDuration(value);
-    const numValue = parseInt(value) || 0;
-    onUpdate({ restTime: numValue });
+    // Allow empty string, otherwise validate and update
+    if (value === '' || value === '-') {
+      onUpdate({ restTime: undefined });
+    } else {
+      const numValue = parseInt(value);
+      if (!isNaN(numValue) && numValue >= 0) {
+        onUpdate({ restTime: numValue });
+      }
+      // If invalid, keep the display value but don't update the set
+    }
   };
 
   const handleRoundsChange = (value: string) => {
     setRounds(value);
-    const numValue = parseInt(value) || 1;
-    onUpdate({ rounds: numValue });
+    // Allow empty string, but default to 1 for rounds
+    if (value === '' || value === '-') {
+      onUpdate({ rounds: 1 });
+    } else {
+      const numValue = parseInt(value);
+      if (!isNaN(numValue) && numValue >= 1) {
+        onUpdate({ rounds: numValue });
+      }
+      // If invalid, keep the display value but don't update the set
+    }
   };
 
   const handleHeartRateChange = (value: string) => {
@@ -121,9 +160,9 @@ export function HIITSetCard({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const workDurationNum = parseInt(workDuration) || 0;
-  const restDurationNum = parseInt(restDuration) || 0;
-  const roundsNum = parseInt(rounds) || 1;
+  const workDurationNum = workDuration ? parseInt(workDuration) : 0;
+  const restDurationNum = restDuration ? parseInt(restDuration) : 0;
+  const roundsNum = rounds ? parseInt(rounds) : 1;
   const canLogSet = workDurationNum > 0 && roundsNum > 0;
 
   const handleLogSetClick = () => {
@@ -229,7 +268,7 @@ export function HIITSetCard({
             value={workDuration}
             onChange={(e) => handleWorkDurationChange(e.target.value)}
             disabled={disabled}
-            placeholder="0"
+            placeholder=""
             className="rounded-xl bg-white dark:bg-orange-950/50 border-2 border-orange-200 dark:border-orange-800 focus:border-orange-500 dark:focus:border-orange-400 text-center text-3xl font-bold text-orange-900 dark:text-orange-100 h-20 focus:ring-0 transition-all placeholder:text-orange-300 dark:placeholder:text-orange-600"
           />
           {workDurationNum > 0 && (
@@ -254,7 +293,7 @@ export function HIITSetCard({
             value={restDuration}
             onChange={(e) => handleRestDurationChange(e.target.value)}
             disabled={disabled}
-            placeholder="0"
+            placeholder=""
             className="rounded-xl bg-white dark:bg-orange-950/50 border-2 border-orange-200 dark:border-orange-800 focus:border-orange-500 dark:focus:border-orange-400 text-center text-3xl font-bold text-orange-900 dark:text-orange-100 h-20 focus:ring-0 transition-all placeholder:text-orange-300 dark:placeholder:text-orange-600"
           />
           {restDurationNum > 0 && (

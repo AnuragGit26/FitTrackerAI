@@ -39,7 +39,7 @@ export function RecoveryMetricsCard({ metrics }: RecoveryMetricsCardProps) {
             <span className="text-xs text-gray-500 dark:text-gray-400">Sleep Correlation</span>
           </div>
           <p className="text-xl font-bold text-gray-900 dark:text-white">
-            {metrics.correlationWithSleep > 0 
+            {metrics.correlationWithSleep !== null 
               ? metrics.correlationWithSleep.toFixed(2) 
               : 'N/A'}
           </p>

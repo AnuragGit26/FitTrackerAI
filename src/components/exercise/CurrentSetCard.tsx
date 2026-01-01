@@ -41,8 +41,8 @@ export function CurrentSetCard({
   showGroupRestMessage = false,
   exerciseEquipment = [],
 }: CurrentSetCardProps) {
-  const [weight, setWeight] = useState(() => (set.weight ?? 0).toString());
-  const [reps, setReps] = useState(() => (set.reps ?? 0).toString());
+  const [weight, setWeight] = useState(() => (set.weight !== undefined ? set.weight.toString() : ''));
+  const [reps, setReps] = useState(() => (set.reps !== undefined ? set.reps.toString() : ''));
   const [rpe, setRpe] = useState(() => set.rpe ?? 7.5);
   const [isNewSet, setIsNewSet] = useState(false);
   const [showButtonAnimation, setShowButtonAnimation] = useState(false);
@@ -54,8 +54,8 @@ export function CurrentSetCard({
   // Sync local state with prop changes (e.g., when moving to a new set)
   useEffect(() => {
     // Update when set number changes (new set) or when prop values differ from local state
-    const propWeight = (set.weight ?? 0).toString();
-    const propReps = (set.reps ?? 0).toString();
+    const propWeight = set.weight !== undefined ? set.weight.toString() : '';
+    const propReps = set.reps !== undefined ? set.reps.toString() : '';
     
     // Detect new set - trigger animation
     if (setNumber !== previousSetNumberRef.current) {
@@ -83,7 +83,7 @@ export function CurrentSetCard({
   }, [set.setNumber, set.weight, set.reps, set.rpe, setNumber, weight, reps, rpe]);
 
   const weightChangeBadge = calculateWeightChangeBadge(
-    parseFloat(weight) || 0,
+    weight ? parseFloat(weight) : 0,
     previousWeight
   );
 
@@ -117,14 +117,31 @@ export function CurrentSetCard({
 
   const handleWeightChange = (value: string) => {
     setWeight(value);
-    const numValue = parseFloat(value) || 0;
-    onUpdate({ weight: numValue });
+    // Only update if value is valid, otherwise use undefined
+    if (value === '' || value === '-' || value === '.') {
+      onUpdate({ weight: undefined });
+    } else {
+      const numValue = parseFloat(value);
+      if (!isNaN(numValue) && numValue >= 0) {
+        onUpdate({ weight: numValue });
+      }
+      // If invalid, keep the display value but don't update the set
+    }
   };
 
   const handleRepsChange = (value: string) => {
     setReps(value);
-    const numValue = parseInt(value) || 0;
-    onUpdate({ reps: numValue });
+    // Allow empty string for better UX while typing
+    if (value === '' || value === '-') {
+      onUpdate({ reps: undefined });
+      return;
+    }
+    
+    const numValue = parseInt(value);
+    if (!isNaN(numValue) && numValue >= 0) {
+      onUpdate({ reps: numValue });
+    }
+    // If invalid, keep the display value but don't update the set
   };
 
   const handleRpeChange = (value: number) => {
@@ -273,7 +290,7 @@ export function CurrentSetCard({
             <input
               className="w-full rounded-xl bg-slate-100 dark:bg-[#102217] border-2 border-transparent focus:border-primary text-center text-3xl font-bold text-slate-900 dark:text-white h-20 focus:ring-0 transition-all placeholder:text-slate-300 dark:placeholder:text-white/20"
               inputMode="decimal"
-              placeholder="0"
+              placeholder=""
               type="number"
               value={weight}
               onChange={(e) => handleWeightChange(e.target.value)}
@@ -301,7 +318,7 @@ export function CurrentSetCard({
             <input
               className="w-full rounded-xl bg-slate-100 dark:bg-[#102217] border-2 border-transparent focus:border-primary text-center text-3xl font-bold text-slate-900 dark:text-white h-20 focus:ring-0 transition-all placeholder:text-slate-300 dark:placeholder:text-white/20"
               inputMode="numeric"
-              placeholder="0"
+              placeholder=""
               type="number"
               value={reps}
               onChange={(e) => handleRepsChange(e.target.value)}

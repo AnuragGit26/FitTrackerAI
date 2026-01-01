@@ -31,15 +31,19 @@ export function CardioSetCard({
   isLastInSuperset = false,
   showGroupRestMessage = false,
 }: CardioSetCardProps) {
-  const [distance, setDistance] = useState(() => (set.distance ?? 0).toString());
+  const [distance, setDistance] = useState(() => (set.distance !== undefined ? set.distance.toString() : ''));
   const [distanceUnit, setDistanceUnit] = useState<DistanceUnit>(set.distanceUnit || 'km');
   const [timeMinutes, setTimeMinutes] = useState(() => {
-    const totalSeconds = set.time || 0;
-    return Math.floor(totalSeconds / 60).toString();
+    if (set.time !== undefined && set.time > 0) {
+      return Math.floor(set.time / 60).toString();
+    }
+    return '';
   });
   const [timeSeconds, setTimeSeconds] = useState(() => {
-    const totalSeconds = set.time || 0;
-    return (totalSeconds % 60).toString().padStart(2, '0');
+    if (set.time !== undefined && set.time > 0) {
+      return (set.time % 60).toString().padStart(2, '0');
+    }
+    return '';
   });
   const [heartRate, setHeartRate] = useState(() => (set.heartRate || '').toString());
   const [calories, setCalories] = useState(() => (set.calories || '').toString());
@@ -61,8 +65,10 @@ export function CardioSetCard({
   const cardRef = useRef<HTMLDivElement>(null);
 
   // Calculate pace in real-time
-  const totalTimeSeconds = (parseInt(timeMinutes) || 0) * 60 + (parseInt(timeSeconds) || 0);
-  const distanceNum = parseFloat(distance) || 0;
+  const minutesNum = timeMinutes ? parseInt(timeMinutes) : 0;
+  const secondsNum = timeSeconds ? parseInt(timeSeconds) : 0;
+  const totalTimeSeconds = minutesNum * 60 + secondsNum;
+  const distanceNum = distance ? parseFloat(distance) : 0;
   const pace = distanceNum > 0 && totalTimeSeconds > 0 
     ? calculatePace(totalTimeSeconds, distanceNum, distanceUnit)
     : 0;
@@ -155,14 +161,19 @@ export function CardioSetCard({
 
     if (set.distance !== undefined) {
       setDistance(set.distance.toString());
+    } else {
+      setDistance('');
     }
     if (set.distanceUnit) {
       setDistanceUnit(set.distanceUnit);
     }
-    if (set.time !== undefined) {
+    if (set.time !== undefined && set.time > 0) {
       const totalSeconds = set.time;
       setTimeMinutes(Math.floor(totalSeconds / 60).toString());
       setTimeSeconds((totalSeconds % 60).toString().padStart(2, '0'));
+    } else {
+      setTimeMinutes('');
+      setTimeSeconds('');
     }
     if (set.heartRate !== undefined) {
       setHeartRate(set.heartRate.toString());
@@ -179,21 +190,42 @@ export function CardioSetCard({
 
   const handleDistanceChange = (value: string) => {
     setDistance(value);
-    const numValue = parseFloat(value) || 0;
-    onUpdate({ distance: numValue, distanceUnit });
+    // Only update if value is valid, otherwise use undefined
+    if (value === '' || value === '-' || value === '.') {
+      onUpdate({ distance: undefined, distanceUnit });
+    } else {
+      const numValue = parseFloat(value);
+      if (!isNaN(numValue) && numValue >= 0) {
+        onUpdate({ distance: numValue, distanceUnit });
+      }
+      // If invalid, keep the display value but don't update the set
+    }
   };
 
   const handleDistanceUnitChange = (unit: DistanceUnit) => {
     setDistanceUnit(unit);
-    const numValue = parseFloat(distance) || 0;
-    onUpdate({ distance: numValue, distanceUnit: unit });
+    // Only update if distance value is valid
+    if (distance === '' || distance === '-' || distance === '.') {
+      onUpdate({ distance: undefined, distanceUnit: unit });
+    } else {
+      const numValue = parseFloat(distance);
+      if (!isNaN(numValue) && numValue >= 0) {
+        onUpdate({ distance: numValue, distanceUnit: unit });
+      }
+    }
   };
 
   const handleTimeChange = (minutes: string, seconds: string) => {
     setTimeMinutes(minutes);
     setTimeSeconds(seconds);
-    const totalSeconds = (parseInt(minutes) || 0) * 60 + (parseInt(seconds) || 0);
-    onUpdate({ time: totalSeconds });
+    // Only update if at least one value is provided
+    const minutesNum = minutes ? parseInt(minutes) : 0;
+    const secondsNum = seconds ? parseInt(seconds) : 0;
+    const totalSeconds = minutesNum * 60 + secondsNum;
+    
+    if (totalSeconds > 0 || (minutes === '' && seconds === '')) {
+      onUpdate({ time: totalSeconds > 0 ? totalSeconds : undefined });
+    }
   };
 
   const handleHeartRateChange = (value: string) => {
@@ -389,7 +421,7 @@ export function CardioSetCard({
               }}
               onBlur={() => setFocusedInput(null)}
                 disabled={disabled}
-                placeholder="0"
+                placeholder=""
                 className={cn(
                   "flex-1 min-w-0 rounded-xl bg-white dark:bg-blue-950/50 border-2 text-center text-2xl sm:text-3xl font-bold text-blue-900 dark:text-blue-100 h-20 focus:ring-0 transition-all placeholder:text-blue-300 dark:placeholder:text-blue-600 w-full",
                   focusedInput === 'distance'
@@ -495,7 +527,8 @@ export function CardioSetCard({
                 value={timeMinutes}
                 onChange={(e) => {
                   const mins = e.target.value;
-                  if (mins === '' || (parseInt(mins) >= 0 && parseInt(mins) <= 59)) {
+                  // Allow empty string or valid numbers 0-59
+                  if (mins === '' || (!isNaN(parseInt(mins)) && parseInt(mins) >= 0 && parseInt(mins) <= 59)) {
                     handleTimeChange(mins, timeSeconds);
                   }
                 }}
@@ -537,9 +570,15 @@ export function CardioSetCard({
                 max="59"
                 value={timeSeconds}
                 onChange={(e) => {
-                  const secs = e.target.value.padStart(2, '0');
-                  if (secs === '' || (parseInt(secs) >= 0 && parseInt(secs) <= 59)) {
-                    handleTimeChange(timeMinutes, secs);
+                  const value = e.target.value;
+                  // Allow empty string, otherwise pad and validate
+                  if (value === '') {
+                    handleTimeChange(timeMinutes, '');
+                  } else {
+                    const secs = value.padStart(2, '0');
+                    if (!isNaN(parseInt(secs)) && parseInt(secs) >= 0 && parseInt(secs) <= 59) {
+                      handleTimeChange(timeMinutes, secs);
+                    }
                   }
                 }}
                 onFocus={() => {

@@ -42,7 +42,10 @@ export function CaloriesChart({ data }: CaloriesChartProps) {
       </div>
       <div className="w-full aspect-[16/9] min-h-[200px]">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={chartData}>
+          <AreaChart 
+            data={chartData}
+            margin={{ top: 10, right: 10, left: 0, bottom: 20 }}
+          >
             <defs>
               <linearGradient id="caloriesGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.3} />
@@ -55,11 +58,16 @@ export function CaloriesChart({ data }: CaloriesChartProps) {
               stroke="#6b7280"
               style={{ fontSize: '12px' }}
               tick={{ fill: '#9ca3af' }}
+              angle={chartData.length > 7 ? -45 : 0}
+              textAnchor={chartData.length > 7 ? 'end' : 'middle'}
+              height={chartData.length > 7 ? 60 : 30}
             />
             <YAxis
               stroke="#6b7280"
               style={{ fontSize: '12px' }}
               tick={{ fill: '#9ca3af' }}
+              domain={[0, 'dataMax']}
+              allowDecimals={false}
             />
             <Tooltip
               contentStyle={{
@@ -79,16 +87,6 @@ export function CaloriesChart({ data }: CaloriesChartProps) {
             />
           </AreaChart>
         </ResponsiveContainer>
-      </div>
-      <div className="flex justify-between mt-4 text-xs text-gray-400 font-medium px-1">
-        {chartData.map((item, index) => (
-          <span
-            key={index}
-            className={index === chartData.length - 1 ? 'text-amber-500' : ''}
-          >
-            {item.date}
-          </span>
-        ))}
       </div>
     </div>
   );

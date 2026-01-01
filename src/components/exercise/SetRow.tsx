@@ -15,9 +15,9 @@ interface SetRowProps {
 }
 
 export function SetRow({ set, onUpdate, unit, trackingType, distanceUnit = 'km', isActive = false }: SetRowProps) {
-  const [weight, setWeight] = useState(() => (set.weight ?? 0).toString());
-  const [reps, setReps] = useState(() => (set.reps ?? 0).toString());
-  const [distance, setDistance] = useState(() => (set.distance ?? 0).toString());
+  const [weight, setWeight] = useState(() => (set.weight !== undefined ? set.weight.toString() : ''));
+  const [reps, setReps] = useState(() => (set.reps !== undefined ? set.reps.toString() : ''));
+  const [distance, setDistance] = useState(() => (set.distance !== undefined ? set.distance.toString() : ''));
   const [time, setTime] = useState(() => {
     if (set.time) {
       const minutes = Math.floor(set.time / 60);
@@ -40,9 +40,9 @@ export function SetRow({ set, onUpdate, unit, trackingType, distanceUnit = 'km',
   const [isCompleted, setIsCompleted] = useState(() => set.completed);
 
   useEffect(() => {
-    setWeight((set.weight ?? 0).toString());
-    setReps((set.reps ?? 0).toString());
-    setDistance((set.distance ?? 0).toString());
+    setWeight(set.weight !== undefined ? set.weight.toString() : '');
+    setReps(set.reps !== undefined ? set.reps.toString() : '');
+    setDistance(set.distance !== undefined ? set.distance.toString() : '');
     if (set.time) {
       const minutes = Math.floor(set.time / 60);
       const seconds = set.time % 60;
@@ -61,41 +61,56 @@ export function SetRow({ set, onUpdate, unit, trackingType, distanceUnit = 'km',
 
   const handleWeightChange = (value: string) => {
     setWeight(value);
-    const numValue = parseFloat(value) || 0;
-    onUpdate({ weight: numValue });
+    // Only update if value is valid, otherwise use undefined
+    if (value === '' || value === '-' || value === '.') {
+      onUpdate({ weight: undefined });
+    } else {
+      const numValue = parseFloat(value);
+      if (!isNaN(numValue) && numValue >= 0) {
+        onUpdate({ weight: numValue });
+      }
+      // If invalid, keep the display value but don't update the set
+    }
   };
 
   const handleRepsChange = (value: string) => {
+    setReps(value);
     // Allow empty string for better UX while typing
-    if (value === '') {
-      setReps('');
-      onUpdate({ reps: 0 });
+    if (value === '' || value === '-') {
+      onUpdate({ reps: undefined });
       return;
     }
     
-    const numValue = parseInt(value) || 0;
+    const numValue = parseInt(value);
     
     // Validate range: 0-100
-    if (numValue < 0) {
-      return; // Don't update if negative
+    if (isNaN(numValue) || numValue < 0) {
+      // Don't update if invalid or negative, but keep display value
+      return;
     }
     
     if (numValue > 100) {
       // Don't allow values > 100, but show the input for user feedback
-      setReps(value);
       // Still update with max value to trigger validation error
       onUpdate({ reps: numValue });
       return;
     }
     
-    setReps(value);
     onUpdate({ reps: numValue });
   };
 
   const handleDistanceChange = (value: string) => {
     setDistance(value);
-    const numValue = parseFloat(value) || 0;
-    onUpdate({ distance: numValue, distanceUnit });
+    // Only update if value is valid, otherwise use undefined
+    if (value === '' || value === '-' || value === '.') {
+      onUpdate({ distance: undefined, distanceUnit });
+    } else {
+      const numValue = parseFloat(value);
+      if (!isNaN(numValue) && numValue >= 0) {
+        onUpdate({ distance: numValue, distanceUnit });
+      }
+      // If invalid, keep the display value but don't update the set
+    }
   };
 
   const handleTimeChange = (value: string) => {
@@ -224,7 +239,7 @@ export function SetRow({ set, onUpdate, unit, trackingType, distanceUnit = 'km',
               value={weight}
               onChange={(e) => handleWeightChange(e.target.value)}
               disabled={isDisabled}
-              placeholder="0"
+              placeholder=""
               className={inputClassName(isCompleted)}
               aria-label={`Weight in ${unit} for set ${set.setNumber}`}
             />
@@ -326,7 +341,7 @@ export function SetRow({ set, onUpdate, unit, trackingType, distanceUnit = 'km',
               value={distance}
               onChange={(e) => handleDistanceChange(e.target.value)}
               disabled={isDisabled}
-              placeholder="0"
+              placeholder=""
               className={inputClassName(isCompleted)}
             />
             <span className="absolute right-0 top-1/2 -translate-y-1/2 text-xs text-gray-400">

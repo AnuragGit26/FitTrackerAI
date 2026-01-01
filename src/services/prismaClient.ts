@@ -10,14 +10,30 @@ const prismaApiUrl = '/api/prisma/query';
 
 /**
  * Make a request to Prisma API route
+ * @param model - Prisma model name
+ * @param action - Prisma action (findMany, create, etc.)
+ * @param params - Parameters for the Prisma operation
+ * @param accessToken - Optional Auth0 access token for authentication
  */
-async function prismaRequest(model: string, action: string, params: unknown) {
+async function prismaRequest(
+    model: string,
+    action: string,
+    params: unknown,
+    accessToken?: string
+) {
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+    };
+
+    // Add Authorization header if token is provided
+    if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
     try {
         const response = await fetch(prismaApiUrl, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers,
             body: JSON.stringify({ model, action, params }),
         });
 
@@ -89,244 +105,274 @@ async function prismaRequest(model: string, action: string, params: unknown) {
 /**
  * Browser-compatible Prisma Client interface
  * Maps Prisma operations to API route calls
+ * 
+ * Note: All operations require an Auth0 access token for authentication.
+ * Pass the token obtained from useAuth0().getAccessTokenSilently() to methods.
  */
 class BrowserPrismaClient {
+    private accessToken: string | undefined;
+
+    /**
+     * Set the Auth0 access token for all subsequent operations
+     */
+    setAccessToken(token: string | undefined): void {
+        this.accessToken = token;
+    }
+
+    /**
+     * Get the current access token
+     */
+    getAccessToken(): string | undefined {
+        return this.accessToken;
+    }
+
     // Workout operations
     get workout() {
+        const token = this.accessToken;
         return {
-            findMany: async (params?: { where?: unknown; orderBy?: unknown; take?: number; skip?: number }) => {
-                return prismaRequest('workout', 'findMany', params || {});
+            findMany: async (params?: { where?: unknown; orderBy?: unknown; take?: number; skip?: number }, t?: string) => {
+                return prismaRequest('workout', 'findMany', params || {}, t || token);
             },
-            findFirst: async (params?: { where?: unknown }) => {
-                return prismaRequest('workout', 'findFirst', params || {});
+            findFirst: async (params?: { where?: unknown }, t?: string) => {
+                return prismaRequest('workout', 'findFirst', params || {}, t || token);
             },
-            findUnique: async (params: { where: { id: string } }) => {
-                return prismaRequest('workout', 'findUnique', params);
+            findUnique: async (params: { where: { id: string } }, t?: string) => {
+                return prismaRequest('workout', 'findUnique', params, t || token);
             },
-            create: async (params: { data: unknown }) => {
-                return prismaRequest('workout', 'create', params);
+            create: async (params: { data: unknown }, t?: string) => {
+                return prismaRequest('workout', 'create', params, t || token);
             },
-            update: async (params: { where: { id: string }; data: unknown }) => {
-                return prismaRequest('workout', 'update', params);
+            update: async (params: { where: { id: string }; data: unknown }, t?: string) => {
+                return prismaRequest('workout', 'update', params, t || token);
             },
-            upsert: async (params: { where: { id: string }; update: unknown; create: unknown }) => {
-                return prismaRequest('workout', 'upsert', params);
+            upsert: async (params: { where: { id: string }; update: unknown; create: unknown }, t?: string) => {
+                return prismaRequest('workout', 'upsert', params, t || token);
             },
-            delete: async (params: { where: { id: string } }) => {
-                return prismaRequest('workout', 'delete', params);
+            delete: async (params: { where: { id: string } }, t?: string) => {
+                return prismaRequest('workout', 'delete', params, t || token);
             },
         };
     }
 
     // Exercise operations
     get exercise() {
+        const token = this.accessToken;
         return {
-            findMany: async (params?: { where?: unknown; orderBy?: unknown; take?: number; skip?: number }) => {
-                return prismaRequest('exercise', 'findMany', params || {});
+            findMany: async (params?: { where?: unknown; orderBy?: unknown; take?: number; skip?: number }, t?: string) => {
+                return prismaRequest('exercise', 'findMany', params || {}, t || token);
             },
-            findFirst: async (params?: { where?: unknown }) => {
-                return prismaRequest('exercise', 'findFirst', params || {});
+            findFirst: async (params?: { where?: unknown }, t?: string) => {
+                return prismaRequest('exercise', 'findFirst', params || {}, t || token);
             },
-            findUnique: async (params: { where: { exerciseId: string } }) => {
-                return prismaRequest('exercise', 'findUnique', params);
+            findUnique: async (params: { where: { exerciseId: string } }, t?: string) => {
+                return prismaRequest('exercise', 'findUnique', params, t || token);
             },
-            create: async (params: { data: unknown }) => {
-                return prismaRequest('exercise', 'create', params);
+            create: async (params: { data: unknown }, t?: string) => {
+                return prismaRequest('exercise', 'create', params, t || token);
             },
-            update: async (params: { where: { exerciseId: string }; data: unknown }) => {
-                return prismaRequest('exercise', 'update', params);
+            update: async (params: { where: { exerciseId: string }; data: unknown }, t?: string) => {
+                return prismaRequest('exercise', 'update', params, t || token);
             },
-            upsert: async (params: { where: { exerciseId: string }; update: unknown; create: unknown }) => {
-                return prismaRequest('exercise', 'upsert', params);
+            upsert: async (params: { where: { exerciseId: string }; update: unknown; create: unknown }, t?: string) => {
+                return prismaRequest('exercise', 'upsert', params, t || token);
             },
         };
     }
 
     // WorkoutTemplate operations
     get workoutTemplate() {
+        const token = this.accessToken;
         return {
-            findMany: async (params?: { where?: unknown; orderBy?: unknown }) => {
-                return prismaRequest('workoutTemplate', 'findMany', params || {});
+            findMany: async (params?: { where?: unknown; orderBy?: unknown }, t?: string) => {
+                return prismaRequest('workoutTemplate', 'findMany', params || {}, t || token);
             },
-            findFirst: async (params?: { where?: unknown }) => {
-                return prismaRequest('workoutTemplate', 'findFirst', params || {});
+            findFirst: async (params?: { where?: unknown }, t?: string) => {
+                return prismaRequest('workoutTemplate', 'findFirst', params || {}, t || token);
             },
-            create: async (params: { data: unknown }) => {
-                return prismaRequest('workoutTemplate', 'create', params);
+            create: async (params: { data: unknown }, t?: string) => {
+                return prismaRequest('workoutTemplate', 'create', params, t || token);
             },
-            update: async (params: { where: { templateId: string }; data: unknown }) => {
-                return prismaRequest('workoutTemplate', 'update', params);
+            update: async (params: { where: { templateId: string }; data: unknown }, t?: string) => {
+                return prismaRequest('workoutTemplate', 'update', params, t || token);
             },
-            upsert: async (params: { where: { templateId: string }; update: unknown; create: unknown }) => {
-                return prismaRequest('workoutTemplate', 'upsert', params);
+            upsert: async (params: { where: { templateId: string }; update: unknown; create: unknown }, t?: string) => {
+                return prismaRequest('workoutTemplate', 'upsert', params, t || token);
             },
         };
     }
 
     // PlannedWorkout operations
     get plannedWorkout() {
+        const token = this.accessToken;
         return {
-            findMany: async (params?: { where?: unknown; orderBy?: unknown }) => {
-                return prismaRequest('plannedWorkout', 'findMany', params || {});
+            findMany: async (params?: { where?: unknown; orderBy?: unknown }, t?: string) => {
+                return prismaRequest('plannedWorkout', 'findMany', params || {}, t || token);
             },
-            findFirst: async (params?: { where?: unknown }) => {
-                return prismaRequest('plannedWorkout', 'findFirst', params || {});
+            findFirst: async (params?: { where?: unknown }, t?: string) => {
+                return prismaRequest('plannedWorkout', 'findFirst', params || {}, t || token);
             },
-            create: async (params: { data: unknown }) => {
-                return prismaRequest('plannedWorkout', 'create', params);
+            create: async (params: { data: unknown }, t?: string) => {
+                return prismaRequest('plannedWorkout', 'create', params, t || token);
             },
-            update: async (params: { where: { plannedWorkoutId: string }; data: unknown }) => {
-                return prismaRequest('plannedWorkout', 'update', params);
+            update: async (params: { where: { plannedWorkoutId: string }; data: unknown }, t?: string) => {
+                return prismaRequest('plannedWorkout', 'update', params, t || token);
             },
-            upsert: async (params: { where: { plannedWorkoutId: string }; update: unknown; create: unknown }) => {
-                return prismaRequest('plannedWorkout', 'upsert', params);
+            upsert: async (params: { where: { plannedWorkoutId: string }; update: unknown; create: unknown }, t?: string) => {
+                return prismaRequest('plannedWorkout', 'upsert', params, t || token);
             },
         };
     }
 
     // MuscleStatus operations
     get muscleStatus() {
+        const token = this.accessToken;
         return {
-            findMany: async (params?: { where?: unknown; orderBy?: unknown }) => {
-                return prismaRequest('muscleStatus', 'findMany', params || {});
+            findMany: async (params?: { where?: unknown; orderBy?: unknown }, t?: string) => {
+                return prismaRequest('muscleStatus', 'findMany', params || {}, t || token);
             },
-            findFirst: async (params?: { where?: unknown }) => {
-                return prismaRequest('muscleStatus', 'findFirst', params || {});
+            findFirst: async (params?: { where?: unknown }, t?: string) => {
+                return prismaRequest('muscleStatus', 'findFirst', params || {}, t || token);
             },
-            create: async (params: { data: unknown }) => {
-                return prismaRequest('muscleStatus', 'create', params);
+            create: async (params: { data: unknown }, t?: string) => {
+                return prismaRequest('muscleStatus', 'create', params, t || token);
             },
-            update: async (params: { where: { userId_muscle: { userId: string; muscle: string } }; data: unknown }) => {
-                return prismaRequest('muscleStatus', 'update', params);
+            update: async (params: { where: { userId_muscle: { userId: string; muscle: string } }; data: unknown }, t?: string) => {
+                return prismaRequest('muscleStatus', 'update', params, t || token);
             },
-            upsert: async (params: { where: { userId_muscle: { userId: string; muscle: string } }; update: unknown; create: unknown }) => {
-                return prismaRequest('muscleStatus', 'upsert', params);
+            upsert: async (params: { where: { userId_muscle: { userId: string; muscle: string } }; update: unknown; create: unknown }, t?: string) => {
+                return prismaRequest('muscleStatus', 'upsert', params, t || token);
             },
         };
     }
 
     // UserProfile operations
     get userProfile() {
+        const token = this.accessToken;
         return {
-            findMany: async (params?: { where?: unknown }) => {
-                return prismaRequest('userProfile', 'findMany', params || {});
+            findMany: async (params?: { where?: unknown }, t?: string) => {
+                return prismaRequest('userProfile', 'findMany', params || {}, t || token);
             },
-            findFirst: async (params?: { where?: unknown }) => {
-                return prismaRequest('userProfile', 'findFirst', params || {});
+            findFirst: async (params?: { where?: unknown }, t?: string) => {
+                return prismaRequest('userProfile', 'findFirst', params || {}, t || token);
             },
-            create: async (params: { data: unknown }) => {
-                return prismaRequest('userProfile', 'create', params);
+            create: async (params: { data: unknown }, t?: string) => {
+                return prismaRequest('userProfile', 'create', params, t || token);
             },
-            update: async (params: { where: { userId: string }; data: unknown }) => {
-                return prismaRequest('userProfile', 'update', params);
+            update: async (params: { where: { userId: string }; data: unknown }, t?: string) => {
+                return prismaRequest('userProfile', 'update', params, t || token);
             },
-            upsert: async (params: { where: { userId: string }; update: unknown; create: unknown }) => {
-                return prismaRequest('userProfile', 'upsert', params);
+            upsert: async (params: { where: { userId: string }; update: unknown; create: unknown }, t?: string) => {
+                return prismaRequest('userProfile', 'upsert', params, t || token);
             },
         };
     }
 
     // Setting operations
     get setting() {
+        const token = this.accessToken;
         return {
-            findMany: async (params?: { where?: unknown; orderBy?: unknown }) => {
-                return prismaRequest('setting', 'findMany', params || {});
+            findMany: async (params?: { where?: unknown; orderBy?: unknown }, t?: string) => {
+                return prismaRequest('setting', 'findMany', params || {}, t || token);
             },
-            findFirst: async (params?: { where?: unknown }) => {
-                return prismaRequest('setting', 'findFirst', params || {});
+            findFirst: async (params?: { where?: unknown }, t?: string) => {
+                return prismaRequest('setting', 'findFirst', params || {}, t || token);
             },
-            create: async (params: { data: unknown }) => {
-                return prismaRequest('setting', 'create', params);
+            create: async (params: { data: unknown }, t?: string) => {
+                return prismaRequest('setting', 'create', params, t || token);
             },
-            update: async (params: { where: { userId_key: { userId: string; key: string } }; data: unknown }) => {
-                return prismaRequest('setting', 'update', params);
+            update: async (params: { where: { userId_key: { userId: string; key: string } }; data: unknown }, t?: string) => {
+                return prismaRequest('setting', 'update', params, t || token);
             },
-            upsert: async (params: { where: { userId_key: { userId: string; key: string } }; update: unknown; create: unknown }) => {
-                return prismaRequest('setting', 'upsert', params);
+            upsert: async (params: { where: { userId_key: { userId: string; key: string } }; update: unknown; create: unknown }, t?: string) => {
+                return prismaRequest('setting', 'upsert', params, t || token);
             },
         };
     }
 
     // Notification operations
     get notification() {
+        const token = this.accessToken;
         return {
-            findMany: async (params?: { where?: unknown; orderBy?: unknown }) => {
-                return prismaRequest('notification', 'findMany', params || {});
+            findMany: async (params?: { where?: unknown; orderBy?: unknown }, t?: string) => {
+                return prismaRequest('notification', 'findMany', params || {}, t || token);
             },
-            findFirst: async (params?: { where?: unknown }) => {
-                return prismaRequest('notification', 'findFirst', params || {});
+            findFirst: async (params?: { where?: unknown }, t?: string) => {
+                return prismaRequest('notification', 'findFirst', params || {}, t || token);
             },
-            create: async (params: { data: unknown }) => {
-                return prismaRequest('notification', 'create', params);
+            create: async (params: { data: unknown }, t?: string) => {
+                return prismaRequest('notification', 'create', params, t || token);
             },
-            update: async (params: { where: { notificationId: string }; data: unknown }) => {
-                return prismaRequest('notification', 'update', params);
+            update: async (params: { where: { notificationId: string }; data: unknown }, t?: string) => {
+                return prismaRequest('notification', 'update', params, t || token);
             },
-            upsert: async (params: { where: { notificationId: string }; update: unknown; create: unknown }) => {
-                return prismaRequest('notification', 'upsert', params);
+            upsert: async (params: { where: { notificationId: string }; update: unknown; create: unknown }, t?: string) => {
+                return prismaRequest('notification', 'upsert', params, t || token);
             },
         };
     }
 
     // SleepLog operations
     get sleepLog() {
+        const token = this.accessToken;
         return {
-            findMany: async (params?: { where?: unknown; orderBy?: unknown }) => {
-                return prismaRequest('sleepLog', 'findMany', params || {});
+            findMany: async (params?: { where?: unknown; orderBy?: unknown }, t?: string) => {
+                return prismaRequest('sleepLog', 'findMany', params || {}, t || token);
             },
-            findFirst: async (params?: { where?: unknown }) => {
-                return prismaRequest('sleepLog', 'findFirst', params || {});
+            findFirst: async (params?: { where?: unknown }, t?: string) => {
+                return prismaRequest('sleepLog', 'findFirst', params || {}, t || token);
             },
-            create: async (params: { data: unknown }) => {
-                return prismaRequest('sleepLog', 'create', params);
+            create: async (params: { data: unknown }, t?: string) => {
+                return prismaRequest('sleepLog', 'create', params, t || token);
             },
-            update: async (params: { where: { userId_date: { userId: string; date: Date } }; data: unknown }) => {
-                return prismaRequest('sleepLog', 'update', params);
+            update: async (params: { where: { userId_date: { userId: string; date: Date } }; data: unknown }, t?: string) => {
+                return prismaRequest('sleepLog', 'update', params, t || token);
             },
-            upsert: async (params: { where: { userId_date: { userId: string; date: Date } }; update: unknown; create: unknown }) => {
-                return prismaRequest('sleepLog', 'upsert', params);
+            upsert: async (params: { where: { userId_date: { userId: string; date: Date } }; update: unknown; create: unknown }, t?: string) => {
+                return prismaRequest('sleepLog', 'upsert', params, t || token);
             },
         };
     }
 
     // RecoveryLog operations
     get recoveryLog() {
+        const token = this.accessToken;
         return {
-            findMany: async (params?: { where?: unknown; orderBy?: unknown }) => {
-                return prismaRequest('recoveryLog', 'findMany', params || {});
+            findMany: async (params?: { where?: unknown; orderBy?: unknown }, t?: string) => {
+                return prismaRequest('recoveryLog', 'findMany', params || {}, t || token);
             },
-            findFirst: async (params?: { where?: unknown }) => {
-                return prismaRequest('recoveryLog', 'findFirst', params || {});
+            findFirst: async (params?: { where?: unknown }, t?: string) => {
+                return prismaRequest('recoveryLog', 'findFirst', params || {}, t || token);
             },
-            create: async (params: { data: unknown }) => {
-                return prismaRequest('recoveryLog', 'create', params);
+            create: async (params: { data: unknown }, t?: string) => {
+                return prismaRequest('recoveryLog', 'create', params, t || token);
             },
-            update: async (params: { where: { userId_date: { userId: string; date: Date } }; data: unknown }) => {
-                return prismaRequest('recoveryLog', 'update', params);
+            update: async (params: { where: { userId_date: { userId: string; date: Date } }; data: unknown }, t?: string) => {
+                return prismaRequest('recoveryLog', 'update', params, t || token);
             },
-            upsert: async (params: { where: { userId_date: { userId: string; date: Date } }; update: unknown; create: unknown }) => {
-                return prismaRequest('recoveryLog', 'upsert', params);
+            upsert: async (params: { where: { userId_date: { userId: string; date: Date } }; update: unknown; create: unknown }, t?: string) => {
+                return prismaRequest('recoveryLog', 'upsert', params, t || token);
             },
         };
     }
 
     // ErrorLog operations
     get errorLog() {
+        const token = this.accessToken;
         return {
-            findMany: async (params?: { where?: unknown; orderBy?: unknown }) => {
-                return prismaRequest('errorLog', 'findMany', params || {});
+            findMany: async (params?: { where?: unknown; orderBy?: unknown }, t?: string) => {
+                return prismaRequest('errorLog', 'findMany', params || {}, t || token);
             },
-            findFirst: async (params?: { where?: unknown }) => {
-                return prismaRequest('errorLog', 'findFirst', params || {});
+            findFirst: async (params?: { where?: unknown }, t?: string) => {
+                return prismaRequest('errorLog', 'findFirst', params || {}, t || token);
             },
-            create: async (params: { data: unknown }) => {
-                return prismaRequest('errorLog', 'create', params);
+            create: async (params: { data: unknown }, t?: string) => {
+                return prismaRequest('errorLog', 'create', params, t || token);
             },
-            update: async (params: { where: { id: string }; data: unknown }) => {
-                return prismaRequest('errorLog', 'update', params);
+            update: async (params: { where: { id: string }; data: unknown }, t?: string) => {
+                return prismaRequest('errorLog', 'update', params, t || token);
             },
-            upsert: async (params: { where: { id: string }; update: unknown; create: unknown }) => {
-                return prismaRequest('errorLog', 'upsert', params);
+            upsert: async (params: { where: { id: string }; update: unknown; create: unknown }, t?: string) => {
+                return prismaRequest('errorLog', 'upsert', params, t || token);
             },
         };
     }
