@@ -171,7 +171,7 @@ class TemplateService {
 
             let sets: WorkoutSet[];
             
-            if (hasSetData && templateExercise.setData.length === templateExercise.sets) {
+            if (hasSetData && templateExercise.setData && templateExercise.setData.length === templateExercise.sets) {
                 // Use preserved set data from original workout
                 sets = templateExercise.setData.map((setData, i) => ({
                     setNumber: i + 1,

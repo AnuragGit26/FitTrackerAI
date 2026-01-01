@@ -113,9 +113,9 @@ export const supersetService = {
         return {
           ...exercise,
           groupOrder: index,
-        };
+        } as WorkoutExercise;
       })
-      .filter((ex): ex is WorkoutExercise => ex !== null);
+      .filter((ex): ex is WorkoutExercise => ex !== null && ex !== undefined);
 
     return {
       ...group,
