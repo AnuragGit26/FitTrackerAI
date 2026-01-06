@@ -134,7 +134,8 @@ function countWorkoutsInWindow(workoutDates: Date[], windowStart: Date, windowEn
 
 /**
  * Validate that the current workout is part of a 7-day window with at least 3 workouts
- * Checks if there are at least 2 other workouts within 7 days (before or after) of the current workout
+ * Checks all possible 7-day windows that contain the current workout
+ * A 7-day window containing workout at time T can start anywhere from T-6days to T
  */
 function validateRollingWindows(
   allWorkoutDates: Date[],
@@ -142,14 +143,26 @@ function validateRollingWindows(
   minWorkoutsPerWindow: number = 3
 ): boolean {
   const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+  const oneDayMs = 24 * 60 * 60 * 1000;
   const currentTime = currentWorkoutDate.getTime();
-  const windowStart = new Date(currentTime - sevenDaysMs);
-  const windowEnd = new Date(currentTime + sevenDaysMs);
   
-  // Count workouts within the 7-day window (including the current workout)
-  const workoutsInWindow = countWorkoutsInWindow(allWorkoutDates, windowStart, windowEnd);
+  // Check all possible 7-day windows that contain the current workout
+  // A window can start from 6 days before the workout up to the workout time itself
+  for (let daysBefore = 0; daysBefore <= 6; daysBefore++) {
+    const windowStart = new Date(currentTime - daysBefore * oneDayMs);
+    const windowEnd = new Date(windowStart.getTime() + sevenDaysMs);
+    
+    // Count workouts within this 7-day window (including the current workout)
+    const workoutsInWindow = countWorkoutsInWindow(allWorkoutDates, windowStart, windowEnd);
+    
+    if (workoutsInWindow >= minWorkoutsPerWindow) {
+      // Found at least one valid 7-day window
+      return true;
+    }
+  }
   
-  return workoutsInWindow >= minWorkoutsPerWindow;
+  // No valid 7-day window found
+  return false;
 }
 
 /**
@@ -182,11 +195,7 @@ export function calculateStreak(workoutDates: Date[]): number {
     if (i === 0) {
       // Check if this workout can be part of a valid streak
       // We need to verify it can form a 7-day window with at least 3 workouts
-      const sevenDaysAgo = new Date(currentWorkout.getTime() - 7 * 24 * 60 * 60 * 1000);
-      const sevenDaysLater = new Date(currentWorkout.getTime() + 7 * 24 * 60 * 60 * 1000);
-      const workoutsInWindow = countWorkoutsInWindow(sortedDates, sevenDaysAgo, sevenDaysLater);
-      
-      if (workoutsInWindow >= 3) {
+      if (validateRollingWindows(sortedDates, currentWorkout, 3)) {
         streakWorkouts.push(currentWorkout);
       } else {
         // Can't form a valid streak starting from here
