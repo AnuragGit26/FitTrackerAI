@@ -87,10 +87,12 @@ export function StatsCarousel() {
               {profile?.preferredUnit || 'kg'}
             </span>
           </p>
-          <div className="flex items-center gap-1 bg-primary/10 w-fit px-1.5 py-0.5 rounded text-primary text-xs font-bold">
-            <TrendingUp className="w-3.5 h-3.5" />
-            <span>{volumeChange > 0 ? '+' : ''}{Math.round(volumeChange)}%</span>
-          </div>
+          {volumeChange !== 0 && (
+            <div className="flex items-center gap-1 bg-primary/10 w-fit px-1.5 py-0.5 rounded text-primary text-xs font-bold">
+              <TrendingUp className="w-3.5 h-3.5" />
+              <span>{volumeChange > 0 ? '+' : ''}{Math.round(volumeChange)}%</span>
+            </div>
+          )}
         </motion.div>
 
         {/* Streak Card */}
@@ -125,10 +127,12 @@ export function StatsCarousel() {
           <p className="text-slate-900 dark:text-white text-2xl font-bold tracking-tight">
             {energyCount.formattedValue} <span className="text-sm font-normal text-gray-400">kcal</span>
           </p>
-          <div className="flex items-center gap-1 bg-primary/10 w-fit px-1.5 py-0.5 rounded text-primary text-xs font-bold">
-            <TrendingUp className="w-3.5 h-3.5" />
-            <span>{energyChange > 0 ? '+' : ''}{Math.round(energyChange)}%</span>
-          </div>
+          {energyChange !== 0 && (
+            <div className="flex items-center gap-1 bg-primary/10 w-fit px-1.5 py-0.5 rounded text-primary text-xs font-bold">
+              <TrendingUp className="w-3.5 h-3.5" />
+              <span>{energyChange > 0 ? '+' : ''}{Math.round(energyChange)}%</span>
+            </div>
+          )}
         </motion.div>
       </motion.div>
     </div>

@@ -47,7 +47,7 @@ export function SessionAnalysisCard({ comparison }: SessionAnalysisCardProps) {
             <span className="text-xl font-bold text-slate-900 dark:text-white">
               {formatDuration(comparison.duration.current)}
             </span>
-            {comparison.duration.change !== undefined && (
+            {comparison.duration.change !== undefined && comparison.duration.change !== 0 && (
               <span
                 className={`text-xs font-bold flex items-center ${getChangeColor(
                   comparison.duration.change
@@ -79,7 +79,7 @@ export function SessionAnalysisCard({ comparison }: SessionAnalysisCardProps) {
             <span className="text-xl font-bold text-slate-900 dark:text-white">
               {formatVolume(comparison.volume.current)}
             </span>
-            {comparison.volume.changePercent !== undefined && (
+            {comparison.volume.changePercent !== undefined && comparison.volume.changePercent !== 0 && (
               <span
                 className={`text-xs font-bold flex items-center ${getChangeColor(
                   comparison.volume.changePercent

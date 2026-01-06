@@ -1,8 +1,14 @@
 import { PrismaClient } from '@prisma/client';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
+// Set DATABASE_URL from ORM_PRISMA_DATABASE_URL if needed
+// PrismaClient reads DATABASE_URL from process.env automatically
+if (process.env.ORM_PRISMA_DATABASE_URL && !process.env.DATABASE_URL) {
+    process.env.DATABASE_URL = process.env.ORM_PRISMA_DATABASE_URL;
+}
+
 const prisma = new PrismaClient({
-    accelerateUrl: process.env.ORM_PRISMA_DATABASE_URL,
+    log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
 });
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

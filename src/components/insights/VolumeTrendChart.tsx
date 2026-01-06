@@ -42,10 +42,12 @@ export function VolumeTrendChart({
         <div>
           <p className="text-slate-500 dark:text-secondary-text text-sm font-medium">Volume vs Last Month</p>
           <div className="flex items-baseline gap-2">
-            <p className="text-slate-900 dark:text-white text-3xl font-bold">
-              {changePercent >= 0 ? '+' : ''}
-              {changePercent.toFixed(0)}%
-            </p>
+            {changePercent !== 0 && (
+              <p className="text-slate-900 dark:text-white text-3xl font-bold">
+                {changePercent >= 0 ? '+' : ''}
+                {changePercent.toFixed(0)}%
+              </p>
+            )}
             <span className="flex items-center text-green-600 dark:text-primary text-sm font-bold">
               <TrendingUp className="w-4 h-4" />
               {Math.round(currentVolume / 1000)}k lbs

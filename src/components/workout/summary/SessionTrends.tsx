@@ -107,11 +107,11 @@ export function SessionTrends({ trends }: SessionTrendsProps) {
                 </svg>
               </div>
               <div className="flex flex-col items-end gap-0.5 min-w-[50px]">
-                <span className={`${getTrendColor(trend.trend)} font-bold text-sm`}>
-                  {trend.changePercent !== undefined
-                    ? `${trend.changePercent > 0 ? '+' : ''}${Math.round(trend.changePercent)}%`
-                    : '0%'}
-                </span>
+                {trend.changePercent !== undefined && trend.changePercent !== 0 && (
+                  <span className={`${getTrendColor(trend.trend)} font-bold text-sm`}>
+                    {trend.changePercent > 0 ? '+' : ''}{Math.round(trend.changePercent)}%
+                  </span>
+                )}
                 <span
                   className={`material-symbols-outlined ${getTrendColor(trend.trend)} text-xs ${
                     trend.trend === 'increasing' ? 'rotate-[-45deg]' : ''

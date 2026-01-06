@@ -183,7 +183,7 @@ export function WorkoutHistory() {
                       </h3>
                     )}
                     <p className="text-slate-500 dark:text-gray-400 text-sm">
-                      {formatWorkoutDate(workout.date)} • {formatWorkoutTime(workout.date)}
+                      {formatWorkoutDate(workout.date)} • {formatWorkoutTime(workout.startTime || workout.date)}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">

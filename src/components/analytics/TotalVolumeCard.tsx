@@ -53,13 +53,15 @@ export function TotalVolumeCard({ totalVolume, trendPercentage, unit }: TotalVol
         <span className="text-3xl font-bold tracking-tight">{volumeCount.formattedValue}</span>
         <span className="text-sm font-medium text-gray-400">{unit}</span>
       </div>
-      <div className="relative z-10 flex items-center gap-1 mt-2 text-primary text-sm font-bold bg-primary/10 w-fit px-2 py-0.5 rounded-md">
-        <TrendingUp className="w-4 h-4" />
-        <span>
-          {trendPercentage > 0 ? '+' : ''}
-          {trendPercentage}% vs last month
-        </span>
-      </div>
+      {trendPercentage !== 0 && (
+        <div className="relative z-10 flex items-center gap-1 mt-2 text-primary text-sm font-bold bg-primary/10 w-fit px-2 py-0.5 rounded-md">
+          <TrendingUp className="w-4 h-4" />
+          <span>
+            {trendPercentage > 0 ? '+' : ''}
+            {trendPercentage}% vs last month
+          </span>
+        </div>
+      )}
     </motion.div>
   );
 }

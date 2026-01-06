@@ -22,16 +22,18 @@ export function PerformanceTrendsCards({
             <div className="p-1.5 rounded bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400">
               <Calendar className="w-5 h-5" />
             </div>
-            <span
-              className={`text-xs font-bold px-1.5 py-0.5 rounded ${
-                consistencyChange >= 0
-                  ? 'bg-green-100 dark:bg-[#0bda43]/20 text-green-700 dark:text-[#0bda43]'
-                  : 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400'
-              }`}
-            >
-              {consistencyChange >= 0 ? '+' : ''}
-              {consistencyChange}%
-            </span>
+            {consistencyChange !== 0 && (
+              <span
+                className={`text-xs font-bold px-1.5 py-0.5 rounded ${
+                  consistencyChange >= 0
+                    ? 'bg-green-100 dark:bg-[#0bda43]/20 text-green-700 dark:text-[#0bda43]'
+                    : 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400'
+                }`}
+              >
+                {consistencyChange >= 0 ? '+' : ''}
+                {consistencyChange}%
+              </span>
+            )}
           </div>
           <div>
             <p className="text-slate-500 dark:text-secondary-text text-xs font-medium uppercase tracking-wider">
@@ -46,16 +48,18 @@ export function PerformanceTrendsCards({
             <div className="p-1.5 rounded bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400">
               <Dumbbell className="w-5 h-5" />
             </div>
-            <span
-              className={`text-xs font-bold px-1.5 py-0.5 rounded ${
-                workoutCountChange >= 0
-                  ? 'bg-green-100 dark:bg-[#0bda43]/20 text-green-700 dark:text-[#0bda43]'
-                  : 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400'
-              }`}
-            >
-              {workoutCountChange >= 0 ? '+' : ''}
-              {workoutCountChange}
-            </span>
+            {workoutCountChange !== 0 && (
+              <span
+                className={`text-xs font-bold px-1.5 py-0.5 rounded ${
+                  workoutCountChange >= 0
+                    ? 'bg-green-100 dark:bg-[#0bda43]/20 text-green-700 dark:text-[#0bda43]'
+                    : 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400'
+                }`}
+              >
+                {workoutCountChange >= 0 ? '+' : ''}
+                {workoutCountChange}
+              </span>
+            )}
           </div>
           <div>
             <p className="text-slate-500 dark:text-secondary-text text-xs font-medium uppercase tracking-wider">
