@@ -16,12 +16,172 @@ import {
   ImportPreview,
   ExportStats,
   ImportResult,
+  ImportError,
+  ValidationResult,
   ProgressCallback,
 } from '@/types/export';
 import { logger } from '@/utils/logger';
+import { AppError } from '@/utils/errorHandler';
 
 const EXPORT_VERSION = '2.0.0';
 const APP_VERSION = '1.0.0';
+
+/**
+ * Get user-friendly error message for import errors
+ */
+function getUserFriendlyImportErrorMessage(error: unknown): string {
+  if (error instanceof AppError) {
+    return error.message;
+  }
+
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+    
+    // Network errors
+    if (message.includes('network') || message.includes('fetch') || message.includes('connection')) {
+      return 'Network error. Please check your internet connection and try again.';
+    }
+    
+    // Timeout errors
+    if (message.includes('timeout')) {
+      return 'Request timed out. Please try again.';
+    }
+    
+    // Database errors
+    if (message.includes('database') || message.includes('indexeddb') || message.includes('quota')) {
+      return 'Storage error. Please free up some space and try again.';
+    }
+    
+    // Validation errors
+    if (message.includes('invalid') || message.includes('validation') || message.includes('required')) {
+      return error.message;
+    }
+    
+    // Return the error message if it's user-friendly (short and clear)
+    if (error.message.length < 150 && !error.message.includes('Error:') && !error.message.includes('at ')) {
+      return error.message;
+    }
+  }
+
+  return 'An unexpected error occurred. Please try again or contact support if the problem persists.';
+}
+
+/**
+ * Create a structured import error with user-friendly message and context
+ */
+function createImportError(
+  type: ImportError['type'],
+  category: string,
+  error: unknown,
+  context?: {
+    recordId?: string;
+    recordName?: string;
+    field?: string;
+    expected?: string;
+    actual?: string;
+  }
+): ImportError {
+  const baseMessage = getUserFriendlyImportErrorMessage(error);
+  const technicalMessage = error instanceof Error ? error.message : String(error);
+  
+  // Category-specific messages
+  let userMessage = '';
+  let suggestion = '';
+  let severity: ImportError['severity'] = type === 'validation' ? 'warning' : 'error';
+  
+  switch (category) {
+    case 'workout':
+      if (type === 'validation') {
+        userMessage = `Workout on ${context?.recordName || 'unknown date'} has invalid data`;
+        suggestion = context?.field 
+          ? `Please check the ${context.field} field in the workout data`
+          : 'Please check the workout date and exercise data';
+      } else if (type === 'data') {
+        userMessage = `Failed to import workout from ${context?.recordName || 'unknown date'}`;
+        suggestion = 'The workout data may be corrupted. Try exporting again or contact support.';
+      } else {
+        userMessage = `Error importing workout: ${baseMessage}`;
+        suggestion = 'Please check the workout data format and try again.';
+      }
+      break;
+      
+    case 'template':
+      userMessage = `Template "${context?.recordName || 'Unknown'}" could not be imported`;
+      if (type === 'validation') {
+        suggestion = 'Please check the template structure and exercise references';
+      } else {
+        suggestion = 'Check if the template name already exists or if exercise references are valid';
+      }
+      break;
+      
+    case 'exercise':
+      userMessage = `Custom exercise "${context?.recordName || 'Unknown'}" could not be imported`;
+      suggestion = 'The exercise data may be incomplete or corrupted. Check the exercise details.';
+      break;
+      
+    case 'plannedWorkout':
+      userMessage = `Planned workout for ${context?.recordName || 'unknown date'} could not be imported`;
+      suggestion = 'Check if a planned workout already exists for this date or if the template reference is valid.';
+      break;
+      
+    case 'muscleStatus':
+      userMessage = `Muscle status for ${context?.recordName || 'unknown muscle'} could not be imported`;
+      suggestion = 'The muscle status data may be invalid. This will be recalculated from your workouts.';
+      severity = 'warning';
+      break;
+      
+    case 'sleepLog':
+      userMessage = `Sleep log for ${context?.recordName || 'unknown date'} could not be imported`;
+      suggestion = 'Please check the sleep log date and duration values.';
+      break;
+      
+    case 'recoveryLog':
+      userMessage = `Recovery log for ${context?.recordName || 'unknown date'} could not be imported`;
+      suggestion = 'Please check the recovery log date and values.';
+      break;
+      
+    case 'userProfile':
+      userMessage = 'User profile could not be imported';
+      suggestion = 'Your profile settings may be incomplete. You can update them manually in settings.';
+      break;
+      
+    case 'settings':
+      userMessage = 'Settings could not be imported';
+      suggestion = 'Some app settings may not have been imported. You can reconfigure them in settings.';
+      severity = 'warning';
+      break;
+      
+    case 'file':
+      userMessage = baseMessage;
+      if (type === 'validation') {
+        suggestion = 'Please export your data using the latest version of the app';
+      } else {
+        suggestion = 'Please ensure the file is not corrupted and try again.';
+      }
+      break;
+      
+    case 'sync':
+      userMessage = 'Data sync failed after import';
+      suggestion = 'Your data has been saved locally. It will sync automatically when you have internet connection.';
+      severity = 'warning';
+      break;
+      
+    default:
+      userMessage = baseMessage;
+      suggestion = 'Please try again or contact support if the problem persists.';
+  }
+  
+  return {
+    type,
+    category,
+    message: userMessage || baseMessage,
+    technicalMessage,
+    recordId: context?.recordId,
+    recordName: context?.recordName,
+    suggestion,
+    severity,
+  };
+}
 
 export const dataExport = {
   /**
@@ -439,6 +599,194 @@ export const dataExport = {
   },
 
   /**
+   * Validate import data before starting import process
+   */
+  async validateImportData(data: ExportData): Promise<ValidationResult> {
+    const errors: ImportError[] = [];
+    const warnings: ImportError[] = [];
+    
+    // Version check
+    if (!data.version) {
+      errors.push(createImportError(
+        'validation',
+        'file',
+        new Error('Missing version field'),
+        { recordName: 'Export file' }
+      ));
+    } else if (!data.version.startsWith('2.') && !data.version.startsWith('1.')) {
+      errors.push(createImportError(
+        'validation',
+        'file',
+        new Error(`Unsupported version: ${data.version}`),
+        { 
+          recordName: 'Export file',
+          expected: 'Version 2.0.0 or 1.x',
+          actual: data.version
+        }
+      ));
+    }
+    
+    // Validate export date
+    if (!data.exportDate) {
+      warnings.push(createImportError(
+        'validation',
+        'file',
+        new Error('Missing export date'),
+        { recordName: 'Export file' }
+      ));
+    }
+    
+    // Validate workouts
+    if (Array.isArray(data.workouts)) {
+      data.workouts.forEach((workout, index) => {
+        if (!workout.date) {
+          errors.push(createImportError(
+            'validation',
+            'workout',
+            new Error('Missing workout date'),
+            {
+              recordId: workout.id?.toString(),
+              recordName: `Workout #${index + 1}`,
+              field: 'date'
+            }
+          ));
+        } else {
+          // Validate date format
+          const date = new Date(workout.date);
+          if (isNaN(date.getTime())) {
+            errors.push(createImportError(
+              'validation',
+              'workout',
+              new Error(`Invalid date format: ${workout.date}`),
+              {
+                recordId: workout.id?.toString(),
+                recordName: `Workout #${index + 1}`,
+                field: 'date',
+                actual: typeof workout.date === 'string' ? workout.date : String(workout.date)
+              }
+            ));
+          }
+        }
+        
+        if (!Array.isArray(workout.exercises)) {
+          errors.push(createImportError(
+            'validation',
+            'workout',
+            new Error('Missing or invalid exercises array'),
+            {
+              recordId: workout.id?.toString(),
+              recordName: `Workout #${index + 1}`,
+              field: 'exercises'
+            }
+          ));
+        }
+      });
+    }
+    
+    // Validate templates
+    if (Array.isArray(data.templates)) {
+      data.templates.forEach((template, index) => {
+        if (!template.name) {
+          errors.push(createImportError(
+            'validation',
+            'template',
+            new Error('Missing template name'),
+            {
+              recordId: template.id,
+              recordName: `Template #${index + 1}`,
+              field: 'name'
+            }
+          ));
+        }
+        
+        if (!Array.isArray(template.exercises)) {
+          warnings.push(createImportError(
+            'validation',
+            'template',
+            new Error('Missing or invalid exercises array'),
+            {
+              recordId: template.id,
+              recordName: template.name || `Template #${index + 1}`,
+              field: 'exercises'
+            }
+          ));
+        }
+      });
+    }
+    
+    // Validate planned workouts
+    if (Array.isArray(data.plannedWorkouts)) {
+      data.plannedWorkouts.forEach((plannedWorkout, index) => {
+        if (!plannedWorkout.scheduledDate) {
+          errors.push(createImportError(
+            'validation',
+            'plannedWorkout',
+            new Error('Missing scheduled date'),
+            {
+              recordId: plannedWorkout.id,
+              recordName: `Planned workout #${index + 1}`,
+              field: 'scheduledDate'
+            }
+          ));
+        } else {
+          const date = new Date(plannedWorkout.scheduledDate);
+          if (isNaN(date.getTime())) {
+            errors.push(createImportError(
+              'validation',
+              'plannedWorkout',
+              new Error(`Invalid scheduled date format: ${plannedWorkout.scheduledDate}`),
+              {
+                recordId: plannedWorkout.id,
+                recordName: `Planned workout #${index + 1}`,
+                field: 'scheduledDate',
+                actual: String(plannedWorkout.scheduledDate)
+              }
+            ));
+          }
+        }
+      });
+    }
+    
+    // Validate sleep logs
+    if (Array.isArray(data.sleepLogs)) {
+      data.sleepLogs.forEach((log, index) => {
+        if (!log.date) {
+          errors.push(createImportError(
+            'validation',
+            'sleepLog',
+            new Error('Missing sleep log date'),
+            {
+              recordId: log.id?.toString(),
+              recordName: `Sleep log #${index + 1}`,
+              field: 'date'
+            }
+          ));
+        }
+      });
+    }
+    
+    // Validate recovery logs
+    if (Array.isArray(data.recoveryLogs)) {
+      data.recoveryLogs.forEach((log, index) => {
+        if (!log.date) {
+          errors.push(createImportError(
+            'validation',
+            'recoveryLog',
+            new Error('Missing recovery log date'),
+            {
+              recordId: log.id?.toString(),
+              recordName: `Recovery log #${index + 1}`,
+              field: 'date'
+            }
+          ));
+        }
+      });
+    }
+    
+    return { errors, warnings, isValid: errors.length === 0 };
+  },
+
+  /**
    * Import all data from JSON with merge or replace strategy
    */
   async importAllData(
@@ -466,9 +814,27 @@ export const dataExport = {
         },
       };
 
-      // Validate version
-      if (!data.version) {
-        throw new Error('Invalid export file: missing version');
+      // Pre-import validation
+      const totalSteps = 10; // 9 import steps + 1 sync step
+      onProgress?.({
+        percentage: 2,
+        currentOperation: 'Validating import data...',
+        completedItems: 0,
+        totalItems: totalSteps,
+      });
+      
+      const validation = await this.validateImportData(data);
+      
+      // Add validation errors and warnings to result
+      result.errors.push(...validation.errors);
+      result.errors.push(...validation.warnings);
+      
+      // If there are critical validation errors, we can still proceed but log them
+      if (validation.errors.length > 0) {
+        logger.warn('Import validation found errors', {
+          errorCount: validation.errors.length,
+          warningCount: validation.warnings.length,
+        });
       }
 
       // If replace strategy, clear existing data first
@@ -477,12 +843,11 @@ export const dataExport = {
           percentage: 5,
           currentOperation: 'Clearing existing data...',
           completedItems: 0,
-          totalItems: 9,
+          totalItems: totalSteps,
         });
         await this.clearUserData(userId);
       }
 
-      const totalSteps = 9;
       let currentStep = strategy === 'replace' ? 1 : 0;
 
       // 1. Import User Profile
@@ -511,12 +876,22 @@ export const dataExport = {
             result.imported++;
           }
         } catch (error) {
-          result.errors.push({
-            type: 'userProfile',
-            message: `Failed to import user profile: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          const importError = createImportError(
+            'data',
+            'userProfile',
+            error,
+            {
+              recordName: data.userProfile?.name || 'User profile'
+            }
+          );
+          result.errors.push(importError);
+          result.details.userProfile.error = importError.technicalMessage || importError.message;
+          
+          logger.error('Failed to import user profile', {
+            error,
+            userId,
+            profileName: data.userProfile?.name
           });
-          result.details.userProfile.error =
-            error instanceof Error ? error.message : 'Unknown error';
         }
       }
       currentStep++;
@@ -536,11 +911,20 @@ export const dataExport = {
           result.details.settings.imported = Object.keys(data.settings).length;
           result.imported += result.details.settings.imported;
         } catch (error) {
-          result.errors.push({
-            type: 'settings',
-            message: `Failed to import settings: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          });
+          const importError = createImportError(
+            'data',
+            'settings',
+            error,
+            { recordName: 'App settings' }
+          );
+          result.errors.push(importError);
           result.details.settings.errors++;
+          
+          logger.error('Failed to import settings', {
+            error,
+            userId,
+            settingKeys: Object.keys(data.settings)
+          });
         }
       }
       currentStep++;
@@ -577,12 +961,24 @@ export const dataExport = {
               }
             }
           } catch (error) {
-            result.errors.push({
-              type: 'customExercise',
-              message: `Failed to import exercise ${exercise.name}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-              recordId: exercise.id,
-            });
+            const importError = createImportError(
+              'data',
+              'exercise',
+              error,
+              {
+                recordId: exercise.id,
+                recordName: exercise.name || 'Unknown exercise'
+              }
+            );
+            result.errors.push(importError);
             result.details.customExercises.errors++;
+            
+            logger.error(`Failed to import custom exercise ${exercise.id}`, {
+              error,
+              exerciseId: exercise.id,
+              exerciseName: exercise.name,
+              userId
+            });
           }
         }
       }
@@ -624,12 +1020,24 @@ export const dataExport = {
               }
             }
           } catch (error) {
-            result.errors.push({
-              type: 'template',
-              message: `Failed to import template ${template.name}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-              recordId: template.id,
-            });
+            const importError = createImportError(
+              'data',
+              'template',
+              error,
+              {
+                recordId: template.id,
+                recordName: template.name || 'Unknown template'
+              }
+            );
+            result.errors.push(importError);
             result.details.templates.errors++;
+            
+            logger.error(`Failed to import template ${template.id}`, {
+              error,
+              templateId: template.id,
+              templateName: template.name,
+              userId
+            });
           }
         }
       }
@@ -647,7 +1055,17 @@ export const dataExport = {
           try {
             // Remove id, createdAt, updatedAt for import
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, ...plannedToImport } = plannedWorkout;
+            const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, ...plannedToImportBase } = plannedWorkout;
+            
+            // Ensure dates are Date objects
+            const plannedToImport = {
+              ...plannedToImportBase,
+              scheduledDate: plannedToImportBase.scheduledDate
+                ? (typeof plannedToImportBase.scheduledDate === 'string'
+                    ? new Date(plannedToImportBase.scheduledDate)
+                    : plannedToImportBase.scheduledDate)
+                : new Date(),
+            };
             
             if (strategy === 'replace') {
               await plannedWorkoutService.createPlannedWorkout(userId, plannedToImport);
@@ -657,10 +1075,10 @@ export const dataExport = {
               // Merge: check if planned workout exists (by scheduledDate + name)
               const existingPlanned =
                 await plannedWorkoutService.getAllPlannedWorkouts(userId);
+              const scheduledDate = plannedToImport.scheduledDate;
               const exists = existingPlanned.some(
                 (pw: PlannedWorkout) =>
-                  pw.scheduledDate.getTime() ===
-                    new Date(plannedWorkout.scheduledDate).getTime() &&
+                  pw.scheduledDate.getTime() === scheduledDate.getTime() &&
                   pw.workoutName === plannedWorkout.workoutName
               );
               if (!exists) {
@@ -673,12 +1091,27 @@ export const dataExport = {
               }
             }
           } catch (error) {
-            result.errors.push({
-              type: 'plannedWorkout',
-              message: `Failed to import planned workout: ${error instanceof Error ? error.message : 'Unknown error'}`,
-              recordId: plannedWorkout.id,
-            });
+            const scheduledDate = plannedWorkout.scheduledDate 
+              ? new Date(plannedWorkout.scheduledDate).toLocaleDateString()
+              : 'Unknown date';
+            const importError = createImportError(
+              'data',
+              'plannedWorkout',
+              error,
+              {
+                recordId: plannedWorkout.id,
+                recordName: scheduledDate
+              }
+            );
+            result.errors.push(importError);
             result.details.plannedWorkouts.errors++;
+            
+            logger.error(`Failed to import planned workout ${plannedWorkout.id}`, {
+              error,
+              plannedWorkoutId: plannedWorkout.id,
+              scheduledDate: plannedWorkout.scheduledDate,
+              userId
+            });
           }
         }
       }
@@ -697,9 +1130,30 @@ export const dataExport = {
             // Remove id for import (will be auto-generated)
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
             const { id: _id, ...workoutToImport } = workout;
+            
+            // Ensure dates are Date objects
+            const workoutDate = workoutToImport.date 
+              ? (typeof workoutToImport.date === 'string' 
+                  ? new Date(workoutToImport.date) 
+                  : workoutToImport.date)
+              : new Date();
+            const workoutStartTime = workoutToImport.startTime
+              ? (typeof workoutToImport.startTime === 'string'
+                  ? new Date(workoutToImport.startTime)
+                  : workoutToImport.startTime)
+              : workoutDate; // Default to workout date if not provided
+            const workoutEndTime = workoutToImport.endTime
+              ? (typeof workoutToImport.endTime === 'string'
+                  ? new Date(workoutToImport.endTime)
+                  : workoutToImport.endTime)
+              : undefined;
+            
             const workoutWithUserId = {
               ...workoutToImport,
               userId, // Ensure userId matches
+              date: workoutDate,
+              startTime: workoutStartTime,
+              endTime: workoutEndTime,
             };
 
             if (strategy === 'replace') {
@@ -728,12 +1182,36 @@ export const dataExport = {
               }
             }
           } catch (error) {
-            result.errors.push({
-              type: 'workout',
-              message: `Failed to import workout: ${error instanceof Error ? error.message : 'Unknown error'}`,
-              recordId: workout.id?.toString(),
-            });
+            // Convert date to Date object if it's a string
+            let workoutDate = 'Unknown date';
+            try {
+              if (workout.date) {
+                const date = typeof workout.date === 'string' ? new Date(workout.date) : workout.date;
+                workoutDate = date.toLocaleDateString();
+              }
+            } catch (dateError) {
+              logger.warn('Failed to parse workout date', { dateError, workoutDate: workout.date });
+            }
+            
+            const importError = createImportError(
+              'data',
+              'workout',
+              error,
+              {
+                recordId: workout.id?.toString(),
+                recordName: workoutDate
+              }
+            );
+            result.errors.push(importError);
             result.details.workouts.errors++;
+            
+            logger.error(`Failed to import workout ${workout.id}`, {
+              error,
+              workoutId: workout.id,
+              workoutDate: workout.date,
+              exerciseCount: workout.exercises?.length,
+              userId
+            });
           }
         }
       }
@@ -775,12 +1253,23 @@ export const dataExport = {
               }
             }
           } catch (error) {
-            result.errors.push({
-              type: 'muscleStatus',
-              message: `Failed to import muscle status: ${error instanceof Error ? error.message : 'Unknown error'}`,
-              recordId: status.muscle,
-            });
+            const importError = createImportError(
+              'data',
+              'muscleStatus',
+              error,
+              {
+                recordId: status.muscle,
+                recordName: status.muscle.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+              }
+            );
+            result.errors.push(importError);
             result.details.muscleStatuses.errors++;
+            
+            logger.error(`Failed to import muscle status for ${status.muscle}`, {
+              error,
+              muscle: status.muscle,
+              userId
+            });
           }
         }
       }
@@ -796,9 +1285,23 @@ export const dataExport = {
         });
         for (const log of data.sleepLogs) {
           try {
+            // Ensure dates are Date objects
+            const sleepDate = log.date
+              ? (typeof log.date === 'string' ? new Date(log.date) : log.date)
+              : new Date();
+            const sleepBedtime = log.bedtime
+              ? (typeof log.bedtime === 'string' ? new Date(log.bedtime) : log.bedtime)
+              : sleepDate; // Default to sleep date if not provided
+            const sleepWakeTime = log.wakeTime
+              ? (typeof log.wakeTime === 'string' ? new Date(log.wakeTime) : log.wakeTime)
+              : new Date(sleepDate.getTime() + 8 * 60 * 60 * 1000); // Default to 8 hours later if not provided
+            
             const logToImport = {
               ...log,
               userId, // Ensure userId matches
+              date: sleepDate,
+              bedtime: sleepBedtime,
+              wakeTime: sleepWakeTime,
             };
 
             if (strategy === 'replace') {
@@ -809,7 +1312,7 @@ export const dataExport = {
               // Merge: check if log exists (by date + userId)
               const existing = await sleepRecoveryService.getSleepLog(
                 userId,
-                new Date(log.date)
+                logToImport.date
               );
               if (!existing) {
                 await sleepRecoveryService.saveSleepLog(logToImport);
@@ -821,12 +1324,27 @@ export const dataExport = {
               }
             }
           } catch (error) {
-            result.errors.push({
-              type: 'sleepLog',
-              message: `Failed to import sleep log: ${error instanceof Error ? error.message : 'Unknown error'}`,
-              recordId: log.id?.toString(),
-            });
+            const logDate = log.date 
+              ? (typeof log.date === 'string' ? new Date(log.date) : log.date).toLocaleDateString()
+              : 'Unknown date';
+            const importError = createImportError(
+              'data',
+              'sleepLog',
+              error,
+              {
+                recordId: log.id?.toString(),
+                recordName: logDate
+              }
+            );
+            result.errors.push(importError);
             result.details.sleepLogs.errors++;
+            
+            logger.error(`Failed to import sleep log ${log.id}`, {
+              error,
+              logId: log.id,
+              logDate: log.date,
+              userId
+            });
           }
         }
       }
@@ -842,9 +1360,13 @@ export const dataExport = {
         });
         for (const log of data.recoveryLogs) {
           try {
+            // Ensure dates are Date objects
             const logToImport = {
               ...log,
               userId, // Ensure userId matches
+              date: log.date
+                ? (typeof log.date === 'string' ? new Date(log.date) : log.date)
+                : new Date(),
             };
 
             if (strategy === 'replace') {
@@ -855,7 +1377,7 @@ export const dataExport = {
               // Merge: check if log exists (by date + userId)
               const existing = await sleepRecoveryService.getRecoveryLog(
                 userId,
-                new Date(log.date)
+                logToImport.date
               );
               if (!existing) {
                 await sleepRecoveryService.saveRecoveryLog(logToImport);
@@ -867,14 +1389,71 @@ export const dataExport = {
               }
             }
           } catch (error) {
-            result.errors.push({
-              type: 'recoveryLog',
-              message: `Failed to import recovery log: ${error instanceof Error ? error.message : 'Unknown error'}`,
-              recordId: log.id?.toString(),
-            });
+            const logDate = log.date 
+              ? (typeof log.date === 'string' ? new Date(log.date) : log.date).toLocaleDateString()
+              : 'Unknown date';
+            const importError = createImportError(
+              'data',
+              'recoveryLog',
+              error,
+              {
+                recordId: log.id?.toString(),
+                recordName: logDate
+              }
+            );
+            result.errors.push(importError);
             result.details.recoveryLogs.errors++;
+            
+            logger.error(`Failed to import recovery log ${log.id}`, {
+              error,
+              logId: log.id,
+              logDate: log.date,
+              userId
+            });
           }
         }
+      }
+
+      onProgress?.({
+        percentage: 95,
+        currentOperation: 'Syncing data to cloud...',
+        completedItems: totalSteps - 1,
+        totalItems: totalSteps,
+      });
+
+      // Post-import sync to Supabase/MongoDB
+      try {
+        const { mongodbSyncService } = await import('./mongodbSyncService');
+        await mongodbSyncService.sync(userId, {
+          tables: [
+            'workouts',
+            'workout_templates',
+            'planned_workouts',
+            'exercises',
+            'muscle_statuses',
+            'sleep_logs',
+            'recovery_logs',
+            'user_profiles',
+            'settings'
+          ],
+          direction: 'push',
+        });
+        logger.info('Post-import sync completed successfully', { userId });
+      } catch (syncError) {
+        const importError = createImportError(
+          'sync',
+          'sync',
+          syncError,
+          { recordName: 'All imported data' }
+        );
+        result.errors.push(importError);
+        
+        logger.warn('Post-import sync failed (will retry later)', {
+          error: syncError,
+          userId,
+          importedItems: result.imported
+        });
+        // Don't fail import if sync fails - data is in IndexedDB
       }
 
       onProgress?.({
@@ -907,7 +1486,13 @@ export const dataExport = {
       // Validate file size before reading
       const maxSize = 50 * 1024 * 1024; // 50MB
       if (file.size > maxSize) {
-        reject(new Error('File is too large. Maximum size is 50MB.'));
+        reject(new AppError(
+          `The file is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Maximum size is 50MB.`,
+          'FILE_TOO_LARGE',
+          undefined,
+          undefined,
+          { fileName: file.name, fileSize: file.size, maxSize }
+        ));
         return;
       }
 
@@ -917,7 +1502,27 @@ export const dataExport = {
         try {
           const text = e.target?.result;
           if (typeof text !== 'string') {
-            reject(new Error('Failed to read file as text'));
+            reject(new AppError(
+              'Unable to read the selected file. The file may be corrupted or in an unsupported format.',
+              'FILE_READ_ERROR',
+              undefined,
+              undefined,
+              { fileName: file.name }
+            ));
+            return;
+          }
+          
+          // Validate JSON before parsing (importAllData will do full validation)
+          try {
+            JSON.parse(text); // Just validate it's valid JSON
+          } catch (parseError) {
+            reject(new AppError(
+              'The file is not valid JSON. Please ensure you selected the correct export file from FitTrackAI.',
+              'INVALID_JSON',
+              undefined,
+              parseError instanceof Error ? parseError : new Error(String(parseError)),
+              { fileName: file.name }
+            ));
             return;
           }
           
@@ -930,17 +1535,39 @@ export const dataExport = {
           resolve(result);
         } catch (error) {
           logger.error('Import failed', error);
-          reject(error);
+          if (error instanceof AppError) {
+            reject(error);
+          } else {
+            reject(new AppError(
+              'Failed to import data. Please check the file format and try again.',
+              'IMPORT_FAILED',
+              undefined,
+              error instanceof Error ? error : new Error(String(error)),
+              { fileName: file.name }
+            ));
+          }
         }
       };
       
       reader.onerror = (error) => {
         logger.error('FileReader error', error);
-        reject(new Error('Failed to read file. Please ensure the file is not corrupted.'));
+        reject(new AppError(
+          'Unable to read the selected file. The file may be corrupted or in an unsupported format.',
+          'FILE_READ_ERROR',
+          undefined,
+          error instanceof Error ? error : new Error(String(error)),
+          { fileName: file.name, fileSize: file.size }
+        ));
       };
       
       reader.onabort = () => {
-        reject(new Error('File reading was aborted'));
+        reject(new AppError(
+          'File reading was cancelled. Please try again.',
+          'FILE_READ_ABORTED',
+          undefined,
+          undefined,
+          { fileName: file.name }
+        ));
       };
       
       // Use readAsText with UTF-8 encoding for proper JSON parsing
@@ -948,7 +1575,13 @@ export const dataExport = {
         reader.readAsText(file, 'UTF-8');
       } catch (error) {
         logger.error('Failed to start file read', error);
-        reject(new Error('Failed to read file. Please try again.'));
+        reject(new AppError(
+          'Failed to read file. Please ensure the file is accessible and try again.',
+          'FILE_READ_START_FAILED',
+          undefined,
+          error instanceof Error ? error : new Error(String(error)),
+          { fileName: file.name }
+        ));
       }
     });
   },

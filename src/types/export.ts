@@ -62,14 +62,21 @@ export interface ExportStats {
     estimatedSize: string; // Human-readable file size estimate
 }
 
+export interface ImportError {
+    type: 'validation' | 'data' | 'sync' | 'permission' | 'unknown';
+    category: string; // 'workout' | 'template' | 'exercise' | 'file' | 'userProfile' | etc.
+    message: string; // User-friendly message
+    technicalMessage?: string; // Technical details for debugging
+    recordId?: string;
+    recordName?: string; // Human-readable identifier (e.g., workout date, template name)
+    suggestion?: string; // Actionable suggestion for user
+    severity: 'error' | 'warning' | 'info';
+}
+
 export interface ImportResult {
     imported: number;
     skipped: number;
-    errors: Array<{
-        type: string;
-        message: string;
-        recordId?: string;
-    }>;
+    errors: ImportError[];
     details: {
         workouts: { imported: number; skipped: number; errors: number };
         templates: { imported: number; skipped: number; errors: number };
@@ -81,6 +88,12 @@ export interface ImportResult {
         settings: { imported: number; skipped: number; errors: number };
         userProfile: { imported: boolean; error?: string };
     };
+}
+
+export interface ValidationResult {
+    errors: ImportError[];
+    warnings: ImportError[];
+    isValid: boolean;
 }
 
 export interface ProgressCallback {

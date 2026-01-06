@@ -13,7 +13,7 @@ import {
   getWeeklyWorkoutDays,
   DateRange,
 } from '@/utils/analyticsHelpers';
-import { calculateEstimatedOneRepMax } from '@/utils/calculations';
+import { calculateEstimatedOneRepMax, calculateStreak } from '@/utils/calculations';
 
 export const analyticsService = {
   calculateTotalVolume(workouts: Workout[]): number {
@@ -334,10 +334,14 @@ export const analyticsService = {
       recoveryMetrics = sleepRecoveryService.calculateRecoveryMetrics(recoveryLogs, sleepLogs);
     }
 
+    // Calculate streak from workout dates
+    const workoutDates = filtered.map(w => new Date(w.date));
+    const currentStreak = calculateStreak(workoutDates);
+
     return {
       totalVolume: this.calculateTotalVolume(filtered),
       workoutCount: filtered.length,
-      currentStreak: 0,
+      currentStreak,
       consistencyScore: calculateConsistencyScore(filtered),
       volumeTrend: this.calculateVolumeTrend(filtered, range),
       personalRecords: this.getPersonalRecords(filtered),

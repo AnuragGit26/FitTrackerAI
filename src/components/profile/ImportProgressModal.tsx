@@ -1,7 +1,8 @@
-import { Upload, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
-import { ImportResult } from '@/types/export';
+import { Upload, CheckCircle2, XCircle, AlertTriangle, Info, AlertCircle } from 'lucide-react';
+import { ImportResult, ImportError } from '@/types/export';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { Modal } from '@/components/common/Modal';
+import { useState } from 'react';
 
 interface ImportProgressModalProps {
   isOpen: boolean;
@@ -21,9 +22,64 @@ export function ImportProgressModal({
   result,
   onClose,
 }: ImportProgressModalProps) {
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const isComplete = result !== null;
   const hasErrors = result ? result.errors.length > 0 : false;
   const hasSkipped = result ? result.skipped > 0 : false;
+  
+  // Group errors by category
+  const errorsByCategory = result?.errors.reduce((acc, error) => {
+    const category = error.category || 'other';
+    if (!acc[category]) acc[category] = [];
+    acc[category].push(error);
+    return acc;
+  }, {} as Record<string, ImportError[]>) || {};
+  
+  const toggleCategory = (category: string) => {
+    setExpandedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(category)) {
+        next.delete(category);
+      } else {
+        next.add(category);
+      }
+      return next;
+    });
+  };
+  
+  const getSeverityIcon = (severity: ImportError['severity']) => {
+    switch (severity) {
+      case 'error':
+        return <AlertCircle className="w-4 h-4 text-red-500" />;
+      case 'warning':
+        return <AlertTriangle className="w-4 h-4 text-yellow-500" />;
+      case 'info':
+        return <Info className="w-4 h-4 text-blue-500" />;
+      default:
+        return <AlertTriangle className="w-4 h-4 text-yellow-500" />;
+    }
+  };
+  
+  const getSeverityColor = (severity: ImportError['severity']) => {
+    switch (severity) {
+      case 'error':
+        return 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-800 dark:text-red-400';
+      case 'warning':
+        return 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-400';
+      case 'info':
+        return 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-400';
+      default:
+        return 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-400';
+    }
+  };
+  
+  const formatCategoryName = (category: string): string => {
+    return category
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, l => l.toUpperCase())
+      .trim();
+  };
 
   return (
     <Modal
@@ -134,29 +190,96 @@ export function ImportProgressModal({
               </div>
             </div>
 
-            {/* Errors */}
+            {/* Errors - Grouped by Category */}
             {hasErrors && (
-              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-4">
-                <div className="flex items-center gap-2 mb-2">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
                   <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
-                  <h3 className="font-semibold text-yellow-900 dark:text-yellow-300">
-                    {result.errors.length} Error(s)
+                  <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                    {result.errors.length} Issue{result.errors.length !== 1 ? 's' : ''} Found
                   </h3>
                 </div>
-                <div className="space-y-1 max-h-32 overflow-y-auto">
-                  {result.errors.slice(0, 5).map((error, index) => (
-                    <p
-                      key={index}
-                      className="text-sm text-yellow-800 dark:text-yellow-400"
-                    >
-                      {error.type}: {error.message}
-                    </p>
-                  ))}
-                  {result.errors.length > 5 && (
-                    <p className="text-sm text-yellow-700 dark:text-yellow-500">
-                      ...and {result.errors.length - 5} more errors
-                    </p>
-                  )}
+                
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {Object.entries(errorsByCategory).map(([category, errors]) => {
+                    const isExpanded = expandedCategories.has(category);
+                    const errorCount = errors.length;
+                    const hasErrors = errors.some(e => e.severity === 'error');
+                    const hasWarnings = errors.some(e => e.severity === 'warning');
+                    
+                    return (
+                      <div
+                        key={category}
+                        className={`border rounded-lg overflow-hidden ${
+                          hasErrors
+                            ? 'border-red-200 dark:border-red-800'
+                            : hasWarnings
+                            ? 'border-yellow-200 dark:border-yellow-800'
+                            : 'border-blue-200 dark:border-blue-800'
+                        }`}
+                      >
+                        <button
+                          onClick={() => toggleCategory(category)}
+                          className="w-full flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            {getSeverityIcon(
+                              hasErrors ? 'error' : hasWarnings ? 'warning' : 'info'
+                            )}
+                            <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                              {formatCategoryName(category)}
+                            </span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              ({errorCount})
+                            </span>
+                          </div>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            {isExpanded ? '▼' : '▶'}
+                          </span>
+                        </button>
+                        
+                        {isExpanded && (
+                          <div className="border-t border-gray-200 dark:border-gray-700 p-3 space-y-3 bg-gray-50 dark:bg-gray-900/50">
+                            {errors.map((error, index) => (
+                              <div
+                                key={index}
+                                className={`p-3 rounded-lg border ${getSeverityColor(error.severity)}`}
+                              >
+                                <div className="flex items-start gap-2">
+                                  {getSeverityIcon(error.severity)}
+                                  <div className="flex-1 space-y-1">
+                                    <p className="text-sm font-medium">
+                                      {error.message}
+                                    </p>
+                                    {error.recordName && (
+                                      <p className="text-xs opacity-75">
+                                        Record: {error.recordName}
+                                      </p>
+                                    )}
+                                    {error.suggestion && (
+                                      <p className="text-xs font-medium mt-1">
+                                        💡 {error.suggestion}
+                                      </p>
+                                    )}
+                                    {error.technicalMessage && error.technicalMessage !== error.message && (
+                                      <details className="mt-1">
+                                        <summary className="text-xs cursor-pointer opacity-75 hover:opacity-100">
+                                          Technical details
+                                        </summary>
+                                        <p className="text-xs mt-1 font-mono opacity-75">
+                                          {error.technicalMessage}
+                                        </p>
+                                      </details>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

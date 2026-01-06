@@ -7,6 +7,7 @@ import { useWorkoutStore } from '@/store/workoutStore';
 import { useMuscleRecovery } from '@/hooks/useMuscleRecovery';
 import { useUserStore } from '@/store/userStore';
 import { cleanPlainTextResponse } from '@/utils/aiResponseCleaner';
+import { calculateStreak } from '@/utils/calculations';
 
 export function SmartCoachInsight() {
   const [insight, setInsight] = useState<string | null>(null);
@@ -18,6 +19,10 @@ export function SmartCoachInsight() {
   useEffect(() => {
     async function generateInsight() {
       const recentWorkouts = workouts.slice(0, 5);
+      
+      // Calculate current streak
+      const workoutDates = workouts.map(w => new Date(w.date));
+      const currentStreak = calculateStreak(workoutDates);
       
       // Get fingerprint for caching
       const fingerprint = aiChangeDetector.getFingerprint(
@@ -39,6 +44,7 @@ export function SmartCoachInsight() {
             userLevel: profile?.experienceLevel || 'intermediate',
             weakPoints: [],
             progressTrends: {},
+            currentStreak,
           }),
           profile?.id,
           0

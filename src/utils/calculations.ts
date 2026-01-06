@@ -114,32 +114,105 @@ export function formatWeight(weight: number, unit: 'kg' | 'lbs'): string {
   return `${weight.toFixed(unit === 'kg' ? 1 : 0)} ${unit}`;
 }
 
+/**
+ * Check if two workout dates are within 72 hours of each other
+ */
+function isWithin72Hours(date1: Date, date2: Date): boolean {
+  const hoursDiff = Math.abs(date1.getTime() - date2.getTime()) / (1000 * 60 * 60);
+  return hoursDiff <= 72;
+}
+
+/**
+ * Count workouts within a date window
+ */
+function countWorkoutsInWindow(workoutDates: Date[], windowStart: Date, windowEnd: Date): number {
+  return workoutDates.filter(date => {
+    const workoutTime = date.getTime();
+    return workoutTime >= windowStart.getTime() && workoutTime <= windowEnd.getTime();
+  }).length;
+}
+
+/**
+ * Validate that the current workout is part of a 7-day window with at least 3 workouts
+ * Checks if there are at least 2 other workouts within 7 days (before or after) of the current workout
+ */
+function validateRollingWindows(
+  allWorkoutDates: Date[],
+  currentWorkoutDate: Date,
+  minWorkoutsPerWindow: number = 3
+): boolean {
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+  const currentTime = currentWorkoutDate.getTime();
+  const windowStart = new Date(currentTime - sevenDaysMs);
+  const windowEnd = new Date(currentTime + sevenDaysMs);
+  
+  // Count workouts within the 7-day window (including the current workout)
+  const workoutsInWindow = countWorkoutsInWindow(allWorkoutDates, windowStart, windowEnd);
+  
+  return workoutsInWindow >= minWorkoutsPerWindow;
+}
+
+/**
+ * Calculate workout streak based on:
+ * - At least 3 workouts in any rolling 7-day window
+ * - Consecutive workouts within 72 hours of each other
+ * Returns the count of workouts that meet these conditions
+ */
 export function calculateStreak(workoutDates: Date[]): number {
   if (workoutDates.length === 0) return 0;
+  
+  // Need at least 3 workouts to form a valid streak
+  if (workoutDates.length < 3) return 0;
 
-  const sortedDates = workoutDates
-    .map(date => new Date(date.getFullYear(), date.getMonth(), date.getDate()))
-    .sort((a, b) => b.getTime() - a.getTime());
+  // Remove duplicates and sort by date (most recent first)
+  const uniqueDates = Array.from(
+    new Set(workoutDates.map(date => date.getTime()))
+  ).map(time => new Date(time));
+  
+  const sortedDates = uniqueDates.sort((a, b) => b.getTime() - a.getTime());
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  let streak = 0;
-  const currentDate = new Date(today);
-
-  for (const workoutDate of sortedDates) {
-    const workoutDay = new Date(workoutDate);
-    workoutDay.setHours(0, 0, 0, 0);
-
-    if (workoutDay.getTime() === currentDate.getTime()) {
-      streak++;
-      currentDate.setDate(currentDate.getDate() - 1);
-    } else if (workoutDay.getTime() < currentDate.getTime()) {
-      break;
+  // Track workouts in the streak
+  const streakWorkouts: Date[] = [];
+  
+  // Start from the most recent workout
+  for (let i = 0; i < sortedDates.length; i++) {
+    const currentWorkout = sortedDates[i];
+    
+    // First workout is always added (if we have enough workouts)
+    if (i === 0) {
+      // Check if this workout can be part of a valid streak
+      // We need to verify it can form a 7-day window with at least 3 workouts
+      const sevenDaysAgo = new Date(currentWorkout.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const sevenDaysLater = new Date(currentWorkout.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const workoutsInWindow = countWorkoutsInWindow(sortedDates, sevenDaysAgo, sevenDaysLater);
+      
+      if (workoutsInWindow >= 3) {
+        streakWorkouts.push(currentWorkout);
+      } else {
+        // Can't form a valid streak starting from here
+        break;
+      }
+    } else {
+      // Check 72-hour gap rule
+      const previousWorkout = streakWorkouts[streakWorkouts.length - 1];
+      if (!isWithin72Hours(currentWorkout, previousWorkout)) {
+        // Gap too large, streak ends
+        break;
+      }
+      
+      // Check rolling 7-day window rule
+      // The workout must be part of a 7-day window with at least 3 workouts
+      if (!validateRollingWindows(sortedDates, currentWorkout, 3)) {
+        // Window rule violated, streak ends
+        break;
+      }
+      
+      // Both conditions met, add to streak
+      streakWorkouts.push(currentWorkout);
     }
   }
-
-  return streak;
+  
+  return streakWorkouts.length;
 }
 
 export function estimateEnergy(workouts: Array<{ totalVolume: number; totalDuration: number }>): number {

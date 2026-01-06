@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { aiService } from '@/services/aiService';
 import { aiChangeDetector } from '@/services/aiChangeDetector';
 import { aiRefreshService } from '@/services/aiRefreshService';
@@ -6,6 +6,7 @@ import { workoutAnalysisService } from '@/services/workoutAnalysisService';
 import { useWorkoutStore } from '@/store/workoutStore';
 import { useUserStore } from '@/store/userStore';
 import { useMuscleRecovery } from './useMuscleRecovery';
+import { calculateStreak } from '@/utils/calculations';
 
 export interface AIInsights {
   analysis: string;
@@ -22,11 +23,6 @@ export function useAIInsights() {
   const { profile } = useUserStore();
   const { muscleStatuses } = useMuscleRecovery();
   const isGeneratingRef = useRef(false);
-  
-  const muscleStatusesKey = useMemo(() =>
-    muscleStatuses.map(s => `${s.muscle}-${s.recoveryPercentage}`).join(','),
-    [muscleStatuses]
-  );
 
   const generateInsights = useCallback(async () => {
     if (!profile || workouts.length === 0) {
@@ -69,6 +65,10 @@ export function useAIInsights() {
       userExperienceLevel: profile.experienceLevel,
     });
     
+    // Calculate current streak
+    const workoutDates = workouts.map(w => new Date(w.date));
+    const currentStreak = calculateStreak(workoutDates);
+    
     // Get fingerprint for caching (include pattern analysis in fingerprint)
     const patternFingerprint = patternAnalysis.hasWorkoutToday 
       ? `has-workout-today-${patternAnalysis.todayWorkout?.id || ''}`
@@ -98,6 +98,7 @@ export function useAIInsights() {
           readinessScore,
           patternAnalysis,
           recommendationContext,
+          currentStreak,
         }),
         profile.id,
         0
@@ -113,7 +114,7 @@ export function useAIInsights() {
       setIsLoading(false);
       isGeneratingRef.current = false;
     }
-  }, [workouts, profile, muscleStatuses, muscleStatusesKey]);
+  }, [workouts, profile, muscleStatuses]);
 
   return { insights, isLoading, generateInsights };
 }

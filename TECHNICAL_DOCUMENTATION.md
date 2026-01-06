@@ -171,7 +171,10 @@
 
 - PRs calculated as maximum weight × reps combination
 - Consistency score based on workout frequency vs. user-set goal
-- Streaks calculated from consecutive workout days
+- Streaks calculated based on workout count with specific conditions:
+  - At least 3 workouts must be done in any rolling 7-day window
+  - Consecutive workouts must be within 72 hours of each other
+  - Streak is the count of workouts meeting these conditions, working backwards from the most recent workout
 - Volume aggregated by date, exercise, and muscle group
 
 #### 2.6 Workout Templates & Planning
