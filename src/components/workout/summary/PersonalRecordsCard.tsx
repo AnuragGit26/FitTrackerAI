@@ -121,11 +121,6 @@ export function PersonalRecordsCard({ records }: PersonalRecordsCardProps) {
               )}
               <p className="text-white text-2xl font-bold">
                 {formatValue(record)}
-                {record.type === '1rm' || record.type === 'volume' || record.type === 'weight' ? (
-                  <span className="text-sm font-normal text-gray-400 ml-1">
-                    {record.type === '1rm' || record.type === 'weight' ? unit : unit}
-                  </span>
-                ) : null}
               </p>
             </div>
           </div>

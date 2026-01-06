@@ -815,7 +815,7 @@ export const dataExport = {
       };
 
       // Pre-import validation
-      const totalSteps = 10; // 9 import steps + 1 sync step
+      const totalSteps = 9; // 9 import steps (sync happens automatically later)
       onProgress?.({
         percentage: 2,
         currentOperation: 'Validating import data...',
@@ -1415,53 +1415,15 @@ export const dataExport = {
       }
 
       onProgress?.({
-        percentage: 95,
-        currentOperation: 'Syncing data to cloud...',
-        completedItems: totalSteps - 1,
-        totalItems: totalSteps,
-      });
-
-      // Post-import sync to Supabase/MongoDB
-      try {
-        const { mongodbSyncService } = await import('./mongodbSyncService');
-        await mongodbSyncService.sync(userId, {
-          tables: [
-            'workouts',
-            'workout_templates',
-            'planned_workouts',
-            'exercises',
-            'muscle_statuses',
-            'sleep_logs',
-            'recovery_logs',
-            'user_profiles',
-            'settings'
-          ],
-          direction: 'push',
-        });
-        logger.info('Post-import sync completed successfully', { userId });
-      } catch (syncError) {
-        const importError = createImportError(
-          'sync',
-          'sync',
-          syncError,
-          { recordName: 'All imported data' }
-        );
-        result.errors.push(importError);
-        
-        logger.warn('Post-import sync failed (will retry later)', {
-          error: syncError,
-          userId,
-          importedItems: result.imported
-        });
-        // Don't fail import if sync fails - data is in IndexedDB
-      }
-
-      onProgress?.({
         percentage: 100,
         currentOperation: 'Import complete',
-        completedItems: totalSteps,
-        totalItems: totalSteps,
+        completedItems: totalSteps - 1,
+        totalItems: totalSteps - 1,
       });
+
+      // Note: Imported data is saved to IndexedDB only by default
+      // Sync to Supabase/MongoDB will happen automatically via the normal sync mechanism
+      // (debounced sync triggered by dataService events)
 
       return result;
     } catch (error) {

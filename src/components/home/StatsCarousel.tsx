@@ -104,11 +104,11 @@ export function StatsCarousel() {
             <p className="text-slate-500 dark:text-gray-300 text-xs font-medium">Streak</p>
           </div>
           <p className="text-slate-900 dark:text-white text-2xl font-bold tracking-tight">
-            {streak} <span className="text-sm font-normal text-gray-400">Days</span>
+            {streak} <span className="text-sm font-normal text-gray-400">Workouts</span>
           </p>
           <div className="flex items-center gap-1 bg-primary/10 w-fit px-1.5 py-0.5 rounded text-primary text-xs font-bold">
             <Plus className="w-3.5 h-3.5" />
-            <span>1 day</span>
+            <span>Active</span>
           </div>
         </motion.div>
 

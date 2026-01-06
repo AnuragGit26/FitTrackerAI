@@ -47,7 +47,7 @@ export function WorkoutStatsCards({ workoutCount, currentStreak }: WorkoutStatsC
           Streak
         </div>
         <div className="text-2xl font-bold text-white">
-          {streakCountValue.formattedValue} <span className="text-sm text-gray-400 font-normal">Days</span>
+          {streakCountValue.formattedValue} <span className="text-sm text-gray-400 font-normal">Workouts</span>
         </div>
         <div className="flex gap-1 mt-2">
           {streakDots.map((i) => (

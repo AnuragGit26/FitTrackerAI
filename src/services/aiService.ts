@@ -95,7 +95,7 @@ export const aiService = {
         : '';
       
       const streakInfo = context.currentStreak !== undefined
-        ? `\nCurrent Streak: ${context.currentStreak} days`
+        ? `\nCurrent Streak: ${context.currentStreak} workouts`
         : '';
       
       const workoutCountInfo = context.workoutCount !== undefined
