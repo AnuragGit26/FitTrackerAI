@@ -57,6 +57,8 @@ Review checklist:
 - Error handling and security boundaries
 - No dead code or unnecessary complexity
 - Test coverage exists for core logic
+- Ensure this rule is relevant to project requirements.
+- Test and fix lint errors and build errors without any functionality changes.
 
 Merge only after approval.
 

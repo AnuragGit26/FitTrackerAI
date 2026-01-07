@@ -32,10 +32,13 @@ export function RestTimer({
   const [isPaused, setIsPaused] = useState(initialPaused);
   const [showCompletionAnimation, setShowCompletionAnimation] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const completionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isCompletedOrSkippedRef = useRef(false);
   const initialDurationRef = useRef(initialRemainingTime ?? duration);
   const notificationPermissionRef = useRef<NotificationPermission | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const onCompleteRef = useRef(onComplete);
+  const onSkipRef = useRef(onSkip);
   const hasInitializedRef = useRef(initialRemainingTime !== undefined || initialPaused);
   const { settings } = useSettingsStore();
   const onRemainingTimeChangeRef = useRef(onRemainingTimeChange);
@@ -50,6 +53,11 @@ export function RestTimer({
   useEffect(() => {
     onCompleteRef.current = onComplete;
   }, [onComplete]);
+
+  // Keep onSkip ref up to date
+  useEffect(() => {
+    onSkipRef.current = onSkip;
+  }, [onSkip]);
 
   // Request notification permission on mount
   useEffect(() => {
@@ -92,6 +100,13 @@ export function RestTimer({
         initialDurationRef.current = initialRemainingTime;
         setRemainingTime(initialRemainingTime);
         setIsPaused(initialPaused);
+        // Reset completion flag when timer becomes visible
+        isCompletedOrSkippedRef.current = false;
+        // Clear any pending completion timeout
+        if (completionTimeoutRef.current) {
+          clearTimeout(completionTimeoutRef.current);
+          completionTimeoutRef.current = null;
+        }
         // Sync with parent - defer to avoid updating parent during render
         setTimeout(() => {
           onRemainingTimeChange?.(initialRemainingTime);
@@ -101,6 +116,13 @@ export function RestTimer({
         initialDurationRef.current = duration;
         setRemainingTime(duration);
         setIsPaused(false);
+        // Reset completion flag when timer becomes visible
+        isCompletedOrSkippedRef.current = false;
+        // Clear any pending completion timeout
+        if (completionTimeoutRef.current) {
+          clearTimeout(completionTimeoutRef.current);
+          completionTimeoutRef.current = null;
+        }
         // Sync with parent - defer to avoid updating parent during render
         setTimeout(() => {
           onRemainingTimeChange?.(duration);
@@ -153,9 +175,15 @@ export function RestTimer({
             setShowCompletionAnimation(true);
 
             // Call onComplete after animation delay (2 seconds)
-            setTimeout(() => {
-              setShowCompletionAnimation(false);
-              onCompleteRef.current();
+            // Store timeout ID so we can cancel it if user skips
+            completionTimeoutRef.current = setTimeout(() => {
+              // Only call onComplete if timer hasn't been skipped
+              if (!isCompletedOrSkippedRef.current) {
+                isCompletedOrSkippedRef.current = true;
+                setShowCompletionAnimation(false);
+                onCompleteRef.current();
+              }
+              completionTimeoutRef.current = null;
             }, 2000);
 
             // Defer onRemainingTimeChange to avoid updating parent during render
@@ -182,8 +210,25 @@ export function RestTimer({
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
+      if (completionTimeoutRef.current) {
+        clearTimeout(completionTimeoutRef.current);
+        completionTimeoutRef.current = null;
+      }
     };
   }, [isVisible, isPaused, remainingTime, settings.soundEnabled, settings.vibrationEnabled]);
+
+  const handleSkip = () => {
+    // Clear the completion timeout to prevent race condition
+    if (completionTimeoutRef.current) {
+      clearTimeout(completionTimeoutRef.current);
+      completionTimeoutRef.current = null;
+    }
+    // Mark as completed/skipped to prevent onComplete from firing
+    isCompletedOrSkippedRef.current = true;
+    setShowCompletionAnimation(false);
+    // Call onSkip callback
+    onSkipRef.current();
+  };
 
   const handlePause = () => {
     const newPausedState = !isPaused;
@@ -408,7 +453,7 @@ export function RestTimer({
                   </span>
                 </button>
                 <button
-                  onClick={onSkip}
+                  onClick={handleSkip}
                   className="h-11 pl-4 pr-5 rounded-full bg-primary text-background-dark font-bold text-sm flex items-center gap-2 shadow-lg shadow-primary/20 hover:brightness-105 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
                   aria-label="Skip to next set"
                 >

@@ -11,7 +11,13 @@ export function RecoveryCalendar() {
   const { workouts } = useWorkoutStore();
   const { profile } = useUserStore();
   const { settings } = useSettingsStore();
-  const today = useMemo(() => new Date(), []);
+  
+  // Get current date - use date string as dependency to update when day changes
+  // This ensures the calendar updates correctly if user keeps app open past midnight
+  const currentDateString = new Date().toISOString().split('T')[0];
+  // currentDateString is intentionally included to update 'today' when the day changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const today = useMemo(() => new Date(), [currentDateString]);
   const monthStart = startOfMonth(today);
   const monthEnd = endOfMonth(today);
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
