@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Check } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { useSettingsStore } from '@/store/settingsStore';
+import { prefersReducedMotion } from '@/utils/animations';
 
 interface RestTimerProps {
   duration: number; // Initial rest duration in seconds
@@ -28,6 +30,7 @@ export function RestTimer({
 }: RestTimerProps) {
   const [remainingTime, setRemainingTime] = useState(initialRemainingTime ?? duration);
   const [isPaused, setIsPaused] = useState(initialPaused);
+  const [showCompletionAnimation, setShowCompletionAnimation] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const initialDurationRef = useRef(initialRemainingTime ?? duration);
   const notificationPermissionRef = useRef<NotificationPermission | null>(null);
@@ -36,6 +39,7 @@ export function RestTimer({
   const hasInitializedRef = useRef(initialRemainingTime !== undefined || initialPaused);
   const { settings } = useSettingsStore();
   const onRemainingTimeChangeRef = useRef(onRemainingTimeChange);
+  const shouldReduceMotion = prefersReducedMotion();
   
   // Keep callback ref up to date
   useEffect(() => {
@@ -145,10 +149,15 @@ export function RestTimer({
               navigator.vibrate([200, 100, 200]);
             }
 
-            // Defer onComplete to avoid updating parent during render
+            // Show completion animation
+            setShowCompletionAnimation(true);
+
+            // Call onComplete after animation delay (2 seconds)
             setTimeout(() => {
+              setShowCompletionAnimation(false);
               onCompleteRef.current();
-            }, 0);
+            }, 2000);
+
             // Defer onRemainingTimeChange to avoid updating parent during render
             setTimeout(() => {
               onRemainingTimeChangeRef.current?.(0);
@@ -243,15 +252,104 @@ export function RestTimer({
   }
 
   return (
-    <AnimatePresence>
-      {isVisible && (
-        <motion.div
-          initial={{ y: 100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: 100, opacity: 0 }}
-          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="absolute bottom-6 left-4 right-4 z-40"
-        >
+    <>
+      {/* Completion Animation Overlay */}
+      <AnimatePresence>
+        {showCompletionAnimation && !shouldReduceMotion && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
+          >
+            {/* Success Checkmark with Pulse */}
+            <motion.div
+              initial={{ scale: 0, rotate: -180 }}
+              animate={{ 
+                scale: [0, 1.2, 1],
+                rotate: 0,
+              }}
+              exit={{ scale: 0, opacity: 0 }}
+              transition={{ 
+                type: 'spring',
+                damping: 15,
+                stiffness: 300,
+                duration: 0.6
+              }}
+              className="relative"
+            >
+              <div className="size-24 rounded-full bg-primary/20 backdrop-blur-sm flex items-center justify-center border-4 border-primary">
+                <Check className="w-12 h-12 text-primary stroke-[4]" />
+              </div>
+              
+              {/* Pulse Ripple Effect */}
+              {[...Array(3)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  className="absolute inset-0 rounded-full border-4 border-primary"
+                  initial={{ scale: 1, opacity: 0.6 }}
+                  animate={{ 
+                    scale: [1, 2, 3],
+                    opacity: [0.6, 0.3, 0],
+                  }}
+                  transition={{
+                    duration: 1.5,
+                    delay: i * 0.2,
+                    ease: 'easeOut',
+                    repeat: 0,
+                  }}
+                  style={{ left: '50%', top: '50%', x: '-50%', y: '-50%' }}
+                />
+              ))}
+            </motion.div>
+
+            {/* Success Message */}
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -20, opacity: 0 }}
+              transition={{ delay: 0.3, duration: 0.4 }}
+              className="absolute top-[45%] mt-32"
+            >
+              <motion.p
+                className="text-2xl font-bold text-primary text-center"
+                animate={{ 
+                  scale: [1, 1.1, 1],
+                }}
+                transition={{ 
+                  duration: 0.5,
+                  delay: 0.4,
+                  times: [0, 0.5, 1],
+                }}
+              >
+                Rest Complete!
+              </motion.p>
+            </motion.div>
+
+            {/* Screen Flash */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ 
+                opacity: [0, 0.3, 0],
+              }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="absolute inset-0 bg-primary pointer-events-none"
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isVisible && (
+          <motion.div
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            className="absolute bottom-6 left-4 right-4 z-40"
+          >
           <div className="bg-surface-dark dark:bg-[#152e22] rounded-2xl p-4 shadow-[0_8px_32px_rgba(0,0,0,0.3)] border border-gray-700 dark:border-[#316847] overflow-hidden relative ring-1 ring-white/10">
             {/* Progress Bar */}
             <div className="absolute top-0 left-0 w-full h-1 bg-gray-800/50">
@@ -323,6 +421,7 @@ export function RestTimer({
         </motion.div>
       )}
     </AnimatePresence>
+    </>
   );
 }
 

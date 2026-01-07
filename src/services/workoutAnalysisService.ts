@@ -1,6 +1,5 @@
 import { Workout } from '@/types/workout';
-import { WorkoutExercise } from '@/types/exercise';
-import { isToday, startOfDay, subDays, differenceInDays, isSameDay } from 'date-fns';
+import { isToday, startOfDay, subDays, isSameDay } from 'date-fns';
 
 export type WorkoutType = 'strength' | 'cardio' | 'mixed';
 
@@ -178,8 +177,6 @@ export const workoutAnalysisService = {
    */
   analyzeWorkoutPatterns(workouts: Workout[]): WorkoutPatternAnalysis {
     const today = new Date();
-    const todayStart = startOfDay(today);
-    
     // Check if workout today
     const hasWorkoutToday = this.hasWorkoutToday(workouts);
     const todayWorkout = this.getTodayWorkout(workouts);

@@ -9,9 +9,8 @@ import { userContextManager } from './userContextManager';
 import { errorRecovery } from './errorRecovery';
 import { sanitizeString } from '@/utils/sanitize';
 import { Transaction } from 'dexie';
-import { validateReps, validateWeight, validateDuration, validateCalories, validateRPE } from '@/utils/validators';
+import { validateReps, validateWeight, validateDuration, validateCalories, validateRPE, normalizeWorkoutStartTime } from '@/utils/validators';
 import { calculateVolume } from '@/utils/calculations';
-import { exerciseLibrary } from '@/services/exerciseLibrary';
 import { generateWorkoutId } from '@/utils/idGenerator';
 
 // UserProfile type - matches userStore definition
@@ -182,14 +181,9 @@ class DataService {
       throw new Error('Workout must have a date');
     }
     
-    // Validate date is not in the future (with tolerance for clock skew)
     const workoutDate = new Date(workout.date);
     const now = new Date();
     const toleranceMs = 5000; // 5 seconds tolerance for clock skew
-    
-    if (workoutDate.getTime() > now.getTime() + toleranceMs) {
-      throw new Error('Workout date cannot be in the future');
-    }
     
     // Validate date is not too far in the past (more than 10 years)
     const tenYearsAgo = new Date();
@@ -198,33 +192,37 @@ class DataService {
       throw new Error('Workout date is too far in the past');
     }
     
+    // Start time should already be normalized by createWorkout before validation
+    // Just verify it exists and is valid
     if (!workout.startTime) {
       throw new Error('Workout must have a startTime');
     }
     
-    // Validate startTime is not in the future (with tolerance)
-    const startTime = new Date(workout.startTime);
-    if (startTime.getTime() > now.getTime() + toleranceMs) {
-      throw new Error('Workout startTime cannot be in the future');
-    }
-    
-    // Validate startTime is on the same day as workout date
-    const workoutDateStr = workoutDate.toISOString().split('T')[0];
-    const startTimeStr = startTime.toISOString().split('T')[0];
-    if (workoutDateStr !== startTimeStr) {
-      throw new Error('Workout startTime must be on the same day as workout date');
+    const startTime = workout.startTime instanceof Date ? workout.startTime : new Date(workout.startTime);
+    if (isNaN(startTime.getTime())) {
+      throw new Error('Workout startTime is invalid');
     }
     
     // Validate endTime if present
     if (workout.endTime) {
-      const endTime = new Date(workout.endTime);
+      const endTime = workout.endTime instanceof Date ? workout.endTime : new Date(workout.endTime);
+      if (isNaN(endTime.getTime())) {
+        throw new Error('Workout endTime is invalid');
+      }
       if (endTime < startTime) {
         throw new Error('Workout endTime must be after startTime');
       }
       if (endTime.getTime() > now.getTime() + toleranceMs) {
-        throw new Error('Workout endTime cannot be in the future');
+        // Auto-adjust endTime to current time if it's in the future
+        const cappedEndTime = new Date(Math.min(endTime.getTime(), now.getTime() + toleranceMs));
+        console.warn('End time capped to current time (was in the future)', {
+          original: endTime.toISOString(),
+          capped: cappedEndTime.toISOString(),
+        });
+        (workout as Workout).endTime = cappedEndTime;
       }
       // Allow endTime to be on next day (for late-night workouts)
+      const startTimeStr = startTime.toISOString().split('T')[0];
       const endTimeStr = endTime.toISOString().split('T')[0];
       const endDateObj = new Date(endTimeStr);
       const startDateObj = new Date(startTimeStr);
@@ -417,11 +415,14 @@ class DataService {
 
   // Workout operations with ACID transactions and versioning
   async createWorkout(workout: Omit<Workout, 'id'>): Promise<string> {
-    this.validateWorkout(workout);
+    // Normalize start time before validation to handle stale dates gracefully
+    const workoutDate = workout.date instanceof Date ? workout.date : new Date(workout.date);
+    const normalizedStartTime = normalizeWorkoutStartTime(workoutDate, workout.startTime);
     
     // Sanitize user inputs to prevent XSS and normalize duration
     const sanitizedWorkout: Omit<Workout, 'id'> = {
       ...workout,
+      startTime: normalizedStartTime, // Use normalized start time
       // Normalize totalDuration to integer minutes to handle floating point precision
       totalDuration: workout.totalDuration !== undefined 
         ? Math.round(workout.totalDuration) 
@@ -436,6 +437,9 @@ class DataService {
         })),
       })),
     };
+    
+    // Validate workout (will use normalized start time)
+    this.validateWorkout(sanitizedWorkout);
     
     // Ensure user context
     const userId = userContextManager.requireUserId();

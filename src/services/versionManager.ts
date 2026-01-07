@@ -137,7 +137,7 @@ class VersionManager {
    * Merge records (three-way merge)
    */
   mergeRecords<T extends VersionedRecord>(
-    base: T,
+    _base: T,
     local: T,
     remote: T
   ): T {

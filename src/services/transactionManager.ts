@@ -35,12 +35,13 @@ class TransactionManager {
 
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
-        return await Promise.race([
-          db.transaction('rw', storeNames as IDBValidKey[], async (tx) => {
+        const result = await Promise.race([
+          db.transaction('rw', storeNames, async (tx) => {
             return await operations(tx);
           }),
           this.createTimeoutPromise(timeout),
         ]);
+        return result as T;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
         
@@ -73,7 +74,7 @@ class TransactionManager {
     const executed: TransactionOperation[] = [];
 
     try {
-      await this.execute(storeNames, async (tx) => {
+      await this.execute(storeNames, async (_tx) => {
         for (const op of operations) {
           try {
             await op.operation();
@@ -180,7 +181,7 @@ class TransactionManager {
     storeNames: string[],
     operation: (tx: Transaction) => Promise<T>
   ): Promise<T> {
-    return await db.transaction('r', storeNames as IDBValidKey[], async (tx) => {
+    return await db.transaction('r', storeNames, async (tx) => {
       return await operation(tx);
     });
   }

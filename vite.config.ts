@@ -52,8 +52,8 @@ export default defineConfig(({ mode }) => {
       },
       includeAssets: ['assests/img/Fittrack2.png'],
       manifest: {
-        name: 'FitTrackAI - Gym Exercise Tracker',
-        short_name: 'FitTrackAI',
+        name: 'Fit Track AI',
+        short_name: 'Fit Track AI',
         description: 'Track workouts, visualize muscle recovery, and get AI insights',
         theme_color: '#3b82f6',
         background_color: '#0f172a',

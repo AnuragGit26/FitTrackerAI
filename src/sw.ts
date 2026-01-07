@@ -4,7 +4,7 @@ import { clientsClaim } from 'workbox-core';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { precacheAndRoute, createHandlerBoundToURL } from 'workbox-precaching';
 import { registerRoute } from 'workbox-routing';
-import { CacheFirst, NetworkFirst, StaleWhileRevalidate } from 'workbox-strategies';
+import { CacheFirst, NetworkFirst } from 'workbox-strategies';
 import type { AIContext, InsightType, AIInsightsResults, AIInsightsErrors, SyncEvent, PeriodicSyncEvent } from '@/types/serviceWorker';
 import type { Workout } from '@/types/workout';
 import type { MuscleStatus } from '@/types/muscle';
@@ -67,13 +67,14 @@ registerRoute(
 );
 
 // Background sync for AI requests (when offline)
-self.addEventListener('sync', (event: SyncEvent) => {
-    if (event.tag === 'ai-request-sync') {
-        event.waitUntil(handleAISync());
+self.addEventListener('sync', (event: Event) => {
+    const syncEvent = event as SyncEvent;
+    if (syncEvent.tag === 'ai-request-sync') {
+        syncEvent.waitUntil(handleAISync());
     }
 
-    if (event.tag === 'workout-reminder-sync') {
-        event.waitUntil(checkScheduledWorkoutReminders());
+    if (syncEvent.tag === 'workout-reminder-sync') {
+        syncEvent.waitUntil(checkScheduledWorkoutReminders());
     }
 });
 
@@ -83,13 +84,14 @@ async function handleAISync(): Promise<void> {
 }
 
 // Periodic background sync for AI refresh checks (every hour)
-self.addEventListener('periodicsync', (event: PeriodicSyncEvent) => {
-    if (event.tag === 'ai-refresh-check') {
-        event.waitUntil(checkAIRefresh());
+self.addEventListener('periodicsync', (event: Event) => {
+    const periodicSyncEvent = event as PeriodicSyncEvent;
+    if (periodicSyncEvent.tag === 'ai-refresh-check') {
+        periodicSyncEvent.waitUntil(checkAIRefresh());
     }
 
-    if (event.tag === 'recovery-check') {
-        event.waitUntil(checkMuscleRecovery());
+    if (periodicSyncEvent.tag === 'recovery-check') {
+        periodicSyncEvent.waitUntil(checkMuscleRecovery());
     }
 });
 
@@ -130,7 +132,7 @@ async function checkMuscleRecovery(): Promise<void> {
 }
 
 // Handle messages from the main app
-self.addEventListener('message', (event: MessageEvent) => {
+self.addEventListener('message', (event: ExtendableMessageEvent) => {
     if (event.data && event.data.type === 'SKIP_WAITING') {
         self.skipWaiting();
     }
@@ -240,7 +242,7 @@ async function showWorkoutReminderNotification(notification: any): Promise<void>
         body,
         icon,
         badge,
-        tag: notification.id,
+        tag: `workout-reminder-${notification.data.workoutId || notification.id}`,
         requireInteraction: false,
         data: {
             type: 'workout_reminder',
@@ -266,11 +268,15 @@ async function showMuscleRecoveryNotification(notification: any): Promise<void> 
     const icon = '/assests/img/Fittrack2.png';
     const badge = '/assests/img/Fittrack2.png';
 
+    // Create tag with muscle name and date to allow one notification per day per muscle
+    const today = new Date().toISOString().split('T')[0];
+    const tag = `muscle-recovery-${notification.data.muscle || 'unknown'}-${today}`;
+
     const options: NotificationOptions = {
         body,
         icon,
         badge,
-        tag: notification.id,
+        tag,
         requireInteraction: false,
         data: {
             type: 'muscle_recovery',
@@ -383,7 +389,7 @@ async function fetchAIInsightsInBackground(
     context: AIContext,
     fingerprint: string,
     insightTypes: InsightType[],
-    userId?: string,
+    _userId?: string,
     apiKey?: string
 ): Promise<void> {
 
@@ -428,7 +434,8 @@ async function fetchAIInsightsInBackground(
             }
 
             if (result) {
-                results[insightType] = result;
+                // Type assertion needed for union type assignment
+                (results as Record<string, ProgressAnalysis | SmartAlerts | WorkoutRecommendations>)[insightType] = result as ProgressAnalysis | SmartAlerts | WorkoutRecommendations;
                 // Cache the result
                 await cacheAIResponse(fingerprint, insightType, result);
             }
@@ -453,7 +460,7 @@ async function fetchAIInsightsInBackground(
 async function generateProgressAnalysisInSW(
     workouts: Workout[],
     personalRecords: PersonalRecord[],
-    strengthProgression: StrengthProgression[],
+    _strengthProgression: StrengthProgression[],
     volumeTrend: Array<{ date: string; totalVolume: number }>,
     consistencyScore: number,
     previousConsistencyScore: number,
@@ -573,14 +580,15 @@ CRITICAL OUTPUT REQUIREMENTS:
                 return obj;
             };
 
-            const cleaned = cleanObject(parsed);
+            const cleaned = cleanObject(parsed) as Record<string, unknown>;
+            const breakthrough = cleaned.breakthrough as { exercise?: string; projectedWeight?: number; improvementPercent?: number; reason?: string } | undefined;
 
             return {
-                breakthrough: cleaned.breakthrough?.exercise ? {
-                    exercise: cleanString(cleaned.breakthrough.exercise),
-                    projectedWeight: cleaned.breakthrough.projectedWeight,
-                    improvementPercent: cleaned.breakthrough.improvementPercent,
-                    reason: cleanString(cleaned.breakthrough.reason || ''),
+                breakthrough: breakthrough?.exercise ? {
+                    exercise: cleanString(breakthrough.exercise),
+                    projectedWeight: breakthrough.projectedWeight,
+                    improvementPercent: breakthrough.improvementPercent,
+                    reason: cleanString(breakthrough.reason || ''),
                 } : undefined,
                 consistencyScore,
                 consistencyChange: consistencyScore - previousConsistencyScore,
@@ -597,27 +605,28 @@ CRITICAL OUTPUT REQUIREMENTS:
                 plateaus: (Array.isArray(cleaned.plateaus) ? cleaned.plateaus : []).map((p: unknown) => {
                     const plateau = p as Record<string, unknown>;
                     return {
-                        exercise: cleanString(p.exercise || ''),
-                        weight: p.weight,
-                        weeksStuck: p.weeksStuck,
-                        suggestion: cleanString(plateau.suggestion || ''),
+                        exercise: cleanString(String(plateau.exercise || '')),
+                        weight: (plateau.weight as number) || 0,
+                        weeksStuck: (plateau.weeksStuck as number) || 0,
+                        suggestion: cleanString(String(plateau.suggestion || '')),
                     };
                 }),
                 formChecks: (Array.isArray(cleaned.formChecks) ? cleaned.formChecks : []).map((f: unknown) => {
                     const formCheck = f as Record<string, unknown>;
                     return {
-                        exercise: cleanString(f.exercise || ''),
-                        issue: cleanString(f.issue || ''),
-                        muscleGroup: cleanString(formCheck.muscleGroup || ''),
+                        exercise: cleanString(String(formCheck.exercise || '')),
+                        issue: cleanString(String(formCheck.issue || '')),
+                        muscleGroup: (formCheck.muscleGroup as MuscleGroup) || 'chest',
                     };
                 }),
-                trainingPatterns: (Array.isArray(cleaned.trainingPatterns) ? cleaned.trainingPatterns : []).map((t: unknown) => {
+                trainingPatterns: (Array.isArray(cleaned.trainingPatterns) ? cleaned.trainingPatterns : []).map((t: unknown, i: number) => {
                     const pattern = t as Record<string, unknown>;
                     return {
-                        type: t.type,
-                        title: cleanString(t.title || ''),
-                        description: cleanString(t.description || ''),
-                        impact: cleanString(pattern.impact || ''),
+                        id: `pattern-${i}`,
+                        type: (pattern.type as 'sleep' | 'caffeine' | 'timing' | 'other') || 'other',
+                        title: cleanString(String(pattern.title || '')),
+                        description: cleanString(String(pattern.description || '')),
+                        impact: cleanString(String(pattern.impact || '')),
                     };
                 }),
             };
@@ -737,30 +746,30 @@ CRITICAL OUTPUT REQUIREMENTS:
                     const alert = a as Record<string, unknown>;
                     return {
                         id: `alert-${i}`,
-                        type: a.type,
-                        title: cleanString(a.title || ''),
-                        message: cleanString(a.message || ''),
-                        muscleGroup: cleanString(alert.muscleGroup || ''),
+                        type: (alert.type as 'critical' | 'warning' | 'info') || 'info',
+                        title: cleanString(String(alert.title || '')),
+                        message: cleanString(String(alert.message || '')),
+                        muscleGroup: (alert.muscleGroup as MuscleGroup) || 'chest',
                     };
                 }),
                 suggestions: (Array.isArray(parsed.suggestions) ? parsed.suggestions : []).map((s: unknown, i: number) => {
                     const suggestion = s as Record<string, unknown>;
                     return {
                         id: `suggestion-${i}`,
-                        type: s.type,
-                        title: cleanString(s.title || ''),
-                        description: cleanString(suggestion.description || ''),
+                        type: (suggestion.type as 'deload' | 'sleep' | 'nutrition' | 'workout') || 'workout',
+                        title: cleanString(String(suggestion.title || '')),
+                        description: cleanString(String(suggestion.description || '')),
                     };
                 }),
                 nutritionEvents: (Array.isArray(parsed.nutritionEvents) ? parsed.nutritionEvents : []).map((e: unknown, i: number) => {
                     const event = e as Record<string, unknown>;
                     return {
                         id: `nutrition-${i}`,
-                        time: e.time,
-                        relativeTime: cleanString(e.relativeTime || ''),
-                        title: cleanString(e.title || ''),
-                        description: cleanString(e.description || ''),
-                        type: event.type,
+                        time: String(event.time || ''),
+                        relativeTime: cleanString(String(event.relativeTime || '')),
+                        title: cleanString(String(event.title || '')),
+                        description: cleanString(String(event.description || '')),
+                        type: (event.type as 'protein' | 'carb' | 'meal' | 'supplement') || 'meal',
                     };
                 }),
             };
@@ -1079,7 +1088,7 @@ CRITICAL OUTPUT REQUIREMENTS:
 }
 
 // Helper functions for formatting data in SW
-function formatWorkoutSummaryForSW(workouts: Workout[], personalRecords?: PersonalRecord[]): string {
+function formatWorkoutSummaryForSW(workouts: Workout[], _personalRecords?: PersonalRecord[]): string {
     if (workouts.length === 0) return 'No workouts logged yet.';
 
     const recent = workouts.slice(0, 10);
@@ -1212,8 +1221,8 @@ function generateMockProgressAnalysisInSW(
 }
 
 function generateMockSmartAlertsInSW(
-    workouts: Workout[],
-    muscleStatuses: MuscleStatus[],
+    _workouts: Workout[],
+    _muscleStatuses: MuscleStatus[],
     readinessScore: number
 ): SmartAlerts {
     return {
@@ -1231,11 +1240,11 @@ function generateMockSmartAlertsInSW(
 }
 
 function generateMockWorkoutRecommendationsInSW(
-    workouts: Workout[],
-    muscleStatuses: MuscleStatus[],
+    _workouts: Workout[],
+    _muscleStatuses: MuscleStatus[],
     readinessScore: number,
     symmetryScore: number,
-    focusDistribution: { legs: number; push: number; pull: number },
+    _focusDistribution: { legs: number; push: number; pull: number },
     calculatedPredictions: RecoveryPrediction[]
 ): WorkoutRecommendations {
     return {

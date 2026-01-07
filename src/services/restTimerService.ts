@@ -20,7 +20,6 @@ export interface RestTimerPreset {
 }
 
 class RestTimerService {
-  private timerInterval: NodeJS.Timeout | null = null;
   private notificationPermission: NotificationPermission = 'default';
   private audioContext: AudioContext | null = null;
 
@@ -100,12 +99,12 @@ class RestTimerService {
   showNotification(title: string, body: string): void {
     if (this.notificationPermission === 'granted') {
       try {
-        new Notification(title, {
+        new Notification(`Fit Track AI - ${title}`, {
           body,
           icon: '/assests/img/Fittrack2.png',
           badge: '/assests/img/Fittrack2.png',
           tag: 'rest-timer',
-        });
+        } as NotificationOptions);
       } catch (error) {
         console.warn('Failed to show notification:', error);
       }

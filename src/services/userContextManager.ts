@@ -1,4 +1,4 @@
-import { db, dbHelpers } from './database';
+import { dbHelpers } from './database';
 
 class UserContextManager {
   private currentUserId: string | null = null;

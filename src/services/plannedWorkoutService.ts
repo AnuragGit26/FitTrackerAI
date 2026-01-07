@@ -4,7 +4,7 @@ import { templateService } from './templateService';
 
 class PlannedWorkoutService {
   async createPlannedWorkout(
-    userId: string,
+    _userId: string,
     plannedWorkout: Omit<PlannedWorkout, 'id' | 'createdAt' | 'updatedAt'>
   ): Promise<string> {
     const id = `planned-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;

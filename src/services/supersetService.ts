@@ -1,5 +1,4 @@
 import { WorkoutExercise, ExerciseGroupType } from '@/types/exercise';
-import { calculateVolume } from '@/utils/calculations';
 
 export interface SupersetGroup {
   groupId: string;

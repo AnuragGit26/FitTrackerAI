@@ -1,5 +1,5 @@
 import { Workout } from './workout';
-import { WorkoutExercise, WorkoutSet } from './exercise';
+import { WorkoutSet } from './exercise';
 import { MuscleGroup } from './muscle';
 
 export interface SessionComparison {

@@ -1,5 +1,4 @@
 import { Workout } from '@/types/workout';
-import { WorkoutExercise, WorkoutSet } from '@/types/exercise';
 import { MuscleGroup } from '@/types/muscle';
 import {
   WorkoutSummaryData,
@@ -15,10 +14,9 @@ import {
 } from '@/types/workoutSummary';
 import { rpeService } from './rpeService';
 import { workoutHistoryService } from './workoutHistoryService';
-import { analyticsService } from './analyticsService';
 import { dataService } from './dataService';
-import { calculateEstimatedOneRepMax, calculateVolume } from '@/utils/calculations';
-import { categorizeMuscleGroup, aggregateVolumeByMuscleGroup } from '@/utils/analyticsHelpers';
+import { aggregateVolumeByMuscleGroup } from '@/utils/analyticsHelpers';
+import { calculateEstimatedOneRepMax } from '@/utils/calculations';
 
 export const workoutSummaryService = {
   /**

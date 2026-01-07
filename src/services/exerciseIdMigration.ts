@@ -1,8 +1,5 @@
 import { dbHelpers } from './database';
 import { Exercise } from '@/types/exercise';
-import { Workout } from '@/types/workout';
-import { WorkoutTemplate } from '@/types/workout';
-import { PlannedWorkout } from '@/types/workout';
 import { generateAlphanumericId } from '@/utils/idGenerator';
 import { logger } from '@/utils/logger';
 

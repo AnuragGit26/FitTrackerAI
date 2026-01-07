@@ -65,7 +65,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     try {
       const savedSettings = await dataService.getSetting('appSettings');
       // Merge with defaults to handle new notification fields
-      const settings = { ...DEFAULT_SETTINGS, ...savedSettings };
+      const settings = { ...DEFAULT_SETTINGS, ...(savedSettings || {}) };
       
       // Check notification permission from browser
       if ('Notification' in window) {

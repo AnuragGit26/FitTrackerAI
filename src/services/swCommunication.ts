@@ -175,14 +175,14 @@ class SWCommunication {
    * Register handler for AI insights ready messages
    */
   onAIInsightsReady(handler: (data: { fingerprint: string; results: Record<string, unknown>; errors?: unknown }) => void): () => void {
-    return this.registerHandler('AI_INSIGHTS_READY', handler);
+    return this.registerHandler('AI_INSIGHTS_READY', handler as unknown as MessageHandler);
   }
 
   /**
    * Register handler for AI insights error messages
    */
   onAIInsightsError(handler: (data: { error: string; fingerprint: string; insightTypes: string[] }) => void): () => void {
-    return this.registerHandler('AI_INSIGHTS_ERROR', handler);
+    return this.registerHandler('AI_INSIGHTS_ERROR', handler as unknown as MessageHandler);
   }
 
   /**

@@ -1,4 +1,3 @@
-import { PreviousWorkoutData } from '@/services/workoutHistoryService';
 import { WorkoutSet } from '@/types/exercise';
 
 /**
@@ -113,7 +112,7 @@ export function formatSetsForGrid(sets: WorkoutSet[]): Array<{
  */
 export function getContextualMessage(
   previousSet: { weight?: number; reps?: number } | null,
-  currentSetNumber: number
+  _currentSetNumber: number
 ): string | null {
   if (!previousSet) return null;
 

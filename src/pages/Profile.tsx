@@ -204,7 +204,6 @@ export function Profile() {
     console.log('[Profile.handleManualSync] Button clicked, profile.id:', profile?.id, 'isSyncing:', isSyncing);
     
     if (!profile?.id || isSyncing) {
-      // eslint-disable-next-line no-console
       console.warn('[Profile.handleManualSync] Sync aborted - missing profile.id or already syncing');
       return;
     }
@@ -261,7 +260,6 @@ export function Profile() {
       setLastSyncTime(new Date());
       await loadSyncStatus();
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('[Profile.handleManualSync] Sync error:', error);
       setSyncStatus('error');
       const errorMessage = error instanceof Error ? error.message : 'Failed to sync data';

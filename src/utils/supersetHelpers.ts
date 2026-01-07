@@ -105,8 +105,8 @@ export function identifyBestCombinations(
  * Check if exercises are compatible for grouping
  */
 export function areExercisesCompatible(
-  exercise1: WorkoutExercise,
-  exercise2: WorkoutExercise
+  _exercise1: WorkoutExercise,
+  _exercise2: WorkoutExercise
 ): boolean {
   // Basic compatibility check - can be enhanced
   // For now, allow any exercises to be grouped

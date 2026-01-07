@@ -1,5 +1,5 @@
 import { ExerciseAdvancedDetails } from '@/types/exercise';
-import { db, dbHelpers } from './database';
+import { dbHelpers } from './database';
 
 const ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
 const STRENGTHLOG_BASE_URL = 'https://www.strengthlog.com';
@@ -45,7 +45,7 @@ async function getAnatomyImageUrlFromExercise(exerciseSlug: string): Promise<str
 /**
  * Parse HTML content to extract exercise details
  */
-function parseExerciseDetails(html: string, exerciseSlug: string): ExerciseAdvancedDetails {
+function parseExerciseDetails(html: string, _exerciseSlug: string): ExerciseAdvancedDetails {
   // Create a temporary DOM parser (works in browser)
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');

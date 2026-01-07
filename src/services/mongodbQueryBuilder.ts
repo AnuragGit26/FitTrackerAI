@@ -19,7 +19,7 @@ import type { Prisma } from '@prisma/client';
  * @returns A Prisma where clause with userId filter pre-applied
  * @throws {UserIdValidationError} If userId is missing or invalid
  */
-export function userScopedFilter<T = Record<string, unknown>>(
+export function userScopedFilter(
     userId: string,
     tableName: SyncableTable,
     additionalFilters?: {

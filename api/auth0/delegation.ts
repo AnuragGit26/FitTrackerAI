@@ -18,11 +18,6 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-interface DelegationRequest {
-    target?: string;
-    scope?: string;
-}
-
 interface DelegationResponse {
     access_token: string;
     token_type: string;

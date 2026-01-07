@@ -1,6 +1,5 @@
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { useMuscleRecovery } from '@/hooks/useMuscleRecovery';
-import { useWorkoutStore } from '@/store/workoutStore';
 import { useUserStore } from '@/store/userStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useMemo } from 'react';
@@ -9,7 +8,6 @@ import { DEFAULT_RECOVERY_SETTINGS } from '@/types/muscle';
 
 export function RecoveryStatusHeader() {
   const { muscleStatuses, isLoading } = useMuscleRecovery();
-  const { workouts } = useWorkoutStore();
   const { profile } = useUserStore();
   const { settings } = useSettingsStore();
 
@@ -114,7 +112,7 @@ export function RecoveryStatusHeader() {
       trend,
       statusMessage,
     };
-  }, [muscleStatuses, isLoading, workouts, profile, settings.baseRestInterval]);
+  }, [muscleStatuses, isLoading, profile, settings.baseRestInterval]);
 
   return (
     <div className="flex flex-col gap-1">

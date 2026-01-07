@@ -1,7 +1,6 @@
 import { Workout } from '@/types/workout';
 import { PersonalRecord } from '@/types/analytics';
 import { MuscleGroup } from '@/types/muscle';
-import { calculateEstimatedOneRepMax } from './calculations';
 import { exerciseMuscleMap } from '@/services/muscleMapping';
 
 export type DateRange = '7d' | '30d' | '90d' | '180d' | '1y' | 'all';
@@ -80,7 +79,7 @@ export function calculatePersonalRecords(workouts: Workout[]): PersonalRecord[] 
             maxWeight: set.weight,
             maxReps: set.reps,
             date: workout.date,
-            workoutId: workout.id || 0, // Each record is uniquely associated with its workout
+            workoutId: String(workout.id || 0), // Each record is uniquely associated with its workout
           });
         }
       });
@@ -174,7 +173,7 @@ function getMondayOfWeek(date: Date): Date {
  * For partial weeks, the threshold is prorated.
  * Score = (consistent_weeks / total_weeks) * 100
  */
-export function calculateConsistencyScore(workouts: Workout[], days: number = 30): number {
+export function calculateConsistencyScore(workouts: Workout[], _days: number = 30): number {
   if ((workouts ?? []).length === 0) return 0;
 
   // Use all available workout data (no date filtering)

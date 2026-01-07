@@ -4,7 +4,7 @@
  */
 
 import { notificationService } from './notificationService';
-import { NotificationCreateInput, NotificationType } from '@/types/notification';
+import { NotificationCreateInput } from '@/types/notification';
 import { PlannedWorkout } from '@/types/workout';
 import { MuscleStatus } from '@/types/muscle';
 

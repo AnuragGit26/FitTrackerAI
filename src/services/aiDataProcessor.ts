@@ -87,7 +87,8 @@ class AIDataProcessor {
       w => new Date(w.date) >= fourteenDaysAgo && new Date(w.date) < sevenDaysAgo
     );
     const olderWorkouts = workouts.filter(w => new Date(w.date) < fourteenDaysAgo);
-    const _prWorkouts = workouts.filter(w => 
+    // Filter workouts with PRs (kept for potential future use)
+    workouts.filter(w => 
       prWorkoutDates.has(new Date(w.date).toISOString().split('T')[0])
     );
 
@@ -159,9 +160,6 @@ class AIDataProcessor {
         })
         .slice(0, 8)
         .map(([week, data]) => {
-          const _avgDate = new Date(
-            data.dates.reduce((sum, d) => sum + d.getTime(), 0) / data.dates.length
-          );
           return `${week}: ${data.count} workouts, ${Math.round(data.volume)}kg total`;
         })
         .join('\n');

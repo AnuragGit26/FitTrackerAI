@@ -97,7 +97,6 @@ class MongoDBSyncService {
                 return this.performSync(userId, options);
             })
             .catch((error) => {
-                // eslint-disable-next-line no-console
                 console.error('[MongoDBSyncService.sync] Sync failed:', error);
                 this.isSyncing = false;
                 this.currentProgress = null;
@@ -177,7 +176,6 @@ class MongoDBSyncService {
                     return result;
                 } catch (error) {
                     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-                    // eslint-disable-next-line no-console
                     console.error(`[MongoDBSyncService.performSync] Error syncing table ${table}:`, errorMessage);
                     const errorResult: SyncResult = {
                         tableName: table,
@@ -344,7 +342,6 @@ class MongoDBSyncService {
                 });
             }
         } catch (error) {
-            // eslint-disable-next-line no-console
             console.error('[MongoDBSyncService.performSync] Sync error:', error);
             this.isSyncing = false;
             this.currentProgress = null;
@@ -1306,7 +1303,6 @@ class MongoDBSyncService {
                     }
                 } catch (findError) {
                     const errorMessage = findError instanceof Error ? findError.message : 'Unknown error';
-                    // eslint-disable-next-line no-console
                     console.error(`[MongoDBSyncService.pushBatch] Error finding existing record for ${tableName} ${recordId}:`, errorMessage);
                     result.errors.push({
                         tableName,
@@ -1333,7 +1329,6 @@ class MongoDBSyncService {
                     const existingObj = existing as Record<string, unknown>;
                     if (Object.keys(existingObj).length === 1 && 'success' in existingObj) {
                         // This is likely a response wrapper, not an actual record
-                        // eslint-disable-next-line no-console
                         console.warn(`[MongoDBSyncService.pushBatch] Received response wrapper instead of record for ${tableName} ${recordId}, treating as not found`);
                         existing = null;
                     }
@@ -1352,7 +1347,6 @@ class MongoDBSyncService {
                         // eslint-disable-next-line no-console
                         console.log(`[MongoDBSyncService.pushBatch] Workout existingId extracted:`, existingId, `type:`, typeof existingId);
                         if (!existingId) {
-                            // eslint-disable-next-line no-console
                             console.error(`[MongoDBSyncService.pushBatch] Workout existing record (no id):`, JSON.stringify(existing, null, 2));
                         }
                     }
@@ -1426,9 +1420,7 @@ class MongoDBSyncService {
                                     console.log(`[MongoDBSyncService.pushBatch] Workout conflict resolution - existingId: ${existingId}, type: ${typeof existingId}`);
                                     
                                     if (!existingId) {
-                                        // eslint-disable-next-line no-console
                                         console.error(`[MongoDBSyncService.pushBatch] No existingId for workout ${recordId}, existing record keys:`, Object.keys(existing as Record<string, unknown>));
-                                        // eslint-disable-next-line no-console
                                         console.error(`[MongoDBSyncService.pushBatch] Existing record:`, JSON.stringify(existing, null, 2));
                                         
                                         // The existing record should have an id if it came from MongoDB
@@ -1470,7 +1462,6 @@ class MongoDBSyncService {
                                                 // eslint-disable-next-line no-console
                                                 console.log(`[MongoDBSyncService.pushBatch] Workout upsert result (fallback):`, workoutResult.id);
                                             } else {
-                                                // eslint-disable-next-line no-console
                                                 console.error(`[MongoDBSyncService.pushBatch] Could not find workout by date fallback, foundWorkout:`, foundWorkout);
                                                 throw new Error(`No existingId for workout ${recordId} and could not find by date`);
                                             }
@@ -1524,7 +1515,6 @@ class MongoDBSyncService {
                                 case 'settings': {
                                     const settingKey = (where.key as string) || (mongoRecord.key as string);
                                     if (!settingKey) {
-                                        // eslint-disable-next-line no-console
                                         console.error(`[MongoDBSyncService.pushBatch] Invalid key for setting ${recordId}`);
                                         throw new Error(`Invalid key for setting ${recordId}`);
                                     }
@@ -1538,7 +1528,6 @@ class MongoDBSyncService {
                                 case 'notifications': {
                                     const notificationId = (where.notificationId as string) || (mongoRecord.notificationId as string) || recordId;
                                     if (!notificationId || notificationId === 'new') {
-                                        // eslint-disable-next-line no-console
                                         console.error(`[MongoDBSyncService.pushBatch] Invalid notificationId for notification ${recordId}`);
                                         throw new Error(`Invalid notificationId for notification ${recordId}`);
                                     }
@@ -1577,7 +1566,6 @@ class MongoDBSyncService {
                             result.conflicts++;
                         } catch (upsertError) {
                             const errorMessage = upsertError instanceof Error ? upsertError.message : 'Unknown error';
-                            // eslint-disable-next-line no-console
                             console.error(`[MongoDBSyncService.pushBatch] Error upserting conflict-resolved record for ${tableName} ${recordId}:`, errorMessage);
                             result.errors.push({
                                 tableName,
@@ -1936,7 +1924,6 @@ class MongoDBSyncService {
                             result.conflicts++;
                         } catch (upsertError) {
                             const errorMessage = upsertError instanceof Error ? upsertError.message : 'Unknown error';
-                            // eslint-disable-next-line no-console
                             console.error(`[MongoDBSyncService.pushBatch] Error upserting record for ${tableName} ${recordId} (remote newer case):`, errorMessage);
                             result.errors.push({
                                 tableName,
@@ -2066,7 +2053,6 @@ class MongoDBSyncService {
                         result.recordsCreated++;
                     } catch (createError) {
                         const errorMessage = createError instanceof Error ? createError.message : 'Unknown error';
-                        // eslint-disable-next-line no-console
                         console.error(`[MongoDBSyncService.pushBatch] Error creating new record for ${tableName} ${recordId}:`, errorMessage);
                         result.errors.push({
                             tableName,

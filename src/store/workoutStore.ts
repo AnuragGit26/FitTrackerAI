@@ -9,6 +9,7 @@ import { saveWorkoutState, loadWorkoutState, clearWorkoutState } from '@/utils/w
 import { saveFailedWorkout } from '@/utils/workoutErrorRecovery';
 import { calculateVolume } from '@/utils/calculations';
 import { userContextManager } from '@/services/userContextManager';
+import { normalizeWorkoutStartTime } from '@/utils/validators';
 
 interface WorkoutState {
   currentWorkout: Workout | null;
@@ -480,10 +481,16 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         );
       }
 
+      // Normalize start time to handle stale dates from persisted state
+      const workoutDate = currentWorkout.date instanceof Date 
+        ? currentWorkout.date 
+        : new Date(currentWorkout.date);
+      const normalizedStartTime = normalizeWorkoutStartTime(workoutDate, startTime);
+
       const completedWorkout: Workout = {
         ...currentWorkout,
         userId: currentUserId, // Use current user ID from context manager
-        startTime, // Use calculated/corrected startTime
+        startTime: normalizedStartTime, // Use normalized start time
         endTime,
         totalDuration: totalDurationMinutes,
         calories: calories !== undefined ? calories : currentWorkout.calories,

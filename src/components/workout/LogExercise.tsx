@@ -10,6 +10,7 @@ import { CardioSetCard } from '@/components/exercise/CardioSetCard';
 import { HIITSetCard } from '@/components/exercise/HIITSetCard';
 import { YogaSetCard } from '@/components/exercise/YogaSetCard';
 import { CompletedSetItem } from '@/components/exercise/CompletedSetItem';
+import { SetCompletionCelebration } from '@/components/exercise/SetCompletionCelebration';
 import { SupersetNavigationCards } from '@/components/exercise/SupersetNavigationCards';
 import { GroupRestTimer } from '@/components/exercise/GroupRestTimer';
 import { PreviousWorkoutTable } from '@/components/exercise/PreviousWorkoutTable';
@@ -634,7 +635,7 @@ export function LogExercise({
     }
   };
 
-  const handleUpdateSet = (setNumber: number, updates: Partial<WorkoutSet>) => {
+  const handleUpdateSet = useCallback((setNumber: number, updates: Partial<WorkoutSet>) => {
     setSets((prevSets) => {
       const updated = prevSets.map((set) => {
         if (set.setNumber === setNumber) {
@@ -718,7 +719,7 @@ export function LogExercise({
 
       return updated;
     });
-  };
+  }, [completeSet, resetSetDuration, startSet, settings.autoStartRestTimer, defaultRestDuration, selectedExercise, profile?.preferredUnit]);
 
   const validateForm = (): { isValid: boolean; errorMessage: string | null } => {
     const errors: Record<string, string> = {};
@@ -918,34 +919,122 @@ export function LogExercise({
     handleCloseRequest();
   }, [handleCloseRequest]);
 
-  // Rest timer handlers
-  const handleRestComplete = () => {
-    const actualRestTime = restTimerStartTime
-      ? Math.floor((new Date().getTime() - restTimerStartTime.getTime()) / 1000)
-      : defaultRestDuration;
+  // Track if component is mounted to prevent state updates after unmount
+  const isMountedRef = useRef(true);
 
-    if (restTimerSetNumberRef.current !== null) {
-      handleUpdateSet(restTimerSetNumberRef.current, { restTime: actualRestTime });
-      restTimerSetNumberRef.current = null;
-    } else {
-      if (sets.length > 0) {
-        const lastCompletedSet = [...sets].reverse().find((s) => s.completed);
-        if (lastCompletedSet) {
-          handleUpdateSet(lastCompletedSet.setNumber, { restTime: actualRestTime });
-        }
-      }
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Helper function to auto-save exercise sets to workout store
+  const autoSaveExerciseSets = useCallback(async () => {
+    if (!selectedExercise || !sets.length || !isMountedRef.current) {
+      return;
     }
 
-    setRestTimerVisible(false);
-    setRestTimerRemaining(defaultRestDuration);
-    setRestTimerStartTime(null);
-    setRestTimerPaused(false);
-    restTimerSetNumberRef.current = null;
+    try {
+      // Ensure workout exists
+      let workout = currentWorkout;
+      if (!workout && profile) {
+        await startWorkout(profile.id);
+        workout = useWorkoutStore.getState().currentWorkout;
+        if (!workout) {
+          console.warn('Failed to start workout for auto-save');
+          return;
+        }
+      }
 
-    // Start tracking next set
-    currentSetStartTimeRef.current = new Date();
-    startSet();
-  };
+      if (!workout) {
+        return;
+      }
+
+      const muscleMapping = getMuscleMapping(selectedExercise.name);
+      let musclesWorked: MuscleGroup[] = muscleMapping
+        ? [...muscleMapping.primary, ...muscleMapping.secondary]
+        : [...(selectedExercise.primaryMuscles || []), ...(selectedExercise.secondaryMuscles || [])];
+      
+      if (musclesWorked.length === 0) {
+        musclesWorked = [MuscleGroup.CHEST];
+      }
+
+      const totalVolume = calculateVolume(sets, selectedExercise.trackingType);
+
+      const workoutExercise: WorkoutExercise = {
+        id: exerciseId || `exercise-${Date.now()}`,
+        exerciseId: selectedExercise.id,
+        exerciseName: selectedExercise.name,
+        sets: sets,
+        totalVolume,
+        musclesWorked,
+        timestamp: workoutDate,
+        notes: notes.trim() ? sanitizeNotes(notes.trim()) : undefined,
+      };
+
+      if (exerciseId) {
+        updateExercise(exerciseId, workoutExercise);
+      } else {
+        addExercise(workoutExercise);
+      }
+    } catch (error) {
+      console.error('Error auto-saving exercise sets:', error);
+    }
+  }, [selectedExercise, sets, exerciseId, workoutDate, notes, currentWorkout, profile, startWorkout, updateExercise, addExercise]);
+
+  // Rest timer handlers
+  const handleRestComplete = useCallback(() => {
+    if (!isMountedRef.current) {
+      return;
+    }
+
+    try {
+      const actualRestTime = restTimerStartTime
+        ? Math.floor((new Date().getTime() - restTimerStartTime.getTime()) / 1000)
+        : defaultRestDuration;
+
+      if (restTimerSetNumberRef.current !== null) {
+        const setNumber = restTimerSetNumberRef.current;
+        handleUpdateSet(setNumber, { restTime: actualRestTime });
+        restTimerSetNumberRef.current = null;
+      } else {
+        if (sets.length > 0) {
+          const lastCompletedSet = [...sets].reverse().find((s) => s.completed);
+          if (lastCompletedSet) {
+            handleUpdateSet(lastCompletedSet.setNumber, { restTime: actualRestTime });
+          }
+        }
+      }
+
+      // Auto-save exercise sets to workout store
+      autoSaveExerciseSets();
+
+      if (!isMountedRef.current) {
+        return;
+      }
+
+      setRestTimerVisible(false);
+      setRestTimerRemaining(defaultRestDuration);
+      setRestTimerStartTime(null);
+      setRestTimerPaused(false);
+      restTimerSetNumberRef.current = null;
+
+      // Start tracking next set
+      currentSetStartTimeRef.current = new Date();
+      startSet();
+    } catch (error) {
+      console.error('Error in handleRestComplete:', error);
+      // Still reset timer state even if there's an error
+      if (isMountedRef.current) {
+        setRestTimerVisible(false);
+        setRestTimerRemaining(defaultRestDuration);
+        setRestTimerStartTime(null);
+        setRestTimerPaused(false);
+        restTimerSetNumberRef.current = null;
+      }
+    }
+  }, [restTimerStartTime, defaultRestDuration, sets, handleUpdateSet, autoSaveExerciseSets, startSet]);
 
   const handleRestSkip = () => {
     const actualRestTime = restTimerStartTime
@@ -1020,10 +1109,10 @@ export function LogExercise({
     // Use requestAnimationFrame to ensure state update happens after render
     requestAnimationFrame(() => {
       setJustCompletedSetNumber(setToComplete.setNumber);
-      // Keep animation state longer for better visibility
+      // Keep animation state longer for better visibility (matches celebration duration)
       setTimeout(() => {
         setJustCompletedSetNumber(null);
-      }, 1500);
+      }, 2000);
     });
 
     // If in superset and has next exercise, show group rest timer
@@ -1551,6 +1640,12 @@ export function LogExercise({
         )}
         </div>
       </main>
+
+      {/* Set Completion Celebration Animation */}
+      <SetCompletionCelebration
+        isVisible={justCompletedSetNumber !== null}
+        onComplete={() => setJustCompletedSetNumber(null)}
+      />
 
       {/* Rest Timer - Only show when not in superset or last exercise in superset */}
       {(!isInSuperset || isLastInSuperset) && (

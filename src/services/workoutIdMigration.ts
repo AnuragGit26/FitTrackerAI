@@ -1,6 +1,5 @@
 import { dbHelpers } from './database';
 import { Workout } from '@/types/workout';
-import { PlannedWorkout } from '@/types/workout';
 import { generateWorkoutId } from '@/utils/idGenerator';
 import { logger } from '@/utils/logger';
 
@@ -121,7 +120,7 @@ class WorkoutIdMigration {
 
       // Update workouts - delete old and create new
       for (const [oldId, newId] of idMapping) {
-        const workout = workouts.find(w => w.id === oldId);
+        const workout = workouts.find(w => String(w.id) === String(oldId));
         if (!workout) continue;
 
         // Create updated workout with new ID
@@ -131,7 +130,7 @@ class WorkoutIdMigration {
         };
 
         // Delete old workout (numeric ID)
-        await dbHelpers.deleteWorkout(oldId);
+        await dbHelpers.deleteWorkout(String(oldId));
 
         // Save new workout (string ID)
         await dbHelpers.saveWorkout(updatedWorkout as Omit<Workout, 'id'>);
@@ -158,7 +157,7 @@ class WorkoutIdMigration {
   /**
    * Update planned workout references
    */
-  async updatePlannedWorkoutReferences(idMapping: Map<number, string>): Promise<number> {
+  async updatePlannedWorkoutReferences(_idMapping: Map<number, string>): Promise<number> {
     const updated = 0;
     
     try {

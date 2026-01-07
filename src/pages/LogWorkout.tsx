@@ -26,6 +26,7 @@ import { LogExercise } from '@/components/workout/LogExercise';
 import { QuickCardioLog } from '@/components/workout/QuickCardioLog';
 import { calculateVolume } from '@/utils/calculations';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
+import { normalizeWorkoutStartTime } from '@/utils/validators';
 
 // Helper function to format date for datetime-local input (local time, not UTC)
 function formatDateTimeLocal(date: Date): string {
@@ -596,32 +597,18 @@ export function LogWorkout() {
       }
       
       // Update workout with calculated start/end times
-      // Ensure startTime is on the same day as workout date
+      // Normalize start time to handle stale dates and ensure it's on the same day as workout date
       if (workoutStartTime && currentWorkout) {
         const workoutDate = currentWorkout.date instanceof Date 
           ? currentWorkout.date 
           : new Date(currentWorkout.date);
-        const workoutDateStr = workoutDate.toISOString().split('T')[0];
-        const startTimeStr = workoutStartTime.toISOString().split('T')[0];
         
-        // Adjust startTime to match workout date if needed
-        let adjustedStartTime = workoutStartTime;
-        if (workoutDateStr !== startTimeStr) {
-          adjustedStartTime = new Date(workoutDate);
-          adjustedStartTime.setHours(workoutStartTime.getHours());
-          adjustedStartTime.setMinutes(workoutStartTime.getMinutes());
-          adjustedStartTime.setSeconds(workoutStartTime.getSeconds());
-          adjustedStartTime.setMilliseconds(workoutStartTime.getMilliseconds());
-          
-          // Show warning if adjusted
-          if (workoutDateStr !== startTimeStr) {
-            console.warn('Start time adjusted to match workout date');
-          }
-        }
+        // Use normalization function to ensure start time is valid
+        const normalizedStartTime = normalizeWorkoutStartTime(workoutDate, workoutStartTime);
         
         const updatedWorkout = {
           ...currentWorkout,
-          startTime: adjustedStartTime,
+          startTime: normalizedStartTime,
           endTime: workoutEndTime,
         };
         useWorkoutStore.setState({ currentWorkout: updatedWorkout });

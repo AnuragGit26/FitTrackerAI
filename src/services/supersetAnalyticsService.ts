@@ -91,7 +91,7 @@ export const supersetAnalyticsService = {
    */
   suggestOptimalRestTime(
     group: SupersetGroup,
-    historicalData?: SupersetGroup[]
+    _historicalData?: SupersetGroup[]
   ): number {
     // Default suggestions based on group type
     if (group.groupType === 'circuit') {
@@ -111,7 +111,6 @@ export const supersetAnalyticsService = {
     currentExercise: string,
     historicalGroups: SupersetGroup[]
   ): string[] {
-    const recommendations: string[] = [];
     const pairingCounts = new Map<string, number>();
 
     historicalGroups.forEach((group) => {

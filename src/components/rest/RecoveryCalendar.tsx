@@ -11,7 +11,7 @@ export function RecoveryCalendar() {
   const { workouts } = useWorkoutStore();
   const { profile } = useUserStore();
   const { settings } = useSettingsStore();
-  const today = new Date();
+  const today = useMemo(() => new Date(), []);
   const monthStart = startOfMonth(today);
   const monthEnd = endOfMonth(today);
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });

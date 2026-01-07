@@ -180,6 +180,34 @@ async function createNotification(
     userId: string,
     insights: AIInsights
 ): Promise<void> {
+    // Check if a notification with the same type already exists for today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStart = today.toISOString();
+    const todayEnd = new Date(today);
+    todayEnd.setHours(23, 59, 59, 999);
+    const todayEndStr = todayEnd.toISOString();
+
+    const { data: existingNotifications, error: checkError } = await supabase
+        .from('notifications')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('type', 'ai_insight')
+        .gte('created_at', todayStart)
+        .lte('created_at', todayEndStr)
+        .is('deleted_at', null)
+        .limit(1);
+
+    if (checkError) {
+        console.error(`Error checking for existing notifications: ${checkError.message}`);
+        // Continue anyway - don't block notification creation on check failure
+    }
+
+    // If a notification already exists for today, skip creating a duplicate
+    if (existingNotifications && existingNotifications.length > 0) {
+        return;
+    }
+
     const notificationId = crypto.randomUUID();
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30); // Expires in 30 days

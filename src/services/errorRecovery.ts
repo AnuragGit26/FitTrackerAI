@@ -98,7 +98,7 @@ class ErrorRecovery {
       const result = await Promise.race([
         operation(),
         this.createTimeoutPromise(timeout),
-      ]);
+      ]) as T;
 
       // Reset on success
       state.failures = 0;
@@ -127,7 +127,7 @@ class ErrorRecovery {
     return Promise.race([
       operation(),
       this.createTimeoutPromise(timeoutMs),
-    ]);
+    ]) as Promise<T>;
   }
 
   /**

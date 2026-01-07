@@ -240,3 +240,73 @@ export function adjustStartTimeToMatchDate(workoutDate: Date, startTime: Date): 
   return adjusted;
 }
 
+/**
+ * Normalizes workout start time to ensure it's valid:
+ * - Ensures start time is on the same day as workout date (preserving time of day)
+ * - Caps start time to current time (not in the future, with 5s tolerance for clock skew)
+ * - Handles missing or invalid dates gracefully
+ * 
+ * @param workoutDate - The workout date
+ * @param startTime - The start time to normalize (can be undefined)
+ * @returns Normalized start time, or workoutDate if startTime is missing/invalid
+ */
+export function normalizeWorkoutStartTime(
+  workoutDate: Date,
+  startTime?: Date | string | null
+): Date {
+  const now = new Date();
+  const toleranceMs = 5000; // 5 seconds tolerance for clock skew
+  
+  // Ensure workoutDate is valid
+  const validWorkoutDate = workoutDate instanceof Date && !isNaN(workoutDate.getTime())
+    ? workoutDate
+    : new Date();
+  
+  // Default to workoutDate if startTime is missing
+  if (!startTime) {
+    return validWorkoutDate;
+  }
+  
+  // Convert startTime to Date if needed
+  let startTimeDate: Date;
+  if (startTime instanceof Date) {
+    startTimeDate = startTime;
+  } else if (typeof startTime === 'string') {
+    startTimeDate = new Date(startTime);
+  } else {
+    return validWorkoutDate;
+  }
+  
+  // Check if startTime is valid
+  if (isNaN(startTimeDate.getTime())) {
+    console.warn('Invalid startTime detected, using workout date');
+    return validWorkoutDate;
+  }
+  
+  // Step 1: Ensure startTime is on the same day as workout date (preserve time)
+  const workoutDateStr = validWorkoutDate.toISOString().split('T')[0];
+  const startTimeStr = startTimeDate.toISOString().split('T')[0];
+  
+  let normalized = startTimeDate;
+  if (workoutDateStr !== startTimeStr) {
+    normalized = adjustStartTimeToMatchDate(validWorkoutDate, startTimeDate);
+    console.warn('Start time adjusted to match workout date', {
+      original: startTimeDate.toISOString(),
+      adjusted: normalized.toISOString(),
+    });
+  }
+  
+  // Step 2: Cap startTime to current time (not in the future, with tolerance)
+  const maxAllowedTime = now.getTime() + toleranceMs;
+  if (normalized.getTime() > maxAllowedTime) {
+    const capped = new Date(Math.min(normalized.getTime(), maxAllowedTime));
+    console.warn('Start time capped to current time (was in the future)', {
+      original: normalized.toISOString(),
+      capped: capped.toISOString(),
+    });
+    normalized = capped;
+  }
+  
+  return normalized;
+}
+

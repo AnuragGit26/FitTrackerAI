@@ -1,5 +1,4 @@
-import { Workout } from '@/types/workout';
-import { WorkoutExercise, WorkoutSet } from '@/types/exercise';
+import { WorkoutSet } from '@/types/exercise';
 import { dataService } from './dataService';
 
 export interface PreviousWorkoutData {
@@ -45,7 +44,7 @@ export const workoutHistoryService = {
       );
       if (exercise && exercise.sets.length > 0) {
         return {
-          workoutId: workout.id || 0,
+          workoutId: String(workout.id || ''),
           date: workout.date,
           sets: exercise.sets,
           totalVolume: exercise.totalVolume,

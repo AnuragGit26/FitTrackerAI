@@ -76,7 +76,7 @@ export function SmartCoachInsight() {
       );
       setIsLoading(false);
     }
-  }, [workouts.length, muscleStatuses.length, profile?.id]);
+  }, [workouts, muscleStatuses, profile?.id, profile?.experienceLevel, profile?.goals]);
 
   return (
     <div className="bg-slate-200/50 dark:bg-white/5 border border-primary/30 rounded-xl p-4 flex gap-4 items-start relative overflow-hidden">

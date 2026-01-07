@@ -296,6 +296,67 @@ class NotificationService {
    * Create a new notification and store it in IndexedDB and Supabase
    */
   async createNotification(input: NotificationCreateInput): Promise<Notification> {
+    // Check for duplicates before creating
+    const existingNotifications = await dbHelpers.getAllNotifications(input.userId);
+    const now = Date.now();
+
+    // Check for duplicates based on notification type
+    let isDuplicate = false;
+
+    if (input.type === 'ai_insight') {
+      // Check if a notification with the same title and message exists within the last 24 hours
+      const twentyFourHoursAgo = now - (24 * 60 * 60 * 1000);
+      isDuplicate = existingNotifications.some(n => 
+        n.type === 'ai_insight' &&
+        n.title === input.title &&
+        n.message === input.message &&
+        n.createdAt >= twentyFourHoursAgo &&
+        !n.deletedAt
+      );
+    } else if (input.type === 'workout_reminder') {
+      // Check if a notification with the same workoutId and scheduled time exists
+      const workoutId = input.data?.workoutId as string | undefined;
+      const scheduledTime = input.data?.scheduledTime as number | undefined;
+      if (workoutId && scheduledTime) {
+        isDuplicate = existingNotifications.some(n =>
+          n.type === 'workout_reminder' &&
+          n.data?.workoutId === workoutId &&
+          n.data?.scheduledTime === scheduledTime &&
+          !n.deletedAt
+        );
+      }
+    } else if (input.type === 'muscle_recovery') {
+      // Check if a notification for the same muscle was created in the last hour
+      const oneHourAgo = now - (60 * 60 * 1000);
+      const muscle = input.data?.muscle as string | undefined;
+      if (muscle) {
+        isDuplicate = existingNotifications.some(n =>
+          n.type === 'muscle_recovery' &&
+          n.data?.muscle === muscle &&
+          n.createdAt >= oneHourAgo &&
+          !n.deletedAt
+        );
+      }
+    }
+
+    if (isDuplicate) {
+      console.warn(`[NotificationService] Duplicate notification prevented for type: ${input.type}`);
+      // Return the existing notification instead of creating a new one
+      const duplicate = existingNotifications.find(n => {
+        if (input.type === 'ai_insight') {
+          return n.type === 'ai_insight' && n.title === input.title && n.message === input.message;
+        } else if (input.type === 'workout_reminder') {
+          return n.type === 'workout_reminder' && n.data?.workoutId === input.data?.workoutId;
+        } else if (input.type === 'muscle_recovery') {
+          return n.type === 'muscle_recovery' && n.data?.muscle === input.data?.muscle;
+        }
+        return false;
+      });
+      if (duplicate) {
+        return duplicate;
+      }
+    }
+
     const notification: Notification = {
       id: this.generateUUID(),
       userId: input.userId,
@@ -441,8 +502,9 @@ class NotificationService {
   /**
    * Sync notification to Supabase (deprecated - use syncToMongoDB)
    */
-  private async syncToSupabase(notification: Notification): Promise<void> {
-    return this.syncToMongoDB(notification);
+  private async syncToSupabase(_notification: Notification): Promise<void> {
+    // Deprecated - kept for backward compatibility
+    return Promise.resolve();
   }
 
   /**
