@@ -209,9 +209,19 @@ class DataService {
     }
     
     // Validate startTime is on the same day as workout date (after normalization)
-    const workoutDateStr = workoutDate.toISOString().split('T')[0];
-    const startTimeStr = startTime.toISOString().split('T')[0];
-    if (workoutDateStr !== startTimeStr) {
+    // Use local date comparison to match normalizeWorkoutStartTime behavior
+    // This ensures consistency across timezones, especially for negative UTC offsets
+    const workoutDateLocal = new Date(
+      workoutDate.getFullYear(),
+      workoutDate.getMonth(),
+      workoutDate.getDate()
+    );
+    const startTimeLocal = new Date(
+      startTime.getFullYear(),
+      startTime.getMonth(),
+      startTime.getDate()
+    );
+    if (workoutDateLocal.getTime() !== startTimeLocal.getTime()) {
       throw new Error('Workout startTime must be on the same day as workout date');
     }
     
@@ -236,11 +246,18 @@ class DataService {
         finalEndTime = cappedEndTime; // Use capped value for validation
       }
       // Allow endTime to be on next day (for late-night workouts)
-      const startTimeStr = startTime.toISOString().split('T')[0];
-      const endTimeStr = finalEndTime.toISOString().split('T')[0];
-      const endDateObj = new Date(endTimeStr);
-      const startDateObj = new Date(startTimeStr);
-      const daysDiff = Math.floor((endDateObj.getTime() - startDateObj.getTime()) / (1000 * 60 * 60 * 24));
+      // Use local date comparison to match normalizeWorkoutStartTime behavior
+      const startTimeLocal = new Date(
+        startTime.getFullYear(),
+        startTime.getMonth(),
+        startTime.getDate()
+      );
+      const endTimeLocal = new Date(
+        finalEndTime.getFullYear(),
+        finalEndTime.getMonth(),
+        finalEndTime.getDate()
+      );
+      const daysDiff = Math.floor((endTimeLocal.getTime() - startTimeLocal.getTime()) / (1000 * 60 * 60 * 24));
       if (daysDiff > 1) {
         throw new Error('Workout endTime cannot be more than 1 day after startTime');
       }

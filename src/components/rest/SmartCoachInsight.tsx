@@ -76,7 +76,11 @@ export function SmartCoachInsight() {
       );
       setIsLoading(false);
     }
-  }, [workouts, muscleStatuses, profile?.id, profile?.experienceLevel, profile?.goals]);
+    // Use .length instead of full arrays to avoid re-running on every Zustand state update
+    // The effect body still has access to the full arrays, and aiRefreshService.refreshIfNeeded
+    // uses fingerprinting to detect actual data changes, so this prevents excessive API calls
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workouts.length, muscleStatuses.length, profile?.id, profile?.experienceLevel, profile?.goals]);
 
   return (
     <div className="bg-slate-200/50 dark:bg-white/5 border border-primary/30 rounded-xl p-4 flex gap-4 items-start relative overflow-hidden">

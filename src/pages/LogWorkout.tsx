@@ -76,6 +76,9 @@ export function LogWorkout() {
   const repeatWorkoutProcessedRef = useRef<string | null>(null);
   const shouldReduceMotion = prefersReducedMotion();
   const workoutChannelRef = useRef<BroadcastChannel | null>(null);
+  const lastSavedStateHashRef = useRef<string | null>(null);
+  // Generate unique tab ID once on mount for cross-tab communication
+  const tabIdRef = useRef<string>(`tab-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
 
   // Workout duration tracking - timer state is managed internally and persisted to sessionStorage
   const { formattedTime: workoutDuration, elapsedTime: workoutElapsedSeconds, isRunning: workoutTimerRunning, pause: pauseWorkoutTimer, resume: resumeWorkoutTimer, reset: resetWorkoutTimer, start: startWorkoutTimer } = useWorkoutDuration(false);
@@ -176,7 +179,7 @@ export function LogWorkout() {
     if (currentWorkout && currentWorkout.exercises.length > 0) {
       debouncedSave();
     }
-  }, [currentWorkout?.exercises.length, debouncedSave]);
+  }, [currentWorkout, debouncedSave]);
 
   // Cross-tab synchronization using BroadcastChannel
   useEffect(() => {
@@ -186,23 +189,26 @@ export function LogWorkout() {
       
       const handleMessage = (event: MessageEvent) => {
         if (event.data.type === 'workout-state-changed') {
-          const { workoutId, timestamp } = event.data;
+          const { workoutId } = event.data;
           
           // Ignore messages from this tab
-          if (event.data.sourceTabId === `tab-${Date.now()}`) {
+          if (event.data.sourceTabId === tabIdRef.current) {
             return;
           }
           
           // Handle conflict: another tab has an active workout
-          if (currentWorkout && workoutId && workoutId !== currentWorkout.id) {
+          // Use getWorkoutStore to get current workout at message time
+          const currentWorkoutState = getWorkoutStore.getState().currentWorkout;
+          if (currentWorkoutState && workoutId && workoutId !== currentWorkoutState.id) {
             console.warn('Another tab has an active workout. Consider closing other tabs to avoid conflicts.');
             // Optionally show a toast notification
             showError('Another tab has an active workout. Please close other tabs to avoid conflicts.');
           }
         } else if (event.data.type === 'workout-saved') {
           // Another tab saved a workout, reload workouts if needed
-          if (event.data.workoutId) {
-            loadWorkouts(profile?.id || '');
+          const currentProfile = useUserStore.getState().profile;
+          if (event.data.workoutId && currentProfile?.id) {
+            loadWorkouts(currentProfile.id);
           }
         }
       };
@@ -217,7 +223,7 @@ export function LogWorkout() {
         }
       };
     }
-  }, [currentWorkout, profile?.id, loadWorkouts, showError]);
+  }, [loadWorkouts, showError]);
 
   // Broadcast state changes to other tabs
   useEffect(() => {
@@ -226,10 +232,10 @@ export function LogWorkout() {
         type: 'workout-state-changed',
         workoutId: currentWorkout.id,
         timestamp: Date.now(),
-        sourceTabId: `tab-${Date.now()}`,
+        sourceTabId: tabIdRef.current,
       });
     }
-  }, [currentWorkout?.id, currentWorkout?.exercises.length]);
+  }, [currentWorkout?.id, currentWorkout?.exercises.length, currentWorkout]);
 
   // Warn user before navigating away with unsaved workout
   useEffect(() => {

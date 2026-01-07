@@ -9,7 +9,7 @@ import { saveWorkoutState, loadWorkoutState, clearWorkoutState } from '@/utils/w
 import { saveFailedWorkout } from '@/utils/workoutErrorRecovery';
 import { calculateVolume } from '@/utils/calculations';
 import { userContextManager } from '@/services/userContextManager';
-import { normalizeWorkoutStartTime } from '@/utils/validators';
+import { normalizeWorkoutTimes } from '@/utils/validators';
 
 interface WorkoutState {
   currentWorkout: Workout | null;
@@ -481,18 +481,27 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         );
       }
 
-      // Normalize start time to handle stale dates from persisted state
+      // Normalize both start and end times to handle stale dates from persisted state
+      // This ensures they remain within the 1-day validation constraint
       const workoutDate = currentWorkout.date instanceof Date 
         ? currentWorkout.date 
         : new Date(currentWorkout.date);
-      const normalizedStartTime = normalizeWorkoutStartTime(workoutDate, startTime);
+      const { startTime: normalizedStartTime, endTime: normalizedEndTime } = normalizeWorkoutTimes(
+        workoutDate,
+        startTime,
+        endTime
+      );
+
+      // Recalculate duration based on normalized times
+      const normalizedDurationMs = normalizedEndTime.getTime() - normalizedStartTime.getTime();
+      const normalizedDurationMinutes = Math.max(0, Math.floor(normalizedDurationMs / 60000));
 
       const completedWorkout: Workout = {
         ...currentWorkout,
         userId: currentUserId, // Use current user ID from context manager
         startTime: normalizedStartTime, // Use normalized start time
-        endTime,
-        totalDuration: totalDurationMinutes,
+        endTime: normalizedEndTime, // Use normalized end time
+        totalDuration: normalizedDurationMinutes, // Use normalized duration
         calories: calories !== undefined ? calories : currentWorkout.calories,
       };
 

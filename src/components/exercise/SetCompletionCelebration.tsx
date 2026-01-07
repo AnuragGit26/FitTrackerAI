@@ -18,6 +18,20 @@ const MOTIVATIONAL_MESSAGES = [
   'BEAST MODE!',
   'CRUSHING IT!',
   'FIRE!',
+  'LEGEND!',
+  'UNSTOPPABLE!',
+  'POWER UP!',
+  'DOMINATING!',
+  'INCREDIBLE!',
+  'AMAZING!',
+  'PHENOMENAL!',
+  'OUTSTANDING!',
+  'EPIC!',
+  'MONSTER!',
+  'WOW!',
+  'INSANE!',
+  'PERFECT!',
+  'ELITE!',
 ];
 
 export function SetCompletionCelebration({
@@ -68,10 +82,10 @@ export function SetCompletionCelebration({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
+            className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none"
           >
-            <div className="bg-primary/90 backdrop-blur-sm rounded-2xl px-8 py-4">
-              <p className="text-2xl font-bold text-background-dark text-center">
+            <div className="bg-primary/90 backdrop-blur-sm rounded-2xl px-8 py-4 shadow-2xl border-2 border-primary/50">
+              <p className="text-2xl font-bold text-background-dark text-center drop-shadow-lg">
                 {message}
               </p>
             </div>
@@ -85,7 +99,7 @@ export function SetCompletionCelebration({
   const centerY = position?.y ?? window.innerHeight / 2;
 
   // Generate confetti particles - memoized to prevent regeneration on re-renders
-  // This ensures stable random values for the duration of each celebration animation
+  // Reduced count for better performance (60 instead of 90)
   const confettiParticles = useMemo(() => {
     if (!isVisible) return [];
     return Array.from({ length: 60 }, (_, i) => {
@@ -110,11 +124,11 @@ export function SetCompletionCelebration({
   }, [isVisible]);
 
   // Generate sparkle particles - memoized to prevent regeneration on re-renders
-  // This ensures stable random values for the duration of each celebration animation
+  // Reduced count for better performance (20 instead of 25)
   const sparkleParticles = useMemo(() => {
     if (!isVisible) return [];
-    return Array.from({ length: 25 }, (_, i) => {
-      const angle = (i * 360) / 25;
+    return Array.from({ length: 20 }, (_, i) => {
+      const angle = (i * 360) / 20;
       const distance = 40 + Math.random() * 30;
       const x = Math.cos((angle * Math.PI) / 180) * distance;
       const y = Math.sin((angle * Math.PI) / 180) * distance;
@@ -127,7 +141,7 @@ export function SetCompletionCelebration({
         y,
         delay,
         duration,
-        size: 3 + Math.random() * 4,
+                size: 4 + Math.random() * 6,
       };
     });
   }, [isVisible]);
@@ -140,25 +154,28 @@ export function SetCompletionCelebration({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-50 pointer-events-none overflow-hidden"
+          className="fixed inset-0 z-[100] pointer-events-none overflow-hidden"
           style={{
             left: 0,
             top: 0,
             right: 0,
             bottom: 0,
+            willChange: 'opacity',
+            transform: 'translate3d(0, 0, 0)',
           }}
         >
-          {/* Screen Flash - Phase 1 (0-200ms) */}
+          {/* Screen Flash - Phase 1 (0-200ms) - Double Flash */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ 
-              opacity: [0, 0.25, 0],
+              opacity: [0, 0.6, 0, 0.4, 0],
             }}
             transition={{ 
-              duration: 0.2,
-              times: [0, 0.5, 1],
+              duration: 0.25,
+              times: [0, 0.2, 0.4, 0.6, 1],
             }}
             className="absolute inset-0 bg-primary"
+            style={{ willChange: 'opacity' }}
           />
 
           {/* Confetti Explosion - Phase 1 (0-200ms) */}
@@ -171,6 +188,8 @@ export function SetCompletionCelebration({
                 top: centerY,
                 width: particle.size,
                 height: particle.size,
+                willChange: 'transform, opacity',
+                transform: 'translate3d(0, 0, 0)',
                 boxShadow: `0 0 ${particle.size * 2}px rgba(13, 242, 105, 0.8)`,
               }}
               initial={{ 
@@ -199,43 +218,45 @@ export function SetCompletionCelebration({
           {/* Glow Pulse Effect - Phase 2 (200-600ms) */}
           <motion.div
             className="absolute rounded-full"
-            style={{
-              left: centerX,
-              top: centerY,
-              width: 200,
-              height: 200,
-              background: 'radial-gradient(circle, rgba(13, 242, 105, 0.4) 0%, rgba(13, 242, 105, 0) 70%)',
-              transform: 'translate(-50%, -50%)',
-            }}
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{
-              scale: [0, 2, 3],
-              opacity: [0, 0.6, 0],
-            }}
-            transition={{
-              duration: 0.8,
-              delay: 0.2,
-              times: [0, 0.5, 1],
-              ease: 'easeOut',
-            }}
+              style={{
+                left: centerX,
+                top: centerY,
+                width: 250,
+                height: 250,
+                background: 'radial-gradient(circle, rgba(13, 242, 105, 0.75) 0%, rgba(13, 242, 105, 0) 70%)',
+                transform: 'translate3d(-50%, -50%, 0)',
+                willChange: 'transform, opacity',
+              }}
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{
+                scale: [0, 2.2, 3.5],
+                opacity: [0, 0.85, 0],
+              }}
+              transition={{
+                duration: 0.9,
+                delay: 0.15,
+                times: [0, 0.5, 1],
+                ease: 'easeOut',
+              }}
           />
 
           {/* Ripple Waves - Phase 3 (600-1200ms) */}
           {[...Array(4)].map((_, i) => (
             <motion.div
               key={`ripple-${i}`}
-              className="absolute rounded-full border-4 border-primary/40"
+              className="absolute rounded-full border-4 border-primary/60"
               style={{
                 left: centerX,
                 top: centerY,
                 width: 100,
                 height: 100,
-                transform: 'translate(-50%, -50%)',
+                transform: 'translate3d(-50%, -50%, 0)',
+                willChange: 'transform, opacity',
               }}
-              initial={{ scale: 0, opacity: 0.6 }}
+              initial={{ scale: 0, opacity: 0.8 }}
               animate={{
                 scale: [0, 3, 5],
-                opacity: [0.6, 0.3, 0],
+                opacity: [0.8, 0.4, 0],
               }}
               transition={{
                 duration: 1.2,
@@ -252,35 +273,59 @@ export function SetCompletionCelebration({
             style={{
               left: centerX,
               top: centerY,
-              transform: 'translate(-50%, -50%)',
+              transform: 'translate3d(-50%, -50%, 0)',
+              willChange: 'transform',
             }}
           >
             <motion.div
               initial={{ scale: 0, rotate: -180 }}
               animate={{ 
-                scale: [0, 1.3, 1],
+                scale: [0, 1.5, 0.95, 1.1, 1],
                 rotate: 0,
               }}
               transition={{ 
                 type: 'spring',
-                damping: 15,
-                stiffness: 300,
-                duration: 0.6,
-                delay: 0.2,
+                damping: 12,
+                stiffness: 400,
+                duration: 0.7,
+                delay: 0.15,
               }}
               className="relative"
+              style={{ willChange: 'transform' }}
             >
-              <div className="size-28 rounded-full bg-primary/20 backdrop-blur-md flex items-center justify-center border-4 border-primary shadow-[0_0_40px_rgba(13,242,105,0.5)]">
-                <Check className="w-16 h-16 text-primary stroke-[4]" />
+              <div className="size-36 rounded-full bg-background-dark/80 dark:bg-background-dark/90 flex items-center justify-center border-4 border-primary shadow-[0_0_50px_rgba(13,242,105,0.8)] ring-4 ring-primary/40">
+                <Check className="w-20 h-20 text-primary stroke-[4] drop-shadow-[0_0_15px_rgba(13,242,105,0.9)]" />
               </div>
+              
+              {/* Shimmer Effect - Simplified for performance */}
+              <motion.div
+                className="absolute inset-0 rounded-full overflow-hidden pointer-events-none"
+                initial={{ rotate: 0 }}
+                animate={{ 
+                  rotate: 360,
+                }}
+                transition={{
+                  duration: 3,
+                  repeat: Infinity,
+                  ease: 'linear',
+                }}
+                style={{ willChange: 'transform' }}
+              >
+                <div 
+                  className="absolute inset-0"
+                  style={{
+                    background: 'conic-gradient(from 0deg, transparent 0%, rgba(13, 242, 105, 0.3) 40%, transparent 80%)',
+                  }}
+                />
+              </motion.div>
               
               {/* Inner Pulse */}
               <motion.div
-                className="absolute inset-0 rounded-full bg-primary/30"
-                initial={{ scale: 1, opacity: 0.8 }}
+                className="absolute inset-0 rounded-full bg-primary/50"
+                initial={{ scale: 1, opacity: 0.9 }}
                 animate={{
                   scale: [1, 1.5, 1],
-                  opacity: [0.8, 0, 0.8],
+                  opacity: [0.9, 0, 0.9],
                 }}
                 transition={{
                   duration: 1,
@@ -288,33 +333,40 @@ export function SetCompletionCelebration({
                   repeat: 1,
                   ease: 'easeInOut',
                 }}
+                style={{ willChange: 'transform, opacity' }}
               />
             </motion.div>
 
             {/* Success Message - Phase 2 (200-600ms) */}
-            <motion.p
+            <motion.div
               initial={{ y: 20, opacity: 0, scale: 0.8 }}
               animate={{ 
                 y: 0,
                 opacity: 1,
-                scale: [0.8, 1.15, 1],
+                scale: [0.8, 1.25, 1.05, 1],
               }}
               exit={{ y: -20, opacity: 0 }}
               transition={{ 
-                delay: 0.4,
-                duration: 0.5,
-                times: [0, 0.6, 1],
+                delay: 0.35,
+                duration: 0.6,
+                times: [0, 0.4, 0.7, 1],
                 type: 'spring',
-                stiffness: 200,
-                damping: 15,
+                stiffness: 250,
+                damping: 12,
               }}
-              className="mt-6 text-4xl font-bold text-primary text-center drop-shadow-[0_0_20px_rgba(13,242,105,0.8)]"
-              style={{
-                textShadow: '0 0 30px rgba(13, 242, 105, 0.6), 0 0 60px rgba(13, 242, 105, 0.4)',
-              }}
+              className="mt-6 relative"
+              style={{ willChange: 'transform, opacity' }}
             >
-              {message}
-            </motion.p>
+              <div className="absolute inset-0 bg-background-dark/70 dark:bg-background-dark/80 rounded-xl px-6 py-3 -mx-6 -my-3" />
+              <p
+                className="relative text-4xl font-bold text-primary text-center drop-shadow-[0_0_20px_rgba(13,242,105,0.9)]"
+                style={{
+                  textShadow: '0 0 40px rgba(13, 242, 105, 0.8), 0 0 80px rgba(13, 242, 105, 0.6), 2px 2px 4px rgba(0, 0, 0, 0.5)',
+                }}
+              >
+                {message}
+              </p>
+            </motion.div>
           </div>
 
           {/* Sparkle Effects - Phase 3 (600-1200ms) */}
@@ -327,6 +379,8 @@ export function SetCompletionCelebration({
                 top: centerY,
                 width: particle.size,
                 height: particle.size,
+                willChange: 'transform, opacity',
+                transform: 'translate3d(0, 0, 0)',
               }}
               initial={{ 
                 scale: 0,
@@ -351,7 +405,7 @@ export function SetCompletionCelebration({
               <div
                 className="w-full h-full rounded-full bg-primary"
                 style={{
-                  boxShadow: `0 0 ${particle.size * 3}px rgba(13, 242, 105, 1)`,
+                  boxShadow: `0 0 ${particle.size * 3}px rgba(13, 242, 105, 0.9)`,
                 }}
               />
             </motion.div>

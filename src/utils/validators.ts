@@ -20,8 +20,8 @@ export function validateReps(reps: number): { valid: boolean; error?: string } {
   if (reps === 0) {
     return { valid: false, error: 'Reps must be greater than 0' };
   }
-  if (reps > 100) {
-    return { valid: false, error: 'For reps >100 add another set' };
+  if (reps > 50) {
+    return { valid: false, error: 'Reps cannot exceed 50' };
   }
   return { valid: true };
 }
@@ -317,5 +317,131 @@ export function normalizeWorkoutStartTime(
   }
   
   return normalized;
+}
+
+/**
+ * Normalizes both workout start and end times together to ensure they're valid:
+ * - Ensures start time is on the same day as workout date (preserving time of day)
+ * - Adjusts end time proportionally when start time is adjusted
+ * - Ensures end time is within 1 day of start time (validation requirement)
+ * - Caps times to current time (not in the future)
+ * 
+ * @param workoutDate - The workout date
+ * @param startTime - The start time to normalize (can be undefined)
+ * @param endTime - The end time to normalize (can be undefined)
+ * @returns Object with normalized startTime and endTime
+ */
+export function normalizeWorkoutTimes(
+  workoutDate: Date,
+  startTime?: Date | string | null,
+  endTime?: Date | string | null
+): { startTime: Date; endTime: Date } {
+  const now = new Date();
+  const toleranceMs = 5000; // 5 seconds tolerance for clock skew
+  const MAX_WORKOUT_DURATION_MS = 24 * 60 * 60 * 1000; // 1 day in milliseconds
+  
+  // Ensure workoutDate is valid
+  const validWorkoutDate = workoutDate instanceof Date && !isNaN(workoutDate.getTime())
+    ? workoutDate
+    : new Date();
+  
+  // Normalize start time first
+  const normalizedStartTime = normalizeWorkoutStartTime(validWorkoutDate, startTime);
+  
+  // Handle end time
+  let endTimeDate: Date;
+  if (!endTime) {
+    // If no end time provided, use current time
+    endTimeDate = now;
+  } else if (endTime instanceof Date) {
+    endTimeDate = endTime;
+  } else if (typeof endTime === 'string') {
+    endTimeDate = new Date(endTime);
+  } else {
+    endTimeDate = now;
+  }
+  
+  // Check if endTime is valid
+  if (isNaN(endTimeDate.getTime())) {
+    console.warn('Invalid endTime detected, using current time');
+    endTimeDate = now;
+  }
+  
+  // Calculate the original duration if both times were provided
+  let originalDuration = 0;
+  let originalStart: Date | null = null;
+  if (startTime) {
+    originalStart = startTime instanceof Date ? startTime : new Date(startTime);
+    if (!isNaN(originalStart.getTime()) && endTime) {
+      originalDuration = endTimeDate.getTime() - originalStart.getTime();
+      // Only use original duration if it's reasonable (within 1 day and positive)
+      if (originalDuration < 0 || originalDuration > MAX_WORKOUT_DURATION_MS) {
+        originalDuration = 0; // Ignore unreasonable durations
+      }
+    }
+  }
+  
+  // If start time was adjusted, adjust end time appropriately
+  let normalizedEndTime = endTimeDate;
+  if (originalStart && !isNaN(originalStart.getTime()) && originalStart.getTime() !== normalizedStartTime.getTime()) {
+    // Start time was adjusted
+    const adjustment = normalizedStartTime.getTime() - originalStart.getTime();
+    
+    // If we have a reasonable original duration, preserve it
+    if (originalDuration > 0 && originalDuration <= MAX_WORKOUT_DURATION_MS) {
+      // Preserve the original workout duration
+      normalizedEndTime = new Date(normalizedStartTime.getTime() + originalDuration);
+    } else {
+      // Otherwise, adjust end time by the same amount as start time
+      normalizedEndTime = new Date(endTimeDate.getTime() + adjustment);
+    }
+    
+    // Ensure end time doesn't exceed current time
+    if (normalizedEndTime.getTime() > now.getTime() + toleranceMs) {
+      normalizedEndTime = new Date(Math.min(normalizedEndTime.getTime(), now.getTime() + toleranceMs));
+    }
+    
+    // Ensure end time is after start time
+    if (normalizedEndTime.getTime() <= normalizedStartTime.getTime()) {
+      // If adjusted end time is before or equal to start time, use a reasonable duration
+      // Use original duration if available and reasonable, otherwise use 1 hour as default
+      const fallbackDuration = originalDuration > 0 
+        ? Math.min(originalDuration, MAX_WORKOUT_DURATION_MS)
+        : 60 * 60 * 1000; // 1 hour default
+      normalizedEndTime = new Date(normalizedStartTime.getTime() + fallbackDuration);
+    }
+    
+    console.warn('End time adjusted to match start time adjustment', {
+      original: endTimeDate.toISOString(),
+      adjusted: normalizedEndTime.toISOString(),
+      originalDuration: originalDuration > 0 ? `${Math.round(originalDuration / 60000)} minutes` : 'N/A',
+    });
+  }
+  
+  // Cap end time to current time if it's in the future
+  if (normalizedEndTime.getTime() > now.getTime() + toleranceMs) {
+    normalizedEndTime = new Date(Math.min(normalizedEndTime.getTime(), now.getTime() + toleranceMs));
+  }
+  
+  // Ensure end time is after start time
+  if (normalizedEndTime.getTime() <= normalizedStartTime.getTime()) {
+    normalizedEndTime = new Date(normalizedStartTime.getTime() + 60000); // At least 1 minute after start
+  }
+  
+  // Ensure end time is within 1 day of start time (validation requirement)
+  const timeDiff = normalizedEndTime.getTime() - normalizedStartTime.getTime();
+  if (timeDiff > MAX_WORKOUT_DURATION_MS) {
+    // Cap end time to 1 day after start time
+    normalizedEndTime = new Date(normalizedStartTime.getTime() + MAX_WORKOUT_DURATION_MS);
+    console.warn('End time capped to 1 day after start time', {
+      original: normalizedEndTime.toISOString(),
+      capped: normalizedEndTime.toISOString(),
+    });
+  }
+  
+  return {
+    startTime: normalizedStartTime,
+    endTime: normalizedEndTime,
+  };
 }
 

@@ -12,9 +12,16 @@ export function RecoveryCalendar() {
   const { profile } = useUserStore();
   const { settings } = useSettingsStore();
   
-  // Get current date - use date string as dependency to update when day changes
+  // Get current date - use local date string as dependency to update when day changes
   // This ensures the calendar updates correctly if user keeps app open past midnight
-  const currentDateString = new Date().toISOString().split('T')[0];
+  // Use local date components instead of UTC to handle timezone correctly
+  const getLocalDateString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  const currentDateString = getLocalDateString(new Date());
   // currentDateString is intentionally included to update 'today' when the day changes
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const today = useMemo(() => new Date(), [currentDateString]);

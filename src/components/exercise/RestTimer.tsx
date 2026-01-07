@@ -5,9 +5,30 @@ import { cn } from '@/utils/cn';
 import { useSettingsStore } from '@/store/settingsStore';
 import { prefersReducedMotion } from '@/utils/animations';
 
+const REST_COMPLETE_MESSAGES = [
+  'READY TO GO!',
+  'LET\'S GO!',
+  'YOU GOT THIS!',
+  'TIME TO SHINE!',
+  'NEXT SET!',
+  'HERE WE GO!',
+  'GO TIME!',
+  'LET\'S DO THIS!',
+  'BRING IT ON!',
+  'SHOWTIME!',
+  'GAME ON!',
+  'ALL SET!',
+  'LOCKED IN!',
+  'FOCUS MODE!',
+  'LET\'S CRUSH IT!',
+  'READY TO DOMINATE!',
+  'TIME TO LIFT!',
+  'HERE WE GO AGAIN!',
+];
+
 interface RestTimerProps {
   duration: number; // Initial rest duration in seconds
-  onComplete: () => void; // Callback when timer reaches 0
+  onComplete: (completionTime?: Date) => void; // Callback when timer reaches 0, with actual completion timestamp
   onSkip: () => void; // Callback when "Next Set" is clicked
   onPause?: (paused: boolean) => void; // Callback for pause state
   onTimeAdjust?: (seconds: number) => void; // Callback for time adjustments
@@ -33,10 +54,12 @@ export function RestTimer({
   const [remainingTime, setRemainingTime] = useState(initialRemainingTime ?? duration);
   const [isPaused, setIsPaused] = useState(initialPaused);
   const [showCompletionAnimation, setShowCompletionAnimation] = useState(false);
+  const [completionMessage, setCompletionMessage] = useState<string>('Rest Complete!');
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const completionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isCompletedOrSkippedRef = useRef(false);
   const isInCompletionPhaseRef = useRef(false); // Track if we're in the completion animation phase
+  const isMountedRef = useRef(true); // Track if component is mounted
   const initialDurationRef = useRef(initialRemainingTime ?? duration);
   const notificationPermissionRef = useRef<NotificationPermission | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -61,6 +84,28 @@ export function RestTimer({
   useEffect(() => {
     onSkipRef.current = onSkip;
   }, [onSkip]);
+
+  // Cleanup on unmount - always clear all timeouts
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      // Always clear all timeouts on unmount, regardless of completion phase
+      // This prevents stale callbacks from being invoked after component unmounts
+      const interval = intervalRef.current;
+      const completionTimeout = completionTimeoutRef.current;
+      
+      isMountedRef.current = false;
+      
+      if (interval) {
+        clearInterval(interval);
+        intervalRef.current = null;
+      }
+      if (completionTimeout) {
+        clearTimeout(completionTimeout);
+        completionTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   // Request notification permission on mount
   useEffect(() => {
@@ -203,22 +248,32 @@ export function RestTimer({
               playCompletionSound();
             }
 
-            // Vibrate if enabled
+            // Vibrate if enabled - stronger pattern for attention
             if (settings.vibrationEnabled && 'vibrate' in navigator) {
-              navigator.vibrate([200, 100, 200]);
+              navigator.vibrate([300, 100, 200, 100, 300]);
             }
 
+            // Select random completion message
+            const randomMessage = REST_COMPLETE_MESSAGES[
+              Math.floor(Math.random() * REST_COMPLETE_MESSAGES.length)
+            ];
+            setCompletionMessage(randomMessage);
+            
             // Show completion animation
             setShowCompletionAnimation(true);
 
             // Only schedule completion timeout if not already in completion phase
             if (!isInCompletionPhaseRef.current) {
               isInCompletionPhaseRef.current = true;
+              // Capture the actual completion time (when timer reached 0) before the animation delay
+              // This ensures accurate rest time calculation even though onComplete is called 2 seconds later
+              const actualCompletionTime = new Date();
               completionTimeoutRef.current = setTimeout(() => {
-                if (!isCompletedOrSkippedRef.current) {
+                // Only call onComplete if timer hasn't been skipped and component is still mounted
+                if (!isCompletedOrSkippedRef.current && isMountedRef.current) {
                   isCompletedOrSkippedRef.current = true;
                   setShowCompletionAnimation(false);
-                  onCompleteRef.current();
+                  onCompleteRef.current(actualCompletionTime);
                 }
                 completionTimeoutRef.current = null;
                 isInCompletionPhaseRef.current = false;
@@ -232,8 +287,10 @@ export function RestTimer({
             return 0;
           }
           const newTime = prev - 1;
-          // Report remaining time changes on every tick to keep parent state in sync
-          onRemainingTimeChangeRef.current?.(newTime);
+          // Defer onRemainingTimeChange to avoid updating parent during render
+          setTimeout(() => {
+            onRemainingTimeChangeRef.current?.(newTime);
+          }, 0);
           return newTime;
         });
       }, 1000);
@@ -280,11 +337,17 @@ export function RestTimer({
               playCompletionSound();
             }
 
-            // Vibrate if enabled
+            // Vibrate if enabled - stronger pattern for attention
             if (settings.vibrationEnabled && 'vibrate' in navigator) {
-              navigator.vibrate([200, 100, 200]);
+              navigator.vibrate([300, 100, 200, 100, 300]);
             }
 
+            // Select random completion message
+            const randomMessage = REST_COMPLETE_MESSAGES[
+              Math.floor(Math.random() * REST_COMPLETE_MESSAGES.length)
+            ];
+            setCompletionMessage(randomMessage);
+            
             // Show completion animation
             setShowCompletionAnimation(true);
 
@@ -292,6 +355,9 @@ export function RestTimer({
             // This prevents the timeout from being cancelled when remainingTime changes trigger effect re-run
             if (!isInCompletionPhaseRef.current) {
               isInCompletionPhaseRef.current = true;
+              // Capture the actual completion time (when timer reached 0) before the animation delay
+              // This ensures accurate rest time calculation even though onComplete is called 2 seconds later
+              const actualCompletionTime = new Date();
               // Call onComplete after animation delay (2 seconds)
               // Store timeout ID so we can cancel it if user skips
               completionTimeoutRef.current = setTimeout(() => {
@@ -299,7 +365,7 @@ export function RestTimer({
                 if (!isCompletedOrSkippedRef.current) {
                   isCompletedOrSkippedRef.current = true;
                   setShowCompletionAnimation(false);
-                  onCompleteRef.current();
+                  onCompleteRef.current(actualCompletionTime);
                 }
                 completionTimeoutRef.current = null;
                 isInCompletionPhaseRef.current = false;
@@ -313,8 +379,10 @@ export function RestTimer({
             return 0;
           }
           const newTime = prev - 1;
-          // Report remaining time changes on every tick to keep parent state in sync
-          onRemainingTimeChangeRef.current?.(newTime);
+          // Defer onRemainingTimeChange to avoid updating parent during render
+          setTimeout(() => {
+            onRemainingTimeChangeRef.current?.(newTime);
+          }, 0);
           return newTime;
         });
       }, 1000);
@@ -332,6 +400,7 @@ export function RestTimer({
       }
       // Only clear completion timeout if we're not in the completion phase
       // This prevents the timeout from being cancelled when remainingTime changes trigger effect re-run
+      // Unmount cleanup is handled by separate unmount effect above
       if (completionTimeoutRef.current && !isInCompletionPhaseRef.current) {
         clearTimeout(completionTimeoutRef.current);
         completionTimeoutRef.current = null;
@@ -435,45 +504,68 @@ export function RestTimer({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
+            className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none"
+            style={{ willChange: 'opacity', transform: 'translate3d(0, 0, 0)' }}
           >
             {/* Success Checkmark with Pulse */}
             <motion.div
               initial={{ scale: 0, rotate: -180 }}
               animate={{ 
-                scale: [0, 1.2, 1],
+                scale: [0, 1.4, 0.9, 1.15, 1],
                 rotate: 0,
               }}
               exit={{ scale: 0, opacity: 0 }}
               transition={{ 
                 type: 'spring',
-                damping: 15,
-                stiffness: 300,
-                duration: 0.6
+                damping: 12,
+                stiffness: 400,
+                duration: 0.7
               }}
               className="relative"
+              style={{ willChange: 'transform' }}
             >
-              <div className="size-24 rounded-full bg-primary/20 backdrop-blur-sm flex items-center justify-center border-4 border-primary">
-                <Check className="w-12 h-12 text-primary stroke-[4]" />
+              <div className="size-32 rounded-full bg-background-dark/80 dark:bg-background-dark/90 flex items-center justify-center border-4 border-primary shadow-[0_0_40px_rgba(13,242,105,0.8)] ring-4 ring-primary/40">
+                <Check className="w-16 h-16 text-primary stroke-[4] drop-shadow-[0_0_15px_rgba(13,242,105,0.9)]" />
               </div>
+              
+              {/* Persistent Background Glow */}
+              <motion.div
+                className="absolute inset-0 rounded-full bg-primary/20"
+                initial={{ scale: 1, opacity: 0.6 }}
+                animate={{
+                  scale: [1, 1.2, 1],
+                  opacity: [0.6, 0.4, 0.6],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                }}
+                style={{ willChange: 'transform, opacity' }}
+              />
               
               {/* Pulse Ripple Effect */}
               {[...Array(3)].map((_, i) => (
                 <motion.div
                   key={i}
-                  className="absolute inset-0 rounded-full border-4 border-primary"
-                  initial={{ scale: 1, opacity: 0.6 }}
+                  className="absolute inset-0 rounded-full border-4 border-primary/60"
+                  initial={{ scale: 1, opacity: 0.9 }}
                   animate={{ 
-                    scale: [1, 2, 3],
-                    opacity: [0.6, 0.3, 0],
+                    scale: [1, 2.2, 3.5],
+                    opacity: [0.9, 0.5, 0],
                   }}
                   transition={{
-                    duration: 1.5,
+                    duration: 1.6,
                     delay: i * 0.2,
                     ease: 'easeOut',
                     repeat: 0,
                   }}
-                  style={{ left: '50%', top: '50%', x: '-50%', y: '-50%' }}
+                  style={{ 
+                    left: '50%', 
+                    top: '50%', 
+                    transform: 'translate3d(-50%, -50%, 0)',
+                    willChange: 'transform, opacity',
+                  }}
                 />
               ))}
             </motion.div>
@@ -485,31 +577,45 @@ export function RestTimer({
               exit={{ y: -20, opacity: 0 }}
               transition={{ delay: 0.3, duration: 0.4 }}
               className="absolute top-[45%] mt-32"
+              style={{ willChange: 'transform, opacity' }}
             >
-              <motion.p
-                className="text-2xl font-bold text-primary text-center"
-                animate={{ 
-                  scale: [1, 1.1, 1],
-                }}
-                transition={{ 
-                  duration: 0.5,
-                  delay: 0.4,
-                  times: [0, 0.5, 1],
-                }}
-              >
-                Rest Complete!
-              </motion.p>
+              <div className="relative bg-background-dark/70 dark:bg-background-dark/80 rounded-xl px-6 py-3">
+                <motion.p
+                  className="text-3xl font-bold text-primary text-center drop-shadow-[0_0_20px_rgba(13,242,105,0.9)]"
+                  animate={{ 
+                    scale: [1, 1.15, 1.05, 1],
+                  }}
+                  transition={{ 
+                    duration: 0.6,
+                    delay: 0.35,
+                    times: [0, 0.4, 0.7, 1],
+                    type: 'spring',
+                    stiffness: 250,
+                    damping: 12,
+                  }}
+                  style={{
+                    textShadow: '0 0 40px rgba(13, 242, 105, 0.8), 0 0 80px rgba(13, 242, 105, 0.6), 2px 2px 4px rgba(0, 0, 0, 0.5)',
+                    willChange: 'transform',
+                  }}
+                >
+                  {completionMessage}
+                </motion.p>
+              </div>
             </motion.div>
 
-            {/* Screen Flash */}
+            {/* Screen Flash - Double Flash */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ 
-                opacity: [0, 0.3, 0],
+                opacity: [0, 0.6, 0, 0.4, 0],
               }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
+              transition={{ 
+                duration: 0.25,
+                times: [0, 0.2, 0.4, 0.6, 1],
+              }}
               className="absolute inset-0 bg-primary pointer-events-none"
+              style={{ willChange: 'opacity' }}
             />
           </motion.div>
         )}

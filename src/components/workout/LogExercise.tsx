@@ -1039,14 +1039,17 @@ export function LogExercise({
   }, [selectedExercise, sets, exerciseId, workoutDate, notes, currentWorkout, profile, startWorkout, updateExercise, addExercise]);
 
   // Rest timer handlers
-  const handleRestComplete = useCallback(() => {
+  const handleRestComplete = useCallback((completionTime?: Date) => {
     if (!isMountedRef.current) {
       return;
     }
 
     try {
+      // Use the actual completion time (when timer reached 0) instead of current time
+      // This accounts for the 2-second animation delay before onComplete is called
+      const endTime = completionTime || new Date();
       const actualRestTime = restTimerStartTime
-        ? Math.floor((new Date().getTime() - restTimerStartTime.getTime()) / 1000)
+        ? Math.floor((endTime.getTime() - restTimerStartTime.getTime()) / 1000)
         : defaultRestDuration;
 
       if (restTimerSetNumberRef.current !== null) {
@@ -1631,6 +1634,7 @@ export function LogExercise({
                   isLastInSuperset={isLastInSuperset}
                   showGroupRestMessage={isInSuperset && !!nextExercise && !isLastInSuperset}
                   exerciseEquipment={selectedExercise?.equipment}
+                  validationError={validationErrors[`set-${currentSet.setNumber}-reps`]}
                 />
               );
             })()}

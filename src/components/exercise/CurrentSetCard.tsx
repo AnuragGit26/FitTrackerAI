@@ -23,6 +23,7 @@ interface CurrentSetCardProps {
   isLastInSuperset?: boolean;
   showGroupRestMessage?: boolean;
   exerciseEquipment?: string[];
+  validationError?: string;
 }
 
 export function CurrentSetCard({
@@ -40,6 +41,7 @@ export function CurrentSetCard({
   isLastInSuperset = false,
   showGroupRestMessage = false,
   exerciseEquipment = [],
+  validationError,
 }: CurrentSetCardProps) {
   const [weight, setWeight] = useState(() => (set.weight !== undefined ? set.weight.toString() : ''));
   const [reps, setReps] = useState(() => (set.reps !== undefined ? set.reps.toString() : ''));
@@ -149,7 +151,7 @@ export function CurrentSetCard({
     onUpdate({ rpe: value });
   };
 
-  const canLogSet = (set.weight && set.weight > 0) || (set.reps && set.reps > 0);
+  const canLogSet = ((set.weight && set.weight > 0) || (set.reps && set.reps > 0)) && !validationError;
 
   const handleLogSetClick = () => {
     if (!canLogSet || disabled) return;
@@ -325,6 +327,9 @@ export function CurrentSetCard({
               disabled={disabled}
             />
           </div>
+          {validationError && (
+            <p className="text-xs text-error mt-1 text-center">{validationError}</p>
+          )}
         </label>
       </div>
 
