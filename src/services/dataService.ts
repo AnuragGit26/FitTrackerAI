@@ -185,6 +185,11 @@ class DataService {
     const now = new Date();
     const toleranceMs = 5000; // 5 seconds tolerance for clock skew
     
+    // Validate date is not in the future (with tolerance for clock skew)
+    if (workoutDate.getTime() > now.getTime() + toleranceMs) {
+      throw new Error('Workout date cannot be in the future');
+    }
+    
     // Validate date is not too far in the past (more than 10 years)
     const tenYearsAgo = new Date();
     tenYearsAgo.setFullYear(tenYearsAgo.getFullYear() - 10);
@@ -203,6 +208,13 @@ class DataService {
       throw new Error('Workout startTime is invalid');
     }
     
+    // Validate startTime is on the same day as workout date (after normalization)
+    const workoutDateStr = workoutDate.toISOString().split('T')[0];
+    const startTimeStr = startTime.toISOString().split('T')[0];
+    if (workoutDateStr !== startTimeStr) {
+      throw new Error('Workout startTime must be on the same day as workout date');
+    }
+    
     // Validate endTime if present
     if (workout.endTime) {
       const endTime = workout.endTime instanceof Date ? workout.endTime : new Date(workout.endTime);
@@ -212,6 +224,7 @@ class DataService {
       if (endTime < startTime) {
         throw new Error('Workout endTime must be after startTime');
       }
+      let finalEndTime = endTime;
       if (endTime.getTime() > now.getTime() + toleranceMs) {
         // Auto-adjust endTime to current time if it's in the future
         const cappedEndTime = new Date(Math.min(endTime.getTime(), now.getTime() + toleranceMs));
@@ -220,10 +233,11 @@ class DataService {
           capped: cappedEndTime.toISOString(),
         });
         (workout as Workout).endTime = cappedEndTime;
+        finalEndTime = cappedEndTime; // Use capped value for validation
       }
       // Allow endTime to be on next day (for late-night workouts)
       const startTimeStr = startTime.toISOString().split('T')[0];
-      const endTimeStr = endTime.toISOString().split('T')[0];
+      const endTimeStr = finalEndTime.toISOString().split('T')[0];
       const endDateObj = new Date(endTimeStr);
       const startDateObj = new Date(startTimeStr);
       const daysDiff = Math.floor((endDateObj.getTime() - startDateObj.getTime()) / (1000 * 60 * 60 * 24));
