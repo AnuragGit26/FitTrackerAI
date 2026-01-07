@@ -284,11 +284,20 @@ export function normalizeWorkoutStartTime(
   }
   
   // Step 1: Ensure startTime is on the same day as workout date (preserve time)
-  const workoutDateStr = validWorkoutDate.toISOString().split('T')[0];
-  const startTimeStr = startTimeDate.toISOString().split('T')[0];
+  // Use local date comparison instead of UTC to handle timezone correctly
+  const workoutDateLocal = new Date(
+    validWorkoutDate.getFullYear(),
+    validWorkoutDate.getMonth(),
+    validWorkoutDate.getDate()
+  );
+  const startTimeLocal = new Date(
+    startTimeDate.getFullYear(),
+    startTimeDate.getMonth(),
+    startTimeDate.getDate()
+  );
   
   let normalized = startTimeDate;
-  if (workoutDateStr !== startTimeStr) {
+  if (workoutDateLocal.getTime() !== startTimeLocal.getTime()) {
     normalized = adjustStartTimeToMatchDate(validWorkoutDate, startTimeDate);
     console.warn('Start time adjusted to match workout date', {
       original: startTimeDate.toISOString(),

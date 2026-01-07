@@ -1290,6 +1290,7 @@ export function LogExercise({
       const updatedWorkout = useWorkoutStore.getState().currentWorkout;
       if (updatedWorkout) {
         saveWorkoutState({ 
+          version: 1,
           currentWorkout: updatedWorkout, 
           templateId, 
           plannedWorkoutId 
@@ -1725,6 +1726,7 @@ export function LogExercise({
           isVisible={restTimerVisible && settings.autoStartRestTimer && !groupRestTimerVisible}
           initialPaused={restTimerPaused}
           initialRemainingTime={restTimerVisible ? restTimerRemaining : undefined}
+          initialStartTime={restTimerStartTime}
         />
       )}
 

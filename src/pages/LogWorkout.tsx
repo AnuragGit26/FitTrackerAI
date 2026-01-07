@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { X, Plus, Check, Edit, Trash2, Loader2, BookOpen, Save, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWorkoutStore, useWorkoutStore as getWorkoutStore } from '@/store/workoutStore';
@@ -27,6 +27,7 @@ import { QuickCardioLog } from '@/components/workout/QuickCardioLog';
 import { calculateVolume } from '@/utils/calculations';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { normalizeWorkoutStartTime } from '@/utils/validators';
+import { debounce } from '@/utils/debounce';
 
 // Helper function to format date for datetime-local input (local time, not UTC)
 function formatDateTimeLocal(date: Date): string {
@@ -74,6 +75,7 @@ export function LogWorkout() {
   const [isSaving, setIsSaving] = useState(false);
   const repeatWorkoutProcessedRef = useRef<string | null>(null);
   const shouldReduceMotion = prefersReducedMotion();
+  const workoutChannelRef = useRef<BroadcastChannel | null>(null);
 
   // Workout duration tracking - timer state is managed internally and persisted to sessionStorage
   const { formattedTime: workoutDuration, elapsedTime: workoutElapsedSeconds, isRunning: workoutTimerRunning, pause: pauseWorkoutTimer, resume: resumeWorkoutTimer, reset: resetWorkoutTimer, start: startWorkoutTimer } = useWorkoutDuration(false);
@@ -83,6 +85,15 @@ export function LogWorkout() {
       // Check if we have persisted workout state
       const persistedWorkoutState = loadWorkoutState();
       if (persistedWorkoutState?.currentWorkout) {
+        // Validate userId matches current user to prevent cross-user data leakage
+        if (persistedWorkoutState.currentWorkout.userId && 
+            persistedWorkoutState.currentWorkout.userId !== profile.id) {
+          console.warn('Recovered workout belongs to different user, clearing state');
+          clearWorkoutState();
+          startWorkout(profile.id);
+          return;
+        }
+        
         // Check if workout has exercises (not empty)
         const hasExercises = persistedWorkoutState.currentWorkout.exercises && 
                             persistedWorkoutState.currentWorkout.exercises.length > 0;
@@ -102,7 +113,35 @@ export function LogWorkout() {
     }
   }, [currentWorkout, profile, startWorkout]);
 
-  // Auto-save workout state every 10 seconds when workout is active
+  // Debounced immediate save for critical actions (exercise add/remove)
+  const debouncedSave = useMemo(
+    () => debounce(() => {
+      const storeState = getWorkoutStore.getState();
+      if (!storeState.currentWorkout) return;
+      
+      // Create state hash to avoid unnecessary saves
+      const stateHash = JSON.stringify({
+        exerciseCount: storeState.currentWorkout.exercises.length,
+        totalVolume: storeState.currentWorkout.totalVolume,
+        templateId: storeState.templateId,
+        plannedWorkoutId: storeState.plannedWorkoutId,
+      });
+      
+      // Only save if state has changed
+      if (stateHash !== lastSavedStateHashRef.current) {
+        saveWorkoutState({
+          version: 1,
+          currentWorkout: storeState.currentWorkout,
+          templateId: storeState.templateId || null,
+          plannedWorkoutId: storeState.plannedWorkoutId || null,
+        });
+        lastSavedStateHashRef.current = stateHash;
+      }
+    }, 1000),
+    []
+  );
+
+  // Auto-save workout state every 10 seconds when workout is active (backup)
   useEffect(() => {
     if (!currentWorkout) return;
 
@@ -110,16 +149,87 @@ export function LogWorkout() {
       // Save current workout state to localStorage
       const storeState = getWorkoutStore.getState();
       saveWorkoutState({
+        version: 1,
         currentWorkout: storeState.currentWorkout,
         templateId: storeState.templateId || null,
         plannedWorkoutId: storeState.plannedWorkoutId || null,
       });
+      
+      // Update hash after interval save
+      if (storeState.currentWorkout) {
+        lastSavedStateHashRef.current = JSON.stringify({
+          exerciseCount: storeState.currentWorkout.exercises.length,
+          totalVolume: storeState.currentWorkout.totalVolume,
+          templateId: storeState.templateId,
+          plannedWorkoutId: storeState.plannedWorkoutId,
+        });
+      }
     }, 10000); // 10 seconds
 
     return () => {
       clearInterval(autoSaveInterval);
     };
   }, [currentWorkout]);
+
+  // Trigger immediate save when exercises are added or removed
+  useEffect(() => {
+    if (currentWorkout && currentWorkout.exercises.length > 0) {
+      debouncedSave();
+    }
+  }, [currentWorkout?.exercises.length, debouncedSave]);
+
+  // Cross-tab synchronization using BroadcastChannel
+  useEffect(() => {
+    // Initialize BroadcastChannel for cross-tab communication
+    if (typeof BroadcastChannel !== 'undefined') {
+      workoutChannelRef.current = new BroadcastChannel('fittrackai-workout-sync');
+      
+      const handleMessage = (event: MessageEvent) => {
+        if (event.data.type === 'workout-state-changed') {
+          const { workoutId, timestamp } = event.data;
+          
+          // Ignore messages from this tab
+          if (event.data.sourceTabId === `tab-${Date.now()}`) {
+            return;
+          }
+          
+          // Handle conflict: another tab has an active workout
+          if (currentWorkout && workoutId && workoutId !== currentWorkout.id) {
+            console.warn('Another tab has an active workout. Consider closing other tabs to avoid conflicts.');
+            // Optionally show a toast notification
+            showError('Another tab has an active workout. Please close other tabs to avoid conflicts.');
+          }
+        } else if (event.data.type === 'workout-saved') {
+          // Another tab saved a workout, reload workouts if needed
+          if (event.data.workoutId) {
+            loadWorkouts(profile?.id || '');
+          }
+        }
+      };
+      
+      workoutChannelRef.current.addEventListener('message', handleMessage);
+      
+      return () => {
+        if (workoutChannelRef.current) {
+          workoutChannelRef.current.removeEventListener('message', handleMessage);
+          workoutChannelRef.current.close();
+          workoutChannelRef.current = null;
+        }
+      };
+    }
+  }, [currentWorkout, profile?.id, loadWorkouts, showError]);
+
+  // Broadcast state changes to other tabs
+  useEffect(() => {
+    if (workoutChannelRef.current && currentWorkout) {
+      workoutChannelRef.current.postMessage({
+        type: 'workout-state-changed',
+        workoutId: currentWorkout.id,
+        timestamp: Date.now(),
+        sourceTabId: `tab-${Date.now()}`,
+      });
+    }
+  }, [currentWorkout?.id, currentWorkout?.exercises.length]);
 
   // Warn user before navigating away with unsaved workout
   useEffect(() => {
@@ -623,6 +733,15 @@ export function LogWorkout() {
       const savedWorkouts = getWorkoutStore.getState().workouts;
       const savedWorkout = savedWorkouts[0]; // Most recent workout
       const workoutId = savedWorkout?.id;
+      
+      // Broadcast workout saved to other tabs
+      if (workoutChannelRef.current && workoutId) {
+        workoutChannelRef.current.postMessage({
+          type: 'workout-saved',
+          workoutId,
+          timestamp: Date.now(),
+        });
+      }
       
       // Reset timer when workout is finished
       resetWorkoutTimer();

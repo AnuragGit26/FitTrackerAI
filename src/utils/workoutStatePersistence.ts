@@ -29,7 +29,10 @@ export interface LogWorkoutStateSnapshot {
   setDurationElapsed: number; // seconds
 }
 
+const WORKOUT_STATE_VERSION = 1;
+
 export interface WorkoutStateSnapshot {
+  version: number;
   currentWorkout: Workout | null;
   templateId: string | null;
   plannedWorkoutId: string | null;
@@ -100,6 +103,7 @@ function deserializeWorkout(workoutData: Record<string, unknown>): Workout | nul
 export function saveWorkoutState(state: WorkoutStateSnapshot): void {
   try {
     const serialized = {
+      version: WORKOUT_STATE_VERSION,
       currentWorkout: serializeWorkout(state.currentWorkout),
       templateId: state.templateId,
       plannedWorkoutId: state.plannedWorkoutId,
@@ -146,13 +150,52 @@ export function saveWorkoutState(state: WorkoutStateSnapshot): void {
 /**
  * Load workout store state from localStorage
  */
+/**
+ * Migrate workout state from older versions to current version
+ */
+function migrateWorkoutState(parsed: Record<string, unknown>): WorkoutStateSnapshot | null {
+  const version = parsed.version as number | undefined;
+  
+  // Version 1 is current, no migration needed if version is 1
+  if (version === WORKOUT_STATE_VERSION) {
+    return {
+      version: WORKOUT_STATE_VERSION,
+      currentWorkout: deserializeWorkout(parsed.currentWorkout as Record<string, unknown> | null),
+      templateId: (parsed.templateId as string | undefined) || null,
+      plannedWorkoutId: (parsed.plannedWorkoutId as string | undefined) || null,
+    };
+  }
+  
+  // Version 0 (no version field) - migrate to version 1
+  if (!version || version === 0) {
+    return {
+      version: WORKOUT_STATE_VERSION,
+      currentWorkout: deserializeWorkout(parsed.currentWorkout as Record<string, unknown> | null),
+      templateId: (parsed.templateId as string | undefined) || null,
+      plannedWorkoutId: (parsed.plannedWorkoutId as string | undefined) || null,
+    };
+  }
+  
+  // Unknown version - clear state for safety
+  console.warn(`Unknown workout state version ${version}, clearing state`);
+  return null;
+}
+
 export function loadWorkoutState(): WorkoutStateSnapshot | null {
   try {
     const stored = localStorage.getItem(STORAGE_KEYS.workoutState);
     if (!stored) return null;
 
     const parsed = JSON.parse(stored);
+    
+    // Check version and migrate if needed
+    const version = parsed.version as number | undefined;
+    if (version !== WORKOUT_STATE_VERSION) {
+      return migrateWorkoutState(parsed);
+    }
+    
     return {
+      version: WORKOUT_STATE_VERSION,
       currentWorkout: deserializeWorkout(parsed.currentWorkout),
       templateId: parsed.templateId || null,
       plannedWorkoutId: parsed.plannedWorkoutId || null,

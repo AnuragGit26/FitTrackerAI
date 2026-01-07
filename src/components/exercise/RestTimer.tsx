@@ -15,6 +15,7 @@ interface RestTimerProps {
   isVisible: boolean; // Controls visibility
   initialPaused?: boolean; // Initial pause state (for restoration)
   initialRemainingTime?: number; // Initial remaining time (for restoration)
+  initialStartTime?: Date | string | null; // Start time when timer was first started (for drift correction)
 }
 
 export function RestTimer({
@@ -27,6 +28,7 @@ export function RestTimer({
   isVisible,
   initialPaused = false,
   initialRemainingTime,
+  initialStartTime,
 }: RestTimerProps) {
   const [remainingTime, setRemainingTime] = useState(initialRemainingTime ?? duration);
   const [isPaused, setIsPaused] = useState(initialPaused);
@@ -98,8 +100,19 @@ export function RestTimer({
       
       if (isRestoring && initialRemainingTime !== undefined) {
         // Restore from persisted state
-        initialDurationRef.current = initialRemainingTime;
-        setRemainingTime(initialRemainingTime);
+        // Calculate elapsed time if start time is available to fix timer drift
+        let adjustedRemainingTime = initialRemainingTime;
+        if (initialStartTime && !initialPaused) {
+          const startTime = initialStartTime instanceof Date 
+            ? initialStartTime 
+            : new Date(initialStartTime);
+          const now = new Date();
+          const elapsed = Math.floor((now.getTime() - startTime.getTime()) / 1000);
+          adjustedRemainingTime = Math.max(0, initialRemainingTime - elapsed);
+        }
+        
+        initialDurationRef.current = adjustedRemainingTime;
+        setRemainingTime(adjustedRemainingTime);
         setIsPaused(initialPaused);
         // Reset completion flag when timer becomes visible
         isCompletedOrSkippedRef.current = false;
@@ -111,7 +124,7 @@ export function RestTimer({
         }
         // Sync with parent - defer to avoid updating parent during render
         setTimeout(() => {
-          onRemainingTimeChange?.(initialRemainingTime);
+          onRemainingTimeChange?.(adjustedRemainingTime);
         }, 0);
       } else {
         // First time becoming visible - initialize with duration
@@ -134,7 +147,7 @@ export function RestTimer({
       // Mark as initialized after setting up
       hasInitializedRef.current = true;
     }
-  }, [duration, isVisible, initialRemainingTime, initialPaused, onRemainingTimeChange]);
+  }, [duration, isVisible, initialRemainingTime, initialPaused, initialStartTime, onRemainingTimeChange]);
 
   // Track previous remainingTime to detect transitions from 0 to positive
   const prevRemainingTimeRef = useRef(remainingTime);
