@@ -72,29 +72,6 @@ export function SetCompletionCelebration({
     }
   }, [isVisible, onComplete]);
 
-  if (shouldReduceMotion) {
-    // Simplified version for reduced motion
-    return (
-      <AnimatePresence>
-        {isVisible && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none"
-          >
-            <div className="bg-primary/90 backdrop-blur-sm rounded-2xl px-8 py-4 shadow-2xl border-2 border-primary/50">
-              <p className="text-2xl font-bold text-background-dark text-center drop-shadow-lg">
-                {message}
-              </p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    );
-  }
-
   const centerX = position?.x ?? window.innerWidth / 2;
   const centerY = position?.y ?? window.innerHeight / 2;
 
@@ -145,6 +122,29 @@ export function SetCompletionCelebration({
       };
     });
   }, [isVisible]);
+
+  if (shouldReduceMotion) {
+    // Simplified version for reduced motion
+    return (
+      <AnimatePresence>
+        {isVisible && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none"
+          >
+            <div className="bg-primary/90 backdrop-blur-sm rounded-2xl px-8 py-4 shadow-2xl border-2 border-primary/50">
+              <p className="text-2xl font-bold text-background-dark text-center drop-shadow-lg">
+                {message}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    );
+  }
 
   return (
     <AnimatePresence>

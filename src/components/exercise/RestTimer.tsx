@@ -37,6 +37,7 @@ interface RestTimerProps {
   initialPaused?: boolean; // Initial pause state (for restoration)
   initialRemainingTime?: number; // Initial remaining time (for restoration)
   initialStartTime?: Date | string | null; // Start time when timer was first started (for drift correction)
+  initialOriginalDuration?: number | null; // Original duration when timer started (for drift correction)
 }
 
 export function RestTimer({
@@ -50,6 +51,7 @@ export function RestTimer({
   initialPaused = false,
   initialRemainingTime,
   initialStartTime,
+  initialOriginalDuration,
 }: RestTimerProps) {
   const [remainingTime, setRemainingTime] = useState(initialRemainingTime ?? duration);
   const [isPaused, setIsPaused] = useState(initialPaused);
@@ -147,13 +149,15 @@ export function RestTimer({
         // Restore from persisted state
         // Calculate elapsed time if start time is available to fix timer drift
         let adjustedRemainingTime = initialRemainingTime;
-        if (initialStartTime && !initialPaused) {
+        if (initialStartTime && !initialPaused && initialOriginalDuration !== null && initialOriginalDuration !== undefined) {
           const startTime = initialStartTime instanceof Date 
             ? initialStartTime 
             : new Date(initialStartTime);
           const now = new Date();
           const elapsed = Math.floor((now.getTime() - startTime.getTime()) / 1000);
-          adjustedRemainingTime = Math.max(0, initialRemainingTime - elapsed);
+          // Use original duration minus elapsed time to avoid double-counting
+          // initialRemainingTime is already reduced, so we need the original duration
+          adjustedRemainingTime = Math.max(0, initialOriginalDuration - elapsed);
         }
         
         initialDurationRef.current = adjustedRemainingTime;
@@ -192,7 +196,7 @@ export function RestTimer({
       // Mark as initialized after setting up
       hasInitializedRef.current = true;
     }
-  }, [duration, isVisible, initialRemainingTime, initialPaused, initialStartTime, onRemainingTimeChange]);
+  }, [duration, isVisible, initialRemainingTime, initialPaused, initialStartTime, initialOriginalDuration, onRemainingTimeChange]);
 
   // Track previous remainingTime to detect transitions from 0 to positive
   const prevRemainingTimeRef = useRef(remainingTime);

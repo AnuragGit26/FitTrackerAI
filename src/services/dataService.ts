@@ -9,7 +9,7 @@ import { userContextManager } from './userContextManager';
 import { errorRecovery } from './errorRecovery';
 import { sanitizeString } from '@/utils/sanitize';
 import { Transaction } from 'dexie';
-import { validateReps, validateWeight, validateDuration, validateCalories, validateRPE, normalizeWorkoutStartTime } from '@/utils/validators';
+import { validateWeight, validateDuration, validateCalories, validateRPE, normalizeWorkoutStartTime } from '@/utils/validators';
 import { calculateVolume } from '@/utils/calculations';
 import { generateWorkoutId } from '@/utils/idGenerator';
 
@@ -298,18 +298,17 @@ class DataService {
       // Validate each set using centralized validators
       // Get exercise tracking type from exercise library if available
       (exercise.sets ?? []).forEach((set, setIndex) => {
-        // Validate reps (if present) - allow 0 for incomplete sets
+        // Validate reps (if present) - only basic data integrity checks
+        // Detailed validation (e.g., max 50 reps) is handled during set logging (onChange)
         if (set.reps !== undefined) {
-          if (set.reps === 0 && !set.completed) {
-            // Allow 0 reps for incomplete sets
-          } else if (set.reps > 0) {
-            const repsValidation = validateReps(set.reps);
-            if (!repsValidation.valid) {
-              throw new Error(
-                `Exercise at index ${index}, set ${setIndex + 1}: ${repsValidation.error}`
-              );
-            }
-          } else if (set.completed && set.reps <= 0) {
+          // Check for invalid number values (NaN, Infinity)
+          if (!Number.isFinite(set.reps)) {
+            throw new Error(
+              `Exercise at index ${index}, set ${setIndex + 1}: reps must be a valid number`
+            );
+          }
+          // Only validate that completed sets have positive reps (basic data integrity)
+          if (set.completed && set.reps <= 0) {
             throw new Error(
               `Exercise at index ${index}, set ${setIndex + 1}: completed sets must have reps > 0`
             );
@@ -322,7 +321,7 @@ class DataService {
           const weightValidation = validateWeight(set.weight, unit);
           if (!weightValidation.valid) {
             throw new Error(
-              `Exercise at index ${index}, set ${setIndex + 1}: ${weightValidation.error}`
+              `Exercise at index ${index}, set ${setIndex + 1}: ${weightValidation.error || 'Invalid weight value'}`
             );
           }
         }
@@ -341,7 +340,7 @@ class DataService {
           const durationValidation = validateDuration(set.duration);
           if (!durationValidation.valid) {
             throw new Error(
-              `Exercise at index ${index}, set ${setIndex + 1}: ${durationValidation.error}`
+              `Exercise at index ${index}, set ${setIndex + 1}: ${durationValidation.error || 'Invalid duration value'}`
             );
           }
         }
@@ -384,7 +383,7 @@ class DataService {
     if (workout.calories !== undefined) {
       const caloriesValidation = validateCalories(workout.calories);
       if (!caloriesValidation.valid) {
-        throw new Error(`Workout calories: ${caloriesValidation.error}`);
+        throw new Error(`Workout calories: ${caloriesValidation.error || 'Invalid calories value'}`);
       }
     }
   }

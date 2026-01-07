@@ -374,6 +374,8 @@ class ErrorLogService {
     }
 
     // Unused but kept for potential future use
+    // @ts-expect-error - Unused but kept for potential future use
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     private convertToSupabaseFormat(log: LocalErrorLog): Record<string, unknown> {
         return {
             id: log.id,

@@ -584,7 +584,9 @@ CRITICAL OUTPUT REQUIREMENTS:
             const breakthrough = cleaned.breakthrough as { exercise?: string; projectedWeight?: number; improvementPercent?: number; reason?: string } | undefined;
 
             return {
-                breakthrough: breakthrough?.exercise ? {
+                breakthrough: breakthrough?.exercise && 
+                    breakthrough.projectedWeight !== undefined && 
+                    breakthrough.improvementPercent !== undefined ? {
                     exercise: cleanString(breakthrough.exercise),
                     projectedWeight: breakthrough.projectedWeight,
                     improvementPercent: breakthrough.improvementPercent,

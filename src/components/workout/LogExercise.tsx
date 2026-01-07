@@ -7,6 +7,7 @@ import { ExerciseSelectorDropdown } from '@/components/exercise/ExerciseSelector
 import { RestTimer } from '@/components/exercise/RestTimer';
 import { CurrentSetCard } from '@/components/exercise/CurrentSetCard';
 import { CardioSetCard } from '@/components/exercise/CardioSetCard';
+import { CardioRepsSetCard } from '@/components/exercise/CardioRepsSetCard';
 import { HIITSetCard } from '@/components/exercise/HIITSetCard';
 import { YogaSetCard } from '@/components/exercise/YogaSetCard';
 import { CompletedSetItem } from '@/components/exercise/CompletedSetItem';
@@ -34,6 +35,7 @@ import { trapFocus, restoreFocus } from '@/utils/accessibility';
 import { supersetService, SupersetGroup } from '@/services/supersetService';
 import { Modal } from '@/components/common/Modal';
 import { detectHIIT } from '@/utils/exerciseHelpers';
+import { isDistanceBasedCardio } from '@/utils/cardioExerciseHelpers';
 
 // Constants
 const MODAL_CLOSE_DELAY = 500; // ms
@@ -597,12 +599,25 @@ export function LogExercise({
           break;
         }
         case 'reps_only':
-          newSet = {
-            setNumber: newSetNumber,
-            reps: lastCompletedSet?.reps ?? lastSet?.reps ?? 10,
-            rpe: lastCompletedSet?.rpe ?? lastSet?.rpe ?? 7.5,
-            completed: false,
-          };
+          // Check if this is a cardio exercise (reps-based cardio like Burpees, Jump Rope)
+          if (selectedExercise.category === 'cardio') {
+            newSet = {
+              setNumber: newSetNumber,
+              reps: lastCompletedSet?.reps ?? lastSet?.reps ?? 10,
+              duration: lastCompletedSet?.duration ?? lastSet?.duration,
+              calories: lastCompletedSet?.calories,
+              rpe: lastCompletedSet?.rpe ?? lastSet?.rpe ?? 7.5,
+              completed: false,
+            };
+          } else {
+            // Regular reps-only (bodyweight exercises)
+            newSet = {
+              setNumber: newSetNumber,
+              reps: lastCompletedSet?.reps ?? lastSet?.reps ?? 10,
+              rpe: lastCompletedSet?.rpe ?? lastSet?.rpe ?? 7.5,
+              completed: false,
+            };
+          }
           break;
         case 'cardio':
           newSet = {
@@ -875,11 +890,24 @@ export function LogExercise({
       }
 
       if (exerciseId) {
+        // Editing existing exercise - always update
         updateExercise(exerciseId, workoutExercise);
         success('Exercise updated successfully');
       } else {
-        addExercise(workoutExercise);
-        success('Exercise added successfully');
+        // New exercise - check if it was already added by auto-save
+        const existingExercise = (latestWorkout.exercises ?? []).find(
+          (ex) => ex.exerciseId === selectedExercise.id && ex.exerciseName === selectedExercise.name
+        );
+        
+        if (existingExercise) {
+          // Exercise already exists (likely from auto-save) - update it instead of adding duplicate
+          updateExercise(existingExercise.id, workoutExercise);
+          success('Exercise updated successfully');
+        } else {
+          // Exercise doesn't exist - add it
+          addExercise(workoutExercise);
+          success('Exercise added successfully');
+        }
       }
 
       // Reset state
@@ -949,8 +977,11 @@ export function LogExercise({
   }, []);
 
   // Helper function to auto-save exercise sets to workout store
-  const autoSaveExerciseSets = useCallback(async () => {
-    if (!selectedExercise || !sets.length || !isMountedRef.current) {
+  // Accepts optional updatedSets parameter to handle async state updates
+  const autoSaveExerciseSets = useCallback(async (updatedSets?: WorkoutSet[]) => {
+    const setsToSave = updatedSets ?? sets;
+    
+    if (!selectedExercise || !setsToSave.length || !isMountedRef.current) {
       return;
     }
 
@@ -979,7 +1010,7 @@ export function LogExercise({
         musclesWorked = [MuscleGroup.CHEST];
       }
 
-      const totalVolume = calculateVolume(sets, selectedExercise.trackingType);
+      const totalVolume = calculateVolume(setsToSave, selectedExercise.trackingType);
 
       // Determine the exercise ID to use and whether to add or update
       let exerciseIdToUse: string;
@@ -1019,7 +1050,7 @@ export function LogExercise({
         id: exerciseIdToUse,
         exerciseId: selectedExercise.id,
         exerciseName: selectedExercise.name,
-        sets: sets,
+        sets: setsToSave,
         totalVolume,
         musclesWorked,
         timestamp: workoutDate,
@@ -1038,6 +1069,15 @@ export function LogExercise({
     }
   }, [selectedExercise, sets, exerciseId, workoutDate, notes, currentWorkout, profile, startWorkout, updateExercise, addExercise]);
 
+  // Helper to calculate updated sets with rest time (for use before state update completes)
+  const calculateSetsWithRestTime = useCallback((setNumber: number, restTime: number): WorkoutSet[] => {
+    return sets.map((set) => 
+      set.setNumber === setNumber 
+        ? { ...set, restTime }
+        : set
+    );
+  }, [sets]);
+
   // Rest timer handlers
   const handleRestComplete = useCallback((completionTime?: Date) => {
     if (!isMountedRef.current) {
@@ -1052,21 +1092,29 @@ export function LogExercise({
         ? Math.floor((endTime.getTime() - restTimerStartTime.getTime()) / 1000)
         : defaultRestDuration;
 
+      let setNumberToUpdate: number | null = null;
       if (restTimerSetNumberRef.current !== null) {
-        const setNumber = restTimerSetNumberRef.current;
-        handleUpdateSet(setNumber, { restTime: actualRestTime });
+        setNumberToUpdate = restTimerSetNumberRef.current;
+        handleUpdateSet(setNumberToUpdate, { restTime: actualRestTime });
         restTimerSetNumberRef.current = null;
       } else {
         if (sets.length > 0) {
           const lastCompletedSet = [...sets].reverse().find((s) => s.completed);
           if (lastCompletedSet) {
-            handleUpdateSet(lastCompletedSet.setNumber, { restTime: actualRestTime });
+            setNumberToUpdate = lastCompletedSet.setNumber;
+            handleUpdateSet(setNumberToUpdate, { restTime: actualRestTime });
           }
         }
       }
 
-      // Auto-save exercise sets to workout store
-      autoSaveExerciseSets();
+      // Auto-save exercise sets to workout store with updated rest time
+      // Pass updated sets to avoid race condition with async state update
+      if (setNumberToUpdate !== null) {
+        const updatedSets = calculateSetsWithRestTime(setNumberToUpdate, actualRestTime);
+        autoSaveExerciseSets(updatedSets);
+      } else {
+        autoSaveExerciseSets();
+      }
 
       if (!isMountedRef.current) {
         return;
@@ -1092,27 +1140,36 @@ export function LogExercise({
         restTimerSetNumberRef.current = null;
       }
     }
-  }, [restTimerStartTime, defaultRestDuration, sets, handleUpdateSet, autoSaveExerciseSets, startSet]);
+  }, [restTimerStartTime, defaultRestDuration, sets, handleUpdateSet, autoSaveExerciseSets, startSet, calculateSetsWithRestTime]);
 
   const handleRestSkip = () => {
     const actualRestTime = restTimerStartTime
       ? Math.floor((new Date().getTime() - restTimerStartTime.getTime()) / 1000)
       : 0;
 
+    let setNumberToUpdate: number | null = null;
     if (restTimerSetNumberRef.current !== null) {
-      handleUpdateSet(restTimerSetNumberRef.current, { restTime: actualRestTime });
+      setNumberToUpdate = restTimerSetNumberRef.current;
+      handleUpdateSet(setNumberToUpdate, { restTime: actualRestTime });
       restTimerSetNumberRef.current = null;
     } else {
       if (sets.length > 0) {
         const lastCompletedSet = [...sets].reverse().find((s) => s.completed);
         if (lastCompletedSet) {
-          handleUpdateSet(lastCompletedSet.setNumber, { restTime: actualRestTime });
+          setNumberToUpdate = lastCompletedSet.setNumber;
+          handleUpdateSet(setNumberToUpdate, { restTime: actualRestTime });
         }
       }
     }
 
-    // Auto-save exercise sets to workout store (consistent with handleRestComplete)
-    autoSaveExerciseSets();
+    // Auto-save exercise sets to workout store with updated rest time
+    // Pass updated sets to avoid race condition with async state update
+    if (setNumberToUpdate !== null) {
+      const updatedSets = calculateSetsWithRestTime(setNumberToUpdate, actualRestTime);
+      autoSaveExerciseSets(updatedSets);
+    } else {
+      autoSaveExerciseSets();
+    }
 
     setRestTimerVisible(false);
     setRestTimerRemaining(defaultRestDuration);
@@ -1582,8 +1639,28 @@ export function LogExercise({
               
               // Render Cardio card for cardio exercises
               if (isCardio) {
+                const isDistanceBased = isDistanceBasedCardio(selectedExercise);
+                
+                // Distance-based cardio (Running, Cycling, etc.)
+                if (isDistanceBased) {
+                  return (
+                    <CardioSetCard
+                      setNumber={currentSetNumber}
+                      set={currentSet}
+                      onUpdate={(updates) => handleUpdateSet(currentSet.setNumber, updates)}
+                      onLogSet={handleLogCurrentSet}
+                      onAddSet={handleAddSet}
+                      onCancelSet={() => handleCancelSet(currentSet.setNumber)}
+                      nextExerciseName={nextExercise?.exerciseName}
+                      isLastInSuperset={isLastInSuperset}
+                      showGroupRestMessage={isInSuperset && !!nextExercise && !isLastInSuperset}
+                    />
+                  );
+                }
+                
+                // Reps/duration-based cardio (Burpees, Jump Rope, etc.)
                 return (
-                  <CardioSetCard
+                  <CardioRepsSetCard
                     setNumber={currentSetNumber}
                     set={currentSet}
                     onUpdate={(updates) => handleUpdateSet(currentSet.setNumber, updates)}
@@ -1731,6 +1808,7 @@ export function LogExercise({
           initialPaused={restTimerPaused}
           initialRemainingTime={restTimerVisible ? restTimerRemaining : undefined}
           initialStartTime={restTimerStartTime}
+          initialOriginalDuration={restTimerOriginalDuration}
         />
       )}
 

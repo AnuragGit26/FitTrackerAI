@@ -110,13 +110,35 @@ export function validateSet(set: WorkoutSet, trackingType: ExerciseTrackingType,
       return validateReps(set.reps);
 
     case 'cardio': {
-      if (set.distance === undefined) {
-        return { valid: false, error: 'Distance is required for cardio exercises' };
+      // Distance-based cardio: requires distance and time
+      if (set.distance !== undefined) {
+        const distanceValidation = validateDistance(set.distance, set.distanceUnit || distanceUnit);
+        if (!distanceValidation.valid) return distanceValidation;
+        // Time is required for distance-based cardio
+        if (set.time === undefined) {
+          return { valid: false, error: 'Time is required for distance-based cardio' };
+        }
+        const timeValidation = validateDuration(set.time);
+        if (!timeValidation.valid) return { valid: false, error: 'Time must be between 0 and 24 hours' };
+      } 
+      // Reps-based cardio: requires reps or duration (at least one)
+      else if (set.reps !== undefined || set.duration !== undefined) {
+        if (set.reps !== undefined) {
+          const repsValidation = validateReps(set.reps);
+          if (!repsValidation.valid) return repsValidation;
+        }
+        if (set.duration !== undefined) {
+          const durationValidation = validateDuration(set.duration);
+          if (!durationValidation.valid) return durationValidation;
+        }
+        // At least one must be provided
+        if (set.reps === undefined && set.duration === undefined) {
+          return { valid: false, error: 'Reps or duration is required for cardio exercises' };
+        }
+      } else {
+        return { valid: false, error: 'Distance or reps/duration is required for cardio exercises' };
       }
-      const distanceValidation = validateDistance(set.distance, set.distanceUnit || distanceUnit);
-      if (!distanceValidation.valid) return distanceValidation;
-      const timeValidation = set.time === undefined ? { valid: true } : validateDuration(set.time);
-      if (!timeValidation.valid) return { valid: false, error: 'Time must be between 0 and 24 hours' };
+      // Validate optional fields
       const caloriesValidation = validateCalories(set.calories);
       if (!caloriesValidation.valid) return { valid: false, error: 'Calories must be between 0 and 10000' };
       const stepsValidation = validateSteps(set.steps);

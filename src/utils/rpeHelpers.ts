@@ -55,7 +55,7 @@ export function calculateRpeTrend(
 
 export function suggestLoadFromRpe(
   weight: number,
-  reps: number,
+  _reps: number,
   targetRpe: number,
   currentRpe?: number
 ): number {

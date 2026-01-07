@@ -26,7 +26,14 @@ export function CompletedSetItem({
   const intensityLabel = set.rpe ? getIntensityLabel(set.rpe) : null;
 
   // Determine display type based on set data
-  const isCardio = set.distance !== undefined || set.time !== undefined;
+  // Distance-based cardio: has distance > 0 and time
+  const isDistanceBasedCardio = set.distance !== undefined && set.distance > 0 && set.time !== undefined;
+  // Reps-based cardio: has reps, no weight, AND duration (distinguishes from bodyweight strength)
+  // Bodyweight strength exercises (like pushups) have reps but no duration
+  const isRepsBasedCardio = set.reps !== undefined && 
+    set.weight === undefined && 
+    set.duration !== undefined;
+  const isCardio = isDistanceBasedCardio || isRepsBasedCardio;
   const isHIIT = set.workDuration !== undefined || set.rounds !== undefined;
   const isYoga = set.duration !== undefined && !set.weight && !set.reps && !set.distance;
 
@@ -37,8 +44,8 @@ export function CompletedSetItem({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Calculate pace for cardio
-  const pace = isCardio && set.distance && set.time && set.distance > 0
+  // Calculate pace for distance-based cardio
+  const pace = isDistanceBasedCardio && set.distance && set.time && set.distance > 0
     ? calculatePace(set.time, set.distance, set.distanceUnit || 'km')
     : 0;
 
@@ -65,8 +72,8 @@ export function CompletedSetItem({
           {set.setNumber}
         </motion.div>
         <div className="flex flex-col">
-          {/* Cardio Display */}
-          {isCardio && (
+          {/* Distance-based Cardio Display */}
+          {isDistanceBasedCardio && (
             <>
               <span className="text-slate-900 dark:text-white font-medium text-lg">
                 {set.distance || 0} {set.distanceUnit || 'km'} {set.time ? `• ${formatTime(set.time)}` : ''}
@@ -75,6 +82,26 @@ export function CompletedSetItem({
                 {pace > 0 && (
                   <span>Pace: {formatPace(pace, set.distanceUnit || 'km')}</span>
                 )}
+                {set.calories && (
+                  <span>• {set.calories} cal</span>
+                )}
+                {set.heartRate && (
+                  <span>• HR: {set.heartRate} bpm</span>
+                )}
+                {set.steps && (
+                  <span>• {set.steps} steps</span>
+                )}
+              </div>
+            </>
+          )}
+          
+          {/* Reps-based Cardio Display */}
+          {isRepsBasedCardio && !isDistanceBasedCardio && (
+            <>
+              <span className="text-slate-900 dark:text-white font-medium text-lg">
+                {set.reps || 0} reps {set.duration ? `• ${formatTime(set.duration)}` : ''}
+              </span>
+              <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs">
                 {set.calories && (
                   <span>• {set.calories} cal</span>
                 )}

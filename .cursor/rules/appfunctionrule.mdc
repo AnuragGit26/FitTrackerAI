@@ -1,137 +1,266 @@
 ---
 alwaysApply: true
+selfEvolving: true
 ---
 
-## 1. End-to-End Integration
+# FitTrackAI Application Function Rules
 
-- Implement UI + business logic + DB changes cohesively.
-- Validate full flow from user action to persisted state & back.
-- Ensure new components do not degrade existing UX.
-- Handle loading, error states, and offline fallbacks.
+## 0. Rule Intelligence & Self-Update Authority (CRITICAL)
 
----
+- This rule is **self-aware and self-maintaining**.
+- The system may **optimize, extend, or refine this rule** when explicitly commanded
+  using instructions such as:
+  - "update the rule"
+  - "optimize the rule"
+  - "extend this rule to handle X"
+- Rule updates must:
+  - Preserve backward intent
+  - Never weaken safety, testing, or review constraints
+  - Be additive or clarifying, not destructive
+- Every rule update must:
+  - Be reasoned with architectural context
+  - Avoid ambiguity
+  - Remain production-safe
 
-## 2. Architectural Planning Before Coding
-
-Before writing code, prepare a short design outline including:
-
-- Feature scope & expected user journey
-- Data flow (UI → Logic → DB → IndexedDB → UI)
-- Impact on existing modules and shared services
-- API endpoints, schema updates, and caching approach
-- Risks, scalability concerns, performance expectations
-
----
-
-## 3. Supabase + IndexedDB Data Management
-
-- Update schema/tables safely with version awareness.
-- Keep IndexedDB in sync with Supabase for offline-first behavior.
-- Document new columns, indexes, or migrations.
-- Ensure efficient querying and indexing.
+> The rule may evolve, but never regress.
 
 ---
 
-## 4. UI/UX Implementation Standards
+## 1. End-User Safety First (NON-NEGOTIABLE)
 
-- Follow the existing design language & component patterns.
-- Maintain accessibility and responsiveness across devices.
-- Implement loading, success, failure, empty state behaviors.
-- No UI change without confirming user impact.
-
----
-
-## 5. Code Review & Quality Gate
-
-Every feature must undergo a senior-level review with mindset of:
-
-- **Architect** — scalable design decisions
-- **Senior Engineer** — performance & maintainability
-- **Product Manager** — user value and flow completeness
-
-Review checklist:
-
-- Readability & modularity
-- Efficient DB queries and caching
-- IndexedDB sync logic where applicable
-- Error handling and security boundaries
-- No dead code or unnecessary complexity
-- Test coverage exists for core logic
-- Ensure this rule is relevant to project requirements.
-- Test and fix lint errors and build errors without any functionality changes.
-
-Merge only after approval.
+- Assume **end users cannot handle runtime errors**.
+- Zero unhandled runtime errors across:
+  - UI
+  - Domain logic
+  - Edge functions
+  - Prisma/MongoDB
+  - Sync layers
+- Failures must:
+  - Degrade gracefully
+  - Provide user-safe recovery
+  - Log internally (no technical leakage)
 
 ---
 
-## 6. Testing Requirements
+## 2. End-to-End Integration (Strict)
 
-Test coverage must include:
-
-- End-to-end scenario walkthrough
-- Regression testing for old flows
-- Happy-path + edge cases + failure handling
-- Network-down/offline scenarios if data sync involved
-
----
-
-## 7. Documentation Expectations
-
-For any non-trivial feature:
-
-- Update README / Architecture notes / DB Schema docs
-- Keep comments minimal, explaining logic rather than code
-- Record decisions that future developers should know
+- All functionality must be implemented **E2E**:
+- Validate:
+- User action → persistence → rehydration
+- No UX regression
+- Existing flows remain intact
+- Mandatory handling:
+- Loading
+- Empty
+- Error
+- Offline
+- Partial sync states
 
 ---
 
-## 8. Technical Documentation Reference
+## 3. Architectural Planning Before Coding (Mandatory)
 
-**CRITICAL**: Before implementing features or making architectural decisions, consult the comprehensive technical documentation:
+Before coding, document:
 
-- **Location**: `TECHNICAL_DOCUMENTATION.md` (root directory)
-- **Purpose**: Complete reference for business requirements, system architecture, data models, and implementation details
+- End-user goal (fitness tracking + AI coaching insights)
+- Full user journey
+- Data ownership & flow
+- Edge Function responsibilities (Supabase):
+- Auth
+- Secure execution
+- Event orchestration
+- Prisma + MongoDB:
+- Canonical data store
+- Schema evolution
+- Sync guarantees
+- IndexedDB:
+- Offline authority
+- Reconciliation logic
+- Performance expectations
+- Failure modes & mitigation
 
-### Key Sections to Reference
-
-- **Business Requirements & Objectives**: Understand the "why" behind features
-- **Core Features & Business Logic**: Detailed algorithms, calculations, and business rules
-- **Data Architecture**: Database schemas, relationships, and indexing strategies
-- **System Architecture**: Architecture patterns, data flow, and integration points
-- **API & Integration Points**: External service integrations and authentication flows
-
-### When to Consult
-
-- **Before starting new features**: Understand business requirements and success metrics
-- **When modifying data models**: Check schema documentation and migration strategies
-- **When integrating APIs**: Review integration patterns and authentication flows
-- **When optimizing performance**: Reference performance targets and optimization strategies
-- **When resolving conflicts**: Understand business rules and data flow patterns
-
-### Documentation Maintenance
-
-- Update `TECHNICAL_DOCUMENTATION.md` when:
-  - Adding new features or major functionality
-  - Changing data models or schemas
-  - Modifying business logic or algorithms
-  - Adding new integrations or APIs
-  - Changing architecture patterns
+> No planning → no code.
 
 ---
 
-## Summary
+## 4. Data Architecture & Storage Rules
 
-| Area | Must Be Completed |
-|---|---|
-| UI updates | ✔ Fully integrated |
-| App logic | ✔ Connected to UI & data |
-| Supabase | ✔ Schema & queries updated |
-| IndexedDB | ✔ Offline state maintained |
-| Tests | ✔ Added/updated |
-| Review | ✔ Mandatory approval |
-| Documentation | ✔ Updated (including TECHNICAL_DOCUMENTATION.md) |
-| Technical Reference | ✔ Consulted before implementation |
+### Supabase
+
+- **Used ONLY for Edge Functions**
+- No permanent data storage
+- No business-critical state persistence
+
+### Prisma ORM + MongoDB
+
+- **Single source of truth**
+- Strong schema contracts
+- Migration-safe updates
+- Indexed, query-efficient models
+
+### IndexedDB
+
+- Offline-first UX
+- Syncs deterministically with MongoDB
+- Handles conflict resolution
 
 ---
 
-By following this document consistently, we maintain a clean, scalable codebase with smooth feature development and production-ready delivery.
+## 5. Runtime Error Prevention (STRICT)
+
+- Defensive programming everywhere:
+- Null checks
+- Schema validation
+- AI output sanitization
+- All async calls require:
+- Timeout
+- Retry
+- Fallback
+- AI-generated insights must:
+- Be validated
+- Be explainable
+- Never silently fail
+
+---
+
+## 6. UI/UX Implementation Standards
+
+- Follow existing design language strictly
+- Accessibility is mandatory
+- Every screen defines:
+- Loading
+- Success
+- Failure
+- Empty
+- No UI change without validating **user impact**
+
+---
+
+## 7. Agentic Code Review & Quality Gate
+
+Every feature is reviewed as:
+
+### Architect
+
+- Scalability
+- Separation of concerns
+- No coupling leaks
+
+### Senior Engineer
+
+- Performance
+- Maintainability
+- No over-engineering
+- No dead code
+
+### Product Manager
+
+- Clear user value
+- Complete user flow
+- Edge cases handled
+
+### Review Checklist
+
+- Clean modular code
+- Efficient Prisma queries
+- Correct IndexedDB sync
+- Secure edge boundaries
+- No lint/build errors
+- Tests updated
+- Rule relevance verified
+
+> Merge only after approval.
+
+---
+
+## 8. Testing Requirements (Agentic & E2E)
+
+Testing must include:
+
+- Full E2E user journeys
+- Regression tests
+- Edge cases & failure states
+- Offline + reconnect flows
+- AI insight validation
+
+### Agentic Testing
+
+- Automated verification:
+- Before change
+- After change
+- Validate:
+- No regressions
+- No runtime errors
+- Insight consistency
+
+---
+
+## 9. End-User Perspective (Fitness + AI Coaching)
+
+Always validate as the end user:
+
+- Goal: Track workouts reliably
+- Expectation: AI gives actionable, trustworthy insights
+- No technical leakage
+- Data accuracy is non-negotiable
+
+---
+
+## 10. Documentation as a System Contract
+
+- Update:
+- README
+- Architecture docs
+- Prisma schema docs
+- `TECHNICAL_DOCUMENTATION.md`
+- Comments:
+- Minimal
+- Explain intent, not syntax
+- Architectural decisions must be recorded
+
+---
+
+## 11. Technical Documentation Reference (CRITICAL)
+
+📄 `TECHNICAL_DOCUMENTATION.md` (root)
+
+Consult before:
+
+- New features
+- Schema changes
+- Edge function updates
+- AI logic changes
+- Performance optimizations
+
+Update when any of the above changes.
+
+---
+
+## 12. AI-Output Schema Contracts (CRITICAL)
+
+AI-generated outputs are treated as **untrusted external inputs**.
+
+No AI response may be:
+
+- Rendered
+- Stored
+- Acted upon
+- Used for recommendations
+
+unless it **strictly conforms** to an approved schema contract.
+
+---
+
+### 12.1 Canonical AI Response Envelope (MANDATORY)
+
+Every AI response must conform to the following envelope:
+
+```ts
+type AIResponseEnvelope<T> = {
+  schemaVersion: string        // SemVer, e.g. "1.0.0"
+  requestId: string            // Traceability across systems
+  generatedAt: string          // ISO-8601 UTC timestamp
+  confidenceScore: number      // 0.0 – 1.0
+  explanation: string          // Human-readable reasoning
+  data: T                      // Feature-specific payload
+}

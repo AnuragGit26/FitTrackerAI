@@ -2177,8 +2177,8 @@ const CORE_EXERCISES: Omit<Exercise, 'id' | 'isCustom'>[] = [
       'Keep core tight',
       'Maintain rhythm'
     ],
-  trackingType: 'cardio',
-    },
+    trackingType: 'reps_only',
+  },
   {
     name: 'Sled Push',
     category: 'cardio',
@@ -2192,8 +2192,8 @@ const CORE_EXERCISES: Omit<Exercise, 'id' | 'isCustom'>[] = [
       'Keep back straight',
       'Maintain pace'
     ],
-  trackingType: 'cardio',
-    },
+    trackingType: 'reps_only',
+  },
   {
     name: 'Kettlebell Swings',
     category: 'cardio',
@@ -2207,8 +2207,8 @@ const CORE_EXERCISES: Omit<Exercise, 'id' | 'isCustom'>[] = [
       'Drive through hips',
       'Control descent'
     ],
-  trackingType: 'cardio',
-    },
+    trackingType: 'reps_only',
+  },
   {
     name: 'Kettlebell Turkish Get-up',
     category: 'strength',
@@ -2312,7 +2312,7 @@ const CORE_EXERCISES: Omit<Exercise, 'id' | 'isCustom'>[] = [
       'Perform push-up',
       'Jump forward and up'
     ],
-    trackingType: 'weight_reps',
+    trackingType: 'reps_only',
   },
   {
     name: 'Jump Rope',
@@ -2327,8 +2327,8 @@ const CORE_EXERCISES: Omit<Exercise, 'id' | 'isCustom'>[] = [
       'Land on balls of feet',
       'Keep core engaged'
     ],
-  trackingType: 'cardio',
-    },
+    trackingType: 'reps_only',
+  },
   {
     name: 'Tire Flips',
     category: 'strength',
@@ -2387,8 +2387,8 @@ const CORE_EXERCISES: Omit<Exercise, 'id' | 'isCustom'>[] = [
       'Control breathing',
       'Maintain form'
     ],
-  trackingType: 'cardio',
-    },
+    trackingType: 'reps_only',
+  },
   {
     name: 'Sled Drag',
     category: 'cardio',
@@ -2402,8 +2402,8 @@ const CORE_EXERCISES: Omit<Exercise, 'id' | 'isCustom'>[] = [
       'Drive through legs',
       'Keep core tight'
     ],
-  trackingType: 'cardio',
-    },
+    trackingType: 'reps_only',
+  },
   {
     name: 'Kettlebell Snatch',
     category: 'olympic',

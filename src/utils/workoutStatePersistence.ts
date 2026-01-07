@@ -72,7 +72,7 @@ function serializeWorkout(workout: Workout | null): Record<string, unknown> | nu
 /**
  * Deserialize a Workout object from storage (convert ISO strings to Dates)
  */
-function deserializeWorkout(workoutData: Record<string, unknown>): Workout | null {
+function deserializeWorkout(workoutData: Record<string, unknown> | null): Workout | null {
   if (!workoutData) return null;
 
   try {
@@ -90,7 +90,7 @@ function deserializeWorkout(workoutData: Record<string, unknown>): Workout | nul
           setEndTime: set.setEndTime ? new Date(set.setEndTime as string) : undefined,
         })) || [],
       })) || [],
-    };
+    } as Workout;
   } catch (error) {
     console.error('Failed to deserialize workout:', error);
     return null;
@@ -259,7 +259,7 @@ export function loadLogWorkoutState(): LogWorkoutStateSnapshot | null {
       ...set,
       setStartTime: set.setStartTime ? new Date(set.setStartTime as string) : undefined,
       setEndTime: set.setEndTime ? new Date(set.setEndTime as string) : undefined,
-    })) || [];
+    })) as WorkoutSet[] || [];
 
     return {
       selectedExerciseId: parsed.selectedExerciseId || null,
@@ -347,7 +347,7 @@ export function loadLogExerciseState(): LogExerciseStateSnapshot | null {
       ...set,
       setStartTime: set.setStartTime ? new Date(set.setStartTime as string) : undefined,
       setEndTime: set.setEndTime ? new Date(set.setEndTime as string) : undefined,
-    })) || [];
+    })) as WorkoutSet[] || [];
 
     return {
       selectedExerciseId: parsed.selectedExerciseId || null,

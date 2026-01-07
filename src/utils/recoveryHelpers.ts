@@ -3,8 +3,6 @@ import { subDays, differenceInHours } from 'date-fns';
 import { DEFAULT_RECOVERY_SETTINGS } from '@/types/muscle';
 import { SleepLog } from '@/types/sleep';
 import { calculateAdjustedRecoveryHours } from '@/services/recoveryCalculator';
-import { SleepLog } from '@/types/sleep';
-import { calculateAdjustedRecoveryHours } from '@/services/recoveryCalculator';
 
 export type ReadinessStatus = 'ready' | 'recovering' | 'needs_rest';
 

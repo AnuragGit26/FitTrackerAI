@@ -68,7 +68,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
       workoutType: 'custom',
     };
     set({ currentWorkout: workout, error: null, templateId: null });
-    saveWorkoutState({ currentWorkout: workout, templateId: null, plannedWorkoutId: null });
+    saveWorkoutState({ version: 1, currentWorkout: workout, templateId: null, plannedWorkoutId: null });
   },
 
   startWorkoutFromTemplate: async (templateId: string) => {
@@ -94,7 +94,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
       };
 
       set({ currentWorkout: workout, error: null, templateId: templateId, plannedWorkoutId: null });
-      saveWorkoutState({ currentWorkout: workout, templateId: templateId, plannedWorkoutId: null });
+      saveWorkoutState({ version: 1, currentWorkout: workout, templateId: templateId, plannedWorkoutId: null });
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to start workout from template',
@@ -178,7 +178,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         };
 
         set({ currentWorkout: workout, error: null, templateId: null, plannedWorkoutId: plannedWorkoutId });
-        saveWorkoutState({ currentWorkout: workout, templateId: null, plannedWorkoutId: plannedWorkoutId });
+        saveWorkoutState({ version: 1, currentWorkout: workout, templateId: null, plannedWorkoutId: plannedWorkoutId });
       }
     } catch (error) {
       set({
@@ -204,7 +204,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     };
 
     set({ currentWorkout: updatedWorkout });
-    saveWorkoutState({ currentWorkout: updatedWorkout, templateId: get().templateId, plannedWorkoutId: get().plannedWorkoutId });
+    saveWorkoutState({ version: 1, currentWorkout: updatedWorkout, templateId: get().templateId, plannedWorkoutId: get().plannedWorkoutId });
   },
 
   updateExercise: (exerciseId: string, updates: Partial<WorkoutExercise>) => {
@@ -244,7 +244,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     };
 
     set({ currentWorkout: updatedWorkout });
-    saveWorkoutState({ currentWorkout: updatedWorkout, templateId: get().templateId, plannedWorkoutId: get().plannedWorkoutId });
+    saveWorkoutState({ version: 1, currentWorkout: updatedWorkout, templateId: get().templateId, plannedWorkoutId: get().plannedWorkoutId });
   },
 
   addSet: (exerciseId: string, workoutSet: WorkoutSet) => {
@@ -273,7 +273,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     };
 
     set({ currentWorkout: updatedWorkout });
-    saveWorkoutState({ currentWorkout: updatedWorkout, templateId: get().templateId, plannedWorkoutId: get().plannedWorkoutId });
+    saveWorkoutState({ version: 1, currentWorkout: updatedWorkout, templateId: get().templateId, plannedWorkoutId: get().plannedWorkoutId });
   },
 
   updateSet: (exerciseId: string, setNumber: number, updates: Partial<WorkoutSet>) => {
@@ -304,7 +304,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     };
 
     set({ currentWorkout: updatedWorkout });
-    saveWorkoutState({ currentWorkout: updatedWorkout, templateId: get().templateId, plannedWorkoutId: get().plannedWorkoutId });
+    saveWorkoutState({ version: 1, currentWorkout: updatedWorkout, templateId: get().templateId, plannedWorkoutId: get().plannedWorkoutId });
   },
 
   cancelSet: (exerciseId: string, setNumber: number) => {
@@ -344,7 +344,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     };
 
     set({ currentWorkout: updatedWorkout });
-    saveWorkoutState({ currentWorkout: updatedWorkout, templateId: get().templateId, plannedWorkoutId: get().plannedWorkoutId });
+    saveWorkoutState({ version: 1, currentWorkout: updatedWorkout, templateId: get().templateId, plannedWorkoutId: get().plannedWorkoutId });
   },
 
   finishWorkout: async (calories?: number, currentDurationSeconds?: number) => {
