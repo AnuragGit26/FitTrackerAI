@@ -181,11 +181,12 @@ async function createNotification(
     insights: AIInsights
 ): Promise<void> {
     // Check if a notification with the same type already exists for today
+    // Use UTC methods to ensure consistent behavior regardless of server timezone
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    today.setUTCHours(0, 0, 0, 0);
     const todayStart = today.toISOString();
     const todayEnd = new Date(today);
-    todayEnd.setHours(23, 59, 59, 999);
+    todayEnd.setUTCHours(23, 59, 59, 999);
     const todayEndStr = todayEnd.toISOString();
 
     const { data: existingNotifications, error: checkError } = await supabase

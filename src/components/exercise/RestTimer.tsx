@@ -34,6 +34,7 @@ export function RestTimer({
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const completionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isCompletedOrSkippedRef = useRef(false);
+  const isInCompletionPhaseRef = useRef(false); // Track if we're in the completion animation phase
   const initialDurationRef = useRef(initialRemainingTime ?? duration);
   const notificationPermissionRef = useRef<NotificationPermission | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -102,6 +103,7 @@ export function RestTimer({
         setIsPaused(initialPaused);
         // Reset completion flag when timer becomes visible
         isCompletedOrSkippedRef.current = false;
+        isInCompletionPhaseRef.current = false;
         // Clear any pending completion timeout
         if (completionTimeoutRef.current) {
           clearTimeout(completionTimeoutRef.current);
@@ -118,6 +120,7 @@ export function RestTimer({
         setIsPaused(false);
         // Reset completion flag when timer becomes visible
         isCompletedOrSkippedRef.current = false;
+        isInCompletionPhaseRef.current = false;
         // Clear any pending completion timeout
         if (completionTimeoutRef.current) {
           clearTimeout(completionTimeoutRef.current);
@@ -132,6 +135,104 @@ export function RestTimer({
       hasInitializedRef.current = true;
     }
   }, [duration, isVisible, initialRemainingTime, initialPaused, onRemainingTimeChange]);
+
+  // Track previous remainingTime to detect transitions from 0 to positive
+  const prevRemainingTimeRef = useRef(remainingTime);
+
+  // Handle transition from 0 to positive remainingTime (e.g., user adds time during completion phase)
+  useEffect(() => {
+    const prevTime = prevRemainingTimeRef.current;
+    const currentTime = remainingTime;
+
+    // Detect transition from 0 to positive
+    if (prevTime === 0 && currentTime > 0 && isVisible && !isPaused) {
+      // Exit completion phase if we're in it
+      if (isInCompletionPhaseRef.current) {
+        // Clear completion timeout
+        if (completionTimeoutRef.current) {
+          clearTimeout(completionTimeoutRef.current);
+          completionTimeoutRef.current = null;
+        }
+        isInCompletionPhaseRef.current = false;
+        isCompletedOrSkippedRef.current = false;
+        setShowCompletionAnimation(false);
+      }
+
+      // Restart the countdown interval since main effect won't re-run (remainingTime not in deps)
+      // Clear any existing interval first
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+
+      // Start new interval to count down from the new remainingTime
+      intervalRef.current = setInterval(() => {
+        setRemainingTime((prev) => {
+          if (prev <= 1) {
+            // Timer completed
+            if (intervalRef.current) {
+              clearInterval(intervalRef.current);
+              intervalRef.current = null;
+            }
+
+            // Show notification if enabled
+            if (notificationPermissionRef.current === 'granted') {
+              new Notification('Rest Timer Complete', {
+                body: 'Time to start your next set!',
+                icon: '/assests/img/Fittrack2.png',
+                badge: '/assests/img/Fittrack2.png',
+                tag: 'rest-timer',
+              });
+            }
+
+            // Play sound if enabled
+            if (settings.soundEnabled && audioContextRef.current) {
+              playCompletionSound();
+            }
+
+            // Vibrate if enabled
+            if (settings.vibrationEnabled && 'vibrate' in navigator) {
+              navigator.vibrate([200, 100, 200]);
+            }
+
+            // Show completion animation
+            setShowCompletionAnimation(true);
+
+            // Only schedule completion timeout if not already in completion phase
+            if (!isInCompletionPhaseRef.current) {
+              isInCompletionPhaseRef.current = true;
+              completionTimeoutRef.current = setTimeout(() => {
+                if (!isCompletedOrSkippedRef.current) {
+                  isCompletedOrSkippedRef.current = true;
+                  setShowCompletionAnimation(false);
+                  onCompleteRef.current();
+                }
+                completionTimeoutRef.current = null;
+                isInCompletionPhaseRef.current = false;
+              }, 2000);
+            }
+
+            // Defer onRemainingTimeChange to avoid updating parent during render
+            setTimeout(() => {
+              onRemainingTimeChangeRef.current?.(0);
+            }, 0);
+            return 0;
+          }
+          const newTime = prev - 1;
+          // Report remaining time changes on every tick to keep parent state in sync
+          onRemainingTimeChangeRef.current?.(newTime);
+          return newTime;
+        });
+      }, 1000);
+    }
+
+    // Update ref for next comparison
+    prevRemainingTimeRef.current = currentTime;
+
+    // Cleanup: The interval created here is managed by the main timer effect's cleanup.
+    // This effect only creates an interval during the 0→positive transition edge case.
+    // The main effect will handle cleanup when dependencies change or component unmounts.
+  }, [remainingTime, isVisible, isPaused, settings.soundEnabled, settings.vibrationEnabled]);
 
   // Timer countdown logic
   useEffect(() => {
@@ -174,17 +275,23 @@ export function RestTimer({
             // Show completion animation
             setShowCompletionAnimation(true);
 
-            // Call onComplete after animation delay (2 seconds)
-            // Store timeout ID so we can cancel it if user skips
-            completionTimeoutRef.current = setTimeout(() => {
-              // Only call onComplete if timer hasn't been skipped
-              if (!isCompletedOrSkippedRef.current) {
-                isCompletedOrSkippedRef.current = true;
-                setShowCompletionAnimation(false);
-                onCompleteRef.current();
-              }
-              completionTimeoutRef.current = null;
-            }, 2000);
+            // Only schedule completion timeout if not already in completion phase
+            // This prevents the timeout from being cancelled when remainingTime changes trigger effect re-run
+            if (!isInCompletionPhaseRef.current) {
+              isInCompletionPhaseRef.current = true;
+              // Call onComplete after animation delay (2 seconds)
+              // Store timeout ID so we can cancel it if user skips
+              completionTimeoutRef.current = setTimeout(() => {
+                // Only call onComplete if timer hasn't been skipped
+                if (!isCompletedOrSkippedRef.current) {
+                  isCompletedOrSkippedRef.current = true;
+                  setShowCompletionAnimation(false);
+                  onCompleteRef.current();
+                }
+                completionTimeoutRef.current = null;
+                isInCompletionPhaseRef.current = false;
+              }, 2000);
+            }
 
             // Defer onRemainingTimeChange to avoid updating parent during render
             setTimeout(() => {
@@ -210,12 +317,19 @@ export function RestTimer({
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
-      if (completionTimeoutRef.current) {
+      // Only clear completion timeout if we're not in the completion phase
+      // This prevents the timeout from being cancelled when remainingTime changes trigger effect re-run
+      if (completionTimeoutRef.current && !isInCompletionPhaseRef.current) {
         clearTimeout(completionTimeoutRef.current);
         completionTimeoutRef.current = null;
       }
     };
-  }, [isVisible, isPaused, remainingTime, settings.soundEnabled, settings.vibrationEnabled]);
+    // remainingTime is intentionally excluded from dependencies to prevent effect re-run
+    // when timer reaches 0, which would cancel the completion timeout. We use functional
+    // updates (setRemainingTime((prev) => ...)) so we don't need remainingTime as a dependency.
+    // The separate effect above handles the transition from 0 to positive to restart the timer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isVisible, isPaused, settings.soundEnabled, settings.vibrationEnabled]);
 
   const handleSkip = () => {
     // Clear the completion timeout to prevent race condition
@@ -223,6 +337,8 @@ export function RestTimer({
       clearTimeout(completionTimeoutRef.current);
       completionTimeoutRef.current = null;
     }
+    // Reset completion phase tracking
+    isInCompletionPhaseRef.current = false;
     // Mark as completed/skipped to prevent onComplete from firing
     isCompletedOrSkippedRef.current = true;
     setShowCompletionAnimation(false);

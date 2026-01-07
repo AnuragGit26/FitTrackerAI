@@ -52,10 +52,6 @@
         "zustand": "^4.4.7"
     },
     "devDependencies": {
-        "@playwright/test": "^1.40.0",
-        "@testing-library/jest-dom": "^6.1.5",
-        "@testing-library/react": "^14.1.2",
-        "@testing-library/user-event": "^14.5.1",
         "@types/cors": "^2.8.19",
         "@types/express": "^5.0.6",
         "@types/node": "^20.10.5",
@@ -67,8 +63,6 @@
         "@typescript-eslint/eslint-plugin": "^6.14.0",
         "@typescript-eslint/parser": "^6.14.0",
         "@vitejs/plugin-react": "^4.2.1",
-        "@vitest/coverage-v8": "^4.0.16",
-        "@vitest/ui": "^4.0.16",
         "autoprefixer": "^10.4.16",
         "concurrently": "^9.2.1",
         "cors": "^2.8.5",
@@ -78,7 +72,6 @@
         "eslint-plugin-react-hooks": "^4.6.0",
         "eslint-plugin-react-refresh": "^0.4.5",
         "express": "^5.2.1",
-        "jsdom": "^23.0.1",
         "postcss": "^8.4.32",
         "puppeteer": "^24.34.0",
         "tailwindcss": "^3.3.6",
@@ -88,7 +81,6 @@
         "vite": "^7.3.0",
         "vite-plugin-eslint": "^1.8.1",
         "vite-plugin-pwa": "^1.2.0",
-        "vitest": "^4.0.16",
         "workbox-window": "^7.0.0"
     }
 }

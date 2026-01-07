@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check } from 'lucide-react';
 import { prefersReducedMotion } from '@/utils/animations';
@@ -84,45 +84,53 @@ export function SetCompletionCelebration({
   const centerX = position?.x ?? window.innerWidth / 2;
   const centerY = position?.y ?? window.innerHeight / 2;
 
-  // Generate confetti particles
-  const confettiParticles = Array.from({ length: 60 }, (_, i) => {
-    const angle = (i * 360) / 60;
-    const distance = 80 + Math.random() * 40;
-    const x = Math.cos((angle * Math.PI) / 180) * distance;
-    const y = Math.sin((angle * Math.PI) / 180) * distance;
-    const delay = Math.random() * 0.2;
-    const duration = 1.2 + Math.random() * 0.4;
-    const size = 4 + Math.random() * 6;
-    
-    return {
-      id: i,
-      x,
-      y,
-      delay,
-      duration,
-      size,
-      rotation: Math.random() * 360,
-    };
-  });
+  // Generate confetti particles - memoized to prevent regeneration on re-renders
+  // This ensures stable random values for the duration of each celebration animation
+  const confettiParticles = useMemo(() => {
+    if (!isVisible) return [];
+    return Array.from({ length: 60 }, (_, i) => {
+      const angle = (i * 360) / 60;
+      const distance = 80 + Math.random() * 40;
+      const x = Math.cos((angle * Math.PI) / 180) * distance;
+      const y = Math.sin((angle * Math.PI) / 180) * distance;
+      const delay = Math.random() * 0.2;
+      const duration = 1.2 + Math.random() * 0.4;
+      const size = 4 + Math.random() * 6;
+      
+      return {
+        id: i,
+        x,
+        y,
+        delay,
+        duration,
+        size,
+        rotation: Math.random() * 360,
+      };
+    });
+  }, [isVisible]);
 
-  // Generate sparkle particles
-  const sparkleParticles = Array.from({ length: 25 }, (_, i) => {
-    const angle = (i * 360) / 25;
-    const distance = 40 + Math.random() * 30;
-    const x = Math.cos((angle * Math.PI) / 180) * distance;
-    const y = Math.sin((angle * Math.PI) / 180) * distance;
-    const delay = 0.6 + Math.random() * 0.2;
-    const duration = 0.8 + Math.random() * 0.4;
-    
-    return {
-      id: i,
-      x,
-      y,
-      delay,
-      duration,
-      size: 3 + Math.random() * 4,
-    };
-  });
+  // Generate sparkle particles - memoized to prevent regeneration on re-renders
+  // This ensures stable random values for the duration of each celebration animation
+  const sparkleParticles = useMemo(() => {
+    if (!isVisible) return [];
+    return Array.from({ length: 25 }, (_, i) => {
+      const angle = (i * 360) / 25;
+      const distance = 40 + Math.random() * 30;
+      const x = Math.cos((angle * Math.PI) / 180) * distance;
+      const y = Math.sin((angle * Math.PI) / 180) * distance;
+      const delay = 0.6 + Math.random() * 0.2;
+      const duration = 0.8 + Math.random() * 0.4;
+      
+      return {
+        id: i,
+        x,
+        y,
+        delay,
+        duration,
+        size: 3 + Math.random() * 4,
+      };
+    });
+  }, [isVisible]);
 
   return (
     <AnimatePresence>

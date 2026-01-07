@@ -103,6 +103,10 @@ export function LogExercise({
   const currentWorkoutRef = useRef(currentWorkout);
   const modalRef = useRef<HTMLDivElement>(null);
   const previousActiveElementRef = useRef<HTMLElement | null>(null);
+  // Track the ID of an exercise that was auto-saved (for new exercises without exerciseId prop)
+  const autoSavedExerciseIdRef = useRef<string | null>(null);
+  // Store timeout ID for justCompletedSetNumber cleanup to prevent race conditions
+  const justCompletedSetTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Keep ref updated
   useEffect(() => {
@@ -115,6 +119,12 @@ export function LogExercise({
       // Reset refs when modal closes
       loadedExerciseIdRef.current = null;
       initializedExerciseIdRef.current = null;
+      autoSavedExerciseIdRef.current = null;
+      // Clear any pending timeout for set completion animation
+      if (justCompletedSetTimeoutRef.current) {
+        clearTimeout(justCompletedSetTimeoutRef.current);
+        justCompletedSetTimeoutRef.current = null;
+      }
       return;
     }
 
@@ -271,6 +281,9 @@ export function LogExercise({
       if (initializedExerciseIdRef.current === selectedExercise.id) {
         return;
       }
+      
+      // Reset auto-saved exercise ID when selecting a new exercise
+      autoSavedExerciseIdRef.current = null;
 
       const trackingType = selectedExercise.trackingType;
       let initialSet: WorkoutSet;
@@ -343,6 +356,7 @@ export function LogExercise({
       // Clear tracking when exercise is deselected
       if (initializedExerciseIdRef.current !== null) {
         initializedExerciseIdRef.current = null;
+        autoSavedExerciseIdRef.current = null;
         setSets([]);
         setNotes('');
         setValidationErrors({});
@@ -926,6 +940,11 @@ export function LogExercise({
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      // Clean up timeout on unmount
+      if (justCompletedSetTimeoutRef.current) {
+        clearTimeout(justCompletedSetTimeoutRef.current);
+        justCompletedSetTimeoutRef.current = null;
+      }
     };
   }, []);
 
@@ -962,8 +981,42 @@ export function LogExercise({
 
       const totalVolume = calculateVolume(sets, selectedExercise.trackingType);
 
+      // Determine the exercise ID to use and whether to add or update
+      let exerciseIdToUse: string;
+      let shouldUpdate = false;
+      
+      if (exerciseId) {
+        // Use the prop ID if provided (editing existing exercise)
+        exerciseIdToUse = exerciseId;
+        shouldUpdate = true;
+      } else {
+        // For new exercises, check if we've already auto-saved it
+        if (autoSavedExerciseIdRef.current) {
+          // Use the tracked ID from previous auto-save
+          exerciseIdToUse = autoSavedExerciseIdRef.current;
+          shouldUpdate = true;
+        } else {
+          // Check if exercise already exists in workout (by matching exerciseId and name)
+          const existingExercise = (workout.exercises ?? []).find(
+            (ex) => ex.exerciseId === selectedExercise.id && ex.exerciseName === selectedExercise.name
+          );
+          
+          if (existingExercise) {
+            // Exercise already exists, use its ID
+            exerciseIdToUse = existingExercise.id;
+            autoSavedExerciseIdRef.current = exerciseIdToUse;
+            shouldUpdate = true;
+          } else {
+            // Generate a stable ID for new exercise (only once)
+            exerciseIdToUse = `exercise-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            autoSavedExerciseIdRef.current = exerciseIdToUse;
+            shouldUpdate = false; // Will add on first save
+          }
+        }
+      }
+
       const workoutExercise: WorkoutExercise = {
-        id: exerciseId || `exercise-${Date.now()}`,
+        id: exerciseIdToUse,
         exerciseId: selectedExercise.id,
         exerciseName: selectedExercise.name,
         sets: sets,
@@ -973,9 +1026,11 @@ export function LogExercise({
         notes: notes.trim() ? sanitizeNotes(notes.trim()) : undefined,
       };
 
-      if (exerciseId) {
-        updateExercise(exerciseId, workoutExercise);
+      if (shouldUpdate) {
+        // Update existing exercise
+        updateExercise(exerciseIdToUse, workoutExercise);
       } else {
+        // Add new exercise (only on first auto-save)
         addExercise(workoutExercise);
       }
     } catch (error) {
@@ -1053,6 +1108,9 @@ export function LogExercise({
       }
     }
 
+    // Auto-save exercise sets to workout store (consistent with handleRestComplete)
+    autoSaveExerciseSets();
+
     setRestTimerVisible(false);
     setRestTimerRemaining(defaultRestDuration);
     setRestTimerStartTime(null);
@@ -1105,13 +1163,21 @@ export function LogExercise({
     handleUpdateSet(setToComplete.setNumber, setUpdates);
     
     // Trigger completion animation - ensure it triggers properly
+    // Clear any existing timeout to prevent race conditions when sets are completed rapidly
+    if (justCompletedSetTimeoutRef.current) {
+      clearTimeout(justCompletedSetTimeoutRef.current);
+      justCompletedSetTimeoutRef.current = null;
+    }
+    
     setJustCompletedSetNumber(null); // Reset first to ensure animation triggers
     // Use requestAnimationFrame to ensure state update happens after render
     requestAnimationFrame(() => {
       setJustCompletedSetNumber(setToComplete.setNumber);
       // Keep animation state longer for better visibility (matches celebration duration)
-      setTimeout(() => {
+      // Store timeout in ref so it can be cancelled if a new set is completed
+      justCompletedSetTimeoutRef.current = setTimeout(() => {
         setJustCompletedSetNumber(null);
+        justCompletedSetTimeoutRef.current = null;
       }, 2000);
     });
 

@@ -12,8 +12,7 @@
 8. [Security & Authentication](#security--authentication)
 9. [Performance & Scalability](#performance--scalability)
 10. [Deployment & DevOps](#deployment--devops)
-11. [Testing Strategy](#testing-strategy)
-12. [Future Roadmap](#future-roadmap)
+11. [Future Roadmap](#future-roadmap)
 
 ---
 
@@ -306,7 +305,7 @@ FitTrackAI follows a **mobile-first, offline-first Progressive Web App (PWA)** a
 
 ### Architecture Diagram
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                      User Interface Layer                    │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
@@ -474,8 +473,6 @@ FitTrackAI follows a **mobile-first, offline-first Progressive Web App (PWA)** a
 
 ### Development Tools
 
-- **Vitest**: Unit testing framework
-- **Playwright**: End-to-end testing
 - **ESLint**: Code linting
 - **TypeScript**: Type checking
 
@@ -487,7 +484,7 @@ FitTrackAI follows a **mobile-first, offline-first Progressive Web App (PWA)** a
 
 #### 1.1 Workout Creation Flow
 
-```
+```text
 User Action: Start Workout
     ↓
 1. Create workout object with:
@@ -653,6 +650,7 @@ volume = distance (converted to km)
 ```
 
 **Steps Field:**
+
 - Optional field in `WorkoutSet` interface
 - Range: 0-100000 steps
 - Used for:
@@ -665,7 +663,7 @@ volume = distance (converted to km)
 
 #### 3.1 Insight Generation Flow
 
-```
+```text
 1. Collect Context Data:
    - Recent workouts (last 30 days)
    - Muscle recovery statuses
@@ -1163,7 +1161,7 @@ The MongoDB schema mirrors the IndexedDB schema with additional features:
 
 ### Data Relationships
 
-```
+```text
 User (Auth0)
   ├── UserProfile (1:1)
   ├── Workouts (1:many)
@@ -1632,7 +1630,7 @@ npm run build:prod
 
 **Build Output**:
 
-```
+```text
 dist/
 ├── index.html
 ├── assets/
@@ -1703,7 +1701,6 @@ jobs:
       - uses: actions/setup-node@v3
       - run: npm ci
       - run: npm run lint:strict
-      - run: npm run test
       - run: npm run build:prod
       - uses: vercel/action@v1
         with:
@@ -1745,118 +1742,6 @@ jobs:
 - `warn`: Warnings (API failures, sync issues)
 - `info`: Important events (workout saved, sync completed)
 - `debug`: Detailed debugging information (dev only)
-
----
-
-## Testing Strategy
-
-### Unit Testing
-
-**Framework**: Vitest
-
-**Test Coverage Targets**:
-
-- Services: 80%+
-- Utilities: 90%+
-- Hooks: 70%+
-
-**Example Test**:
-
-```typescript
-import { describe, it, expect } from 'vitest'
-import { calculateVolume } from '@/utils/calculations'
-
-describe('calculateVolume', () => {
-  it('calculates volume correctly', () => {
-    const sets = [
-      { reps: 10, weight: 100, completed: true },
-      { reps: 8, weight: 100, completed: true }
-    ]
-    expect(calculateVolume(sets)).toBe(1800)
-  })
-})
-```
-
-### Integration Testing
-
-**Service Layer Tests**:
-
-- Test service interactions
-- Mock IndexedDB and API calls
-- Verify data transformations
-
-**Component Tests**:
-
-- React Testing Library
-- Test user interactions
-- Verify state updates
-
-### End-to-End Testing
-
-**Framework**: Playwright
-
-**Test Scenarios**:
-
-1. User registration and login
-2. Complete workout logging flow
-3. View analytics and insights
-4. Create and use workout template
-5. Offline functionality
-
-**Example E2E Test**:
-
-```typescript
-import { test, expect } from '@playwright/test'
-
-test('log workout flow', async ({ page }) => {
-  await page.goto('/log-workout')
-  await page.click('text=Start Workout')
-  await page.fill('[data-testid=exercise-search]', 'bench press')
-  await page.click('text=Bench Press')
-  await page.fill('[data-testid=reps-input]', '10')
-  await page.fill('[data-testid=weight-input]', '100')
-  await page.click('text=Complete Set')
-  await page.click('text=Finish Workout')
-  await expect(page.locator('text=Workout saved')).toBeVisible()
-})
-```
-
-### Manual Testing Checklist
-
-**Workout Logging**:
-
-- [ ] Create new workout
-- [ ] Add multiple exercises
-- [ ] Log sets with different tracking types
-- [ ] Complete workout
-- [ ] Verify data saved correctly
-
-**Muscle Recovery**:
-
-- [ ] Verify recovery status updates after workout
-- [ ] Check recovery percentage calculation
-- [ ] Test recovery status display on muscle map
-
-**AI Insights**:
-
-- [ ] Generate insights with valid API key
-- [ ] Verify insights display correctly
-- [ ] Test caching (should not regenerate within 24 hours)
-
-**Offline Functionality**:
-
-- [ ] Disable network
-- [ ] Log workout offline
-- [ ] Verify data saved locally
-- [ ] Re-enable network
-- [ ] Verify sync completes
-
-**Data Sync**:
-
-- [ ] Make changes on device A
-- [ ] Verify sync to MongoDB
-- [ ] Check device B receives updates
-- [ ] Test conflict resolution
 
 ---
 
@@ -1936,12 +1821,10 @@ test('log workout flow', async ({ page }) => {
 
 - [ ] Improve error handling and user feedback
 - [ ] Optimize bundle size (code splitting)
-- [ ] Add comprehensive test coverage
 - [ ] Improve TypeScript type coverage
 
 #### Medium-Term
 
-- [ ] Refactor service layer for better testability
 - [ ] Implement proper state management patterns
 - [ ] Add performance monitoring and alerting
 - [ ] Improve accessibility (WCAG AAA)
@@ -2011,11 +1894,6 @@ test('log workout flow', async ({ page }) => {
 npm run dev              # Start dev server
 npm run build            # Build for production
 npm run preview          # Preview production build
-
-# Testing
-npm run test             # Run unit tests
-npm run test:ui          # Run tests with UI
-npm run test:e2e         # Run E2E tests
 
 # Linting
 npm run lint             # Check linting

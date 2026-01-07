@@ -342,13 +342,29 @@ class NotificationService {
     if (isDuplicate) {
       console.warn(`[NotificationService] Duplicate notification prevented for type: ${input.type}`);
       // Return the existing notification instead of creating a new one
+      // Use the same criteria as the isDuplicate check to ensure we return a valid (non-deleted, recent) notification
       const duplicate = existingNotifications.find(n => {
         if (input.type === 'ai_insight') {
-          return n.type === 'ai_insight' && n.title === input.title && n.message === input.message;
+          const twentyFourHoursAgo = now - (24 * 60 * 60 * 1000);
+          return n.type === 'ai_insight' &&
+            n.title === input.title &&
+            n.message === input.message &&
+            n.createdAt >= twentyFourHoursAgo &&
+            !n.deletedAt;
         } else if (input.type === 'workout_reminder') {
-          return n.type === 'workout_reminder' && n.data?.workoutId === input.data?.workoutId;
+          const workoutId = input.data?.workoutId as string | undefined;
+          const scheduledTime = input.data?.scheduledTime as number | undefined;
+          return n.type === 'workout_reminder' &&
+            n.data?.workoutId === workoutId &&
+            n.data?.scheduledTime === scheduledTime &&
+            !n.deletedAt;
         } else if (input.type === 'muscle_recovery') {
-          return n.type === 'muscle_recovery' && n.data?.muscle === input.data?.muscle;
+          const oneHourAgo = now - (60 * 60 * 1000);
+          const muscle = input.data?.muscle as string | undefined;
+          return n.type === 'muscle_recovery' &&
+            n.data?.muscle === muscle &&
+            n.createdAt >= oneHourAgo &&
+            !n.deletedAt;
         }
         return false;
       });

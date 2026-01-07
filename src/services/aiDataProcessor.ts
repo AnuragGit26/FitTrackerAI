@@ -76,21 +76,12 @@ class AIDataProcessor {
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
 
-    // Identify PR workouts
-    const prWorkoutDates = new Set(
-      personalRecords.map(pr => new Date(pr.date).toISOString().split('T')[0])
-    );
-
     // Categorize workouts
     const recentWorkouts = workouts.filter(w => new Date(w.date) >= sevenDaysAgo);
     const last14Days = workouts.filter(
       w => new Date(w.date) >= fourteenDaysAgo && new Date(w.date) < sevenDaysAgo
     );
     const olderWorkouts = workouts.filter(w => new Date(w.date) < fourteenDaysAgo);
-    // Filter workouts with PRs (kept for potential future use)
-    workouts.filter(w => 
-      prWorkoutDates.has(new Date(w.date).toISOString().split('T')[0])
-    );
 
     let summary: string;
     let tokenEstimate: number;
