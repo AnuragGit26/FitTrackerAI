@@ -20,16 +20,8 @@ interface ImportMetaEnv {
   // Google Gemini AI API Key (Optional - for AI insights)
   readonly VITE_GEMINI_API_KEY?: string;
   
-  // MongoDB Configuration (Required)
-  // Use VITE_MONGODB_URI for client-side access (Vite requires VITE_ prefix)
-  readonly VITE_MONGODB_URI?: string;
-  readonly MONGODB_URI?: string; // Fallback for backward compatibility
-  
-  // Prisma Configuration (Required for Prisma Accelerate)
-  // Note: Vite requires VITE_ prefix for client-side access
-  readonly VITE_ORM_PRISMA_DATABASE_URL?: string;
-  readonly ORM_PRISMA_DATABASE_URL?: string; // Fallback for server-side
-  readonly ORM_POSTGRES_URL?: string;
+  // Supabase Sync Webhook (Optional - for client-triggered syncs)
+  readonly VITE_SUPABASE_SYNC_WEBHOOK_SECRET?: string;
 }
 
 interface ImportMeta {

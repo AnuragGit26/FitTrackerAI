@@ -1,64 +1,11 @@
 /**
- * MongoDB Client - Prisma Compatibility Layer
+ * @deprecated MongoDB Client is no longer used in the client-side codebase.
+ * All database operations now go through Supabase PostgreSQL.
+ * MongoDB sync is handled by Supabase Edge Functions.
  * 
- * This file provides backward compatibility for code that imports from mongodbClient.
- * All functionality has been migrated to Prisma Client.
- * 
- * @deprecated Use prismaClient.ts instead
+ * This file is kept for backward compatibility but should not be imported.
+ * Remove all imports of this file and use Supabase client instead.
  */
 
-import { prisma, getPrismaClient, getPrismaConnectionStatus, disconnectPrisma } from './prismaClient';
-
-/**
- * @deprecated Use getPrismaClient() from prismaClient.ts instead
- */
-export async function connectToMongoDB() {
-    // Prisma Client is already initialized, just return it
-    return getPrismaClient();
-}
-
-/**
- * @deprecated Use getPrismaConnectionStatus() from prismaClient.ts instead
- */
-export function getMongoDBConnectionStatus() {
-    const status = getPrismaConnectionStatus();
-    return {
-        isConnected: status.isConnected,
-        readyState: status.isConnected ? 1 : 0,
-    };
-}
-
-/**
- * @deprecated Use disconnectPrisma() from prismaClient.ts instead
- */
-export async function disconnectFromMongoDB() {
-    return disconnectPrisma();
-}
-
-/**
- * @deprecated Use getPrismaClient() from prismaClient.ts instead
- */
-export async function getMongoDBConnection(userId?: string) {
-    if (userId) {
-        // Validate userId if provided
-        const { requireUserId } = await import('@/utils/userIdValidation');
-        requireUserId(userId, {
-            functionName: 'getMongoDBConnection',
-            additionalInfo: { operation: 'mongodb_connection' },
-        });
-    }
-    return getPrismaClient();
-}
-
-/**
- * @deprecated Use resetPrismaClient() from prismaClient.ts instead
- */
-export function resetMongoDBConnection() {
-    // Import synchronously for compatibility
-    import('./prismaClient').then(({ resetPrismaClient }) => {
-        resetPrismaClient();
-    });
-}
-
-// Export Prisma client for direct use
-export { prisma };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const mongodbClient: any = null;

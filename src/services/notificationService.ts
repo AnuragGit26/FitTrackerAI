@@ -2,8 +2,8 @@ import { PlannedWorkout } from '@/types/workout';
 import { MuscleStatus } from '@/types/muscle';
 import type { Notification, NotificationCreateInput, NotificationFilters, NotificationType } from '@/types/notification';
 import { dbHelpers } from './database';
-import { prisma } from './prismaClient';
-import { userScopedFilter } from './mongodbQueryBuilder';
+import { getSupabaseClientWithAuth } from './supabaseClient';
+import { userScopedQuery } from './supabaseQueryBuilder';
 import { requireUserId } from '@/utils/userIdValidation';
 
 interface ScheduledNotification {
@@ -484,34 +484,67 @@ class NotificationService {
    */
   private async syncToMongoDB(notification: Notification): Promise<void> {
     try {
-      const userId = requireUserId(notification.userId, {
+      requireUserId(notification.userId, {
         functionName: 'syncToMongoDB',
         additionalInfo: { notificationId: notification.id },
       });
 
-      const mongoNotification = {
-        notificationId: notification.id,
-        userId: userId,
+      const supabase = await getSupabaseClientWithAuth(notification.userId);
+      
+      // Helper to convert timestamp or Date to ISO string
+      const toISOString = (value: Date | number | null | undefined): string | null => {
+        if (!value) return null;
+        if (value instanceof Date) return value.toISOString();
+        if (typeof value === 'number') return new Date(value).toISOString();
+        return null;
+      };
+      
+      // Check if notification already exists in Supabase to determine version
+      const { data: existing, error: fetchError } = await userScopedQuery(supabase, 'notifications', notification.userId)
+        .select('version')
+        .eq('id', notification.id)
+        .maybeSingle();
+      
+      if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "not found" which is OK
+        throw new Error(`Failed to check existing notification in Supabase: ${fetchError.message}`);
+      }
+      
+      // Determine version: increment if exists, use local version if new
+      let version: number;
+      if (existing && typeof existing === 'object' && 'version' in existing) {
+        // Existing record: increment the existing version
+        const existingVersion = (existing as { version: number }).version;
+        version = existingVersion + 1;
+      } else {
+        // New record: use the notification's current version (should be 1 for new notifications)
+        version = notification.version || 1;
+      }
+      
+      const supabaseNotification: Record<string, unknown> = {
+        id: notification.id,
+        user_id: notification.userId,
         type: notification.type,
         title: notification.title,
         message: notification.message,
-        data: notification.data || {},
-        isRead: notification.isRead,
-        readAt: notification.readAt ? new Date(notification.readAt) : null,
-        version: notification.version || 1,
-        deletedAt: notification.deletedAt ? new Date(notification.deletedAt) : null,
+        data: notification.data ? JSON.stringify(notification.data) : null,
+        read: notification.isRead || false,
+        read_at: toISOString(notification.readAt),
+        version: version,
+        deleted_at: toISOString(notification.deletedAt),
+        created_at: toISOString(notification.createdAt) || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       };
-
-      await prisma.notification.upsert({
-        where: { notificationId: notification.id },
-        update: {
-          ...mongoNotification,
-          version: { increment: 1 },
-        },
-        create: mongoNotification as never,
-      });
+      
+      const { error } = await supabase
+        .from('notifications')
+        .upsert(supabaseNotification, { onConflict: 'id' });
+      
+      if (error) {
+        throw new Error(`Failed to upsert notification to Supabase: ${error.message}`);
+      }
     } catch (error) {
-      console.error('[NotificationService] Failed to sync notification to MongoDB:', error);
+      console.error('[NotificationService] Failed to sync notification to Supabase:', error);
+      throw error; // Re-throw to allow callers to handle the error
     }
   }
 
@@ -536,21 +569,21 @@ class NotificationService {
         additionalInfo: { operation: 'pull_notifications' },
       });
 
-      // Get all notifications from MongoDB using user-scoped query
+      // Get all notifications from Supabase using user-scoped query
       // Only get unread notifications or notifications from last 7 days
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-      const where = {
-        ...userScopedFilter(validatedUserId, 'notifications'),
-        deletedAt: null,
-        createdAt: { gte: sevenDaysAgo },
-      } as never;
+      const supabase = await getSupabaseClientWithAuth(validatedUserId);
+      const { data, error } = await userScopedQuery(supabase, 'notifications', validatedUserId)
+        .select('*')
+        .is('deleted_at', null)
+        .gte('created_at', sevenDaysAgo.toISOString())
+        .order('created_at', { ascending: false });
 
-      const data = await prisma.notification.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-      });
+      if (error) {
+        throw error;
+      }
 
       if (!data || data.length === 0) {
         return 0;
@@ -559,28 +592,60 @@ class NotificationService {
       // Get existing notifications from IndexedDB to check for duplicates
       const existingNotifications = await dbHelpers.getAllNotifications(validatedUserId);
 
-      // Convert MongoDB format to local format and save only new/updated notifications
+      // Convert Supabase format (snake_case) to local format (camelCase) and save only new/updated notifications
       const notificationsToSave: Notification[] = [];
       
-      for (const n of data) {
-        const existing = existingNotifications.find(ex => ex.id === n.id);
+      // Type the Supabase response (snake_case format)
+      type SupabaseNotification = {
+        id: string;
+        user_id: string;
+        type: string;
+        title: string;
+        message: string;
+        data: string | Record<string, unknown> | null;
+        read: boolean;
+        read_at: string | null;
+        created_at: string;
+        version: number;
+        deleted_at: string | null;
+        updated_at: string;
+      };
+      
+      // Type assertion: Supabase returns the data in snake_case format
+      const supabaseNotifications = data as unknown as SupabaseNotification[];
+      
+      for (const n of supabaseNotifications) {
+        // Supabase returns snake_case, convert to camelCase
+        const notificationId = n.id;
+        const existing = existingNotifications.find(ex => ex.id === notificationId);
         const remoteVersion = n.version || 1;
         const localVersion = existing?.version || 0;
 
         // Only save if notification doesn't exist locally or remote version is newer
         if (!existing || remoteVersion > localVersion) {
+          // Parse data if it's a JSON string
+          let notificationData = {};
+          if (n.data) {
+            try {
+              notificationData = typeof n.data === 'string' ? JSON.parse(n.data) : n.data;
+            } catch (e) {
+              console.warn('[NotificationService] Failed to parse notification data:', e);
+              notificationData = {};
+            }
+          }
+
           notificationsToSave.push({
-            id: n.id,
-            userId: n.userId,
+            id: notificationId,
+            userId: n.user_id || validatedUserId, // Use user_id from Supabase
             type: n.type as NotificationType,
             title: n.title,
             message: n.message,
-            data: n.data || {},
-            isRead: n.isRead,
-            readAt: n.readAt ? new Date(n.readAt).getTime() : null,
-            createdAt: new Date(n.createdAt).getTime(),
+            data: notificationData,
+            isRead: n.read || false, // Use 'read' from Supabase
+            readAt: n.read_at ? new Date(n.read_at).getTime() : null, // Use 'read_at' from Supabase
+            createdAt: n.created_at ? new Date(n.created_at).getTime() : Date.now(), // Use 'created_at' from Supabase
             version: remoteVersion,
-            deletedAt: n.deletedAt ? new Date(n.deletedAt).getTime() : null,
+            deletedAt: n.deleted_at ? new Date(n.deleted_at).getTime() : null, // Use 'deleted_at' from Supabase
           });
         }
       }

@@ -134,6 +134,23 @@ class VersionManager {
   }
 
   /**
+   * Resolve conflict prioritizing local data (local-first strategy)
+   * Always returns local data, but marks it for push to remote
+   * This ensures local changes are never lost and are synced to the database
+   */
+  resolveConflictLocalFirst<T extends VersionedRecord>(
+    local: T,
+    remote: T
+  ): { record: T; shouldPush: boolean } {
+    // Always keep local data - it represents the user's most recent work
+    // Mark it for push to ensure it's synced to remote
+    return {
+      record: local,
+      shouldPush: true
+    };
+  }
+
+  /**
    * Merge records (three-way merge)
    */
   mergeRecords<T extends VersionedRecord>(

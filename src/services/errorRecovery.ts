@@ -223,7 +223,13 @@ class ErrorRecovery {
       'bad request',
       'invalid',
       'constraint',
+      'configuration error',
+      'protocol mismatch'
     ];
+
+    if (error.name === 'PrismaConfigurationError') {
+        return false;
+    }
 
     if (nonRetryablePatterns.some(pattern => message.includes(pattern))) {
       return false;

@@ -60,7 +60,7 @@
   - Offline usage percentage
   - Data sync success rate
   - User satisfaction with offline experience
-- **Implementation**: IndexedDB-first architecture with background sync to MongoDB
+- **Implementation**: IndexedDB-first architecture with background sync to Supabase PostgreSQL (MongoDB sync handled by Edge Function)
 
 ### 2. Core Business Features
 
@@ -299,7 +299,7 @@
 FitTrackAI follows a **mobile-first, offline-first Progressive Web App (PWA)** architecture with the following key principles:
 
 1. **Client-Side First**: All data stored locally in IndexedDB
-2. **Background Sync**: Bidirectional sync with MongoDB Atlas when online
+2. **Background Sync**: Push sync to Supabase PostgreSQL when online (MongoDB sync handled by Edge Function)
 3. **Service Worker**: Background processing and offline support
 4. **Component-Based**: React component architecture with code splitting
 
@@ -374,15 +374,17 @@ FitTrackAI follows a **mobile-first, offline-first Progressive Web App (PWA)** a
 2. **State Update** → Zustand store updates
 3. **Service Call** → Service layer processes business logic
 4. **Local Persistence** → Data saved to IndexedDB immediately
-5. **Background Sync** → Queued for MongoDB sync when online
-6. **UI Update** → Component re-renders with new data
+5. **Background Sync** → Queued for Supabase sync when online
+6. **Webhook Trigger** → Edge Function syncs Supabase → MongoDB
+7. **UI Update** → Component re-renders with new data
 
 ### Key Architectural Patterns
 
 #### 1. Offline-First Pattern
 
 - All data operations write to IndexedDB first
-- MongoDB sync happens asynchronously in background
+- Supabase sync happens asynchronously in background
+- Edge Function handles Supabase → MongoDB sync automatically
 - Conflict resolution using version numbers (optimistic locking)
 
 #### 2. Service Layer Pattern
@@ -909,17 +911,28 @@ restTimer.start({
 
 #### 7.1 Sync Strategy
 
-**Bidirectional Sync**:
+**New Architecture (Supabase-First)**:
 
-1. **Push (Local → Cloud)**:
+1. **Push (Local → Supabase)**:
    - On data change, queue for sync
    - Debounced batch sync (5 seconds)
+   - Client syncs IndexedDB → Supabase PostgreSQL only
    - Retry on failure with exponential backoff
+   - Webhook triggers Edge Function for MongoDB sync
 
-2. **Pull (Cloud → Local)**:
+2. **Pull (Supabase → Local)**:
    - On app initialization
    - Periodic background sync (hourly)
    - Manual refresh option
+   - Pulls from Supabase PostgreSQL (not MongoDB)
+
+3. **Supabase → MongoDB Sync (Edge Function)**:
+   - Server-side sync via Supabase Edge Function
+   - Triggered by webhook when client sync starts
+   - Supports manual invocation and scheduled cron jobs
+   - Incremental sync based on `last_sync_at` metadata
+   - Automatic data transformation (PostgreSQL → MongoDB format)
+   - All MongoDB operations handled server-side
 
 #### 7.2 Conflict Resolution
 
@@ -1238,9 +1251,8 @@ All MongoDB operations require validated user IDs:
 
 ```typescript
 import { requireUserId } from '@/utils/userIdValidation';
-import { connectToMongoDB } from '@/services/mongodbClient';
-import { userScopedFilter } from '@/services/mongodbQueryBuilder';
-import { Workout } from '@/services/mongodb/schemas';
+import { getSupabaseClientWithAuth } from '@/services/supabaseClient';
+import { userScopedQuery } from '@/services/supabaseQueryBuilder';
 
 // Validate userId before use
 const userId = requireUserId(userContextManager.getUserId(), {
@@ -1248,22 +1260,124 @@ const userId = requireUserId(userContextManager.getUserId(), {
   additionalInfo: { operation: 'data_fetch' },
 });
 
-// Connect to MongoDB
-await connectToMongoDB();
+// Get Supabase client
+const supabase = await getSupabaseClientWithAuth(userId);
 
-// Use user-scoped filter helper
-const filter = userScopedFilter(userId, 'workouts');
-const data = await Workout.find(filter).sort({ date: -1 });
+// Use user-scoped query helper
+const { data, error } = await userScopedQuery(supabase, 'workouts', userId)
+  .select('*')
+  .order('date', { ascending: false });
 ```
 
 **Sync Service**:
 
 ```typescript
-// Sync local changes with MongoDB (userId validated internally)
+// Sync local changes to Supabase (userId validated internally)
+// Edge Function automatically syncs Supabase → MongoDB
 await mongodbSyncService.sync(userId, {
   tables: ['workouts'],
-  direction: 'bidirectional'
+  direction: 'push' // Only push to Supabase, Edge Function handles MongoDB
 })
+```
+
+### 2.1 Supabase to MongoDB Sync Service
+
+**Edge Function**: `supabase/functions/sync-to-mongodb`
+
+**Purpose**: Syncs data from Supabase PostgreSQL database to MongoDB Atlas using a Supabase Edge Function. This enables server-side synchronization and supports webhook triggers, manual invocation, and scheduled cron jobs.
+
+**Architecture**:
+
+```
+Supabase PostgreSQL → Edge Function → MongoDB Atlas
+     (snake_case)      (Transform)    (camelCase)
+```
+
+**Features**:
+- **Webhook Triggers**: Real-time sync on database changes (INSERT, UPDATE, DELETE)
+- **Manual Invocation**: Sync specific users, tables, or records via API calls
+- **Scheduled Jobs**: Periodic sync via cron jobs (hourly, daily, etc.)
+- **Incremental Sync**: Only syncs records updated since last sync
+- **Data Transformation**: Converts PostgreSQL format (snake_case) to MongoDB format (camelCase)
+- **Error Handling**: Comprehensive error logging and retry logic
+- **Conflict Resolution**: Tracks conflicts and sync status per user/table
+
+**Environment Variables** (set in Supabase Dashboard):
+- `DATABASE_URL`: MongoDB connection string
+- `SUPABASE_URL`: Supabase project URL (auto-provided)
+- `SUPABASE_SERVICE_ROLE_KEY`: Service role key for database access (auto-provided)
+- `CRON_SECRET`: Secret for cron job authentication (optional)
+
+**Request Types**:
+
+1. **Webhook** (POST with payload):
+```json
+{
+  "type": "INSERT" | "UPDATE" | "DELETE",
+  "table": "workouts",
+  "record": { ... },
+  "old_record": { ... }
+}
+```
+
+2. **Manual** (GET/POST with query params or body):
+```
+GET /functions/v1/sync-to-mongodb?userId=auth0|123&tableName=workouts&recordId=456
+```
+
+3. **Cron** (GET with cron secret header):
+```
+GET /functions/v1/sync-to-mongodb?cron=true
+Header: x-cron-secret: <CRON_SECRET>
+```
+
+**Sync Metadata**:
+
+The function tracks sync status in the `sync_metadata` table:
+- `last_sync_at`: Last sync timestamp
+- `sync_status`: Current sync status (idle, syncing, success, error, conflict)
+- `conflict_count`: Number of conflicts encountered
+- `error_message`: Last error message (if any)
+- `record_count`: Number of records processed
+
+**Tables Synced**:
+- `workouts` → `workouts`
+- `exercises` → `exercises`
+- `workout_templates` → `workouttemplates`
+- `planned_workouts` → `plannedworkouts`
+- `muscle_statuses` → `musclestatuses`
+- `user_profiles` → `userprofiles`
+- `settings` → `settings`
+- `notifications` → `notifications`
+- `sleep_logs` → `sleeplogs`
+- `recovery_logs` → `recoverylogs`
+- `error_logs` → `errorlogs`
+
+**Data Transformation**:
+- Snake_case field names → camelCase
+- PostgreSQL SERIAL IDs → MongoDB ObjectIds (with `_supabaseId` reference)
+- TIMESTAMPTZ → Date objects
+- JSONB → JSON
+- Table-specific field mappings (e.g., `exerciseId`, `templateId`)
+
+**Error Handling**:
+- Errors logged to `error_logs` table
+- Sync metadata updated with error details
+- Retry logic with exponential backoff (configurable)
+- Failed records tracked for manual review
+
+**Usage Example**:
+
+```typescript
+// Manual sync via API
+const response = await fetch(
+  'https://<project>.supabase.co/functions/v1/sync-to-mongodb?userId=auth0|123&tableName=workouts',
+  {
+    headers: {
+      'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+    }
+  }
+);
 ```
 
 ### 3. Google Gemini AI API
@@ -1859,7 +1973,8 @@ jobs:
 - `src/services/dataService.ts`: Main data operations
 - `src/services/aiService.ts`: AI insight generation
 - `src/services/muscleRecoveryService.ts`: Recovery calculations
-- `src/services/mongodbSyncService.ts`: Cloud sync
+- `src/services/mongodbSyncService.ts`: Supabase sync (Edge Function handles MongoDB)
+- `src/services/supabaseSyncWebhook.ts`: Webhook trigger for Edge Function
 
 **State Management**:
 

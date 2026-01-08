@@ -1,6 +1,5 @@
 import { getSupabaseClientWithAuth } from './supabaseClient';
 import { userScopedQuery } from './supabaseQueryBuilder';
-import { prisma } from './prismaClient';
 import { requireUserId } from '@/utils/userIdValidation';
 import { ErrorLog, ErrorLogCreateInput, ErrorType, ErrorSeverity } from '@/types/error';
 import { db } from './database';
@@ -239,7 +238,7 @@ class ErrorLogService {
     }
 
     /**
-     * Sync error logs to MongoDB
+     * Sync error logs to Supabase (MongoDB sync handled by Edge Function)
      */
     async syncToMongoDB(userId: string): Promise<void> {
         const validatedUserId = requireUserId(userId, {
@@ -258,31 +257,28 @@ class ErrorLogService {
             }
 
             // Batch creates to avoid resource exhaustion
-            // Error logs are append-only, so we just create new ones in MongoDB
-            // The numeric IDs from IndexedDB can't be used as MongoDB ObjectIds
+            // Error logs are append-only, so we just create new ones in Supabase
+            // Edge Function will sync to MongoDB
+            const supabase = await getSupabaseClientWithAuth(validatedUserId);
             const localLogsArray: LocalErrorLog[] = localLogs as unknown as LocalErrorLog[];
             const BATCH_SIZE = 10; // Process 10 logs at a time
             
             for (let i = 0; i < localLogsArray.length; i += BATCH_SIZE) {
                 const batch = localLogsArray.slice(i, i + BATCH_SIZE);
                 const promises = batch.map(async (localLog: LocalErrorLog) => {
-                    const mongoLog = this.convertToMongoFormat(localLog);
-                    // Remove id - MongoDB will generate a new ObjectId
-                    const createData = { ...mongoLog };
-                    delete createData.id;
+                    const createdAt = new Date(localLog.createdAt);
+                    const timeWindowStart = new Date(createdAt.getTime() - 2000).toISOString();
+                    const timeWindowEnd = new Date(createdAt.getTime() + 2000).toISOString();
                     
                     // Check if a similar log already exists to avoid duplicates
                     // Match on userId + errorMessage + createdAt (within 2 second tolerance)
-                    const existing = await prisma.errorLog.findFirst({
-                        where: {
-                            userId: mongoLog.userId as string,
-                            errorMessage: mongoLog.errorMessage as string,
-                            createdAt: {
-                                gte: new Date((mongoLog.createdAt as Date).getTime() - 2000),
-                                lte: new Date((mongoLog.createdAt as Date).getTime() + 2000),
-                            },
-                        },
-                    });
+                    const { data: existing } = await userScopedQuery(supabase, 'error_logs', validatedUserId)
+                        .select('*')
+                        .eq('error_message', localLog.errorMessage)
+                        .gte('created_at', timeWindowStart)
+                        .lte('created_at', timeWindowEnd)
+                        .limit(1)
+                        .maybeSingle();
                     
                     // If a duplicate exists, skip creating a new one
                     // Error logs are append-only, so we don't update existing ones
@@ -292,14 +288,41 @@ class ErrorLogService {
                         return null;
                     }
                     
-                    // Create new log
-                    return prisma.errorLog.create({
-                        data: createData as never,
-                    });
+                    // Convert to Supabase format (snake_case)
+                    const supabaseLog: Record<string, unknown> = {
+                        user_id: validatedUserId,
+                        error_type: localLog.errorType,
+                        error_message: localLog.errorMessage,
+                        error_stack: localLog.errorStack,
+                        context: localLog.context ? JSON.stringify(localLog.context) : null,
+                        table_name: localLog.tableName,
+                        record_id: localLog.recordId,
+                        operation: localLog.operation,
+                        severity: localLog.severity,
+                        resolved: localLog.resolved,
+                        resolved_at: localLog.resolvedAt ? new Date(localLog.resolvedAt).toISOString() : null,
+                        resolved_by: localLog.resolvedBy,
+                        version: localLog.version || 1,
+                        deleted_at: localLog.deletedAt ? new Date(localLog.deletedAt).toISOString() : null,
+                        created_at: createdAt.toISOString(),
+                        updated_at: new Date(localLog.updatedAt).toISOString(),
+                    };
+                    
+                    // Create new log in Supabase
+                    const { data, error } = await supabase
+                        .from('error_logs')
+                        .insert(supabaseLog)
+                        .select()
+                        .single();
+                    
+                    if (error) {
+                        throw error;
+                    }
+                    
+                    return data;
                 });
-                // Filter out null results (skipped duplicates)
-                const results = await Promise.all(promises);
-                results.filter((r) => r !== null);
+                // Wait for all promises to complete (duplicates return null and are skipped)
+                await Promise.all(promises);
             }
         } catch (error) {
             console.error('Error syncing error logs to MongoDB:', error);
