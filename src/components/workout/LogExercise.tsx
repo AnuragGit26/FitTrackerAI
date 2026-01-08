@@ -1772,6 +1772,8 @@ export function LogExercise({
                         set={set}
                         unit={profile?.preferredUnit || 'kg'}
                         isJustCompleted={justCompletedSetNumber === set.setNumber}
+                        exerciseCategory={selectedExercise?.category}
+                        exerciseTrackingType={selectedExercise?.trackingType}
                         onEdit={() => {
                           // Uncomplete set to edit
                           handleUpdateSet(set.setNumber, { completed: false });
