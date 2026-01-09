@@ -21,7 +21,7 @@ import { Exercise, WorkoutExercise, WorkoutSet, ExerciseCategory } from '@/types
 import { MuscleGroup } from '@/types/muscle';
 import { MuscleGroupCategory } from '@/utils/muscleGroupCategories';
 import { getMuscleMapping } from '@/services/muscleMapping';
-import { calculateVolume, calculateNextSetByVolume } from '@/utils/calculations';
+import { calculateVolume, calculateNextSetByVolume, convertWeight } from '@/utils/calculations';
 import { useNavigate } from 'react-router-dom';
 import { exerciseLibrary } from '@/services/exerciseLibrary';
 import { useToast } from '@/hooks/useToast';

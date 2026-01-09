@@ -11,6 +11,11 @@ import { calculateVolume, convertWeight } from '@/utils/calculations';
 import { userContextManager } from '@/services/userContextManager';
 import { normalizeWorkoutTimes } from '@/utils/validators';
 
+interface RemoveExerciseResult {
+  dissolved: boolean;
+  groupType?: 'superset' | 'circuit' | null;
+}
+
 interface WorkoutState {
   currentWorkout: Workout | null;
   workouts: Workout[];
@@ -26,7 +31,7 @@ interface WorkoutState {
   startWorkoutFromPlanned: (plannedWorkoutId: string) => Promise<void>;
   addExercise: (exercise: WorkoutExercise) => void;
   updateExercise: (exerciseId: string, updates: Partial<WorkoutExercise>) => void;
-  removeExercise: (exerciseId: string) => void;
+  removeExercise: (exerciseId: string) => RemoveExerciseResult;
   addSet: (exerciseId: string, set: WorkoutSet) => void;
   updateSet: (exerciseId: string, setNumber: number, updates: Partial<WorkoutSet>) => void;
   cancelSet: (exerciseId: string, setNumber: number) => void;

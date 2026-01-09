@@ -1,4 +1,4 @@
-import { WorkoutSet, ExerciseTrackingType } from '@/types/exercise';
+import { WorkoutSet, ExerciseTrackingType, ExerciseCategory } from '@/types/exercise';
 import { getIntensityLabel } from '@/utils/rpeHelpers';
 import { Edit, X, User } from 'lucide-react';
 import { formatPace, calculatePace } from '@/utils/calculations';
@@ -13,6 +13,7 @@ interface CompletedSetItemProps {
   onCancel?: () => void;
   isCanceling?: boolean;
   isJustCompleted?: boolean;
+  exerciseCategory?: ExerciseCategory;
   exerciseTrackingType?: ExerciseTrackingType;
   exerciseName?: string;
   userBodyweight?: number;
@@ -25,6 +26,7 @@ export function CompletedSetItem({
   onCancel,
   isCanceling = false,
   isJustCompleted = false,
+  exerciseCategory: _exerciseCategory,
   exerciseTrackingType,
   exerciseName,
   userBodyweight,
