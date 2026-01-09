@@ -1,36 +1,54 @@
 import { WorkoutSet, ExerciseTrackingType } from '@/types/exercise';
+import { calculateEffectiveBodyweight } from './bodyweightMultipliers';
 
 /**
  * Infer tracking type from set data
+ * Priority order: cardio (distance) > weight_reps (weight+reps) > duration > reps_only
  */
 function inferTrackingType(set: WorkoutSet): ExerciseTrackingType {
-  if (set.weight !== undefined || (set.reps !== undefined && set.weight !== undefined)) {
-    return 'weight_reps';
-  }
+  // Check for cardio first (most specific)
   if (set.distance !== undefined) {
     return 'cardio';
   }
-  if (set.duration !== undefined) {
+  // Check for weight training (weight with or without reps)
+  if (set.weight !== undefined && set.weight > 0) {
+    return 'weight_reps';
+  }
+  // Check for duration exercises (yoga, stretching, planks)
+  if (set.duration !== undefined && set.duration > 0) {
     return 'duration';
   }
-  if (set.reps !== undefined) {
+  // Check for reps-only exercises (bodyweight exercises like push-ups)
+  if (set.reps !== undefined && set.reps > 0) {
     return 'reps_only';
   }
-  return 'weight_reps'; // Default fallback
+  // Default fallback
+  return 'weight_reps';
 }
 
 /**
  * Calculate total volume for workout sets
  * For weight_reps: Volume = Σ(reps × weight) for all completed sets
+ * For reps_only (bodyweight): Volume = Σ(reps × effective_bodyweight) where effective_bodyweight = bodyweight × exercise_multiplier
  * This is the standard volume calculation used in strength training.
  * Note: For dumbbell exercises, weight should be the total weight of both dumbbells.
  * For barbell exercises, weight should be the total weight (plates + barbell rod).
- * 
+ *
  * @param sets Array of workout sets
  * @param trackingType Optional tracking type, will be inferred if not provided
- * @returns Total volume (kg × reps for weight_reps, or appropriate unit for other types)
+ * @param options Optional parameters for enhanced calculations
+ * @param options.userBodyweight User's bodyweight in kg (required for accurate reps_only volume)
+ * @param options.exerciseName Exercise name (used to determine bodyweight multiplier for reps_only)
+ * @returns Total volume (kg × reps for weight_reps and reps_only, or appropriate unit for other types)
  */
-export function calculateVolume(sets: WorkoutSet[], trackingType?: ExerciseTrackingType): number {
+export function calculateVolume(
+  sets: WorkoutSet[],
+  trackingType?: ExerciseTrackingType,
+  options?: {
+    userBodyweight?: number;
+    exerciseName?: string;
+  }
+): number {
   return sets.reduce((total, set) => {
     if (!set.completed) return total;
 
@@ -45,20 +63,35 @@ export function calculateVolume(sets: WorkoutSet[], trackingType?: ExerciseTrack
         return total;
 
       case 'reps_only':
-        // For bodyweight exercises, volume could be just total reps
-        // or 0 if we want to exclude them from volume calculations
+        // FIX: For bodyweight exercises, calculate volume using effective bodyweight
+        // Volume = reps × (bodyweight × exercise_multiplier)
+        // This provides meaningful volume comparable to weighted exercises
         if (set.reps !== undefined) {
+          // If bodyweight is provided, calculate realistic volume
+          if (options?.userBodyweight && options?.exerciseName) {
+            const effectiveWeight = calculateEffectiveBodyweight(
+              options.userBodyweight,
+              options.exerciseName
+            );
+            return total + set.reps * effectiveWeight;
+          }
+          // Fallback: If no bodyweight, use reps only (for backward compatibility)
+          // This allows basic tracking even without user weight data
           return total + set.reps;
         }
         return total;
 
       case 'cardio':
-        // For cardio, we could use distance or time, but for consistency
-        // with existing analytics, return 0 or use distance
+        // FIX: For cardio, always normalize to kilometers to prevent mixing units in analytics
+        // This ensures consistent volume calculations regardless of user's unit preference
         if (set.distance !== undefined) {
-          // Convert to a common unit (km) for volume calculation
+          // Convert to kilometers (international standard for fitness tracking)
           const distanceKm = set.distanceUnit === 'miles' ? set.distance * 1.60934 : set.distance;
           return total + distanceKm;
+        }
+        // If no distance, use time as volume metric (seconds)
+        if (set.duration !== undefined) {
+          return total + set.duration;
         }
         return total;
 
@@ -240,13 +273,20 @@ export function estimateEnergy(workouts: Array<{ totalVolume: number; totalDurat
  */
 export interface VolumeMetrics {
   weightRepsVolume: number; // kg × reps (standard volume)
-  repsOnlyVolume: number; // total reps
+  repsOnlyVolume: number; // kg × reps for bodyweight exercises (if bodyweight provided), otherwise total reps
   cardioVolume: number; // distance in km
   durationVolume: number; // duration in seconds
-  totalNormalizedVolume: number; // Normalized total (weight_reps only for now)
+  totalNormalizedVolume: number; // Normalized total (weight_reps + reps_only with bodyweight)
 }
 
-export function calculateVolumeByType(sets: WorkoutSet[], trackingType: ExerciseTrackingType): VolumeMetrics {
+export function calculateVolumeByType(
+  sets: WorkoutSet[],
+  trackingType: ExerciseTrackingType,
+  options?: {
+    userBodyweight?: number;
+    exerciseName?: string;
+  }
+): VolumeMetrics {
   const metrics: VolumeMetrics = {
     weightRepsVolume: 0,
     repsOnlyVolume: 0,
@@ -268,9 +308,23 @@ export function calculateVolumeByType(sets: WorkoutSet[], trackingType: Exercise
         break;
       case 'reps_only':
         if (set.reps !== undefined) {
-          metrics.repsOnlyVolume += set.reps;
-          // Note: reps_only volume is not added to totalNormalizedVolume
-          // to avoid mixing units. Use repsOnlyVolume separately for analytics.
+          // FIX: Calculate proper volume for bodyweight exercises
+          if (options?.userBodyweight && options?.exerciseName) {
+            const effectiveWeight = calculateEffectiveBodyweight(
+              options.userBodyweight,
+              options.exerciseName
+            );
+            const volume = set.reps * effectiveWeight;
+            metrics.repsOnlyVolume += volume;
+            // FIX: Include bodyweight exercise volume in totalNormalizedVolume
+            // Now that we have proper weight calculations, we can combine with weight_reps
+            metrics.totalNormalizedVolume += volume;
+          } else {
+            // Fallback: If no bodyweight, just count reps
+            metrics.repsOnlyVolume += set.reps;
+            // Note: reps-only volume without bodyweight is not added to totalNormalizedVolume
+            // to avoid mixing units (kg vs reps)
+          }
         }
         break;
       case 'cardio':

@@ -551,7 +551,7 @@ class NotificationService {
   /**
    * Sync notification to Supabase (deprecated - use syncToMongoDB)
    */
-  // @ts-ignore - Unused but kept for backward compatibility
+  // @ts-expect-error - Unused but kept for backward compatibility
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private async syncToSupabase(_notification: Notification): Promise<void> {
     // Deprecated - kept for backward compatibility

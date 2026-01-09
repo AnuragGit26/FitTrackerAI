@@ -105,47 +105,59 @@ function App() {
           // Page will reload, so we can return early
           return;
         }
-        
+
         // Track app initialization
         analytics.track('app_initialized');
-        
-        // Initialize database and exercise library
-        await exerciseLibrary.initialize();
-        
-        // Initialize settings (user initialization happens in AppRoutes when Auth0 user is available)
-        await loadSettings();
-        
-        // Initialize data synchronization
-        dataSync.initialize();
-        
-        // Pull notifications from MongoDB on app initialization
+
+        // PARALLEL INITIALIZATION: Run independent tasks concurrently
+        // This significantly reduces initialization time
+        const [settingsResult] = await Promise.allSettled([
+          // Load settings - needed by many components
+          loadSettings(),
+
+          // Initialize database and exercise library - independent
+          exerciseLibrary.initialize(),
+
+          // Start data synchronization service - independent
+          Promise.resolve().then(() => dataSync.initialize()),
+
+          // Preload muscle images in background - independent, non-blocking
+          muscleImageCache.preloadAllImages().catch((error) => {
+            console.warn('Failed to preload muscle images:', error);
+          }),
+
+          // Clear expired muscle image cache - independent, non-blocking
+          muscleImageCache.clearExpiredCache().catch((error) => {
+            console.warn('Failed to clear expired muscle image cache:', error);
+          }),
+        ]);
+
+        // Check if settings loaded successfully
+        if (settingsResult.status === 'rejected') {
+          logger.error('Failed to load settings', settingsResult.reason);
+        }
+
+        // USER-DEPENDENT INITIALIZATION: These require user to be loaded
+        // User might not be available yet (loaded in AppRoutes), so we check
         const user = getUserStore.getState().profile;
         if (user?.id) {
-          try {
-            await notificationService.pullFromMongoDB(user.id);
-            
-            // Start periodic notification pulling (every hour)
-            notificationService.startPeriodicPull(user.id, 60);
-          } catch (error) {
-            console.warn('Failed to initialize notifications:', error);
-          }
+          // Run user-dependent tasks in parallel
+          await Promise.allSettled([
+            // Pull notifications from MongoDB
+            notificationService.pullFromMongoDB(user.id)
+              .then(() => {
+                // Start periodic notification pulling (every hour)
+                notificationService.startPeriodicPull(user.id, 60);
+              })
+              .catch((error) => {
+                console.warn('Failed to initialize notifications:', error);
+              }),
+
+            // Initialize workout event tracker
+            workoutEventTracker.initialize(user.id),
+          ]);
         }
-        
-        // Preload and cache muscle images in the background
-        muscleImageCache.preloadAllImages().catch((error) => {
-          console.warn('Failed to preload muscle images:', error);
-        });
-        
-        // Clear expired muscle image cache
-        muscleImageCache.clearExpiredCache().catch((error) => {
-          console.warn('Failed to clear expired muscle image cache:', error);
-        });
-        
-        // Initialize workout event tracker
-        if (user?.id) {
-          await workoutEventTracker.initialize(user.id);
-        }
-        
+
         // Register service worker (enabled in both dev and prod for end-to-end testing)
         if ('serviceWorker' in navigator) {
           // Determine the service worker path based on environment

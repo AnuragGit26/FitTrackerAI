@@ -30,13 +30,45 @@ import { errorLogService } from './errorLogService';
 /**
  * Convert a timestamp (number) to a local Date object
  * Preserves the local time representation
+ * FIX: Validate timestamp range to detect seconds vs milliseconds
  */
 function timestampToLocalDate(timestamp: number | Date | string | null | undefined): Date | null {
     if (!timestamp) return null;
     if (timestamp instanceof Date) return timestamp;
-    if (typeof timestamp === 'string') return new Date(timestamp);
-    // For numeric timestamps, create a Date object which will be in local time
-    return new Date(timestamp);
+    if (typeof timestamp === 'string') {
+        const date = new Date(timestamp);
+        // Validate the date is valid
+        if (isNaN(date.getTime())) {
+            console.warn(`[timestampToLocalDate] Invalid date string: ${timestamp}`);
+            return null;
+        }
+        return date;
+    }
+
+    // FIX: For numeric timestamps, detect if it's in seconds or milliseconds
+    // Timestamps before year 2000 in milliseconds: < 946684800000
+    // If timestamp is too small, it's likely in seconds (unix timestamp)
+    if (typeof timestamp === 'number') {
+        // If timestamp is less than year 2001 in milliseconds, assume it's in seconds
+        const MIN_TIMESTAMP_MS = 946684800000; // Jan 1, 2000 in milliseconds
+
+        if (timestamp < MIN_TIMESTAMP_MS && timestamp > 0) {
+            // Likely in seconds, convert to milliseconds
+            timestamp = timestamp * 1000;
+        }
+
+        const date = new Date(timestamp);
+        // Validate the date is reasonable (between 2000 and 2100)
+        const year = date.getFullYear();
+        if (year < 2000 || year > 2100) {
+            console.warn(`[timestampToLocalDate] Date out of reasonable range (${year}): ${timestamp}`);
+            return null;
+        }
+
+        return date;
+    }
+
+    return null;
 }
 
 type UserProfile = {
@@ -481,7 +513,15 @@ class MongoDBSyncService {
                         await syncMetadataService.incrementConflictCount(tableName, validatedUserId);
                     }
 
-                    await this.applyRemoteRecord(validatedUserId, tableName, remoteRecord);
+                    // FIX: Capture conflict status from applyRemoteRecord to track conflicts not caught by preliminary check
+                    const applyResult = await this.applyRemoteRecord(validatedUserId, tableName, remoteRecord);
+
+                    // If applyRemoteRecord handled a conflict that wasn't detected in preliminary check, increment counter
+                    if (applyResult.conflictHandled && !conflict) {
+                        result.conflicts++;
+                        await syncMetadataService.incrementConflictCount(tableName, validatedUserId);
+                    }
+
                     result.recordsProcessed++;
                     result.recordsCreated++;
                     this.updateProgress({
@@ -951,7 +991,7 @@ class MongoDBSyncService {
         userId: string,
         tableName: SyncableTable,
         remoteRecord: unknown
-    ): Promise<void> {
+    ): Promise<{ conflictHandled: boolean }> {
         // Convert from Supabase format (snake_case) to camelCase first
         // This is needed for getRecordId which expects camelCase fields
         const convertedRecord = this.convertFromSupabaseFormat(tableName, remoteRecord);
@@ -983,13 +1023,13 @@ class MongoDBSyncService {
                 // eslint-disable-next-line no-console
                 console.log(`[MongoDBSyncService.applyRemoteRecord] Local record ${recordId} is deleted, keeping deletion (local-first) and queuing for push`);
                 this.queueLocalForPush(userId, tableName, recordId);
-                return;
+                return { conflictHandled: false };
             } else if (!localDeletedAt && remoteDeletedAt) {
                 // Remote is deleted but local exists - keep local (user may have restored)
                 // eslint-disable-next-line no-console
                 console.log(`[MongoDBSyncService.applyRemoteRecord] Remote record ${recordId} is deleted but local exists, keeping local (restored) and queuing for push`);
                 this.queueLocalForPush(userId, tableName, recordId);
-                return;
+                return { conflictHandled: false };
             }
 
             if (conflictInfo.hasConflict) {
@@ -1000,20 +1040,69 @@ class MongoDBSyncService {
                 console.log(`[MongoDBSyncService.applyRemoteRecord] Local version: ${localVersion}, remote version: ${remoteVersion}`);
                 // eslint-disable-next-line no-console
                 console.log(`[MongoDBSyncService.applyRemoteRecord] Local updatedAt: ${localUpdatedAt.toISOString()}, remote updatedAt: ${remoteUpdatedAt.toISOString()}`);
-                
+
+                // FIX: Log conflict to database for audit trail
+                try {
+                    const { dbHelpers } = await import('./database');
+                    await dbHelpers.saveErrorLog({
+                        userId,
+                        errorType: 'sync_error',
+                        errorMessage: `Sync conflict detected for ${tableName} record ${recordId}. Local changes preserved.`,
+                        context: {
+                            tableName,
+                            recordId,
+                            localVersion,
+                            remoteVersion,
+                            localUpdatedAt: localUpdatedAt.toISOString(),
+                            remoteUpdatedAt: remoteUpdatedAt.toISOString(),
+                            conflictResolution: 'local-first',
+                        },
+                        tableName,
+                        recordId: String(recordId),
+                        operation: 'sync',
+                        severity: 'warning',
+                    });
+
+                    // FIX: Create user notification for conflict
+                    const notificationId = `conflict-${tableName}-${recordId}-${Date.now()}`;
+                    await dbHelpers.saveNotification({
+                        id: notificationId,
+                        userId,
+                        type: 'system',
+                        title: 'Sync Conflict Resolved',
+                        message: `A sync conflict was detected for your ${tableName.replace('_', ' ')} data. Your local changes have been preserved and will sync to the server.`,
+                        data: {
+                            tableName,
+                            recordId: String(recordId),
+                            conflictResolution: 'local-first',
+                            actionUrl: '/settings/sync',
+                            actionLabel: 'View Sync Status',
+                        },
+                        isRead: false,
+                        createdAt: Date.now(),
+                        version: 1,
+                    });
+                } catch (error) {
+                    // eslint-disable-next-line no-console
+                    console.error('[MongoDBSyncService.applyRemoteRecord] Failed to log conflict:', error);
+                    // Non-blocking - continue with conflict resolution
+                }
+
                 // Resolve conflict using local-first strategy (always keeps local)
                 versionManager.resolveConflictLocalFirst(
                     localVersioned,
                     remoteVersioned
                 );
-                
+
                 // Keep local data (don't overwrite)
                 // Queue local data for push to ensure it's synced to remote
                 this.queueLocalForPush(userId, tableName, recordId);
-                
+
                 // Log conflict for user awareness
                 // eslint-disable-next-line no-console
                 console.log(`[MongoDBSyncService.applyRemoteRecord] Local data preserved for ${tableName} ${recordId}, queued for push to remote`);
+                // FIX: Return conflict handled status for proper tracking
+                return { conflictHandled: true };
             } else if (remoteVersion > localVersion) {
                 // Remote is definitively newer (higher version), update local
                 // eslint-disable-next-line no-console
@@ -1037,6 +1126,8 @@ class MongoDBSyncService {
             console.log(`[MongoDBSyncService.applyRemoteRecord] Creating new local record for ${tableName} ${recordId} from remote`);
             await this.createLocalRecord(userId, tableName, remoteRecord);
         }
+
+        return { conflictHandled: false };
     }
 
     private async createLocalRecord(
@@ -1654,9 +1745,10 @@ class MongoDBSyncService {
         // Table-specific handling
         switch (tableName) {
             case 'workouts':
-                // Workouts use SERIAL id in Supabase
-                if (record.id && typeof record.id === 'number') {
-                    base.id = record.id;
+                // FIX: Workouts now use string IDs (migrated in DB v13)
+                // Support both string and legacy number IDs for backward compatibility
+                if (record.id) {
+                    base.id = String(record.id);
                 }
                 break;
             case 'exercises':

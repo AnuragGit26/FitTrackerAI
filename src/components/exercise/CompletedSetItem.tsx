@@ -1,9 +1,10 @@
-import { WorkoutSet } from '@/types/exercise';
+import { WorkoutSet, ExerciseTrackingType } from '@/types/exercise';
 import { getIntensityLabel } from '@/utils/rpeHelpers';
-import { Edit, X } from 'lucide-react';
+import { Edit, X, User } from 'lucide-react';
 import { formatPace, calculatePace } from '@/utils/calculations';
 import { motion } from 'framer-motion';
 import { prefersReducedMotion, setCompleteCelebration } from '@/utils/animations';
+import { calculateEffectiveBodyweight } from '@/utils/bodyweightMultipliers';
 
 interface CompletedSetItemProps {
   set: WorkoutSet;
@@ -12,6 +13,9 @@ interface CompletedSetItemProps {
   onCancel?: () => void;
   isCanceling?: boolean;
   isJustCompleted?: boolean;
+  exerciseTrackingType?: ExerciseTrackingType;
+  exerciseName?: string;
+  userBodyweight?: number;
 }
 
 export function CompletedSetItem({
@@ -21,6 +25,9 @@ export function CompletedSetItem({
   onCancel,
   isCanceling = false,
   isJustCompleted = false,
+  exerciseTrackingType,
+  exerciseName,
+  userBodyweight,
 }: CompletedSetItemProps) {
   const shouldReduceMotion = prefersReducedMotion();
   const intensityLabel = set.rpe ? getIntensityLabel(set.rpe) : null;
@@ -153,17 +160,39 @@ export function CompletedSetItem({
           {/* Strength Display (default) */}
           {!isCardio && !isHIIT && !isYoga && (
             <>
-              <span className="text-slate-900 dark:text-white font-medium text-lg">
-                {set.weight || 0}{unit}{' '}
-                <span className="text-slate-400 mx-1">×</span> {set.reps || 0}
-              </span>
-              {intensityLabel && (
-                <span
-                  className="text-slate-500 dark:text-slate-400 text-xs"
-                  style={{ color: intensityLabel.color === 'primary' ? '#0df269' : undefined }}
-                >
-                  RPE {set.rpe?.toFixed(1)} • {intensityLabel.label}
-                </span>
+              {/* Bodyweight Exercise Display (reps_only with bodyweight) */}
+              {exerciseTrackingType === 'reps_only' && userBodyweight && exerciseName ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-900 dark:text-white font-medium text-lg">
+                      {set.reps || 0} reps
+                    </span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 flex items-center gap-1">
+                      <User className="w-3 h-3" />
+                      Bodyweight
+                    </span>
+                  </div>
+                  <span className="text-slate-500 dark:text-slate-400 text-xs">
+                    {calculateEffectiveBodyweight(userBodyweight, exerciseName).toFixed(1)}{unit} effective weight
+                    {intensityLabel && ` • RPE ${set.rpe?.toFixed(1)}`}
+                  </span>
+                </>
+              ) : (
+                /* Weighted Exercise Display */
+                <>
+                  <span className="text-slate-900 dark:text-white font-medium text-lg">
+                    {set.weight || 0}{unit}{' '}
+                    <span className="text-slate-400 mx-1">×</span> {set.reps || 0}
+                  </span>
+                  {intensityLabel && (
+                    <span
+                      className="text-slate-500 dark:text-slate-400 text-xs"
+                      style={{ color: intensityLabel.color === 'primary' ? '#0df269' : undefined }}
+                    >
+                      RPE {set.rpe?.toFixed(1)} • {intensityLabel.label}
+                    </span>
+                  )}
+                </>
               )}
             </>
           )}

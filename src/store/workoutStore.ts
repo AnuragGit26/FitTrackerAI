@@ -7,7 +7,7 @@ import { muscleRecoveryService } from '@/services/muscleRecoveryService';
 import { plannedWorkoutService } from '@/services/plannedWorkoutService';
 import { saveWorkoutState, loadWorkoutState, clearWorkoutState } from '@/utils/workoutStatePersistence';
 import { saveFailedWorkout } from '@/utils/workoutErrorRecovery';
-import { calculateVolume } from '@/utils/calculations';
+import { calculateVolume, convertWeight } from '@/utils/calculations';
 import { userContextManager } from '@/services/userContextManager';
 import { normalizeWorkoutTimes } from '@/utils/validators';
 
@@ -36,6 +36,36 @@ interface WorkoutState {
   getWorkout: (id: string) => Promise<Workout | undefined>;
   setWorkoutTimerStartTime: (startTime: Date | null) => void;
 }
+
+/**
+ * Helper function to get user bodyweight in kg for volume calculations
+ * Returns bodyweight in kg, converting from lbs if necessary
+ * Returns undefined if user weight is not available
+ */
+const getUserBodyweightInKg = (): number | undefined => {
+  try {
+    // Dynamic import is needed since userStore and workoutStore import each other
+    // Using require to avoid circular dependency issues
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { useUserStore } = require('./userStore');
+    const profile = useUserStore.getState().profile;
+
+    if (!profile?.weight) {
+      return undefined;
+    }
+
+    // Convert to kg if user uses lbs
+    if (profile.preferredUnit === 'lbs') {
+      return convertWeight(profile.weight, 'lbs', 'kg');
+    }
+
+    return profile.weight;
+  } catch (error) {
+    // Fail silently - volume will be calculated without bodyweight
+    // This ensures the app continues to work even if user profile is not available
+    return undefined;
+  }
+};
 
 // Load persisted state on initialization
 const persistedState = loadWorkoutState();
@@ -222,13 +252,60 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     };
 
     set({ currentWorkout: updatedWorkout });
+    // FIX: Save workout state to prevent data loss on crash
+    // This was missing and could cause exercise metadata updates to be lost
+    saveWorkoutState({ version: 1, currentWorkout: updatedWorkout, templateId: get().templateId, plannedWorkoutId: get().plannedWorkoutId });
   },
 
   removeExercise: (exerciseId: string) => {
     const { currentWorkout } = get();
-    if (!currentWorkout || !currentWorkout.exercises) return;
+    if (!currentWorkout || !currentWorkout.exercises) return { dissolved: false };
 
-    const exercises = (currentWorkout.exercises ?? []).filter((ex) => ex.id !== exerciseId);
+    // FIX: Check if removing this exercise will dissolve a superset/circuit group
+    const removedExercise = currentWorkout.exercises.find((ex) => ex.id === exerciseId);
+    const groupId = removedExercise?.groupId;
+    const groupType = removedExercise?.groupType;
+    let groupDissolved = false;
+    let dissolvedGroupType: 'superset' | 'circuit' | null = null;
+
+    // Filter out the removed exercise
+    let exercises = (currentWorkout.exercises ?? []).filter((ex) => ex.id !== exerciseId);
+
+    // If exercise was part of a group, check if group should be dissolved
+    if (groupId && (groupType === 'superset' || groupType === 'circuit')) {
+      const remainingInGroup = exercises.filter((ex) => ex.groupId === groupId);
+
+      // FIX: If only 1 exercise remains, dissolve the group
+      if (remainingInGroup.length < 2) {
+        groupDissolved = true;
+        dissolvedGroupType = groupType;
+
+        // Convert remaining exercise(s) back to single exercises
+        exercises = exercises.map((ex) => {
+          if (ex.groupId === groupId) {
+            return {
+              ...ex,
+              groupType: 'single' as const,
+              groupId: undefined,
+              groupOrder: undefined,
+            };
+          }
+          return ex;
+        });
+      } else {
+        // Reorder remaining exercises in the group
+        let orderIndex = 0;
+        exercises = exercises.map((ex) => {
+          if (ex.groupId === groupId) {
+            return {
+              ...ex,
+              groupOrder: orderIndex++,
+            };
+          }
+          return ex;
+        });
+      }
+    }
 
     const updatedWorkout = {
       ...currentWorkout,
@@ -245,18 +322,30 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
 
     set({ currentWorkout: updatedWorkout });
     saveWorkoutState({ version: 1, currentWorkout: updatedWorkout, templateId: get().templateId, plannedWorkoutId: get().plannedWorkoutId });
+
+    // Return dissolution info so UI can show notification
+    return {
+      dissolved: groupDissolved,
+      groupType: dissolvedGroupType,
+    };
   },
 
   addSet: (exerciseId: string, workoutSet: WorkoutSet) => {
     const { currentWorkout } = get();
     if (!currentWorkout || !currentWorkout.exercises) return;
 
+    // FIX: Get user bodyweight for accurate bodyweight exercise volume calculation
+    const userBodyweight = getUserBodyweightInKg();
+
     const exercises = (currentWorkout.exercises ?? []).map((ex) => {
       if (ex.id === exerciseId) {
         const newSets = [...(ex.sets ?? []), workoutSet];
-        // Use centralized volume calculation utility
-        // Infer tracking type from sets if not available
-        const totalVolume = calculateVolume(newSets);
+        // FIX: Use trackingType from exercise for accurate volume calculation
+        // Pass bodyweight and exercise name for bodyweight exercises (reps_only)
+        const totalVolume = calculateVolume(newSets, ex.trackingType, {
+          userBodyweight,
+          exerciseName: ex.exerciseName,
+        });
         return {
           ...ex,
           sets: newSets,
@@ -280,14 +369,20 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     const { currentWorkout } = get();
     if (!currentWorkout || !currentWorkout.exercises) return;
 
+    // FIX: Get user bodyweight for accurate bodyweight exercise volume calculation
+    const userBodyweight = getUserBodyweightInKg();
+
     const exercises = (currentWorkout.exercises ?? []).map((ex) => {
       if (ex.id === exerciseId) {
         const sets = (ex.sets ?? []).map((s) =>
           s.setNumber === setNumber ? { ...s, ...updates } : s
         );
-        // Use centralized volume calculation utility
-        // Infer tracking type from sets if not available
-        const totalVolume = calculateVolume(sets);
+        // FIX: Use trackingType from exercise for accurate volume calculation
+        // Pass bodyweight and exercise name for bodyweight exercises (reps_only)
+        const totalVolume = calculateVolume(sets, ex.trackingType, {
+          userBodyweight,
+          exerciseName: ex.exerciseName,
+        });
         return {
           ...ex,
           sets,
@@ -311,6 +406,9 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     const { currentWorkout } = get();
     if (!currentWorkout || !currentWorkout.exercises) return;
 
+    // FIX: Get user bodyweight for accurate bodyweight exercise volume calculation
+    const userBodyweight = getUserBodyweightInKg();
+
     const exercises = (currentWorkout.exercises ?? []).map((ex) => {
       if (ex.id === exerciseId) {
         const sets = (ex.sets ?? []).map((s) => {
@@ -327,7 +425,11 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
           return s;
         });
         // Recalculate volume after canceling set
-        const totalVolume = calculateVolume(sets);
+        // FIX: Pass bodyweight and exercise name for bodyweight exercises
+        const totalVolume = calculateVolume(sets, ex.trackingType, {
+          userBodyweight,
+          exerciseName: ex.exerciseName,
+        });
         return {
           ...ex,
           sets,
@@ -348,9 +450,16 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
   },
 
   finishWorkout: async (calories?: number, currentDurationSeconds?: number) => {
+    // FIX: Get fresh state to prevent race condition
+    // Use get() to ensure we have the latest state including any recently added exercises
     const { currentWorkout } = get();
     if (!currentWorkout) {
       throw new Error('No active workout to finish');
+    }
+
+    // FIX: Validate that workout has exercises to prevent finishing empty workout
+    if (!currentWorkout.exercises || currentWorkout.exercises.length === 0) {
+      throw new Error('Cannot finish workout with no exercises');
     }
 
     set({ isLoading: true, error: null });
@@ -374,10 +483,13 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         // If we have both manual start and end times, calculate duration from them
         if (currentWorkout.endTime) {
           const durationMs = endTime.getTime() - startTime.getTime();
-          totalDurationMinutes = Math.max(0, Math.min(1440, Math.round(durationMs / 60000)));
+          // FIX: Use Math.floor instead of Math.round to prevent adding extra time
+          // Math.round(89.5s) = 90s adds 0.5s, Math.floor is accurate
+          totalDurationMinutes = Math.max(0, Math.min(1440, Math.floor(durationMs / 60000)));
         } else if (currentDurationSeconds !== undefined && currentDurationSeconds > 0) {
           // Use provided duration seconds
-          totalDurationMinutes = Math.round(currentDurationSeconds / 60);
+          // FIX: Use Math.floor instead of Math.round to prevent adding extra time
+          totalDurationMinutes = Math.floor(currentDurationSeconds / 60);
           // Ensure duration is within valid range
           if (totalDurationMinutes < 0) {
             totalDurationMinutes = 0;
@@ -389,13 +501,15 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         } else {
           // Calculate from startTime to endTime
           const durationMs = endTime.getTime() - startTime.getTime();
-          totalDurationMinutes = Math.max(0, Math.min(1440, Math.round(durationMs / 60000)));
+          // FIX: Use Math.floor instead of Math.round to prevent adding extra time
+          totalDurationMinutes = Math.max(0, Math.min(1440, Math.floor(durationMs / 60000)));
         }
       } else if (currentDurationSeconds !== undefined && currentDurationSeconds > 0) {
         // PRIORITY 2: Use currentDurationSeconds from timer if available (most reliable)
         // Convert seconds to minutes
-        totalDurationMinutes = Math.round(currentDurationSeconds / 60);
-        
+        // FIX: Use Math.floor instead of Math.round to prevent adding extra time
+        totalDurationMinutes = Math.floor(currentDurationSeconds / 60);
+
         // Ensure duration is within valid range
         if (totalDurationMinutes < 0) {
           totalDurationMinutes = 0;
@@ -440,7 +554,8 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
           totalDurationMinutes = 0;
         } else {
           // Convert milliseconds to minutes
-          totalDurationMinutes = Math.round(durationMs / 60000);
+          // FIX: Use Math.floor instead of Math.round to prevent adding extra time
+          totalDurationMinutes = Math.floor(durationMs / 60000);
         }
         
         // Ensure duration is within valid range

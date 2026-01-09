@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ExerciseComparison } from '@/types/workoutSummary';
 import { useUserStore } from '@/store/userStore';
+import { User } from 'lucide-react';
 
 interface ExerciseBreakdownProps {
   comparisons: ExerciseComparison[];
@@ -95,8 +96,12 @@ export function ExerciseBreakdown({ comparisons }: ExerciseBreakdownProps) {
 
   return (
     <div className="px-4 pb-6">
-      <div className="flex items-center justify-between mb-4 px-1">
+      <div className="flex flex-col gap-1 mb-4 px-1">
         <h3 className="text-slate-900 dark:text-white text-lg font-bold">Exercise Breakdown</h3>
+        <p className="text-xs text-slate-500 dark:text-gray-400 flex items-center gap-1">
+          <User className="w-3 h-3" />
+          Volume includes bodyweight exercises calculated using exercise-specific multipliers
+        </p>
       </div>
       <div className="flex flex-col gap-3">
         {(comparisons ?? []).map((comparison) => {

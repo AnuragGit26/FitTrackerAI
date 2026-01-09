@@ -84,6 +84,8 @@ export interface WorkoutExercise {
   musclesWorked: MuscleGroup[];
   timestamp: Date;
   notes?: string;
+  // Tracking type for accurate volume calculations
+  trackingType?: ExerciseTrackingType; // Type of exercise tracking (weight_reps, reps_only, cardio, duration)
   // Superset/Circuit grouping
   groupType?: ExerciseGroupType; // Type of grouping (single, superset, circuit)
   groupId?: string; // ID to group exercises together (exercises with same groupId are grouped)

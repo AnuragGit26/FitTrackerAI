@@ -10,7 +10,7 @@ import { errorRecovery } from './errorRecovery';
 import { sanitizeString } from '@/utils/sanitize';
 import { Transaction } from 'dexie';
 import { validateWeight, validateDuration, validateCalories, validateRPE, normalizeWorkoutStartTime } from '@/utils/validators';
-import { calculateVolume } from '@/utils/calculations';
+import { calculateVolume, convertWeight } from '@/utils/calculations';
 import { generateWorkoutId } from '@/utils/idGenerator';
 
 // UserProfile type - matches userStore definition
@@ -41,9 +41,11 @@ type EventCallback = () => void;
 
 class DataService {
   private listeners: Map<EventType, Set<EventCallback>> = new Map();
+  // FIX: Keep in-memory cache but persist to IndexedDB for page refresh recovery
   private syncQueue: Set<SyncableTable> = new Set();
   private syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private syncEnabled = false;
+  private syncQueueLoaded = false;
 
   // LocalStorage helpers for profile pictures
   private getProfilePictureStorageKey(userId: string): string {
@@ -99,7 +101,7 @@ class DataService {
     this.queueSyncForEvent(event);
   }
 
-  private queueSyncForEvent(event: EventType): void {
+  private async queueSyncForEvent(event: EventType): Promise<void> {
     if (!this.syncEnabled) return;
 
     const tableMap: Record<EventType, SyncableTable> = {
@@ -114,8 +116,46 @@ class DataService {
 
     const table = tableMap[event];
     if (table) {
+      // Add to in-memory queue
       this.syncQueue.add(table);
+
+      // FIX: Persist to IndexedDB so queue survives page refresh
+      try {
+        const userId = userContextManager.getUserId();
+        await dbHelpers.addToPendingSyncQueue(table, userId);
+      } catch (error) {
+        console.warn('Failed to persist sync queue to IndexedDB:', error);
+        // Non-blocking - continue with in-memory queue
+      }
+
       this.debounceSync();
+    }
+  }
+
+  /**
+   * FIX: Load pending sync queue from IndexedDB on initialization
+   * This ensures queued syncs aren't lost on page refresh
+   */
+  private async loadPendingSyncQueue(): Promise<void> {
+    if (this.syncQueueLoaded) return;
+
+    try {
+      const pendingItems = await dbHelpers.getPendingSyncQueue();
+      for (const item of pendingItems) {
+        this.syncQueue.add(item.tableName);
+      }
+
+      if (pendingItems.length > 0) {
+        // eslint-disable-next-line no-console
+        console.log(`[DataService] Loaded ${pendingItems.length} pending sync items from IndexedDB`);
+        // Trigger sync processing if there are items
+        this.debounceSync();
+      }
+
+      this.syncQueueLoaded = true;
+    } catch (error) {
+      console.error('Failed to load pending sync queue:', error);
+      this.syncQueueLoaded = true; // Mark as loaded even on error to avoid retry loops
     }
   }
 
@@ -139,15 +179,28 @@ class DataService {
       const { mongodbSyncService } = await import('./mongodbSyncService');
       const { useUserStore } = await import('@/store/userStore');
       const userStore = useUserStore.getState();
-      
+
       if (userStore.profile?.id) {
         await mongodbSyncService.sync(userStore.profile.id, {
           tables: tables as SyncableTable[],
           direction: 'push',
         });
+
+        // FIX: Clear successfully synced tables from persistent queue
+        for (const table of tables) {
+          try {
+            await dbHelpers.clearPendingSyncQueue(table as SyncableTable);
+          } catch (error) {
+            console.warn(`Failed to clear sync queue for table ${table}:`, error);
+            // Non-blocking - continue processing
+          }
+        }
       }
     } catch (error) {
       console.error('Failed to process sync queue:', error);
+      // FIX: On sync failure, keep items in persistent queue for retry
+      // Re-add failed tables to in-memory queue for next attempt
+      tables.forEach(table => this.syncQueue.add(table as SyncableTable));
     }
   }
 
@@ -156,6 +209,10 @@ class DataService {
     if (!enabled && this.syncDebounceTimer) {
       clearTimeout(this.syncDebounceTimer);
       this.syncDebounceTimer = null;
+    }
+    // FIX: Load pending sync queue when sync is enabled
+    if (enabled) {
+      this.loadPendingSyncQueue();
     }
   }
 
@@ -583,10 +640,32 @@ class DataService {
    * Recalculate workout metrics (volume, duration, muscles targeted)
    */
   private recalculateWorkoutMetrics(workout: Workout): Workout {
+    // FIX: Get user bodyweight for accurate bodyweight exercise volume calculation
+    let userBodyweight: number | undefined;
+    try {
+      const userProfile = this.getUserProfile(workout.userId);
+      if (userProfile && (userProfile as Promise<unknown>) instanceof Promise) {
+        // If getUserProfile returns a promise, we can't wait for it in this sync function
+        // Use undefined and volume will be calculated without bodyweight
+        userBodyweight = undefined;
+      } else {
+        const profile = userProfile as UserProfile | null;
+        if (profile?.weight) {
+          // Convert to kg if user uses lbs
+          userBodyweight = profile.preferredUnit === 'lbs'
+            ? convertWeight(profile.weight, 'lbs', 'kg')
+            : profile.weight;
+        }
+      }
+    } catch (error) {
+      // Fail silently - volume will be calculated without bodyweight
+      userBodyweight = undefined;
+    }
+
     // Recalculate exercise volumes and total volume
     let totalVolume = 0;
     const allMuscles = new Set<string>();
-    
+
     const finalExercises = (workout.exercises ?? []).map((exercise) => {
       // Infer tracking type from sets if not available
       let trackingType: string | undefined;
@@ -602,13 +681,21 @@ class DataService {
           trackingType = 'reps_only';
         }
       }
-      
+
       // Recalculate exercise volume
-      const exerciseVolume = calculateVolume(exercise.sets ?? [], trackingType as ExerciseTrackingType);
-      
+      // FIX: Pass bodyweight and exercise name for bodyweight exercises
+      const exerciseVolume = calculateVolume(
+        exercise.sets ?? [],
+        trackingType as ExerciseTrackingType,
+        {
+          userBodyweight,
+          exerciseName: exercise.exerciseName,
+        }
+      );
+
       // Collect muscles from exercise
       (exercise.musclesWorked ?? []).forEach(muscle => allMuscles.add(muscle));
-      
+
       return {
         ...exercise,
         totalVolume: exerciseVolume,

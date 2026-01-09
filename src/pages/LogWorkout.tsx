@@ -24,7 +24,7 @@ import { WorkoutErrorRecoveryModal } from '@/components/workout/WorkoutErrorReco
 import { WorkoutRecoveryModal } from '@/components/common/WorkoutRecoveryModal';
 import { LogExercise } from '@/components/workout/LogExercise';
 import { QuickCardioLog } from '@/components/workout/QuickCardioLog';
-import { calculateVolume } from '@/utils/calculations';
+import { calculateVolume, convertWeight } from '@/utils/calculations';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { normalizeWorkoutStartTime } from '@/utils/validators';
 import { debounce } from '@/utils/debounce';
@@ -372,7 +372,14 @@ export function LogWorkout() {
                 });
 
                 // Calculate initial volume (will be 0 since sets are not completed)
-                const initialVolume = calculateVolume(newSets, exerciseData.trackingType);
+                // FIX: Pass user bodyweight for accurate bodyweight exercise volume
+                const userBodyweight = profile?.weight
+                  ? (profile.preferredUnit === 'lbs' ? convertWeight(profile.weight, 'lbs', 'kg') : profile.weight)
+                  : undefined;
+                const initialVolume = calculateVolume(newSets, exerciseData.trackingType, {
+                  userBodyweight,
+                  exerciseName: prevExercise.exerciseName,
+                });
 
                 // Create new workout exercise
                 const newWorkoutExercise: WorkoutExercise = {
@@ -477,8 +484,17 @@ export function LogWorkout() {
   const handleDeleteExercise = (exerciseId: string) => {
     if (window.confirm('Are you sure you want to remove this exercise from the workout?')) {
       try {
-        removeExercise(exerciseId);
-        success('Exercise removed successfully');
+        // FIX: Handle superset/circuit dissolution notification
+        const result = removeExercise(exerciseId);
+
+        // Show appropriate success message based on whether a group was dissolved
+        if (result.dissolved) {
+          const groupName = result.groupType === 'superset' ? 'Superset' : 'Circuit';
+          success(`Exercise removed. ${groupName} dissolved (needs 2+ exercises to remain grouped).`);
+        } else {
+          success('Exercise removed successfully');
+        }
+
         if (editingExerciseId === exerciseId) {
           // Close modal if we're editing the deleted exercise
           setShowExerciseModal(false);

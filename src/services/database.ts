@@ -44,6 +44,13 @@ export interface LocalSyncMetadata {
   syncToken?: string;
 }
 
+export interface PendingSyncItem {
+  id?: number;
+  tableName: SyncableTable;
+  queuedAt: number; // timestamp when added to queue
+  userId?: string; // optional user context
+}
+
 class FitTrackAIDB extends Dexie {
   workouts!: Table<Workout, string>;
   exercises!: Table<Exercise, string>;
@@ -59,6 +66,7 @@ class FitTrackAIDB extends Dexie {
   recoveryLogs!: Table<RecoveryLog, number>;
   notifications!: Table<Notification, string>;
   errorLogs!: Table<ErrorLog, number>;
+  pendingSyncQueue!: Table<PendingSyncItem, number>;
 
   constructor() {
     super('FitTrackAIDB');
@@ -546,6 +554,49 @@ class FitTrackAIDB extends Dexie {
         // The migration can be retried on next app start
       }
     });
+
+    // Version 14: Optimize indexes for frequently queried fields
+    // This version adds compound indexes for common query patterns to significantly improve performance
+    this.version(14).stores({
+      workouts: 'id, userId, date, version, [userId+date], [userId+updatedAt], *musclesTargeted',
+      // OPTIMIZED: Added indexes for name, [name+category], and *equipment for faster searches
+      exercises: 'id, name, category, userId, version, [name+category], [userId+isCustom], [userId+updatedAt], *primaryMuscles, *secondaryMuscles, *equipment',
+      muscleStatuses: '++id, muscle, userId, version, [userId+muscle], [userId+updatedAt], lastWorked',
+      settings: 'key, userId, version, [userId+key]',
+      // OPTIMIZED: Added [name+userId] for faster template lookups by name
+      workoutTemplates: 'id, userId, category, name, version, [userId+category], [name+userId], [userId+updatedAt], *musclesTargeted',
+      aiCacheMetadata: '++id, insightType, userId, [insightType+userId], lastFetchTimestamp',
+      // OPTIMIZED: Added [userId+isCompleted] for faster filtering of incomplete workouts
+      plannedWorkouts: 'id, userId, scheduledDate, isCompleted, version, [userId+scheduledDate], [userId+isCompleted], [userId+updatedAt]',
+      exerciseDetailsCache: '++id, exerciseSlug, cachedAt',
+      muscleImageCache: '++id, muscle, cachedAt',
+      syncMetadata: '++id, tableName, userId, [userId+tableName], syncStatus, lastSyncAt',
+      sleepLogs: '++id, userId, date, version, [userId+date], [userId+updatedAt]',
+      recoveryLogs: '++id, userId, date, version, [userId+date], [userId+updatedAt]',
+      notifications: 'id, userId, isRead, createdAt, [userId+isRead], [userId+createdAt], type',
+      errorLogs: '++id, userId, errorType, severity, resolved, [userId+resolved], [userId+createdAt], tableName',
+    });
+
+    // Version 15: Add pendingSyncQueue table for persistent sync queue
+    // FIX: Prevents sync queue loss on page refresh
+    this.version(15).stores({
+      workouts: 'id, userId, date, version, [userId+date], [userId+updatedAt], *musclesTargeted',
+      exercises: 'id, name, category, userId, version, [name+category], [userId+isCustom], [userId+updatedAt], *primaryMuscles, *secondaryMuscles, *equipment',
+      muscleStatuses: '++id, muscle, userId, version, [userId+muscle], [userId+updatedAt], lastWorked',
+      settings: 'key, userId, version, [userId+key]',
+      workoutTemplates: 'id, userId, category, name, version, [userId+category], [name+userId], [userId+updatedAt], *musclesTargeted',
+      aiCacheMetadata: '++id, insightType, userId, [insightType+userId], lastFetchTimestamp',
+      plannedWorkouts: 'id, userId, scheduledDate, isCompleted, version, [userId+scheduledDate], [userId+isCompleted], [userId+updatedAt]',
+      exerciseDetailsCache: '++id, exerciseSlug, cachedAt',
+      muscleImageCache: '++id, muscle, cachedAt',
+      syncMetadata: '++id, tableName, userId, [userId+tableName], syncStatus, lastSyncAt',
+      sleepLogs: '++id, userId, date, version, [userId+date], [userId+updatedAt]',
+      recoveryLogs: '++id, userId, date, version, [userId+date], [userId+updatedAt]',
+      notifications: 'id, userId, isRead, createdAt, [userId+isRead], [userId+createdAt], type',
+      errorLogs: '++id, userId, errorType, severity, resolved, [userId+resolved], [userId+createdAt], tableName',
+      // NEW: Persistent sync queue indexed by queuedAt for FIFO processing
+      pendingSyncQueue: '++id, tableName, queuedAt, userId',
+    });
   }
 }
 
@@ -630,79 +681,134 @@ export const dbHelpers = {
   },
 
   async getAllExercises(): Promise<Exercise[]> {
-    const allExercises = await db.exercises.toArray();
-    
-    // Deduplicate by normalized name, keeping the first occurrence
-    const seen = new Map<string, Exercise>();
-    const deduplicated: Exercise[] = [];
-    
+    // Use reverse() to get exercises in reverse chronological order (newest first)
+    // This ensures we keep the most recently added exercise when deduplicating
+    const allExercises = await db.exercises.reverse().toArray();
+
+    // Deduplicate by normalized name in a single pass
+    // Using a Map ensures O(1) lookup and maintains insertion order
+    const deduplicatedMap = new Map<string, Exercise>();
+
     for (const exercise of allExercises) {
       const normalizedName = exercise.name.toLowerCase().trim();
-      if (!seen.has(normalizedName)) {
-        seen.set(normalizedName, exercise);
-        deduplicated.push(exercise);
+      // Only add if not already seen (keeps first occurrence, which is newest)
+      if (!deduplicatedMap.has(normalizedName)) {
+        deduplicatedMap.set(normalizedName, exercise);
       }
     }
-    
-    return deduplicated;
+
+    // Convert Map values to array
+    return Array.from(deduplicatedMap.values());
   },
 
-  async searchExercises(query: string): Promise<Exercise[]> {
-    const lowerQuery = query.toLowerCase();
-    const results = await db.exercises
-      .filter(exercise => 
-        exercise.name.toLowerCase().includes(lowerQuery) ||
-        exercise.category.toLowerCase().includes(lowerQuery) ||
-        exercise.equipment.some(eq => eq.toLowerCase().includes(lowerQuery))
-      )
+  /**
+   * Get exercises with pagination support to avoid loading all exercises at once
+   * @param limit Maximum number of exercises to return
+   * @param offset Number of exercises to skip
+   * @returns Paginated and deduplicated exercises
+   */
+  async getExercisesPaginated(limit: number = 100, offset: number = 0): Promise<Exercise[]> {
+    // Fetch limited set with offset
+    const exercises = await db.exercises
+      .reverse()
+      .offset(offset)
+      .limit(limit * 2) // Fetch 2x limit to account for potential duplicates
       .toArray();
-    
-    // Deduplicate by normalized name, keeping the first occurrence
-    const seen = new Map<string, Exercise>();
-    const deduplicated: Exercise[] = [];
-    
+
+    // Deduplicate in memory
+    const deduplicatedMap = new Map<string, Exercise>();
+    for (const exercise of exercises) {
+      const normalizedName = exercise.name.toLowerCase().trim();
+      if (!deduplicatedMap.has(normalizedName)) {
+        deduplicatedMap.set(normalizedName, exercise);
+      }
+    }
+
+    // Return up to the requested limit
+    return Array.from(deduplicatedMap.values()).slice(0, limit);
+  },
+
+  /**
+   * Get total count of unique exercises (deduplicated by name)
+   */
+  async getExercisesCount(): Promise<number> {
+    const allExercises = await db.exercises.toArray();
+    const uniqueNames = new Set(
+      allExercises.map(ex => ex.name.toLowerCase().trim())
+    );
+    return uniqueNames.size;
+  },
+
+  async searchExercises(query: string, limit: number = 50): Promise<Exercise[]> {
+    const lowerQuery = query.toLowerCase();
+
+    // Strategy: Use index-friendly queries when possible for better performance
+    let results: Exercise[];
+
+    // If query is short (likely searching by name prefix), use the name index
+    if (lowerQuery.length <= 3) {
+      // Use the name index for prefix matching (much faster)
+      results = await db.exercises
+        .where('name')
+        .startsWithIgnoreCase(query)
+        .limit(limit * 2)
+        .toArray();
+    } else {
+      // For longer queries or non-prefix searches, use filter but with limit
+      results = await db.exercises
+        .filter(exercise =>
+          exercise.name.toLowerCase().includes(lowerQuery) ||
+          exercise.category.toLowerCase().includes(lowerQuery) ||
+          exercise.equipment.some(eq => eq.toLowerCase().includes(lowerQuery))
+        )
+        .limit(limit * 2) // Fetch 2x limit to account for potential duplicates
+        .toArray();
+    }
+
+    // Deduplicate by normalized name in a single pass with Map
+    const deduplicatedMap = new Map<string, Exercise>();
     for (const exercise of results) {
       const normalizedName = exercise.name.toLowerCase().trim();
-      if (!seen.has(normalizedName)) {
-        seen.set(normalizedName, exercise);
-        deduplicated.push(exercise);
+      if (!deduplicatedMap.has(normalizedName)) {
+        deduplicatedMap.set(normalizedName, exercise);
       }
     }
-    
-    return deduplicated;
+
+    // Return up to the requested limit
+    return Array.from(deduplicatedMap.values()).slice(0, limit);
   },
 
-  async filterExercisesByEquipment(equipmentCategories: string[]): Promise<Exercise[]> {
+  async filterExercisesByEquipment(equipmentCategories: string[], limit: number = 200): Promise<Exercise[]> {
     const { getEquipmentCategories } = await import('./exerciseLibrary');
-    
+
     let results: Exercise[];
     if (equipmentCategories.length === 0) {
-      results = await db.exercises.toArray();
+      // If no filter, use pagination to avoid loading everything
+      results = await db.exercises.limit(limit * 2).toArray();
     } else {
       results = await db.exercises
         .filter(exercise => {
           const exerciseCategories = getEquipmentCategories(exercise.equipment);
           const exerciseCategoryStrings = exerciseCategories.map(cat => String(cat));
-          return equipmentCategories.some(category => 
+          return equipmentCategories.some(category =>
             exerciseCategoryStrings.includes(category)
           );
         })
+        .limit(limit * 2) // Fetch 2x limit to account for potential duplicates
         .toArray();
     }
-    
-    // Deduplicate by normalized name, keeping the first occurrence
-    const seen = new Map<string, Exercise>();
-    const deduplicated: Exercise[] = [];
-    
+
+    // Deduplicate by normalized name in a single pass with Map
+    const deduplicatedMap = new Map<string, Exercise>();
     for (const exercise of results) {
       const normalizedName = exercise.name.toLowerCase().trim();
-      if (!seen.has(normalizedName)) {
-        seen.set(normalizedName, exercise);
-        deduplicated.push(exercise);
+      if (!deduplicatedMap.has(normalizedName)) {
+        deduplicatedMap.set(normalizedName, exercise);
       }
     }
-    
-    return deduplicated;
+
+    // Return up to the requested limit
+    return Array.from(deduplicatedMap.values()).slice(0, limit);
   },
 
   async deleteExercise(id: string): Promise<void> {
@@ -1182,6 +1288,139 @@ export const dbHelpers = {
       .equals(userId)
       .reverse()
       .sortBy('date');
+  },
+
+  // Pending sync queue operations
+  async addToPendingSyncQueue(tableName: SyncableTable, userId?: string): Promise<number> {
+    // Check if this table is already in the queue for this user
+    const existingItems = await db.pendingSyncQueue
+      .where('tableName')
+      .equals(tableName)
+      .filter(item => !userId || item.userId === userId)
+      .toArray();
+
+    if (existingItems.length > 0) {
+      // Already queued, update timestamp
+      const item = existingItems[0];
+      await db.pendingSyncQueue.update(item.id!, {
+        queuedAt: Date.now(),
+      });
+      return item.id!;
+    } else {
+      // Add new queue item
+      return await db.pendingSyncQueue.add({
+        tableName,
+        queuedAt: Date.now(),
+        userId,
+      });
+    }
+  },
+
+  async getPendingSyncQueue(): Promise<PendingSyncItem[]> {
+    return await db.pendingSyncQueue
+      .orderBy('queuedAt')
+      .toArray();
+  },
+
+  async clearPendingSyncQueue(tableName?: SyncableTable): Promise<void> {
+    if (tableName) {
+      // Clear specific table from queue
+      await db.pendingSyncQueue
+        .where('tableName')
+        .equals(tableName)
+        .delete();
+    } else {
+      // Clear entire queue
+      await db.pendingSyncQueue.clear();
+    }
+  },
+
+  // Error log operations
+  async saveErrorLog(errorLog: Omit<ErrorLog, 'id'>): Promise<number> {
+    const now = new Date();
+    const fullErrorLog: ErrorLog = {
+      ...errorLog,
+      resolved: false,
+      createdAt: now,
+      updatedAt: now,
+      version: 1,
+    };
+    return await db.errorLogs.add(fullErrorLog);
+  },
+
+  async getErrorLog(id: number): Promise<ErrorLog | undefined> {
+    return await db.errorLogs.get(id);
+  },
+
+  async getAllErrorLogs(
+    userId: string,
+    filters?: {
+      errorType?: string;
+      resolved?: boolean;
+      severity?: string;
+      tableName?: string;
+      limit?: number;
+    }
+  ): Promise<ErrorLog[]> {
+    const query = db.errorLogs.where('userId').equals(userId);
+
+    let results = await query.reverse().sortBy('createdAt');
+
+    // Apply filters
+    if (filters) {
+      if (filters.errorType) {
+        results = results.filter((log) => log.errorType === filters.errorType);
+      }
+      if (filters.resolved !== undefined) {
+        results = results.filter((log) => log.resolved === filters.resolved);
+      }
+      if (filters.severity) {
+        results = results.filter((log) => log.severity === filters.severity);
+      }
+      if (filters.tableName) {
+        results = results.filter((log) => log.tableName === filters.tableName);
+      }
+      if (filters.limit) {
+        results = results.slice(0, filters.limit);
+      }
+    }
+
+    return results;
+  },
+
+  async updateErrorLog(id: number, updates: Partial<ErrorLog>): Promise<number> {
+    return await db.errorLogs.update(id, {
+      ...updates,
+      updatedAt: new Date(),
+    });
+  },
+
+  async markErrorLogAsResolved(id: number, resolvedBy?: string): Promise<number> {
+    return await db.errorLogs.update(id, {
+      resolved: true,
+      resolvedAt: new Date(),
+      resolvedBy,
+      updatedAt: new Date(),
+    });
+  },
+
+  async deleteErrorLog(id: number): Promise<void> {
+    await db.errorLogs.delete(id);
+  },
+
+  async clearOldErrorLogs(userId: string, daysOld: number = 30): Promise<number> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - daysOld);
+
+    const oldLogs = await db.errorLogs
+      .where('userId')
+      .equals(userId)
+      .filter((log) => log.resolved && log.createdAt < cutoffDate)
+      .toArray();
+
+    await Promise.all(oldLogs.map((log) => db.errorLogs.delete(log.id!)));
+
+    return oldLogs.length;
   },
 };
 

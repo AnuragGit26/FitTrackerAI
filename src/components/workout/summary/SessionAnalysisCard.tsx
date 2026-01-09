@@ -1,5 +1,6 @@
 import { SessionComparison } from '@/types/workoutSummary';
 import { formatDuration } from '@/utils/calculations';
+import { Info } from 'lucide-react';
 
 interface SessionAnalysisCardProps {
   comparison: SessionComparison;
@@ -68,13 +69,22 @@ export function SessionAnalysisCard({ comparison }: SessionAnalysisCardProps) {
         </div>
 
         {/* Volume */}
-        <div className="bg-white dark:bg-[#162e21] border border-gray-200 dark:border-[#316847] rounded-xl p-4 flex flex-col relative overflow-hidden">
+        <div className="bg-white dark:bg-[#162e21] border border-gray-200 dark:border-[#316847] rounded-xl p-4 flex flex-col relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-2 opacity-10">
             <span className="material-symbols-outlined text-4xl">weight</span>
           </div>
-          <p className="text-slate-500 dark:text-gray-400 text-xs font-medium uppercase tracking-wider mb-1">
-            Volume
-          </p>
+          <div className="flex items-center gap-1.5 mb-1">
+            <p className="text-slate-500 dark:text-gray-400 text-xs font-medium uppercase tracking-wider">
+              Volume
+            </p>
+            <div className="relative flex items-center">
+              <Info className="w-3 h-3 text-slate-400 dark:text-gray-500 cursor-help peer" />
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-slate-900 dark:bg-slate-800 text-white text-[10px] rounded-lg shadow-lg opacity-0 pointer-events-none peer-hover:opacity-100 peer-hover:pointer-events-auto transition-opacity z-10">
+                Includes weighted exercises and bodyweight exercises (calculated using exercise-specific bodyweight multipliers)
+                <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-900 dark:border-t-slate-800"></div>
+              </div>
+            </div>
+          </div>
           <div className="flex items-baseline gap-1">
             <span className="text-xl font-bold text-slate-900 dark:text-white">
               {formatVolume(comparison.volume.current)}

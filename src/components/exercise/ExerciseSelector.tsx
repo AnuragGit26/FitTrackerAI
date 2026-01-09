@@ -7,6 +7,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { cn } from '@/utils/cn';
 import { searchExercises } from '@/utils/exerciseSearch';
 import { SearchHighlight } from './SearchHighlight';
+import { useDebounce } from '@/hooks/useDebounce';
 
 interface ExerciseSelectorProps {
   onSelect: (exercise: Exercise) => void;
@@ -16,7 +17,14 @@ interface ExerciseSelectorProps {
 export function ExerciseSelector({ onSelect, onClose }: ExerciseSelectorProps) {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const deferredSearchQuery = useDeferredValue(searchQuery);
+
+  // Triple optimization for search:
+  // 1. useDebounce: Delays query execution until user stops typing (300ms)
+  // 2. useDeferredValue: Allows UI to remain responsive during expensive filtering
+  // 3. Combined: Reduces query frequency AND keeps UI smooth
+  const debouncedQuery = useDebounce(searchQuery, 300);
+  const deferredSearchQuery = useDeferredValue(debouncedQuery);
+
   const [selectedEquipmentCategories, setSelectedEquipmentCategories] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
@@ -196,8 +204,10 @@ export function ExerciseSelector({ onSelect, onClose }: ExerciseSelectorProps) {
             <>
               <div className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-800">
                 Showing {filteredExercises.length} of {exercises.length} exercises
-                {deferredSearchQuery !== searchQuery && (
-                  <span className="ml-1 text-primary">(updating...)</span>
+                {(debouncedQuery !== searchQuery || deferredSearchQuery !== debouncedQuery) && (
+                  <span className="ml-1 text-primary-500 animate-pulse">
+                    (searching...)
+                  </span>
                 )}
               </div>
               <FixedSizeList

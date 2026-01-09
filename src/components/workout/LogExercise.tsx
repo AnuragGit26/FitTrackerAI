@@ -1774,6 +1774,14 @@ export function LogExercise({
                         isJustCompleted={justCompletedSetNumber === set.setNumber}
                         exerciseCategory={selectedExercise?.category}
                         exerciseTrackingType={selectedExercise?.trackingType}
+                        exerciseName={selectedExercise?.name}
+                        userBodyweight={
+                          profile?.weight
+                            ? profile.preferredUnit === 'lbs'
+                              ? convertWeight(profile.weight, 'lbs', 'kg')
+                              : profile.weight
+                            : undefined
+                        }
                         onEdit={() => {
                           // Uncomplete set to edit
                           handleUpdateSet(set.setNumber, { completed: false });

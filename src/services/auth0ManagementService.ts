@@ -112,7 +112,7 @@ class Auth0ManagementService {
   /**
    * Map UserProfile to Auth0 user_metadata
    */
-  // @ts-ignore - Unused but kept for potential future use
+  // @ts-expect-error - Unused but kept for potential future use
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private _mapProfileToMetadata(profile: UserProfile): Auth0UserMetadata {
     return {
