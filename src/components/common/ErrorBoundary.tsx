@@ -2,6 +2,7 @@ import { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { analytics } from '@/utils/analytics';
+import * as Sentry from '@sentry/react';
 
 interface Props {
     children: ReactNode;
@@ -37,6 +38,14 @@ export class ErrorBoundary extends Component<Props, State> {
         if (import.meta.env.DEV) {
             console.error('ErrorBoundary caught an error:', error, errorInfo);
         }
+
+        // Send to Sentry with component stack
+        Sentry.withScope((scope) => {
+            scope.setContext('errorBoundary', {
+                componentStack: errorInfo.componentStack,
+            });
+            Sentry.captureException(error);
+        });
 
         // Call optional error handler
         this.props.onError?.(error, errorInfo);

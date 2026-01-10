@@ -3,6 +3,10 @@ import ReactDOM from 'react-dom/client'
 import { Auth0Provider } from '@auth0/auth0-react'
 import App from './App.tsx'
 import './index.css'
+import { initializeSentry } from './config/sentry'
+
+// Initialize Sentry error tracking (must be first)
+initializeSentry();
 
 const auth0Domain = import.meta.env.VITE_AUTH0_DOMAIN
 const auth0ClientId = import.meta.env.VITE_AUTH0_CLIENT_ID

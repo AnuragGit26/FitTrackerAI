@@ -50,7 +50,8 @@ export default defineConfig(({ mode }) => {
         type: 'module',
         navigateFallback: 'index.html',
       },
-      includeAssets: ['assets/img/Icon2.png'],
+      // Don't manually include Icon2.png - it's automatically handled by manifest icons
+      // includeAssets: ['assets/img/Icon2.png'],
       manifest: {
         name: 'Fit Track AI',
         short_name: 'Fit Track AI',
