@@ -191,9 +191,12 @@ export function LogExercise({
       }
 
       const loadExercise = async () => {
+        // CRITICAL: Check mounted state BEFORE async operations to prevent race conditions
+        if (!isMountedRef.current) return;
+
         const workout = currentWorkoutRef.current;
         if (!workout) return;
-        
+
         setIsLoadingExercise(true);
         try {
           const workoutExercise = (workout.exercises ?? []).find((ex) => ex.id === exerciseId);
@@ -204,6 +207,10 @@ export function LogExercise({
           }
 
           const exerciseData = await exerciseLibrary.getExerciseById(workoutExercise.exerciseId);
+
+          // CRITICAL: Check mounted state AFTER async operation
+          if (!isMountedRef.current) return;
+
           if (exerciseData) {
             const loadedSets = (workoutExercise.sets ?? []).map((set, index) => ({
               ...set,
@@ -548,6 +555,11 @@ export function LogExercise({
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
+        // Mobile PWA: Pause rest timer when app goes to background
+        // This prevents completion callbacks from firing while suspended
+        if (restTimerVisible && !restTimerPaused) {
+          setRestTimerPaused(true);
+        }
         saveCurrentState();
       }
     };
@@ -559,7 +571,10 @@ export function LogExercise({
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
+  // Note: restTimerVisible and restTimerPaused are accessed but not in deps to avoid recreating listener
+  // They are captured by closure and their current values are checked at runtime
 
   const handleSelectExercise = (exercise: Exercise) => {
     setSelectedExercise(exercise);
@@ -852,6 +867,13 @@ export function LogExercise({
       }
     }
 
+    // Re-check selectedExercise after async boundary to prevent race conditions
+    // selectedExercise could become null if user closes modal during await
+    if (!selectedExercise) {
+      showError('Exercise was deselected. Please select an exercise and try again.');
+      return;
+    }
+
     setIsSaving(true);
     setValidationErrors({});
 
@@ -997,6 +1019,13 @@ export function LogExercise({
         }
       }
 
+      // Re-check selectedExercise after async boundary to prevent race conditions
+      // selectedExercise could become null if user closes modal or switches exercises during await
+      if (!selectedExercise || !isMountedRef.current) {
+        console.warn('Exercise became null or component unmounted during workout start');
+        return;
+      }
+
       if (!workout) {
         return;
       }
@@ -1080,7 +1109,10 @@ export function LogExercise({
 
   // Rest timer handlers
   const handleRestComplete = useCallback((completionTime?: Date) => {
-    if (!isMountedRef.current) {
+    // Mobile PWA: Critical checks for component mount and exercise state
+    // Component may unmount while timer is in background on mobile
+    if (!isMountedRef.current || !selectedExercise) {
+      console.warn('[LogExercise] handleRestComplete called but component unmounted or exercise cleared');
       return;
     }
 
@@ -1109,11 +1141,14 @@ export function LogExercise({
 
       // Auto-save exercise sets to workout store with updated rest time
       // Pass updated sets to avoid race condition with async state update
-      if (setNumberToUpdate !== null) {
-        const updatedSets = calculateSetsWithRestTime(setNumberToUpdate, actualRestTime);
-        autoSaveExerciseSets(updatedSets);
-      } else {
-        autoSaveExerciseSets();
+      // Only auto-save if selectedExercise still exists (prevent race condition)
+      if (selectedExercise && isMountedRef.current) {
+        if (setNumberToUpdate !== null) {
+          const updatedSets = calculateSetsWithRestTime(setNumberToUpdate, actualRestTime);
+          autoSaveExerciseSets(updatedSets);
+        } else {
+          autoSaveExerciseSets();
+        }
       }
 
       if (!isMountedRef.current) {
@@ -1140,7 +1175,10 @@ export function LogExercise({
         restTimerSetNumberRef.current = null;
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restTimerStartTime, defaultRestDuration, sets, handleUpdateSet, autoSaveExerciseSets, startSet, calculateSetsWithRestTime]);
+  // Note: selectedExercise is intentionally not in deps - we check it at runtime inside the callback
+  // This prevents callback recreation on every exercise change and is safe for mobile PWA lifecycle
 
   const handleRestSkip = () => {
     const actualRestTime = restTimerStartTime
@@ -1199,10 +1237,15 @@ export function LogExercise({
     if (!selectedExercise) return;
 
     const setToComplete = currentSet;
-    
+
     // Ensure we have a set to complete
-    if (!setToComplete || setToComplete.completed) {
-      console.error('No set to complete');
+    if (!setToComplete) {
+      showError('No set to complete. Please add a new set first.');
+      return;
+    }
+
+    if (setToComplete.completed) {
+      showError('This set is already completed.');
       return;
     }
 

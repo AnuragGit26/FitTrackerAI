@@ -146,8 +146,6 @@ class DataService {
       }
 
       if (pendingItems.length > 0) {
-        // eslint-disable-next-line no-console
-        console.log(`[DataService] Loaded ${pendingItems.length} pending sync items from IndexedDB`);
         // Trigger sync processing if there are items
         this.debounceSync();
       }

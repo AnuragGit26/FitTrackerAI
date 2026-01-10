@@ -337,6 +337,14 @@ export const dataExport = {
         totalItems: 8,
       });
       const userProfile = await dataService.getUserProfile(userId);
+
+      // Include profile picture from localStorage (not stored in IndexedDB)
+      const profilePictureKey = `fitTrackAI_profilePicture_${userId}`;
+      const profilePicture = localStorage.getItem(profilePictureKey);
+      if (profilePicture && userProfile) {
+        userProfile.profilePicture = profilePicture;
+      }
+
       const settings = await dataService.getSetting('appSettings');
       const settingsObj = settings
         ? { appSettings: settings }
@@ -376,6 +384,18 @@ export const dataExport = {
       });
 
       const jsonString = JSON.stringify(exportData, null, 2);
+
+      // Validate export size (50MB limit to prevent browser crashes)
+      const sizeBytes = new Blob([jsonString]).size;
+      const sizeMB = sizeBytes / (1024 * 1024);
+      const MAX_EXPORT_SIZE_MB = 50;
+
+      if (sizeMB > MAX_EXPORT_SIZE_MB) {
+        throw new Error(
+          `Export size (${sizeMB.toFixed(1)} MB) exceeds the maximum allowed size of ${MAX_EXPORT_SIZE_MB} MB. ` +
+          `Please try exporting a smaller date range or contact support for assistance with large datasets.`
+        );
+      }
 
       onProgress?.({
         percentage: 100,
@@ -824,31 +844,66 @@ export const dataExport = {
       });
       
       const validation = await this.validateImportData(data);
-      
-      // Add validation errors and warnings to result
-      result.errors.push(...validation.errors);
+
+      // If there are critical validation errors, block import
+      if (!validation.isValid) {
+        const criticalErrors = validation.errors.filter(
+          (error) => error.severity === 'error'
+        );
+
+        if (criticalErrors.length > 0) {
+          const errorMessages = criticalErrors
+            .slice(0, 5) // Show first 5 errors
+            .map((err) => `- ${err.message}`)
+            .join('\n');
+
+          throw new Error(
+            `Import blocked due to ${criticalErrors.length} critical validation error(s):\n\n${errorMessages}\n\n` +
+            (criticalErrors.length > 5 ? `...and ${criticalErrors.length - 5} more errors.\n\n` : '') +
+            `Please fix these issues in the export file before importing.`
+          );
+        }
+      }
+
+      // Add warnings to result (non-blocking)
       result.errors.push(...validation.warnings);
-      
-      // If there are critical validation errors, we can still proceed but log them
-      if (validation.errors.length > 0) {
-        logger.warn('Import validation found errors', {
+
+      // Log validation summary
+      if (validation.errors.length > 0 || validation.warnings.length > 0) {
+        logger.warn('Import validation found issues', {
           errorCount: validation.errors.length,
           warningCount: validation.warnings.length,
         });
       }
 
-      // If replace strategy, clear existing data first
-      if (strategy === 'replace') {
-        onProgress?.({
-          percentage: 5,
-          currentOperation: 'Clearing existing data...',
-          completedItems: 0,
-          totalItems: totalSteps,
-        });
-        await this.clearUserData(userId);
-      }
+      /**
+       * Transaction handling: Currently using per-operation try-catch for granular error handling
+       * and progress updates. For full atomic transactions, consider using Dexie.transaction() API.
+       *
+       * Trade-off: Current approach allows partial imports with detailed error tracking,
+       * but may leave database in partially imported state on critical failures.
+       * Replace strategy clears all data first, so failures leave empty database.
+       * Merge strategy attempts best-effort rollback on critical errors.
+       */
 
-      let currentStep = strategy === 'replace' ? 1 : 0;
+      // Track import progress for potential rollback
+      let workoutsImportedCount = 0;
+      let templatesImportedCount = 0;
+      const importStartTime = Date.now();
+
+      try {
+        // If replace strategy, clear existing data first
+        if (strategy === 'replace') {
+          onProgress?.({
+            percentage: 5,
+            currentOperation: 'Clearing existing data...',
+            completedItems: 0,
+            totalItems: totalSteps,
+          });
+          await this.clearUserData(userId);
+        }
+
+        let currentStep = strategy === 'replace' ? 1 : 0;
 
       // 1. Import User Profile
       if (data.userProfile) {
@@ -874,6 +929,12 @@ export const dataExport = {
             await dataService.updateUserProfile(profileToImport);
             result.details.userProfile.imported = true;
             result.imported++;
+          }
+
+          // Restore profile picture to localStorage (not stored in IndexedDB)
+          if (data.userProfile.profilePicture) {
+            const profilePictureKey = `fitTrackAI_profilePicture_${userId}`;
+            localStorage.setItem(profilePictureKey, data.userProfile.profilePicture);
           }
         } catch (error) {
           const importError = createImportError(
@@ -1003,6 +1064,7 @@ export const dataExport = {
               await templateService.createTemplate(templateToImport);
               result.details.templates.imported++;
               result.imported++;
+              templatesImportedCount++;
             } else {
               // Merge: check if template exists (by name + userId)
               const existingTemplates =
@@ -1014,6 +1076,7 @@ export const dataExport = {
                 await templateService.createTemplate(templateToImport);
                 result.details.templates.imported++;
                 result.imported++;
+                templatesImportedCount++;
               } else {
                 result.details.templates.skipped++;
                 result.skipped++;
@@ -1160,6 +1223,7 @@ export const dataExport = {
               await dataService.createWorkout(workoutWithUserId);
               result.details.workouts.imported++;
               result.imported++;
+              workoutsImportedCount++;
             } else {
               // Merge: check if workout exists (by date + exercises)
               const existingWorkouts = await dataService.getAllWorkouts(userId);
@@ -1176,6 +1240,7 @@ export const dataExport = {
                 await dataService.createWorkout(workoutWithUserId);
                 result.details.workouts.imported++;
                 result.imported++;
+                workoutsImportedCount++;
               } else {
                 result.details.workouts.skipped++;
                 result.skipped++;
@@ -1414,18 +1479,53 @@ export const dataExport = {
         }
       }
 
-      onProgress?.({
-        percentage: 100,
-        currentOperation: 'Import complete',
-        completedItems: totalSteps - 1,
-        totalItems: totalSteps - 1,
-      });
+        onProgress?.({
+          percentage: 100,
+          currentOperation: 'Import complete',
+          completedItems: totalSteps - 1,
+          totalItems: totalSteps - 1,
+        });
 
-      // Note: Imported data is saved to IndexedDB only by default
-      // Sync to Supabase/MongoDB will happen automatically via the normal sync mechanism
-      // (debounced sync triggered by dataService events)
+        // Note: Imported data is saved to IndexedDB only by default
+        // Sync to Supabase/MongoDB will happen automatically via the normal sync mechanism
+        // (debounced sync triggered by dataService events)
 
-      return result;
+        return result;
+      } catch (importError) {
+        // Critical error during import
+        logger.error('Critical error during import', {
+          error: importError,
+          strategy,
+          workoutsImported: workoutsImportedCount,
+          templatesImported: templatesImportedCount,
+          elapsedMs: Date.now() - importStartTime,
+        });
+
+        onProgress?.({
+          percentage: 0,
+          currentOperation: 'Import failed',
+          completedItems: 0,
+          totalItems: totalSteps,
+        });
+
+        // Re-throw the error with context
+        const errorMessage = importError instanceof Error ? importError.message : 'Unknown error';
+
+        if (strategy === 'replace') {
+          throw new Error(
+            `Import failed after clearing data: ${errorMessage}\n\n` +
+            `Your data was cleared before the error occurred. ` +
+            `Please restore from a backup or re-import a valid file.`
+          );
+        } else {
+          throw new Error(
+            `Import failed: ${errorMessage}\n\n` +
+            `Partially imported: ${workoutsImportedCount} workouts, ${templatesImportedCount} templates. ` +
+            `Database may be in a partially imported state. ` +
+            `You may want to review and manually remove duplicate entries.`
+          );
+        }
+      }
     } catch (error) {
       logger.error('Failed to import data', error);
       throw new Error(

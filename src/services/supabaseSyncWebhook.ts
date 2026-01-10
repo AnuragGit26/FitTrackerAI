@@ -154,9 +154,6 @@ async function triggerSyncWebhookInternal(
             const errorText = await response.text().catch(() => 'Unknown error');
             throw new Error(`Webhook failed: ${response.status} ${response.statusText} - ${errorText}`);
         }
-
-        // eslint-disable-next-line no-console
-        console.log('[SupabaseSyncWebhook] Webhook triggered successfully for userId:', userId);
     } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') {
             throw new Error('Webhook request timed out');

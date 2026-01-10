@@ -50,7 +50,7 @@ export default defineConfig(({ mode }) => {
         type: 'module',
         navigateFallback: 'index.html',
       },
-      includeAssets: ['assests/img/Fittrack2.png'],
+      includeAssets: ['assets/img/Fittrack2.png'],
       manifest: {
         name: 'Fit Track AI',
         short_name: 'Fit Track AI',
@@ -63,13 +63,13 @@ export default defineConfig(({ mode }) => {
         start_url: '/',
         icons: [
           {
-            src: 'assests/img/Fittrack2.png',
+            src: 'assets/img/Fittrack2.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any maskable'
           },
           {
-            src: 'assests/img/Fittrack2.png',
+            src: 'assets/img/Fittrack2.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any maskable'
@@ -165,13 +165,55 @@ export default defineConfig(({ mode }) => {
   },
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    sourcemap: false, // Disable source maps in production for security
+    chunkSizeWarningLimit: 500, // Only warn for chunks > 500 KB
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'three-vendor': ['three', '@react-three/fiber', '@react-three/drei'],
-          'chart-vendor': ['recharts']
+        manualChunks: (id) => {
+          // Core React libraries
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
+            return 'react-core';
+          }
+          // React Router
+          if (id.includes('node_modules/react-router') || id.includes('node_modules/@remix-run')) {
+            return 'react-router';
+          }
+          // Auth0
+          if (id.includes('node_modules/@auth0/')) {
+            return 'auth-vendor';
+          }
+          // Lucide Icons (split to reduce Profile bundle size)
+          if (id.includes('node_modules/lucide-react/')) {
+            return 'icons-vendor';
+          }
+          // Three.js and related
+          if (id.includes('node_modules/three/') || id.includes('node_modules/@react-three/')) {
+            return 'three-vendor';
+          }
+          // Charts library
+          if (id.includes('node_modules/recharts/') || id.includes('node_modules/d3-')) {
+            return 'chart-vendor';
+          }
+          // Google Generative AI
+          if (id.includes('node_modules/@google/generative-ai/')) {
+            return 'ai-vendor';
+          }
+          // Framer Motion
+          if (id.includes('node_modules/framer-motion/')) {
+            return 'motion-vendor';
+          }
+          // Supabase
+          if (id.includes('node_modules/@supabase/')) {
+            return 'supabase-vendor';
+          }
+          // Dexie (IndexedDB wrapper)
+          if (id.includes('node_modules/dexie/')) {
+            return 'dexie-vendor';
+          }
+          // All other node_modules as common vendor chunk
+          if (id.includes('node_modules/')) {
+            return 'vendor';
+          }
         }
       }
     },

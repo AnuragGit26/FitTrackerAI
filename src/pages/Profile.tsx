@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth0 } from '@auth0/auth0-react';
 import { ArrowLeft, ArrowRight, Scale, Ruler, Moon, Sun, Monitor, Bell, Volume2, Vibrate, Download, Upload, AlertCircle, Clock, Cloud, CloudOff, RefreshCw, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
@@ -17,21 +17,18 @@ import { mongodbSyncService } from '@/services/mongodbSyncService';
 import { syncMetadataService } from '@/services/syncMetadataService';
 import { SyncStatus, SyncProgress } from '@/types/sync';
 import { logger } from '@/utils/logger';
-import { ImportStrategyModal } from '@/components/profile/ImportStrategyModal';
-import { ExportProgressModal } from '@/components/profile/ExportProgressModal';
-import { ImportProgressModal } from '@/components/profile/ImportProgressModal';
 import { ImportStrategy, ImportResult, ProgressCallback } from '@/types/export';
+
+// Lazy load heavy modals to reduce initial bundle size
+const ImportStrategyModal = lazy(() => import('@/components/profile/ImportStrategyModal').then(m => ({ default: m.ImportStrategyModal })));
+const ExportProgressModal = lazy(() => import('@/components/profile/ExportProgressModal').then(m => ({ default: m.ExportProgressModal })));
+const ImportProgressModal = lazy(() => import('@/components/profile/ImportProgressModal').then(m => ({ default: m.ImportProgressModal })));
 
 export function Profile() {
   const navigate = useNavigate();
   const { user: auth0User, getAccessTokenSilently, isAuthenticated } = useAuth0();
   const { profile, updateProfile, isLoading, setPreferredUnit, setDefaultRestTime, setProfilePicture: updateProfilePictureInStore, syncToAuth0, auth0SyncStatus, auth0SyncError } = useUserStore();
   
-  // Debug logging for profile state
-  useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log('[Profile] Component render - profile:', profile, 'profile?.id:', profile?.id, 'isLoading:', isLoading, 'isAuthenticated:', isAuthenticated);
-  }, [profile, isLoading, isAuthenticated]);
   const { 
     settings, 
     setTheme, 
@@ -200,26 +197,18 @@ export function Profile() {
   };
   
   const handleManualSync = async () => {
-    // eslint-disable-next-line no-console
-    console.log('[Profile.handleManualSync] Button clicked, profile.id:', profile?.id, 'isSyncing:', isSyncing);
-    
     if (!profile?.id || isSyncing) {
       console.warn('[Profile.handleManualSync] Sync aborted - missing profile.id or already syncing');
       return;
     }
-    
+
     setIsSyncing(true);
     setSyncStatus('syncing');
-    
+
     try {
-      // eslint-disable-next-line no-console
-      console.log('[Profile.handleManualSync] Calling mongodbSyncService.sync...');
       const results = await mongodbSyncService.sync(profile.id, {
         direction: 'bidirectional',
       });
-      
-      // eslint-disable-next-line no-console
-      console.log('[Profile.handleManualSync] Sync completed, results:', results);
       
       const hasErrors = results.some((r) => r.status === 'error');
       const totalConflicts = results.reduce((sum, r) => sum + r.conflicts, 0);
@@ -1156,6 +1145,26 @@ export function Profile() {
                   // Validate and preview file
                   await dataExport.validateExportFile(file);
                   const preview = await dataExport.previewImport(file);
+
+                  // Check for user ID mismatch (security warning)
+                  if (preview.userProfile && preview.userProfile.id && preview.userProfile.id !== profile.id) {
+                    const confirmed = window.confirm(
+                      `⚠️ WARNING: This data belongs to a different user!\n\n` +
+                      `Export user: ${preview.userProfile.name || 'Unknown'} (ID: ${preview.userProfile.id})\n` +
+                      `Current user: ${profile.name || 'You'} (ID: ${profile.id})\n\n` +
+                      `Importing this data will assign all records to your account. This may not be what you want.\n\n` +
+                      `Are you sure you want to continue?`
+                    );
+
+                    if (!confirmed) {
+                      showError('Import cancelled - User ID mismatch');
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = '';
+                      }
+                      return;
+                    }
+                  }
+
                   setImportPreview(preview);
                   setSelectedFile(file);
                   setShowImportStrategyModal(true);
@@ -1180,22 +1189,25 @@ export function Profile() {
         </section>
 
         {/* Export Progress Modal */}
-        <ExportProgressModal
-          isOpen={showExportModal}
-          progress={exportProgress}
-          error={exportError}
-          onClose={() => {
-            setShowExportModal(false);
-            setExportProgress(null);
-            setExportError(null);
-          }}
-        />
+        <Suspense fallback={null}>
+          <ExportProgressModal
+            isOpen={showExportModal}
+            progress={exportProgress}
+            error={exportError}
+            onClose={() => {
+              setShowExportModal(false);
+              setExportProgress(null);
+              setExportError(null);
+            }}
+          />
+        </Suspense>
 
         {/* Import Strategy Modal */}
         {showImportStrategyModal && importPreview && selectedFile && (
-          <ImportStrategyModal
-            preview={importPreview}
-            onSelect={async (strategy: ImportStrategy) => {
+          <Suspense fallback={null}>
+            <ImportStrategyModal
+              preview={importPreview}
+              onSelect={async (strategy: ImportStrategy) => {
               setShowImportStrategyModal(false);
               if (!profile?.id || !selectedFile) return;
               
@@ -1250,20 +1262,23 @@ export function Profile() {
                 fileInputRef.current.value = '';
               }
             }}
-          />
+            />
+          </Suspense>
         )}
 
         {/* Import Progress Modal */}
-        <ImportProgressModal
-          isOpen={showImportModal}
-          progress={importProgress}
-          result={importResult}
-          onClose={() => {
-            setShowImportModal(false);
-            setImportProgress(null);
-            setImportResult(null);
-          }}
-        />
+        <Suspense fallback={null}>
+          <ImportProgressModal
+            isOpen={showImportModal}
+            progress={importProgress}
+            result={importResult}
+            onClose={() => {
+              setShowImportModal(false);
+              setImportProgress(null);
+              setImportResult(null);
+            }}
+          />
+        </Suspense>
 
         {/* Notification Settings */}
         <section className="space-y-4">

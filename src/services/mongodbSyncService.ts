@@ -1247,7 +1247,14 @@ class MongoDBSyncService {
                 break;
             case 'muscle_statuses': {
                 const record = remoteRecord as Record<string, unknown>;
-                const muscle = record.muscle as string;
+                const muscle = record.muscle as string | null | undefined;
+
+                // CRITICAL: Validate muscle field exists before proceeding
+                if (!muscle) {
+                    console.warn('[MongoDBSync] Skipping muscle_statuses update - null/undefined muscle field', recordId);
+                    break;
+                }
+
                 const existing = await dbHelpers.getMuscleStatus(muscle);
                 if (existing?.id) {
                     await dbHelpers.updateMuscleStatus(existing.id, converted as Partial<MuscleStatus>);

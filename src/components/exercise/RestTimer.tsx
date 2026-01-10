@@ -87,6 +87,25 @@ export function RestTimer({
     onSkipRef.current = onSkip;
   }, [onSkip]);
 
+  // Mobile PWA: Auto-pause timer when app goes to background
+  // This prevents completion callbacks from firing while app is suspended
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && !isPaused && isVisible && remainingTime > 0) {
+        // App backgrounded - auto-pause to prevent completion while hidden
+        // Critical for mobile: prevents race conditions when app is suspended
+        handlePause();
+      }
+      // Note: We don't auto-resume when foregrounded - user must manually resume
+      // This prevents surprise completions when user returns to app
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPaused, isVisible, remainingTime]);
+  // Note: handlePause is intentionally not in deps to avoid recreating listener on every render
+
   // Cleanup on unmount - always clear all timeouts
   useEffect(() => {
     isMountedRef.current = true;
@@ -365,8 +384,9 @@ export function RestTimer({
               // Call onComplete after animation delay (2 seconds)
               // Store timeout ID so we can cancel it if user skips
               completionTimeoutRef.current = setTimeout(() => {
-                // Only call onComplete if timer hasn't been skipped
-                if (!isCompletedOrSkippedRef.current) {
+                // Only call onComplete if timer hasn't been skipped and component is still mounted
+                // Critical for mobile PWA: component may unmount while timer is in background
+                if (!isCompletedOrSkippedRef.current && isMountedRef.current) {
                   isCompletedOrSkippedRef.current = true;
                   setShowCompletionAnimation(false);
                   onCompleteRef.current(actualCompletionTime);

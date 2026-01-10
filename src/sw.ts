@@ -66,22 +66,13 @@ registerRoute(
     })
 );
 
-// Background sync for AI requests (when offline)
+// Background sync for workout reminders
 self.addEventListener('sync', (event: Event) => {
     const syncEvent = event as SyncEvent;
-    if (syncEvent.tag === 'ai-request-sync') {
-        syncEvent.waitUntil(handleAISync());
-    }
-
     if (syncEvent.tag === 'workout-reminder-sync') {
         syncEvent.waitUntil(checkScheduledWorkoutReminders());
     }
 });
-
-async function handleAISync(): Promise<void> {
-    // This would handle queued AI requests when back online
-    // Implementation depends on your specific needs
-}
 
 // Periodic background sync for AI refresh checks (every hour)
 self.addEventListener('periodicsync', (event: Event) => {

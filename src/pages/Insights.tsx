@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Bot, RefreshCw, User, X } from 'lucide-react';
+import { Bot, RefreshCw, User, X, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { InsightsTabNavigation } from '@/components/insights/InsightsTabNavigation';
-import { useInsightsData } from '@/hooks/useInsightsData';
+import { useInsightsDataLazy } from '@/hooks/useInsightsDataLazy';
 import { useUserStore } from '@/store/userStore';
 import { Skeleton } from '@/components/common/Skeleton';
 import { BreakthroughCard } from '@/components/insights/BreakthroughCard';
@@ -30,13 +30,25 @@ export function Insights() {
   const [showProfilePrompt, setShowProfilePrompt] = useState(false);
   const { profile } = useUserStore();
   const {
-    progressAnalysis,
-    smartAlerts,
-    workoutRecommendations,
-    isLoading,
+    progress,
+    alerts,
+    recommendations,
     getTimeSinceUpdate,
-    refreshInsights,
-  } = useInsightsData();
+    loadInsightType,
+    refreshInsightType,
+    getUsageStats,
+  } = useInsightsDataLazy();
+
+  // Lazy load data when tab changes
+  useEffect(() => {
+    if (view === 'progress' && !progress.isLoaded && !progress.isLoading) {
+      loadInsightType('progress');
+    } else if (view === 'alerts' && !alerts.isLoaded && !alerts.isLoading) {
+      loadInsightType('insights');
+    } else if (view === 'recommendations' && !recommendations.isLoaded && !recommendations.isLoading) {
+      loadInsightType('recommendations');
+    }
+  }, [view, progress, alerts, recommendations, loadInsightType]);
 
   // Check if profile is incomplete
   useEffect(() => {
@@ -59,22 +71,23 @@ export function Insights() {
     navigate('/profile');
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background-light dark:bg-background-dark pb-24">
-        <div className="sticky top-0 z-50 flex items-center bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md p-4 pb-3 justify-between border-b border-gray-200 dark:border-[#316847]">
-          <h2 className="text-xl font-bold leading-tight tracking-[-0.015em] flex-1">AI Insights</h2>
-        </div>
-        <InsightsTabNavigation currentView={view} onViewChange={setView} />
-        <div className="flex flex-col gap-6 p-4 max-w-md mx-auto w-full">
-          <Skeleton height={120} className="rounded-xl" />
-          <Skeleton height={80} className="rounded-xl" />
-          <Skeleton height={200} className="rounded-xl" />
-          <Skeleton height={150} className="rounded-xl" />
-        </div>
-      </div>
-    );
-  }
+  const handleRefresh = () => {
+    if (view === 'progress') {
+      refreshInsightType('progress');
+    } else if (view === 'alerts') {
+      refreshInsightType('insights');
+    } else if (view === 'recommendations') {
+      refreshInsightType('recommendations');
+    }
+  };
+
+  // Get current tab state
+  const currentTabState =
+    view === 'progress' ? progress :
+    view === 'alerts' ? alerts :
+    recommendations;
+
+  const usageStats = getUsageStats();
 
   return (
     <div className="min-h-screen bg-background-light dark:bg-background-dark pb-24">
@@ -86,16 +99,32 @@ export function Insights() {
             Updated {getTimeSinceUpdate()}
           </p>
           <button
-            onClick={refreshInsights}
-            className="ml-1 p-1 hover:bg-primary/20 rounded transition-colors"
+            onClick={handleRefresh}
+            className="ml-1 p-1 hover:bg-primary/20 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             aria-label="Refresh insights"
+            disabled={currentTabState.isLoading}
           >
-            <RefreshCw className="w-3 h-3 text-primary" />
+            <RefreshCw className={`w-3 h-3 text-primary ${currentTabState.isLoading ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>
 
       <InsightsTabNavigation currentView={view} onViewChange={setView} />
+
+      {/* Usage Stats Display (for debugging/transparency) */}
+      {usageStats && usageStats.daily.remaining < 10 && (
+        <div className="p-4 max-w-md mx-auto w-full">
+          <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-xl p-3 flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-orange-600 dark:text-orange-400 shrink-0 mt-0.5" />
+            <div className="flex-1 text-sm">
+              <p className="text-orange-900 dark:text-orange-100 font-semibold">API Limit Warning</p>
+              <p className="text-orange-700 dark:text-orange-200 text-xs mt-1">
+                {usageStats.daily.remaining} of {usageStats.daily.limit} daily API calls remaining
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Profile Completion Prompt */}
       {showProfilePrompt && (
@@ -137,8 +166,41 @@ export function Insights() {
       )}
 
       <div className="flex flex-col gap-6 p-4 max-w-md mx-auto w-full">
+        {/* Loading state for current tab */}
+        {currentTabState.isLoading && (
+          <div className="flex flex-col gap-6">
+            <Skeleton height={120} className="rounded-xl" />
+            <Skeleton height={80} className="rounded-xl" />
+            <Skeleton height={200} className="rounded-xl" />
+            <Skeleton height={150} className="rounded-xl" />
+          </div>
+        )}
+
+        {/* Error state for current tab */}
+        {currentTabState.error && !currentTabState.isLoading && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="text-red-900 dark:text-red-100 font-bold text-sm mb-1">
+                  Unable to Load Insights
+                </h3>
+                <p className="text-red-700 dark:text-red-200 text-sm">
+                  {currentTabState.error}
+                </p>
+                <button
+                  onClick={handleRefresh}
+                  className="mt-3 text-red-900 dark:text-red-100 font-semibold text-sm hover:underline"
+                >
+                  Try Again →
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <AnimatePresence mode="wait">
-          {view === 'progress' && progressAnalysis && (
+          {view === 'progress' && progress.data && !progress.isLoading && !progress.error && (
             <motion.div
               key="progress"
               initial={{ opacity: 0, y: 20 }}
@@ -149,37 +211,37 @@ export function Insights() {
               className="flex flex-col gap-6"
             >
                 <motion.div variants={prefersReducedMotion() ? {} : {}}>
-                  <BreakthroughCard breakthrough={progressAnalysis.breakthrough} />
+                  <BreakthroughCard breakthrough={progress.data.breakthrough} />
                 </motion.div>
                 <motion.div variants={prefersReducedMotion() ? {} : {}}>
                   <PerformanceTrendsCards
-                    consistencyScore={progressAnalysis.consistencyScore}
-                    consistencyChange={progressAnalysis.consistencyChange}
-                    workoutCount={progressAnalysis.workoutCount}
-                    workoutCountChange={progressAnalysis.workoutCountChange}
+                    consistencyScore={progress.data.consistencyScore}
+                    consistencyChange={progress.data.consistencyChange}
+                    workoutCount={progress.data.workoutCount}
+                    workoutCountChange={progress.data.workoutCountChange}
                   />
                 </motion.div>
                 <motion.div variants={prefersReducedMotion() ? {} : {}}>
                   <VolumeTrendChart
-                    currentVolume={progressAnalysis.volumeTrend.current}
-                    previousVolume={progressAnalysis.volumeTrend.previous}
-                    changePercent={progressAnalysis.volumeTrend.changePercent}
-                    weeklyData={progressAnalysis.volumeTrend.weeklyData}
+                    currentVolume={progress.data.volumeTrend.current}
+                    previousVolume={progress.data.volumeTrend.previous}
+                    changePercent={progress.data.volumeTrend.changePercent}
+                    weeklyData={progress.data.volumeTrend.weeklyData}
                   />
                 </motion.div>
                 <motion.div variants={prefersReducedMotion() ? {} : {}}>
                   <AttentionNeededSection
-                    plateaus={progressAnalysis.plateaus}
-                    formChecks={progressAnalysis.formChecks}
+                    plateaus={progress.data.plateaus}
+                    formChecks={progress.data.formChecks}
                   />
                 </motion.div>
                 <motion.div variants={prefersReducedMotion() ? {} : {}}>
-                  <TrainingPatternsSection patterns={progressAnalysis.trainingPatterns} />
+                  <TrainingPatternsSection patterns={progress.data.trainingPatterns} />
                 </motion.div>
             </motion.div>
           )}
 
-          {view === 'alerts' && smartAlerts && (
+          {view === 'alerts' && alerts.data && !alerts.isLoading && !alerts.error && (
             <motion.div
               key="alerts"
               initial={{ opacity: 0, y: 20 }}
@@ -190,22 +252,22 @@ export function Insights() {
               className="flex flex-col gap-6"
             >
                 <motion.div variants={prefersReducedMotion() ? {} : {}}>
-                  <SystemStatusCard alerts={smartAlerts} />
+                  <SystemStatusCard alerts={alerts.data} />
                 </motion.div>
                 <div className="w-full h-px bg-gray-200 dark:bg-white/5 mx-4" />
                 <motion.div variants={prefersReducedMotion() ? {} : {}}>
-                  <CriticalAlertsCard alerts={smartAlerts.criticalAlerts} />
+                  <CriticalAlertsCard alerts={alerts.data.criticalAlerts} />
                 </motion.div>
                 <motion.div variants={prefersReducedMotion() ? {} : {}}>
-                  <SuggestionsSection suggestions={smartAlerts.suggestions} />
+                  <SuggestionsSection suggestions={alerts.data.suggestions} />
                 </motion.div>
                 <motion.div variants={prefersReducedMotion() ? {} : {}}>
-                  <NutritionTimingTimeline events={smartAlerts.nutritionEvents} />
+                  <NutritionTimingTimeline events={alerts.data.nutritionEvents} />
                 </motion.div>
             </motion.div>
           )}
 
-          {view === 'recommendations' && workoutRecommendations && (
+          {view === 'recommendations' && recommendations.data && !recommendations.isLoading && !recommendations.error && (
             <motion.div
               key="recommendations"
               initial={{ opacity: 0, y: 20 }}
@@ -216,19 +278,19 @@ export function Insights() {
               className="flex flex-col gap-6"
             >
                 <motion.div variants={prefersReducedMotion() ? {} : {}}>
-                  <ReadinessScoreHeader recommendations={workoutRecommendations} />
+                  <ReadinessScoreHeader recommendations={recommendations.data} />
                 </motion.div>
                 <motion.div variants={prefersReducedMotion() ? {} : {}}>
-                  <RecommendedWorkoutCard workout={workoutRecommendations.recommendedWorkout} />
+                  <RecommendedWorkoutCard workout={recommendations.data.recommendedWorkout} />
                 </motion.div>
                 <motion.div variants={prefersReducedMotion() ? {} : {}}>
-                  <MuscleBalanceSection imbalances={workoutRecommendations.muscleBalance.imbalances} />
+                  <MuscleBalanceSection imbalances={recommendations.data.muscleBalance.imbalances} />
                 </motion.div>
                 <motion.div variants={prefersReducedMotion() ? {} : {}}>
-                  <CorrectiveExercisesCarousel exercises={workoutRecommendations.correctiveExercises} />
+                  <CorrectiveExercisesCarousel exercises={recommendations.data.correctiveExercises} />
                 </motion.div>
                 <motion.div variants={prefersReducedMotion() ? {} : {}}>
-                  <PredictedRecoveryChart predictions={workoutRecommendations.recoveryPredictions} />
+                  <PredictedRecoveryChart predictions={recommendations.data.recoveryPredictions} />
                 </motion.div>
             </motion.div>
           )}

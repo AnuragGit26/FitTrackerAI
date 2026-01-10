@@ -322,6 +322,12 @@ export function LogWorkout() {
               // Get exercise data from library
               const exerciseData = await exerciseLibrary.getExerciseById(prevExercise.exerciseId);
 
+              if (!exerciseData) {
+                // CRITICAL: Exercise no longer exists in library, skip it
+                console.warn(`[LogWorkout] Exercise ${prevExercise.exerciseId} not found in library, skipping from repeat workout`);
+                continue;
+              }
+
               if (exerciseData) {
                 // Create new sets preserving the previous workout's rep/weight scheme
                 // Sets are uncompleted but keep the intended values from the template

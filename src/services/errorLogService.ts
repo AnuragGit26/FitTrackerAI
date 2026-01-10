@@ -283,8 +283,6 @@ class ErrorLogService {
                     // If a duplicate exists, skip creating a new one
                     // Error logs are append-only, so we don't update existing ones
                     if (existing && existing.id) {
-                        // eslint-disable-next-line no-console
-                        console.log('[ErrorLogService] Skipping duplicate error log:', existing.id);
                         return null;
                     }
                     
