@@ -28,7 +28,6 @@ import { seedWorkoutLogs } from '@/utils/seedWorkoutLogs';
 import { cacheVersionService } from '@/services/cacheVersionService';
 import { iconRefreshService } from '@/services/iconRefreshService';
 import { logger } from '@/utils/logger';
-import { setSentryUser, clearSentryUser } from '@/config/sentry';
 
 // Lazy load route components for code splitting
 // Pages with default exports: LogWorkout, WorkoutSummary, EditWorkout, WorkoutHistory
@@ -381,14 +380,6 @@ function AppRoutes() {
         emailAddresses: auth0User.email ? [{ emailAddress: auth0User.email }] : [],
       }).then(() => {
         const userId = auth0User.sub || auth0User.email || 'user-unknown';
-
-        // Set Sentry user context for error tracking
-        setSentryUser({
-          id: userId,
-          email: auth0User.email,
-          username: auth0User.nickname || auth0User.name,
-        });
-
         // Initialize workout event tracker for this user
         workoutEventTracker.initialize(userId).catch((error) => {
           logger.error('Failed to initialize workout event tracker', error);
@@ -401,9 +392,6 @@ function AppRoutes() {
       }).catch((err) => {
         logger.error('Failed to initialize user', err);
       });
-    } else if (!isLoading && !isAuthenticated) {
-      // Clear Sentry user context on logout
-      clearSentryUser();
     }
   }, [isLoading, isAuthenticated, auth0User, initializeUser, auth0Error]);
 
