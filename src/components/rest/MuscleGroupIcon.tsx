@@ -3,6 +3,7 @@ import { MuscleGroup, RecoveryStatus } from '@/types/muscle';
 import { getRecoveryColor } from '@/services/recoveryCalculator';
 import { muscleImageCache } from '@/services/muscleImageCache';
 import { cn } from '@/utils/cn';
+import { AnimatedImage } from '@/components/common/AnimatedImage';
 
 interface MuscleGroupIconProps {
   muscle: MuscleGroup;
@@ -84,7 +85,7 @@ export function MuscleGroupIcon({ muscle, recoveryStatus, className }: MuscleGro
           }}
         />
       ) : (
-        <img
+        <AnimatedImage
           src={imageUrl}
           alt={`${muscle} muscle anatomy`}
           className={cn(
@@ -92,7 +93,8 @@ export function MuscleGroupIcon({ muscle, recoveryStatus, className }: MuscleGro
             filterClass,
             overlayOpacity
           )}
-          loading="lazy"
+          width="100%"
+          height="100%"
           onError={() => {
             setImageError(true);
           }}
@@ -102,10 +104,10 @@ export function MuscleGroupIcon({ muscle, recoveryStatus, className }: MuscleGro
       <div
         className={cn(
           'absolute inset-0 rounded-full',
-          isReady 
-            ? 'bg-primary/20' 
-            : isOverworked 
-            ? 'bg-warning/30' 
+          isReady
+            ? 'bg-primary/20'
+            : isOverworked
+            ? 'bg-warning/30'
             : 'bg-caution/25'
         )}
         style={{

@@ -1083,7 +1083,6 @@ class MongoDBSyncService {
                         version: 1,
                     });
                 } catch (error) {
-                    // eslint-disable-next-line no-console
                     console.error('[MongoDBSyncService.applyRemoteRecord] Failed to log conflict:', error);
                     // Non-blocking - continue with conflict resolution
                 }

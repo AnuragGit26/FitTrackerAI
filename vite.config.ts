@@ -50,29 +50,59 @@ export default defineConfig(({ mode }) => {
         type: 'module',
         navigateFallback: 'index.html',
       },
-      includeAssets: ['assets/img/Fittrack2.png'],
+      includeAssets: ['assets/img/Icon2.png'],
       manifest: {
         name: 'Fit Track AI',
         short_name: 'Fit Track AI',
         description: 'Track workouts, visualize muscle recovery, and get AI insights',
-        theme_color: '#3b82f6',
+        theme_color: '#0df269',
         background_color: '#0f172a',
         display: 'standalone',
         orientation: 'portrait',
         scope: '/',
         start_url: '/',
+        // Icon purposes explained:
+        // - 'any': Standard display icons (using Icon2.png - transparent RGBA)
+        // - 'maskable': Adaptive icons for platform-specific masks (using Icon2.png - proper RGBA with safe zone)
+        //   Content MUST fit within 80% safe zone (40% radius from center) to avoid white background
+        //   overflow on iOS and Android when system applies shaped masks
+        // Icon2.png is 1024x1024 RGBA with transparent background, designed to work for both purposes
         icons: [
           {
-            src: 'assets/img/Fittrack2.png',
+            src: 'assets/img/Icon2.png',
             sizes: '192x192',
             type: 'image/png',
-            purpose: 'any maskable'
+            purpose: 'any'
           },
           {
-            src: 'assets/img/Fittrack2.png',
+            src: 'assets/img/Icon2.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable'
+            purpose: 'any'
+          },
+          {
+            src: 'assets/img/Icon2.png',
+            sizes: '1024x1024',
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: 'assets/img/Icon2.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'maskable'
+          },
+          {
+            src: 'assets/img/Icon2.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable'
+          },
+          {
+            src: 'assets/img/Icon2.png',
+            sizes: '1024x1024',
+            type: 'image/png',
+            purpose: 'maskable'
           }
         ],
         shortcuts: [

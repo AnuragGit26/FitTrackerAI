@@ -186,7 +186,7 @@ class AIConsistencyChecker {
   /**
    * Extract terminology used in response
    */
-  private extractTerminology(response: any): Map<string, string> {
+  private extractTerminology(response: unknown): Map<string, string> {
     const terminology = new Map<string, string>();
 
     const responseText = JSON.stringify(response);

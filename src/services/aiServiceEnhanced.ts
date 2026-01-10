@@ -20,6 +20,7 @@ import { Workout } from '@/types/workout';
 import { MuscleStatus } from '@/types/muscle';
 import { PersonalRecord } from '@/types/analytics';
 import { ProgressAnalysis, SmartAlerts, WorkoutRecommendations } from '@/types/insights';
+import { logger } from '@/utils/logger';
 
 interface EnhancedGenerationOptions {
   validateResponse?: boolean;
@@ -102,7 +103,7 @@ class AIServiceEnhanced {
     const governedPrompt = masterPromptGovernor.governPrompt(enhancedPrompt, governanceOptions);
 
     if (!this.genAI) {
-      console.warn('[AIServiceEnhanced] Gemini API key not configured');
+      logger.warn('[AIServiceEnhanced] Gemini API key not configured');
       return {
         result: null,
         metrics: {
@@ -156,20 +157,17 @@ class AIServiceEnhanced {
 
           if (!validation.valid && autoRetryOnFailure && retries < maxRetries) {
             if (logMetrics) {
-              // eslint-disable-next-line no-console
-              console.warn(
+              logger.warn(
                 `[AIServiceEnhanced] Validation failed (score: ${validation.score}/100), retrying... (${retries + 1}/${maxRetries})`
               );
-              // eslint-disable-next-line no-console
-              console.warn('Validation issues:', validation.issues);
+              logger.warn('Validation issues', validation.issues);
             }
             retries++;
             continue;
           }
 
           if (logMetrics && validation.warnings.length > 0) {
-            // eslint-disable-next-line no-console
-            console.warn('[AIServiceEnhanced] Validation warnings:', validation.warnings);
+            logger.warn('[AIServiceEnhanced] Validation warnings', validation.warnings);
           }
         }
 
@@ -179,15 +177,14 @@ class AIServiceEnhanced {
           consistencyScore = consistency.score;
 
           if (logMetrics && consistency.contradictions.length > 0) {
-            // eslint-disable-next-line no-console
-            console.warn('[AIServiceEnhanced] Consistency issues:', consistency.contradictions);
+            logger.warn('[AIServiceEnhanced] Consistency issues', consistency.contradictions);
           }
         }
 
         // Success - break retry loop
         break;
       } catch (error) {
-        console.error('[AIServiceEnhanced] Generation error:', error);
+        logger.error('[AIServiceEnhanced] Generation error', error);
         retries++;
 
         if (retries > maxRetries || !autoRetryOnFailure) {
@@ -214,8 +211,7 @@ class AIServiceEnhanced {
     };
 
     if (logMetrics) {
-      // eslint-disable-next-line no-console
-      console.log('[AIServiceEnhanced] Progress Analysis Metrics:', metrics);
+      logger.info('[AIServiceEnhanced] Progress Analysis Metrics', metrics);
     }
 
     return { result, metrics };
@@ -320,8 +316,7 @@ class AIServiceEnhanced {
 
           if (!validation.valid && autoRetryOnFailure && retries < maxRetries) {
             if (logMetrics) {
-              // eslint-disable-next-line no-console
-              console.warn(`[AIServiceEnhanced] Alerts validation failed, retrying...`);
+              logger.warn(`[AIServiceEnhanced] Alerts validation failed, retrying...`);
             }
             retries++;
             continue;
@@ -335,7 +330,7 @@ class AIServiceEnhanced {
 
         break;
       } catch (error) {
-        console.error('[AIServiceEnhanced] Alerts generation error:', error);
+        logger.error('[AIServiceEnhanced] Alerts generation error', error);
         retries++;
 
         if (retries > maxRetries || !autoRetryOnFailure) {
@@ -359,8 +354,7 @@ class AIServiceEnhanced {
     };
 
     if (logMetrics) {
-      // eslint-disable-next-line no-console
-      console.log('[AIServiceEnhanced] Smart Alerts Metrics:', metrics);
+      logger.info('[AIServiceEnhanced] Smart Alerts Metrics', metrics);
     }
 
     return { result, metrics };
@@ -460,8 +454,7 @@ class AIServiceEnhanced {
 
           if (!validation.valid && autoRetryOnFailure && retries < maxRetries) {
             if (logMetrics) {
-              // eslint-disable-next-line no-console
-              console.warn(`[AIServiceEnhanced] Recommendations validation failed, retrying...`);
+              logger.warn(`[AIServiceEnhanced] Recommendations validation failed, retrying...`);
             }
             retries++;
             continue;
@@ -475,7 +468,7 @@ class AIServiceEnhanced {
 
         break;
       } catch (error) {
-        console.error('[AIServiceEnhanced] Recommendations generation error:', error);
+        logger.error('[AIServiceEnhanced] Recommendations generation error', error);
         retries++;
 
         if (retries > maxRetries || !autoRetryOnFailure) {
@@ -499,8 +492,7 @@ class AIServiceEnhanced {
     };
 
     if (logMetrics) {
-      // eslint-disable-next-line no-console
-      console.log('[AIServiceEnhanced] Workout Recommendations Metrics:', metrics);
+      logger.info('[AIServiceEnhanced] Workout Recommendations Metrics', metrics);
     }
 
     return { result, metrics };

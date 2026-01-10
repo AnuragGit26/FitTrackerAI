@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { X, ChevronRight, Trash2, Plus, Save } from 'lucide-react';
+import { X, ChevronRight, Trash2, Plus, Save, GripVertical } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { useTemplateStore } from '@/store/templateStore';
 import { useUserStore } from '@/store/userStore';
 import { TemplateCategory, TemplateDifficulty } from '@/types/workout';
@@ -12,8 +12,10 @@ import { useToast } from '@/hooks/useToast';
 import { cn } from '@/utils/cn';
 import { getMuscleMapping } from '@/services/muscleMapping';
 import { MuscleGroup } from '@/types/muscle';
+import { prefersReducedMotion } from '@/utils/animations';
 
 interface TemplateExercise {
+  id: string;  // Unique identifier for Reorder
   exerciseId: string;
   exerciseName: string;
   sets: number;
@@ -52,11 +54,13 @@ export function CreateTemplate() {
   const [exercises, setExercises] = useState<TemplateExercise[]>([]);
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const shouldReduceMotion = prefersReducedMotion();
 
   const handleAddExercise = () => {
     if (!selectedExercise) return;
 
     const newExercise: TemplateExercise = {
+      id: `${Date.now()}-${Math.random()}`, // Unique ID for Reorder
       exerciseId: selectedExercise.id,
       exerciseName: selectedExercise.name,
       sets: 3,
@@ -69,13 +73,13 @@ export function CreateTemplate() {
     setSelectedExercise(null);
   };
 
-  const handleRemoveExercise = (index: number) => {
-    setExercises(exercises.filter((_, i) => i !== index));
+  const handleRemoveExercise = (id: string) => {
+    setExercises(exercises.filter((ex) => ex.id !== id));
   };
 
-  const handleUpdateExercise = (index: number, updates: Partial<TemplateExercise>) => {
+  const handleUpdateExercise = (id: string, updates: Partial<TemplateExercise>) => {
     setExercises(
-      exercises.map((ex, i) => (i === index ? { ...ex, ...updates } : ex))
+      exercises.map((ex) => (ex.id === id ? { ...ex, ...updates } : ex))
     );
   };
 
@@ -362,18 +366,40 @@ export function CreateTemplate() {
                 </div>
 
                 {exercises.length > 0 && (
-                  <div className="space-y-3">
-                    {exercises.map((exercise, index) => (
-                      <div
-                        key={index}
-                        className="p-4 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-[#316847]"
+                  <Reorder.Group
+                    axis="y"
+                    values={exercises}
+                    onReorder={setExercises}
+                    className="space-y-3"
+                  >
+                    {exercises.map((exercise) => (
+                      <Reorder.Item
+                        key={exercise.id}
+                        value={exercise}
+                        dragListener={!shouldReduceMotion}
+                        whileDrag={
+                          !shouldReduceMotion
+                            ? {
+                                scale: 1.05,
+                                boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
+                                cursor: 'grabbing',
+                              }
+                            : undefined
+                        }
+                        className="p-4 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-[#316847] cursor-grab active:cursor-grabbing"
+                        style={{ position: 'relative' }}
                       >
-                        <div className="flex items-start justify-between mb-3">
-                          <h4 className="font-bold text-gray-900 dark:text-white">
+                        <div className="flex items-start gap-3 mb-3">
+                          {!shouldReduceMotion && (
+                            <div className="flex-shrink-0 text-gray-400 dark:text-gray-500 mt-1 cursor-grab active:cursor-grabbing">
+                              <GripVertical className="w-5 h-5" />
+                            </div>
+                          )}
+                          <h4 className="flex-1 font-bold text-gray-900 dark:text-white">
                             {exercise.exerciseName}
                           </h4>
                           <button
-                            onClick={() => handleRemoveExercise(index)}
+                            onClick={() => handleRemoveExercise(exercise.id)}
                             className="p-1 rounded-lg hover:bg-error/10 text-error transition-colors"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -391,7 +417,7 @@ export function CreateTemplate() {
                               max="20"
                               value={exercise.sets}
                               onChange={(e) =>
-                                handleUpdateExercise(index, {
+                                handleUpdateExercise(exercise.id, {
                                   sets: parseInt(e.target.value) || 1,
                                 })
                               }
@@ -408,7 +434,7 @@ export function CreateTemplate() {
                               max="100"
                               value={exercise.reps}
                               onChange={(e) =>
-                                handleUpdateExercise(index, {
+                                handleUpdateExercise(exercise.id, {
                                   reps: parseInt(e.target.value) || 1,
                                 })
                               }
@@ -424,7 +450,7 @@ export function CreateTemplate() {
                               min="0"
                               value={exercise.weight || 0}
                               onChange={(e) =>
-                                handleUpdateExercise(index, {
+                                handleUpdateExercise(exercise.id, {
                                   weight: parseFloat(e.target.value) || 0,
                                 })
                               }
@@ -432,9 +458,9 @@ export function CreateTemplate() {
                             />
                           </div>
                         </div>
-                      </div>
+                      </Reorder.Item>
                     ))}
-                  </div>
+                  </Reorder.Group>
                 )}
               </div>
             </motion.div>

@@ -5,6 +5,7 @@ import { useSettingsStore } from '@/store/settingsStore';
 import { useMemo } from 'react';
 import { subDays, differenceInHours } from 'date-fns';
 import { DEFAULT_RECOVERY_SETTINGS } from '@/types/muscle';
+import { useCountUp } from '@/hooks/useCountUp';
 
 export function RecoveryStatusHeader() {
   const { muscleStatuses, isLoading } = useMuscleRecovery();
@@ -114,6 +115,23 @@ export function RecoveryStatusHeader() {
     };
   }, [muscleStatuses, isLoading, profile, settings.baseRestInterval]);
 
+  // Count-up animations
+  const { formattedValue: recoveryDisplay } = useCountUp(recoveryPercentage, 0, {
+    duration: 1.5,
+    decimals: 0,
+    suffix: '%',
+    ease: 'power2.out'
+  });
+
+  const trendValue = Math.abs(trend);
+  const { formattedValue: trendDisplay } = useCountUp(trendValue, 0, {
+    duration: 1.0,
+    decimals: 0,
+    suffix: '%',
+    prefix: trend > 0 ? '+' : trend < 0 ? '-' : '',
+    ease: 'power2.out'
+  });
+
   return (
     <div className="flex flex-col gap-1">
       <p className="text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-wider">
@@ -121,7 +139,7 @@ export function RecoveryStatusHeader() {
       </p>
       <div className="flex items-baseline gap-3">
         <h1 className="text-5xl font-bold tracking-tight text-slate-900 dark:text-white">
-          {recoveryPercentage}%
+          {recoveryDisplay}
         </h1>
         {trend !== 0 && (
           <div className={`flex items-center gap-1 px-2 py-1 rounded-full ${
@@ -135,7 +153,7 @@ export function RecoveryStatusHeader() {
               <TrendingDown className="w-4 h-4 font-bold" />
             )}
             <span className="text-sm font-bold">
-              {trend > 0 ? '+' : ''}{trend}%
+              {trendDisplay}
             </span>
           </div>
         )}

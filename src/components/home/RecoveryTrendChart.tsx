@@ -100,6 +100,10 @@ export function RecoveryTrendChart() {
               fill="url(#recoveryTrendGradient)"
               dot={false}
               activeDot={{ r: 3, fill: '#0df269' }}
+              isAnimationActive={true}
+              animationBegin={200}
+              animationDuration={1200}
+              animationEasing="ease-in-out"
             />
           </AreaChart>
         </ResponsiveContainer>

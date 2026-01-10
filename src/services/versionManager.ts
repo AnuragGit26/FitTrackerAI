@@ -140,7 +140,7 @@ class VersionManager {
    */
   resolveConflictLocalFirst<T extends VersionedRecord>(
     local: T,
-    remote: T
+    _remote: T
   ): { record: T; shouldPush: boolean } {
     // Always keep local data - it represents the user's most recent work
     // Mark it for push to ensure it's synced to remote

@@ -41,19 +41,20 @@ export const slideUp: Variants = {
 };
 
 export const slideDown: Variants = {
-  hidden: { 
+  hidden: {
     opacity: 0,
     y: -20
   },
-  visible: { 
+  visible: {
     opacity: 1,
     y: 0,
     transition: { duration: 0.4, ease: 'easeOut' }
   },
-  exit: { 
+  exit: {
     opacity: 0,
-    y: 20,
-    transition: { duration: 0.3, ease: 'easeIn' }
+    y: -10,
+    scale: 0.95,
+    transition: { duration: 0.2, ease: 'easeIn' }
   }
 };
 
@@ -282,10 +283,65 @@ export const modalStagger: Variants = {
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.05,
-      delayChildren: 0.1
+      staggerChildren: 0.1,
+      delayChildren: 0
     }
   }
+};
+
+/**
+ * Modal header entrance animation (appears first)
+ */
+export const modalHeader: Variants = {
+  hidden: {
+    opacity: 0,
+    y: -10,
+  },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.2,
+      delay: 0.1,
+      ease: 'easeOut',
+    },
+  },
+};
+
+/**
+ * Modal content entrance animation (appears second)
+ */
+export const modalBody: Variants = {
+  hidden: {
+    opacity: 0,
+  },
+  visible: {
+    opacity: 1,
+    transition: {
+      duration: 0.2,
+      delay: 0.2,
+      ease: 'easeOut',
+    },
+  },
+};
+
+/**
+ * Modal footer entrance animation (appears last)
+ */
+export const modalFooter: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 10,
+  },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.2,
+      delay: 0.3,
+      ease: 'easeOut',
+    },
+  },
 };
 
 /**
@@ -413,6 +469,69 @@ export const setCompleteCelebration: Variants = {
       duration: 0.8,
       times: [0, 0.3, 0.7, 1],
       ease: [0.34, 1.56, 0.64, 1],
+    },
+  },
+};
+
+/**
+ * Error shake animation for form validation
+ * Shakes horizontally to draw attention to invalid input
+ */
+export const errorShake: Variants = {
+  initial: {
+    x: 0,
+  },
+  error: {
+    x: [0, -10, 10, -8, 8, -5, 5, 0],
+    transition: {
+      duration: 0.5,
+    },
+  },
+};
+
+/**
+ * Exercise list item animation
+ * Slides in from left with scale for polished entrance
+ */
+export const exerciseListItem: Variants = {
+  hidden: {
+    opacity: 0,
+    x: -20,
+    scale: 0.95,
+  },
+  visible: {
+    opacity: 1,
+    x: 0,
+    scale: 1,
+    transition: {
+      duration: 0.3,
+      ease: 'easeOut',
+    },
+  },
+  exit: {
+    opacity: 0,
+    x: -20,
+    scale: 0.95,
+    transition: {
+      duration: 0.2,
+      ease: 'easeIn',
+    },
+  },
+};
+
+/**
+ * Success pulse glow animation for button success state
+ * Creates pulsing glow effect behind success message
+ * 3 pulse cycles, 800ms each
+ */
+export const successPulseGlow: Variants = {
+  pulse: {
+    scale: [1, 1.5, 1, 1.5, 1, 1.5, 1],
+    opacity: [0.5, 0, 0.5, 0, 0.5, 0, 0],
+    transition: {
+      duration: 2.4,
+      times: [0, 0.167, 0.334, 0.5, 0.667, 0.834, 1],
+      ease: 'easeInOut',
     },
   },
 };

@@ -13,7 +13,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { exerciseLibrary } from '@/services/exerciseLibrary';
 import { cn } from '@/utils/cn';
 import { useToast } from '@/hooks/useToast';
-import { staggerContainer, slideUp, prefersReducedMotion } from '@/utils/animations';
+import { staggerContainerFast, exerciseListItem, prefersReducedMotion } from '@/utils/animations';
 import { templateService } from '@/services/templateService';
 import { TemplateCategory } from '@/types/workout';
 import { Workout } from '@/types/workout';
@@ -916,7 +916,7 @@ export function LogWorkout() {
             </h3>
             <motion.div
               className="space-y-2"
-              variants={shouldReduceMotion ? {} : staggerContainer}
+              variants={shouldReduceMotion ? {} : staggerContainerFast}
               initial="hidden"
               animate="visible"
             >
@@ -924,26 +924,32 @@ export function LogWorkout() {
                 {existingExercises.map((exercise) => {
                   // Group exercises by groupId for superset/circuit display
                   const isGrouped = exercise.groupId && exercise.groupType && exercise.groupType !== 'single';
-                  const groupExercises = isGrouped 
+                  const groupExercises = isGrouped
                     ? existingExercises.filter(e => e.groupId === exercise.groupId)
                     : [exercise];
                   const isFirstInGroup = isGrouped && exercise.groupOrder === 0;
-                  
+
                   // Only render if first in group or not grouped
                   if (isGrouped && !isFirstInGroup) return null;
-                  
+
                   return (
                     <motion.div
                       key={exercise.id}
                       className={cn(
-                        "flex flex-col rounded-xl bg-surface-light dark:bg-surface-dark border border-gray-200 dark:border-[#316847] overflow-hidden",
+                        "flex flex-col rounded-xl bg-surface-light dark:bg-surface-dark border border-gray-200 dark:border-[#316847] overflow-hidden cursor-pointer",
                         isGrouped && "mb-2"
                       )}
-                      variants={shouldReduceMotion ? {} : slideUp}
+                      variants={shouldReduceMotion ? {} : exerciseListItem}
                       initial="hidden"
                       animate="visible"
                       exit="exit"
                       layout
+                      whileHover={!shouldReduceMotion ? {
+                        scale: 1.02,
+                        x: 4,
+                        transition: { duration: 0.2, ease: 'easeOut' }
+                      } : {}}
+                      whileTap={!shouldReduceMotion ? { scale: 0.98 } : {}}
                     >
                       {isGrouped && (
                         <div className="px-3 py-1.5 bg-primary/10 dark:bg-primary/20 border-b border-primary/20">

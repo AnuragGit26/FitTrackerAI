@@ -1,4 +1,7 @@
+import { useRef, useEffect, useState } from 'react';
 import { TrendingUp, MoreHorizontal } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { prefersReducedMotion } from '@/utils/animations';
 
 interface VolumeTrendChartProps {
   currentVolume: number;
@@ -13,6 +16,10 @@ export function VolumeTrendChart({
   changePercent,
   weeklyData,
 }: VolumeTrendChartProps) {
+  const linePathRef = useRef<SVGPathElement>(null);
+  const [pathLength, setPathLength] = useState(0);
+  const shouldReduceMotion = prefersReducedMotion();
+
   const maxVolume = Math.max(...weeklyData.map((d) => d.volume), 1);
   const normalizedData = weeklyData.map((d) => ({
     ...d,
@@ -35,6 +42,14 @@ export function VolumeTrendChart({
     const x = ((data.length - 1) / (data.length - 1 || 1)) * 100;
     return `${path} L${x},100 L0,100 Z`;
   };
+
+  // Calculate path length for animation
+  useEffect(() => {
+    if (linePathRef.current) {
+      const length = linePathRef.current.getTotalLength();
+      setPathLength(length);
+    }
+  }, [normalizedData]);
 
   return (
     <section className="rounded-xl border border-gray-200 dark:border-[#316847] bg-white dark:bg-surface-card p-5 shadow-sm">
@@ -66,8 +81,9 @@ export function VolumeTrendChart({
               <stop offset="100%" stopColor="#0df269" stopOpacity="0" />
             </linearGradient>
           </defs>
-          {[25, 50, 75].map((y) => (
-            <line
+          {/* Grid lines with staggered fade-in */}
+          {[25, 50, 75].map((y, index) => (
+            <motion.line
               key={y}
               className="text-gray-200 dark:text-white/10"
               stroke="currentColor"
@@ -77,20 +93,48 @@ export function VolumeTrendChart({
               x2="100"
               y1={y}
               y2={y}
+              initial={!shouldReduceMotion ? { opacity: 0 } : {}}
+              animate={!shouldReduceMotion ? { opacity: 1 } : {}}
+              transition={{
+                duration: 0.3,
+                delay: index * 0.1,
+                ease: 'easeOut'
+              }}
             />
           ))}
-          <path
+          {/* Area fill with delayed fade-in */}
+          <motion.path
             d={generateAreaPath(normalizedData)}
             fill="url(#chartGradient)"
+            initial={!shouldReduceMotion ? { opacity: 0 } : {}}
+            animate={!shouldReduceMotion ? { opacity: 1 } : {}}
+            transition={{
+              duration: 0.5,
+              delay: 0.5,
+              ease: 'easeOut'
+            }}
           />
-          <path
+          {/* Line path with drawing animation */}
+          <motion.path
+            ref={linePathRef}
             d={generatePath(normalizedData)}
             fill="none"
             stroke="#0df269"
             strokeLinecap="round"
             strokeWidth="2"
             vectorEffect="non-scaling-stroke"
-            className="transition-all duration-500"
+            initial={!shouldReduceMotion ? {
+              strokeDasharray: pathLength,
+              strokeDashoffset: pathLength
+            } : {}}
+            animate={!shouldReduceMotion ? {
+              strokeDashoffset: 0
+            } : {}}
+            transition={{
+              duration: 1.2,
+              delay: 0.2,
+              ease: 'easeInOut'
+            }}
           />
         </svg>
       </div>

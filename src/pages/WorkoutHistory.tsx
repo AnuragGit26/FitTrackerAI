@@ -7,10 +7,12 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { EditableWorkoutNameInline } from '@/components/common/EditableWorkoutNameInline';
 import { formatDuration } from '@/utils/calculations';
 import { motion } from 'framer-motion';
+import { prefersReducedMotion } from '@/utils/animations';
 
 export function WorkoutHistory() {
   const navigate = useNavigate();
   const { profile } = useUserStore();
+  const shouldReduceMotion = prefersReducedMotion();
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -158,9 +160,15 @@ export function WorkoutHistory() {
             {workouts.map((workout, index) => (
               <motion.div
                 key={workout.id || index}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
+                initial={!shouldReduceMotion ? { opacity: 0, y: 20 } : {}}
+                animate={!shouldReduceMotion ? { opacity: 1, y: 0 } : {}}
+                transition={{ delay: index * 0.03, duration: 0.3, ease: 'easeOut' }}
+                whileHover={!shouldReduceMotion ? {
+                  scale: 1.02,
+                  x: 4,
+                  transition: { duration: 0.2, ease: 'easeOut' }
+                } : {}}
+                whileTap={!shouldReduceMotion ? { scale: 0.98 } : {}}
                 onClick={(e) => {
                   const target = e.target as HTMLElement;
                   if (!target.closest('button') && !target.closest('input')) {

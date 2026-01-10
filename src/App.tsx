@@ -21,10 +21,12 @@ import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { RouteLoader } from '@/components/common/RouteLoader';
 import { OfflineIndicator } from '@/components/common/OfflineIndicator';
 import { InstallPrompt } from '@/components/common/InstallPrompt';
+import { IconUpdatePrompt } from '@/components/common/IconUpdatePrompt';
 import { MobileOnlyModal } from '@/components/common/MobileOnlyModal';
 import { analytics } from '@/utils/analytics';
 import { seedWorkoutLogs } from '@/utils/seedWorkoutLogs';
 import { cacheVersionService } from '@/services/cacheVersionService';
+import { iconRefreshService } from '@/services/iconRefreshService';
 import { logger } from '@/utils/logger';
 
 // Lazy load route components for code splitting
@@ -105,6 +107,11 @@ function App() {
           // Page will reload, so we can return early
           return;
         }
+
+        // Check and refresh icons if needed (runs in background)
+        iconRefreshService.refreshIconsIfNeeded().catch((error) => {
+          logger.warn('Failed to refresh icons', error);
+        });
 
         // Track app initialization
         analytics.track('app_initialized');
@@ -349,6 +356,7 @@ function App() {
         <MobileOnlyModal />
         <OfflineIndicator />
         <InstallPrompt />
+        <IconUpdatePrompt />
         <AppRoutes />
       </BrowserRouter>
     </ErrorBoundary>

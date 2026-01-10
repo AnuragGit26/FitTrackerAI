@@ -226,8 +226,8 @@ function clearAllScheduledNotifications(): void {
 async function showWorkoutReminderNotification(notification: any): Promise<void> {
     const title = `Workout Reminder: ${notification.data.workoutName || 'Workout'}`;
     const body = `Your ${notification.data.workoutName || 'workout'} is scheduled soon!`;
-    const icon = '/assests/img/Fittrack2.png';
-    const badge = '/assests/img/Fittrack2.png';
+    const icon = '/assets/img/Icon2.png';
+    const badge = '/assets/img/Icon2.png';
 
     const options: NotificationOptions = {
         body,
@@ -256,8 +256,8 @@ async function showMuscleRecoveryNotification(notification: any): Promise<void> 
 
     const title = `${muscleName} is Ready!`;
     const body = `Your ${muscleName.toLowerCase()} has fully recovered and is ready for training`;
-    const icon = '/assests/img/Fittrack2.png';
-    const badge = '/assests/img/Fittrack2.png';
+    const icon = '/assets/img/Icon2.png';
+    const badge = '/assets/img/Icon2.png';
 
     // Create tag with muscle name and date to allow one notification per day per muscle
     const today = new Date().toISOString().split('T')[0];

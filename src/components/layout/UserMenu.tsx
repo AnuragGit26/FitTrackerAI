@@ -5,6 +5,7 @@ import { useAuth0 } from '@auth0/auth0-react';
 import { useUserStore } from '@/store/userStore';
 import { userContextManager } from '@/services/userContextManager';
 import { cn } from '@/utils/cn';
+import { AnimatedImage } from '@/components/common/AnimatedImage';
 
 export function UserMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -75,16 +76,19 @@ export function UserMenu() {
         <div className="relative">
           <div
             className={cn(
-              'bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 ring-2 ring-primary/20 flex items-center justify-center',
+              'aspect-square rounded-full size-10 ring-2 ring-primary/20 flex items-center justify-center overflow-hidden',
               !profilePictureUrl && 'bg-gradient-to-br from-primary/20 to-primary/40'
             )}
-            style={
-              profilePictureUrl
-                ? { backgroundImage: `url("${profilePictureUrl}")` }
-                : undefined
-            }
           >
-            {!profilePictureUrl && (
+            {profilePictureUrl ? (
+              <AnimatedImage
+                src={profilePictureUrl}
+                alt={`${userName}'s profile picture`}
+                className="w-full h-full object-cover"
+                width="100%"
+                height="100%"
+              />
+            ) : (
               <span className="text-primary font-bold text-lg">
                 {userName.charAt(0).toUpperCase()}
               </span>

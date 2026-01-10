@@ -7,6 +7,7 @@ import { userScopedStorage } from '@/services/supabaseQueryBuilder';
 import { requireUserId } from '@/utils/userIdValidation';
 import { useUserStore } from '@/store/userStore';
 import { useToast } from '@/hooks/useToast';
+import { AnimatedImage } from '@/components/common/AnimatedImage';
 
 interface ProfilePictureUploadProps {
   picture?: string;
@@ -194,18 +195,21 @@ export function ProfilePictureUpload({ picture, onPictureChange }: ProfilePictur
           className={cn(
             'size-32 rounded-full overflow-hidden border-4 border-gray-200 dark:border-surface-border',
             'group-hover:border-primary transition-colors duration-300',
-            'bg-gray-100 dark:bg-surface-dark bg-center bg-cover',
+            'bg-gray-100 dark:bg-surface-dark',
             isLoading && 'opacity-50',
             !isLoading && 'cursor-pointer'
           )}
-          style={
-            displayUrl
-              ? { backgroundImage: `url("${displayUrl}")` }
-              : undefined
-          }
           onClick={!isLoading ? handleClick : undefined}
         >
-          {!displayUrl && (
+          {displayUrl ? (
+            <AnimatedImage
+              src={displayUrl}
+              alt="Profile picture"
+              className="w-full h-full object-cover"
+              width="100%"
+              height="100%"
+            />
+          ) : (
             <div className="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-surface-dark">
               <Camera className="w-12 h-12 text-gray-400 dark:text-gray-500" />
             </div>

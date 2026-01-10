@@ -9,6 +9,7 @@ import { ProfilePictureUpload } from '@/components/profile/ProfilePictureUpload'
 import { UnitSwitcher } from '@/components/profile/UnitSwitcher';
 import { GoalSelection } from '@/components/profile/GoalSelectionCard';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { Toggle } from '@/components/common/Toggle';
 import { dataExport } from '@/services/dataExport';
 import { useToast } from '@/hooks/useToast';
 import { cn } from '@/utils/cn';
@@ -1284,42 +1285,36 @@ export function Profile() {
         <section className="space-y-4">
           <h3 className="text-xl font-bold tracking-tight px-1">Notifications</h3>
           <div className="space-y-3">
-            <label className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border">
               <div className="flex items-center gap-3">
                 <Bell className="w-5 h-5 text-slate-400" />
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Auto-start Rest Timer</span>
               </div>
-              <input
-                type="checkbox"
+              <Toggle
                 checked={settings.autoStartRestTimer}
                 onChange={toggleAutoStartRestTimer}
-                className="w-5 h-5 rounded accent-primary"
               />
-            </label>
-            <label className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border">
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border">
               <div className="flex items-center gap-3">
                 <Volume2 className="w-5 h-5 text-slate-400" />
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Sound Alerts</span>
               </div>
-              <input
-                type="checkbox"
+              <Toggle
                 checked={settings.soundEnabled}
                 onChange={toggleSound}
-                className="w-5 h-5 rounded accent-primary"
               />
-            </label>
-            <label className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border">
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border">
               <div className="flex items-center gap-3">
                 <Vibrate className="w-5 h-5 text-slate-400" />
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Vibration</span>
               </div>
-              <input
-                type="checkbox"
+              <Toggle
                 checked={settings.vibrationEnabled}
                 onChange={toggleVibration}
-                className="w-5 h-5 rounded accent-primary"
               />
-            </label>
+            </div>
           </div>
         </section>
 

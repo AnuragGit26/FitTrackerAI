@@ -3,13 +3,37 @@
 
 <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/assests/img/Fittrack2.png" />
-    <link rel="apple-touch-icon" href="/assests/img/Fittrack2.png" />
+    <link rel="icon" type="image/png" href="/assets/img/Icon2.png" />
+
+    <!-- Apple Touch Icons - Multiple sizes for better iOS support -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/img/Icon2.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/assets/img/Icon2.png" />
+    <link rel="apple-touch-icon" sizes="167x167" href="/assets/img/Icon2.png" />
+    <link rel="apple-touch-icon" href="/assets/img/Icon2.png" />
+
+    <!-- Android Chrome icon -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/Icon2.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/assets/img/Icon2.png" />
+    <link rel="icon" type="image/png" sizes="1024x1024" href="/assets/img/Icon2.png" />
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="description" content="Track workouts, visualize muscle recovery, and get AI insights" />
+
+    <!-- Theme colors for different platforms -->
     <meta name="theme-color" content="#0df269" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#0df269" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f172a" />
+
+    <!-- PWA support for mobile devices -->
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- iOS PWA support -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="FitTrack AI" />
+
+    <!-- Prevent iOS from adding shine effect to icon -->
+    <meta name="apple-touch-icon-precomposed" content="/assets/img/Icon2.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://challenges.cloudflare.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

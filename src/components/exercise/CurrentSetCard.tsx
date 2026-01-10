@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { CheckCircle, ArrowRight, X } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { RPESlider } from './RPESlider';
 import { WeightChangeBadge } from './WeightChangeBadge';
 import { WorkoutSet } from '@/types/exercise';
 import { cn } from '@/utils/cn';
-import { prefersReducedMotion } from '@/utils/animations';
+import { prefersReducedMotion, errorShake } from '@/utils/animations';
 import { calculateWeightChangeBadge } from '@/utils/workoutHistoryHelpers';
 
 interface CurrentSetCardProps {
@@ -51,6 +51,8 @@ export function CurrentSetCard({
   const [showParticles, setShowParticles] = useState(false);
   const [isLogging, setIsLogging] = useState(false);
   const [showRipple, setShowRipple] = useState(false);
+  const [weightFocused, setWeightFocused] = useState(false);
+  const [repsFocused, setRepsFocused] = useState(false);
   const previousSetNumberRef = useRef(setNumber);
 
   // Sync local state with prop changes (e.g., when moving to a new set)
@@ -288,17 +290,29 @@ export function CurrentSetCard({
               <WeightChangeBadge change={weightChangeBadge.value} />
             )}
           </div>
-          <div className="relative">
-            <input
+          <motion.div
+            className="relative"
+            animate={!shouldReduceMotion && weightFocused ? { scale: 1.02 } : { scale: 1 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+          >
+            <motion.input
               className="w-full rounded-xl bg-slate-100 dark:bg-[#102217] border-2 border-transparent focus:border-primary text-center text-3xl font-bold text-slate-900 dark:text-white h-20 focus:ring-0 transition-all placeholder:text-slate-300 dark:placeholder:text-white/20"
               inputMode="decimal"
               placeholder=""
               type="number"
               value={weight}
               onChange={(e) => handleWeightChange(e.target.value)}
+              onFocus={() => setWeightFocused(true)}
+              onBlur={() => setWeightFocused(false)}
               disabled={disabled}
+              animate={!shouldReduceMotion && weightFocused ? {
+                boxShadow: '0 0 0 2px rgb(13, 242, 105), 0 0 20px rgba(13, 242, 105, 0.3)'
+              } : {
+                boxShadow: '0 0 0 2px transparent'
+              }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
             />
-          </div>
+          </motion.div>
           {helperText && (
             <p className="text-[10px] text-slate-400 dark:text-slate-500 text-center pt-1.5 font-medium leading-tight">
               {helperText}
@@ -316,20 +330,53 @@ export function CurrentSetCard({
           <span className="text-slate-500 dark:text-[#90cba8] text-xs font-medium uppercase tracking-wide pb-2">
             Reps
           </span>
-          <div className="relative">
-            <input
+          <motion.div
+            className="relative"
+            variants={!shouldReduceMotion ? errorShake : undefined}
+            initial="initial"
+            animate={
+              !shouldReduceMotion
+                ? validationError
+                  ? "error"
+                  : repsFocused
+                  ? { scale: 1.02 }
+                  : { scale: 1 }
+                : { scale: 1 }
+            }
+            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+          >
+            <motion.input
               className="w-full rounded-xl bg-slate-100 dark:bg-[#102217] border-2 border-transparent focus:border-primary text-center text-3xl font-bold text-slate-900 dark:text-white h-20 focus:ring-0 transition-all placeholder:text-slate-300 dark:placeholder:text-white/20"
               inputMode="numeric"
               placeholder=""
               type="number"
               value={reps}
               onChange={(e) => handleRepsChange(e.target.value)}
+              onFocus={() => setRepsFocused(true)}
+              onBlur={() => setRepsFocused(false)}
               disabled={disabled}
+              animate={!shouldReduceMotion && repsFocused ? {
+                boxShadow: '0 0 0 2px rgb(13, 242, 105), 0 0 20px rgba(13, 242, 105, 0.3)'
+              } : {
+                boxShadow: '0 0 0 2px transparent'
+              }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
             />
-          </div>
-          {validationError && (
-            <p className="text-xs text-error mt-1 text-center">{validationError}</p>
-          )}
+          </motion.div>
+          <AnimatePresence mode="wait">
+            {validationError && (
+              <motion.p
+                key="validation-error"
+                className="text-xs text-error mt-1 text-center"
+                initial={!shouldReduceMotion ? { opacity: 0, y: -5, scale: 0.95 } : {}}
+                animate={!shouldReduceMotion ? { opacity: 1, y: 0, scale: 1 } : {}}
+                exit={!shouldReduceMotion ? { opacity: 0, y: -5, scale: 0.95 } : {}}
+                transition={{ type: 'spring', stiffness: 400, damping: 25, duration: 0.25 }}
+              >
+                {validationError}
+              </motion.p>
+            )}
+          </AnimatePresence>
         </label>
       </div>
 

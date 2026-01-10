@@ -2,7 +2,7 @@ import { ReactNode, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/utils/cn';
-import { modalBackdrop, modalContent, prefersReducedMotion } from '@/utils/animations';
+import { modalBackdrop, modalContent, modalStagger, modalHeader, modalBody, modalFooter, prefersReducedMotion } from '@/utils/animations';
 
 interface ModalProps {
   isOpen: boolean;
@@ -140,38 +140,54 @@ export function Modal({
             animate="animate"
             exit="exit"
           >
-            {(title || showCloseButton || header) && (
-              <div className="relative flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
-                {header ? (
-                  header
-                ) : (
-                  <>
-                    {title && (
-                      <h2 id="modal-title" className="text-xl font-bold text-gray-900 dark:text-white pr-8">
-                        {title}
-                      </h2>
-                    )}
-                    {showCloseButton && (
-                      <button
-                        onClick={onClose}
-                        className="absolute top-4 right-4 sm:top-6 sm:right-6 p-2 rounded-full text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center touch-manipulation focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                        aria-label="Close modal"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-              {children}
-            </div>
-            {footer && (
-              <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 p-4 sm:p-6">
-                {footer}
-              </div>
-            )}
+            <motion.div
+              variants={shouldReduceMotion ? {} : modalStagger}
+              initial="hidden"
+              animate="visible"
+              className="flex flex-col h-full"
+            >
+              {(title || showCloseButton || header) && (
+                <motion.div
+                  className="relative flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0"
+                  variants={shouldReduceMotion ? {} : modalHeader}
+                >
+                  {header ? (
+                    header
+                  ) : (
+                    <>
+                      {title && (
+                        <h2 id="modal-title" className="text-xl font-bold text-gray-900 dark:text-white pr-8">
+                          {title}
+                        </h2>
+                      )}
+                      {showCloseButton && (
+                        <button
+                          onClick={onClose}
+                          className="absolute top-4 right-4 sm:top-6 sm:right-6 p-2 rounded-full text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center touch-manipulation focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                          aria-label="Close modal"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      )}
+                    </>
+                  )}
+                </motion.div>
+              )}
+              <motion.div
+                className="flex-1 overflow-y-auto p-4 sm:p-6"
+                variants={shouldReduceMotion ? {} : modalBody}
+              >
+                {children}
+              </motion.div>
+              {footer && (
+                <motion.div
+                  className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 p-4 sm:p-6"
+                  variants={shouldReduceMotion ? {} : modalFooter}
+                >
+                  {footer}
+                </motion.div>
+              )}
+            </motion.div>
           </motion.div>
         </motion.div>
       )}

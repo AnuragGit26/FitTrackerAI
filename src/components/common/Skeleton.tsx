@@ -33,7 +33,7 @@ export function Skeleton({
 
   return (
     <motion.div
-      className={cn(baseStyles, variantStyles[variant], className)}
+      className={cn(baseStyles, variantStyles[variant], className, 'relative overflow-hidden')}
       style={style}
       animate={animate && !shouldReduceMotion ? {
         opacity: [0.5, 1, 0.5],
@@ -43,7 +43,26 @@ export function Skeleton({
         repeat: Infinity,
         ease: 'easeInOut'
       }}
-    />
+    >
+      {/* Shimmer overlay effect */}
+      {animate && !shouldReduceMotion && (
+        <motion.div
+          className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 dark:via-white/10 to-transparent"
+          animate={{
+            x: ['-100%', '100%']
+          }}
+          transition={{
+            duration: 1.5,
+            repeat: Infinity,
+            ease: 'linear',
+          }}
+          style={{
+            willChange: 'transform',
+            transform: 'translate3d(0, 0, 0)',
+          }}
+        />
+      )}
+    </motion.div>
   );
 }
 

@@ -6,6 +6,7 @@ import { useMemo } from 'react';
 import { calculateOverallRecoveryScore, calculateRecoveryTrend, getReadinessStatus } from '@/utils/recoveryHelpers';
 import { motion } from 'framer-motion';
 import { slideUp, prefersReducedMotion } from '@/utils/animations';
+import { useCountUp } from '@/hooks/useCountUp';
 
 export function RecoveryScoreCard() {
   const { muscleStatuses, isLoading } = useMuscleRecovery();
@@ -47,6 +48,24 @@ export function RecoveryScoreCard() {
 
   const shouldReduceMotion = prefersReducedMotion();
   const trendChange = trend.changePercentage;
+
+  // Count-up animation for score
+  const { formattedValue: scoreDisplay } = useCountUp(score, 0, {
+    duration: 1.5,
+    decimals: 0,
+    suffix: '%',
+    ease: 'power2.out'
+  });
+
+  // Count-up animation for trend change (if not zero)
+  const trendValue = Math.abs(trendChange);
+  const { formattedValue: trendDisplay } = useCountUp(trendValue, 0, {
+    duration: 1.0,
+    decimals: 0,
+    suffix: '%',
+    prefix: trendChange > 0 ? '+' : trendChange < 0 ? '-' : '',
+    ease: 'power2.out'
+  });
 
   const getStatusColor = () => {
     if (readinessStatus === 'ready') return 'text-primary';
@@ -94,7 +113,7 @@ export function RecoveryScoreCard() {
               <TrendingDown className="w-3.5 h-3.5" />
             )}
             <span className="text-xs font-bold">
-              {trendChange > 0 ? '+' : ''}{trendChange}%
+              {trendDisplay}
             </span>
           </div>
         )}
@@ -102,7 +121,7 @@ export function RecoveryScoreCard() {
 
       <div className="flex items-baseline gap-3 mb-3">
         <h2 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-white">
-          {score}%
+          {scoreDisplay}
         </h2>
         <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${getStatusBgColor()}`}>
           <StatusIcon className={`w-4 h-4 ${getStatusColor()}`} />

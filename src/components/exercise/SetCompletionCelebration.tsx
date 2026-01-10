@@ -2,7 +2,8 @@ import { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check } from 'lucide-react';
 import { prefersReducedMotion } from '@/utils/animations';
-import { restTimerService } from '@/services/restTimerService';
+import { soundService } from '@/services/soundService';
+import { hapticService } from '@/services/hapticService';
 import { useSettingsStore } from '@/store/settingsStore';
 
 interface SetCompletionCelebrationProps {
@@ -43,7 +44,7 @@ export function SetCompletionCelebration({
   const { settings } = useSettingsStore();
   const shouldReduceMotion = prefersReducedMotion();
 
-  // Select random motivational message
+  // Select random motivational message and trigger celebration effects
   useEffect(() => {
     if (isVisible) {
       const randomMessage = MOTIVATIONAL_MESSAGES[
@@ -51,16 +52,40 @@ export function SetCompletionCelebration({
       ];
       setMessage(randomMessage);
 
-      // Play celebration sound if enabled
+      const timeouts: NodeJS.Timeout[] = [];
+
+      // Play celebration sounds if enabled
       if (settings.soundEnabled) {
-        try {
-          restTimerService.playCompletionSound();
-        } catch (error) {
-          console.warn('Failed to play celebration sound:', error);
-        }
+        // Success chime at start (0ms)
+        soundService.play('success', 0.5);
+
+        // Confetti whoosh at confetti release (200ms)
+        timeouts.push(setTimeout(() => {
+          soundService.play('confetti', 0.3);
+        }, 200));
       }
+
+      // Trigger haptic feedback if enabled
+      if (settings.vibrationEnabled) {
+        // Medium impact at start (0ms)
+        hapticService.impact('medium');
+
+        // Light impacts during confetti burst (200-400ms)
+        timeouts.push(setTimeout(() => hapticService.impact('light'), 200));
+        timeouts.push(setTimeout(() => hapticService.impact('light'), 250));
+        timeouts.push(setTimeout(() => hapticService.impact('light'), 300));
+        timeouts.push(setTimeout(() => hapticService.impact('light'), 350));
+
+        // Success notification pattern at end (1200ms)
+        timeouts.push(setTimeout(() => hapticService.notification('success'), 1200));
+      }
+
+      // Cleanup timeouts on unmount
+      return () => {
+        timeouts.forEach(timeout => clearTimeout(timeout));
+      };
     }
-  }, [isVisible, settings.soundEnabled]);
+  }, [isVisible, settings.soundEnabled, settings.vibrationEnabled]);
 
   // Auto-dismiss after 2 seconds
   useEffect(() => {

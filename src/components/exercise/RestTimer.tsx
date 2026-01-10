@@ -260,8 +260,8 @@ export function RestTimer({
             if (notificationPermissionRef.current === 'granted') {
               new Notification('Rest Timer Complete', {
                 body: 'Time to start your next set!',
-                icon: '/assests/img/Fittrack2.png',
-                badge: '/assests/img/Fittrack2.png',
+                icon: '/assets/img/Icon2.png',
+                badge: '/assets/img/Icon2.png',
                 tag: 'rest-timer',
               });
             }
@@ -349,8 +349,8 @@ export function RestTimer({
             if (notificationPermissionRef.current === 'granted') {
               new Notification('Rest Timer Complete', {
                 body: 'Time to start your next set!',
-                icon: '/assests/img/Fittrack2.png',
-                badge: '/assests/img/Fittrack2.png',
+                icon: '/assets/img/Icon2.png',
+                badge: '/assets/img/Icon2.png',
                 tag: 'rest-timer',
               });
             }

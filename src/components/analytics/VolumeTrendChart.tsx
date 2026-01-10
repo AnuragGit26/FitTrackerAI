@@ -54,7 +54,11 @@ export function VolumeTrendChart({ data }: VolumeTrendChartProps) {
                 <stop offset="100%" stopColor="#0df269" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="4 4" stroke="#333" opacity={0.3} />
+            <CartesianGrid
+              strokeDasharray="4 4"
+              stroke="#333"
+              opacity={0.3}
+            />
             <XAxis
               dataKey="week"
               stroke="#6b7280"
@@ -77,6 +81,8 @@ export function VolumeTrendChart({ data }: VolumeTrendChartProps) {
                 borderRadius: '8px',
                 color: '#fff',
               }}
+              animationDuration={200}
+              animationEasing="ease-out"
             />
             <Area
               type="monotone"
@@ -84,6 +90,10 @@ export function VolumeTrendChart({ data }: VolumeTrendChartProps) {
               stroke="#0df269"
               strokeWidth={3}
               fill="url(#volumeGradient)"
+              isAnimationActive={true}
+              animationBegin={200}
+              animationDuration={1200}
+              animationEasing="ease-in-out"
             />
           </AreaChart>
         </ResponsiveContainer>

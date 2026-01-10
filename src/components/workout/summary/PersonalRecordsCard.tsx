@@ -1,8 +1,46 @@
 import { PersonalRecord } from '@/types/workoutSummary';
 import { useUserStore } from '@/store/userStore';
+import { useCountUp } from '@/hooks/useCountUp';
 
 interface PersonalRecordsCardProps {
   records: PersonalRecord[];
+}
+
+interface RecordWithCountUpProps {
+  record: PersonalRecord;
+  unit: string;
+  index: number;
+}
+
+function RecordWithCountUp({ record, unit, index: _index }: RecordWithCountUpProps) {
+  // Determine duration based on value size
+  const duration = record.value > 100 ? 1.5 : 1.0;
+
+  const { formattedValue } = useCountUp(
+    record.value,
+    0,
+    {
+      duration,
+      decimals: record.type === '1rm' ? 1 : 0,
+      suffix: record.type === '1rm' || record.type === 'volume' || record.type === 'weight'
+        ? unit
+        : record.type === 'reps'
+          ? ' reps'
+          : record.type === 'rest'
+            ? ' sec'
+            : '',
+      ease: 'power2.out'
+    }
+  );
+
+  // For time records, format differently after count-up
+  if (record.type === 'time') {
+    const minutes = Math.floor(record.value / 60);
+    const seconds = Math.round(record.value % 60);
+    return <>{`${minutes}:${seconds.toString().padStart(2, '0')}`}</>;
+  }
+
+  return <>{formattedValue}</>;
 }
 
 export function PersonalRecordsCard({ records }: PersonalRecordsCardProps) {
@@ -12,24 +50,6 @@ export function PersonalRecordsCard({ records }: PersonalRecordsCardProps) {
   if (records.length === 0) {
     return null;
   }
-
-  const formatValue = (record: PersonalRecord): string => {
-    if (record.type === '1rm' || record.type === 'volume' || record.type === 'weight') {
-      return `${record.value.toFixed(record.type === '1rm' ? 1 : 0)}${unit}`;
-    }
-    if (record.type === 'reps') {
-      return `${Math.round(record.value)} reps`;
-    }
-    if (record.type === 'time') {
-      const minutes = Math.floor(record.value / 60);
-      const seconds = Math.round(record.value % 60);
-      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    }
-    if (record.type === 'rest') {
-      return `${Math.round(record.value)} sec`;
-    }
-    return record.value.toString();
-  };
 
   const getRecordIcon = (type: PersonalRecord['type']): string => {
     switch (type) {
@@ -120,7 +140,7 @@ export function PersonalRecordsCard({ records }: PersonalRecordsCardProps) {
                 </p>
               )}
               <p className="text-white text-2xl font-bold">
-                {formatValue(record)}
+                <RecordWithCountUp record={record} unit={unit} index={index} />
               </p>
             </div>
           </div>

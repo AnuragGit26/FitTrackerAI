@@ -175,7 +175,7 @@ class AIResponseValidator {
    */
   validateSmartAlerts(
     response: SmartAlerts,
-    userName?: string
+    _userName?: string
   ): ValidationResult {
     const issues: ValidationIssue[] = [];
     const warnings: string[] = [];
@@ -325,8 +325,8 @@ class AIResponseValidator {
    */
   validateWorkoutRecommendations(
     response: WorkoutRecommendations,
-    userName?: string,
-    availableEquipment?: string[]
+    _userName?: string,
+    _availableEquipment?: string[]
   ): ValidationResult {
     const issues: ValidationIssue[] = [];
     const warnings: string[] = [];

@@ -20,7 +20,7 @@ import { RecommendedWorkoutCard } from '@/components/insights/RecommendedWorkout
 import { MuscleBalanceSection } from '@/components/insights/MuscleBalanceSection';
 import { CorrectiveExercisesCarousel } from '@/components/insights/CorrectiveExercisesCarousel';
 import { PredictedRecoveryChart } from '@/components/insights/PredictedRecoveryChart';
-import { staggerContainerSlow, prefersReducedMotion } from '@/utils/animations';
+import { staggerContainer, slideUp, prefersReducedMotion } from '@/utils/animations';
 
 type View = 'progress' | 'alerts' | 'recommendations';
 
@@ -207,13 +207,13 @@ export function Insights() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.3 }}
-              variants={prefersReducedMotion() ? {} : staggerContainerSlow}
+              variants={prefersReducedMotion() ? {} : staggerContainer}
               className="flex flex-col gap-6"
             >
-                <motion.div variants={prefersReducedMotion() ? {} : {}}>
+                <motion.div variants={prefersReducedMotion() ? {} : slideUp}>
                   <BreakthroughCard breakthrough={progress.data.breakthrough} />
                 </motion.div>
-                <motion.div variants={prefersReducedMotion() ? {} : {}}>
+                <motion.div variants={prefersReducedMotion() ? {} : slideUp}>
                   <PerformanceTrendsCards
                     consistencyScore={progress.data.consistencyScore}
                     consistencyChange={progress.data.consistencyChange}
@@ -221,7 +221,7 @@ export function Insights() {
                     workoutCountChange={progress.data.workoutCountChange}
                   />
                 </motion.div>
-                <motion.div variants={prefersReducedMotion() ? {} : {}}>
+                <motion.div variants={prefersReducedMotion() ? {} : slideUp}>
                   <VolumeTrendChart
                     currentVolume={progress.data.volumeTrend.current}
                     previousVolume={progress.data.volumeTrend.previous}
@@ -229,13 +229,13 @@ export function Insights() {
                     weeklyData={progress.data.volumeTrend.weeklyData}
                   />
                 </motion.div>
-                <motion.div variants={prefersReducedMotion() ? {} : {}}>
+                <motion.div variants={prefersReducedMotion() ? {} : slideUp}>
                   <AttentionNeededSection
                     plateaus={progress.data.plateaus}
                     formChecks={progress.data.formChecks}
                   />
                 </motion.div>
-                <motion.div variants={prefersReducedMotion() ? {} : {}}>
+                <motion.div variants={prefersReducedMotion() ? {} : slideUp}>
                   <TrainingPatternsSection patterns={progress.data.trainingPatterns} />
                 </motion.div>
             </motion.div>
@@ -248,20 +248,20 @@ export function Insights() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.3 }}
-              variants={prefersReducedMotion() ? {} : staggerContainerSlow}
+              variants={prefersReducedMotion() ? {} : staggerContainer}
               className="flex flex-col gap-6"
             >
-                <motion.div variants={prefersReducedMotion() ? {} : {}}>
+                <motion.div variants={prefersReducedMotion() ? {} : slideUp}>
                   <SystemStatusCard alerts={alerts.data} />
                 </motion.div>
                 <div className="w-full h-px bg-gray-200 dark:bg-white/5 mx-4" />
-                <motion.div variants={prefersReducedMotion() ? {} : {}}>
+                <motion.div variants={prefersReducedMotion() ? {} : slideUp}>
                   <CriticalAlertsCard alerts={alerts.data.criticalAlerts} />
                 </motion.div>
-                <motion.div variants={prefersReducedMotion() ? {} : {}}>
+                <motion.div variants={prefersReducedMotion() ? {} : slideUp}>
                   <SuggestionsSection suggestions={alerts.data.suggestions} />
                 </motion.div>
-                <motion.div variants={prefersReducedMotion() ? {} : {}}>
+                <motion.div variants={prefersReducedMotion() ? {} : slideUp}>
                   <NutritionTimingTimeline events={alerts.data.nutritionEvents} />
                 </motion.div>
             </motion.div>
@@ -274,22 +274,22 @@ export function Insights() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.3 }}
-              variants={prefersReducedMotion() ? {} : staggerContainerSlow}
+              variants={prefersReducedMotion() ? {} : staggerContainer}
               className="flex flex-col gap-6"
             >
-                <motion.div variants={prefersReducedMotion() ? {} : {}}>
+                <motion.div variants={prefersReducedMotion() ? {} : slideUp}>
                   <ReadinessScoreHeader recommendations={recommendations.data} />
                 </motion.div>
-                <motion.div variants={prefersReducedMotion() ? {} : {}}>
+                <motion.div variants={prefersReducedMotion() ? {} : slideUp}>
                   <RecommendedWorkoutCard workout={recommendations.data.recommendedWorkout} />
                 </motion.div>
-                <motion.div variants={prefersReducedMotion() ? {} : {}}>
+                <motion.div variants={prefersReducedMotion() ? {} : slideUp}>
                   <MuscleBalanceSection imbalances={recommendations.data.muscleBalance.imbalances} />
                 </motion.div>
-                <motion.div variants={prefersReducedMotion() ? {} : {}}>
+                <motion.div variants={prefersReducedMotion() ? {} : slideUp}>
                   <CorrectiveExercisesCarousel exercises={recommendations.data.correctiveExercises} />
                 </motion.div>
-                <motion.div variants={prefersReducedMotion() ? {} : {}}>
+                <motion.div variants={prefersReducedMotion() ? {} : slideUp}>
                   <PredictedRecoveryChart predictions={recommendations.data.recoveryPredictions} />
                 </motion.div>
             </motion.div>

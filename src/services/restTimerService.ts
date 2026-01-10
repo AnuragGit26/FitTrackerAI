@@ -101,8 +101,8 @@ class RestTimerService {
       try {
         new Notification(`Fit Track AI - ${title}`, {
           body,
-          icon: '/assests/img/Fittrack2.png',
-          badge: '/assests/img/Fittrack2.png',
+          icon: '/assets/img/Icon2.png',
+          badge: '/assets/img/Icon2.png',
           tag: 'rest-timer',
         } as NotificationOptions);
       } catch (error) {

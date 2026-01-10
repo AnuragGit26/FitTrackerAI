@@ -211,7 +211,7 @@ export function StrengthProgressionChart({ progressions }: StrengthProgressionCh
             />
             <Tooltip content={<CustomTooltip />} />
             <ReferenceLine y={0} stroke="#666" strokeDasharray="2 2" opacity={0.5} />
-            {progressions.map((prog) => {
+            {progressions.map((prog, index) => {
               if (hiddenSeries.has(prog.exerciseName)) return null;
               return (
                 <Line
@@ -223,6 +223,10 @@ export function StrengthProgressionChart({ progressions }: StrengthProgressionCh
                   strokeLinecap="round"
                   dot={(props) => <CustomDot {...props} />}
                   activeDot={{ r: 6, strokeWidth: 2 }}
+                  isAnimationActive={true}
+                  animationBegin={200 + index * 100}
+                  animationDuration={1200}
+                  animationEasing="ease-in-out"
                 />
               );
             })}

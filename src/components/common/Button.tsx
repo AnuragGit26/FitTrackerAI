@@ -1,7 +1,7 @@
 import { ButtonHTMLAttributes, ReactNode, useState } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/utils/cn';
-import { checkmarkAnimation, prefersReducedMotion } from '@/utils/animations';
+import { checkmarkAnimation, successPulseGlow, prefersReducedMotion } from '@/utils/animations';
 import { Check } from 'lucide-react';
 
 interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onAnimationStart' | 'onAnimationEnd' | 'onAnimationIteration' | 'onDragStart' | 'onDrag' | 'onDragEnd'> {
@@ -59,14 +59,25 @@ export function Button({
       whileTap={!disabled && !isLoading && !shouldReduceMotion ? { scale: 0.98 } : undefined}
       {...props}
     >
+      {/* Pulsing glow effect behind success state */}
+      {showCheckmark && !shouldReduceMotion && (
+        <motion.div
+          className="absolute inset-0 rounded-lg bg-primary"
+          variants={successPulseGlow}
+          initial={{ scale: 1, opacity: 0 }}
+          animate="pulse"
+          style={{ zIndex: 0 }}
+        />
+      )}
+
       {isLoading ? (
-        <span className="flex items-center gap-2">
+        <span className="flex items-center gap-2 relative z-10">
           <span className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" />
           Loading...
         </span>
       ) : showCheckmark ? (
         <motion.span
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 relative z-10"
           variants={shouldReduceMotion ? {} : checkmarkAnimation}
           initial="initial"
           animate="animate"
@@ -75,7 +86,7 @@ export function Button({
           Success!
         </motion.span>
       ) : (
-        children
+        <span className="relative z-10">{children}</span>
       )}
     </motion.button>
   );

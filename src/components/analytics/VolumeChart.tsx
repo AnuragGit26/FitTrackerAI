@@ -59,6 +59,8 @@ export const VolumeChart = memo(function VolumeChart() {
               border: '1px solid #e5e7eb',
               borderRadius: '8px',
             }}
+            animationDuration={200}
+            animationEasing="ease-out"
           />
           <Line
             type="monotone"
@@ -66,6 +68,10 @@ export const VolumeChart = memo(function VolumeChart() {
             stroke="#3b82f6"
             strokeWidth={2}
             dot={{ fill: '#3b82f6', r: 4 }}
+            isAnimationActive={true}
+            animationBegin={200}
+            animationDuration={1200}
+            animationEasing="ease-in-out"
           />
         </LineChart>
       </ResponsiveContainer>
