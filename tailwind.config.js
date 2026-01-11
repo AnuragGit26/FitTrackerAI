@@ -32,6 +32,7 @@ export default {
         caution: '#ffb700',
       },
       fontFamily: {
+        sans: ['Lexend', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
         display: ['Lexend', 'sans-serif'],
       },
       borderRadius: {
