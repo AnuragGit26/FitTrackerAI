@@ -50,7 +50,7 @@ export default defineConfig(({ mode }) => {
         type: 'module',
         navigateFallback: 'index.html',
       },
-      includeAssets: ['assests/img/Fittrack2.png'],
+      includeAssets: ['assests/img/fittrackAI_icon.png'],
       manifest: {
         name: 'Fit Track AI',
         short_name: 'Fit Track AI',
@@ -63,16 +63,16 @@ export default defineConfig(({ mode }) => {
         start_url: '/',
         icons: [
           {
-            src: 'assests/img/Fittrack2.png',
+            src: 'assests/img/fittrackAI_icon.png',
             sizes: '192x192',
             type: 'image/png',
-            purpose: 'any maskable'
+            purpose: 'maskable'
           },
           {
-            src: 'assests/img/Fittrack2.png',
+            src: 'assests/img/fittrackAI_icon.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable'
+            purpose: 'maskable'
           }
         ],
         shortcuts: [
