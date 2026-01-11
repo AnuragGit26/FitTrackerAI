@@ -508,119 +508,157 @@ export function RestTimer({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none"
+            className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none bg-black/40 backdrop-blur-sm"
             style={{ willChange: 'opacity', transform: 'translate3d(0, 0, 0)' }}
           >
-            {/* Success Checkmark with Pulse */}
-            <motion.div
-              initial={{ scale: 0, rotate: -180 }}
-              animate={{ 
-                scale: [0, 1.4, 0.9, 1.15, 1],
-                rotate: 0,
-              }}
-              exit={{ scale: 0, opacity: 0 }}
-              transition={{ 
-                type: 'spring',
-                damping: 12,
-                stiffness: 400,
-                duration: 0.7
-              }}
-              className="relative"
-              style={{ willChange: 'transform' }}
-            >
-              <div className="size-32 rounded-full bg-background-dark/80 dark:bg-background-dark/90 flex items-center justify-center border-4 border-primary shadow-[0_0_40px_rgba(13,242,105,0.8)] ring-4 ring-primary/40">
-                <Check className="w-16 h-16 text-primary stroke-[4] drop-shadow-[0_0_15px_rgba(13,242,105,0.9)]" />
-              </div>
-              
-              {/* Persistent Background Glow */}
-              <motion.div
-                className="absolute inset-0 rounded-full bg-primary/20"
-                initial={{ scale: 1, opacity: 0.6 }}
-                animate={{
-                  scale: [1, 1.2, 1],
-                  opacity: [0.6, 0.4, 0.6],
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: 'easeInOut',
-                }}
-                style={{ willChange: 'transform, opacity' }}
-              />
-              
-              {/* Pulse Ripple Effect */}
-              {[...Array(3)].map((_, i) => (
-                <motion.div
-                  key={i}
-                  className="absolute inset-0 rounded-full border-4 border-primary/60"
-                  initial={{ scale: 1, opacity: 0.9 }}
-                  animate={{ 
-                    scale: [1, 2.2, 3.5],
-                    opacity: [0.9, 0.5, 0],
-                  }}
-                  transition={{
-                    duration: 1.6,
-                    delay: i * 0.2,
-                    ease: 'easeOut',
-                    repeat: 0,
-                  }}
-                  style={{ 
-                    left: '50%', 
-                    top: '50%', 
-                    transform: 'translate3d(-50%, -50%, 0)',
-                    willChange: 'transform, opacity',
-                  }}
-                />
-              ))}
-            </motion.div>
-
-            {/* Success Message */}
-            <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -20, opacity: 0 }}
-              transition={{ delay: 0.3, duration: 0.4 }}
-              className="absolute top-[45%] mt-32"
-              style={{ willChange: 'transform, opacity' }}
-            >
-              <div className="relative bg-background-dark/70 dark:bg-background-dark/80 rounded-xl px-6 py-3">
-                <motion.p
-                  className="text-3xl font-bold text-primary text-center drop-shadow-[0_0_20px_rgba(13,242,105,0.9)]"
-                  animate={{ 
-                    scale: [1, 1.15, 1.05, 1],
-                  }}
-                  transition={{ 
-                    duration: 0.6,
-                    delay: 0.35,
-                    times: [0, 0.4, 0.7, 1],
-                    type: 'spring',
-                    stiffness: 250,
-                    damping: 12,
-                  }}
-                  style={{
-                    textShadow: '0 0 40px rgba(13, 242, 105, 0.8), 0 0 80px rgba(13, 242, 105, 0.6), 2px 2px 4px rgba(0, 0, 0, 0.5)',
-                    willChange: 'transform',
-                  }}
-                >
-                  {completionMessage}
-                </motion.p>
-              </div>
-            </motion.div>
-
-            {/* Screen Flash - Double Flash */}
+            {/* Screen Flash - Double Flash (behind content) */}
             <motion.div
               initial={{ opacity: 0 }}
-              animate={{ 
-                opacity: [0, 0.6, 0, 0.4, 0],
+              animate={{
+                opacity: [0, 0.35, 0, 0.2, 0],
               }}
               exit={{ opacity: 0 }}
-              transition={{ 
-                duration: 0.25,
+              transition={{
+                duration: 0.3,
                 times: [0, 0.2, 0.4, 0.6, 1],
               }}
               className="absolute inset-0 bg-primary pointer-events-none"
               style={{ willChange: 'opacity' }}
             />
+
+            {/* Content Container - Properly Centered */}
+            <div className="relative flex flex-col items-center justify-center gap-8">
+              {/* Success Checkmark with Pulse */}
+              <motion.div
+                initial={{ scale: 0, rotate: -180 }}
+                animate={{
+                  scale: [0, 1.5, 0.95, 1.1, 1],
+                  rotate: 0,
+                }}
+                exit={{ scale: 0, opacity: 0 }}
+                transition={{
+                  type: 'spring',
+                  damping: 14,
+                  stiffness: 350,
+                  duration: 0.8
+                }}
+                className="relative z-10"
+                style={{ willChange: 'transform' }}
+              >
+                {/* Main Checkmark Circle */}
+                <div className="size-36 rounded-full bg-gradient-to-br from-background-dark/90 to-background-dark/95 flex items-center justify-center border-[5px] border-primary shadow-[0_0_60px_rgba(13,242,105,0.9),0_0_100px_rgba(13,242,105,0.5)] ring-[6px] ring-primary/30">
+                  <Check className="w-20 h-20 text-primary stroke-[4.5] drop-shadow-[0_0_20px_rgba(13,242,105,1)]" />
+                </div>
+
+                {/* Persistent Background Glow */}
+                <motion.div
+                  className="absolute inset-0 rounded-full bg-primary/25 -z-10"
+                  initial={{ scale: 1, opacity: 0.7 }}
+                  animate={{
+                    scale: [1, 1.25, 1],
+                    opacity: [0.7, 0.4, 0.7],
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    ease: 'easeInOut',
+                  }}
+                  style={{ willChange: 'transform, opacity' }}
+                />
+
+                {/* Pulse Ripple Effect - Properly Centered */}
+                {[...Array(3)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    className="absolute inset-0 rounded-full border-[5px] border-primary/70 -z-20"
+                    initial={{ scale: 1, opacity: 1 }}
+                    animate={{
+                      scale: [1, 2.5, 4],
+                      opacity: [1, 0.6, 0],
+                    }}
+                    transition={{
+                      duration: 1.8,
+                      delay: i * 0.25,
+                      ease: 'easeOut',
+                      repeat: 0,
+                    }}
+                    style={{
+                      transformOrigin: 'center',
+                      willChange: 'transform, opacity',
+                    }}
+                  />
+                ))}
+              </motion.div>
+
+              {/* Success Message - Properly Aligned Below Checkmark */}
+              <motion.div
+                initial={{ y: 30, opacity: 0, scale: 0.9 }}
+                animate={{ y: 0, opacity: 1, scale: 1 }}
+                exit={{ y: -30, opacity: 0, scale: 0.9 }}
+                transition={{
+                  delay: 0.35,
+                  duration: 0.5,
+                  type: 'spring',
+                  damping: 20,
+                  stiffness: 300
+                }}
+                className="relative z-10"
+                style={{ willChange: 'transform, opacity' }}
+              >
+                <div className="relative bg-gradient-to-br from-background-dark/85 to-background-dark/90 dark:from-background-dark/90 dark:to-background-dark/95 rounded-2xl px-8 py-4 border-2 border-primary/30 shadow-[0_0_30px_rgba(13,242,105,0.4)] backdrop-blur-sm">
+                  {/* Glow effect behind text */}
+                  <div className="absolute inset-0 rounded-2xl bg-primary/10 blur-xl -z-10" />
+
+                  <motion.p
+                    className="text-4xl font-bold text-primary text-center tracking-wide"
+                    animate={{
+                      scale: [1, 1.08, 1.02, 1],
+                    }}
+                    transition={{
+                      duration: 0.7,
+                      delay: 0.4,
+                      times: [0, 0.4, 0.7, 1],
+                      type: 'spring',
+                      stiffness: 200,
+                      damping: 15,
+                    }}
+                    style={{
+                      textShadow: '0 0 30px rgba(13, 242, 105, 1), 0 0 60px rgba(13, 242, 105, 0.8), 0 0 90px rgba(13, 242, 105, 0.6), 3px 3px 6px rgba(0, 0, 0, 0.7)',
+                      willChange: 'transform',
+                      letterSpacing: '0.05em'
+                    }}
+                  >
+                    {completionMessage}
+                  </motion.p>
+                </div>
+              </motion.div>
+
+              {/* Decorative Particles */}
+              {[...Array(6)].map((_, i) => (
+                <motion.div
+                  key={`particle-${i}`}
+                  className="absolute size-2 rounded-full bg-primary/80 shadow-[0_0_10px_rgba(13,242,105,0.8)]"
+                  initial={{
+                    opacity: 0,
+                    x: 0,
+                    y: 0,
+                    scale: 0
+                  }}
+                  animate={{
+                    opacity: [0, 1, 1, 0],
+                    x: [0, Math.cos((i * 60) * Math.PI / 180) * 120],
+                    y: [0, Math.sin((i * 60) * Math.PI / 180) * 120],
+                    scale: [0, 1, 0.8, 0]
+                  }}
+                  transition={{
+                    duration: 1.5,
+                    delay: 0.3 + (i * 0.08),
+                    ease: 'easeOut'
+                  }}
+                  style={{ willChange: 'transform, opacity' }}
+                />
+              ))}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
