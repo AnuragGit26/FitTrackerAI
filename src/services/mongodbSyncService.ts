@@ -1437,6 +1437,14 @@ class MongoDBSyncService {
                         const localVersion = ((localRecord as Record<string, unknown>)?.version as number) || 1;
                         const existingVersion = ((existing as Record<string, unknown>)?.version as number) || 1;
                         const newVersion = Math.max(localVersion, existingVersion) + 1;
+                        resolvedRecord.version = newVersion;
+                        resolvedRecord.updated_at = new Date().toISOString();
+                        
+                        try {
+                            logger.log(`[MongoDBSyncService.pushBatch] Attempting to upsert conflict-resolved ${tableName} record ${recordId} to Supabase`);
+                            await this.upsertToSupabase(supabase, tableName, resolvedRecord, validatedUserId);
+                            logger.log(`[MongoDBSyncService.pushBatch] Successfully upserted conflict-resolved record for ${tableName} record ${recordId}`);
+                            result.recordsUpdated++;
                             result.conflicts++;
                         } catch (upsertError) {
                             const errorMessage = upsertError instanceof Error ? upsertError.message : 'Unknown error';
