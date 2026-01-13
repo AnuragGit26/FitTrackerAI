@@ -10,6 +10,7 @@ import { aiRefreshService } from '@/services/aiRefreshService';
 import { aiCallManager } from '@/services/aiCallManager';
 import { swCommunication } from '@/services/swCommunication';
 import { backgroundAIFetcher } from '@/services/backgroundAIFetcher';
+import { logger } from '@/utils/logger';
 import {
   ProgressAnalysis,
   SmartAlerts,
@@ -91,7 +92,7 @@ export function useInsightsData() {
             // Skip old format cached data (check if first prediction has 'muscle' property which indicates old format)
             const firstPred = cachedRecommendations.recoveryPredictions?.[0];
             if (firstPred && 'muscle' in firstPred && !('dayLabel' in firstPred)) {
-              console.warn('[useInsightsData] Old format detected in cached recommendations, skipping');
+              logger.warn('[useInsightsData] Old format detected in cached recommendations, skipping');
               // Don't set cached data, let it regenerate
             } else {
               setWorkoutRecommendations(cachedRecommendations);
@@ -112,7 +113,7 @@ export function useInsightsData() {
           setIsLoading(true);
         }
       } catch (error) {
-        console.error('Failed to load cached data:', error);
+        logger.error('Failed to load cached data:', error);
         setIsLoading(false);
       }
     }
@@ -150,7 +151,7 @@ export function useInsightsData() {
           const firstPred = recommendations.recoveryPredictions?.[0];
           if (firstPred && 'muscle' in firstPred && !('dayLabel' in firstPred)) {
             // Old format detected - skip it and let the main service regenerate
-            console.warn('[useInsightsData] Old format detected in SW recommendations, skipping');
+            logger.warn('[useInsightsData] Old format detected in SW recommendations, skipping');
             // Don't set the old format data, but continue with state updates
           } else {
             setWorkoutRecommendations(recommendations);
@@ -166,7 +167,7 @@ export function useInsightsData() {
 
     // Register handler for errors
     const unsubscribeError = swCommunication.onAIInsightsError((data) => {
-      console.error('[useInsightsData] Background fetch error:', data);
+      logger.error('[useInsightsData] Background fetch error:', data);
       setIsBackgroundFetching(false);
       setIsLoading(false);
     });
@@ -204,12 +205,12 @@ export function useInsightsData() {
       const withTimeout = <T,>(promise: Promise<T | null>, timeoutMs: number, fallback: T | null): Promise<T | null> => {
         return Promise.race([
           promise.catch((error) => {
-            console.error('AI insight request failed:', error);
+            logger.error('AI insight request failed:', error);
             return fallback;
           }),
           new Promise<T | null>((resolve) => {
             setTimeout(() => {
-              console.warn(`AI insight request timeout after ${timeoutMs}ms, using fallback`);
+              logger.warn(`AI insight request timeout after ${timeoutMs}ms, using fallback`);
               resolve(fallback);
             }, timeoutMs);
           }),
@@ -233,7 +234,7 @@ export function useInsightsData() {
         profile?.id,
         1
       ).catch((error) => {
-        console.error('Failed to load progress analysis:', error);
+        logger.error('Failed to load progress analysis:', error);
         return null;
       });
 
@@ -244,7 +245,7 @@ export function useInsightsData() {
         profile?.id,
         1
       ).catch((error) => {
-        console.error('Failed to load smart alerts:', error);
+        logger.error('Failed to load smart alerts:', error);
         return null;
       });
 
@@ -263,7 +264,7 @@ export function useInsightsData() {
         profile?.id,
         1
       ).catch((error) => {
-        console.error('Failed to load workout recommendations:', error);
+        logger.error('Failed to load workout recommendations:', error);
         return null;
       });
 
@@ -279,7 +280,7 @@ export function useInsightsData() {
       setWorkoutRecommendations(recommendations);
       setLastUpdated(new Date());
     } catch (error) {
-      console.error('Failed to load insights directly:', error);
+      logger.error('Failed to load insights directly:', error);
       setProgressAnalysis(null);
       setSmartAlerts(null);
       setWorkoutRecommendations(null);
@@ -387,7 +388,7 @@ export function useInsightsData() {
         }
       } else {
         // Fallback to direct fetch if SW not available
-        console.warn('[useInsightsData] Service worker not available, using direct fetch');
+        logger.warn('[useInsightsData] Service worker not available, using direct fetch');
         await loadInsightsDirectly(
           currentMonthWorkouts,
           previousMonthWorkouts,
@@ -403,7 +404,7 @@ export function useInsightsData() {
       }
 
     } catch (error) {
-      console.error('Failed to load insights:', error);
+      logger.error('Failed to load insights:', error);
       setIsLoading(false);
       setIsBackgroundFetching(false);
       isLoadingRef.current = false;

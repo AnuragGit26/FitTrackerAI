@@ -7,6 +7,7 @@ import {
   CACHE_SIZE_UNLIMITED,
 } from 'firebase/firestore';
 import { getAuth, Auth } from 'firebase/auth';
+import { logger } from '@/utils/logger';
 
 // Firebase configuration from environment variables
 const firebaseConfig = {
@@ -35,7 +36,7 @@ export function initializeFirebase(): { app: FirebaseApp; db: Firestore; auth: A
   try {
     // Initialize Firebase app
     firebaseApp = initializeApp(firebaseConfig);
-    console.log('[FirebaseConfig] Firebase app initialized');
+    logger.log('[FirebaseConfig] Firebase app initialized');
 
     // Initialize Firestore with persistent local cache (replaces enableIndexedDbPersistence)
     try {
@@ -45,30 +46,30 @@ export function initializeFirebase(): { app: FirebaseApp; db: Firestore; auth: A
         }),
       });
       persistenceEnabled = true;
-      console.log('[FirebaseConfig] Firestore initialized with offline persistence');
+      logger.log('[FirebaseConfig] Firestore initialized with offline persistence');
     } catch (err: any) {
       // Fallback to default Firestore if initialization fails
       // This handles cases where persistence isn't supported
       firestoreDb = getFirestore(firebaseApp);
       if (err.code === 'failed-precondition') {
-        console.warn(
+        logger.warn(
           '[FirebaseConfig] Multiple tabs open. Persistence enabled in first tab only.'
         );
       } else if (err.code === 'unimplemented') {
-        console.warn('[FirebaseConfig] Browser does not support offline persistence');
+        logger.warn('[FirebaseConfig] Browser does not support offline persistence');
       } else {
-        console.error('[FirebaseConfig] Error initializing Firestore with persistence:', err);
+        logger.error('[FirebaseConfig] Error initializing Firestore with persistence:', err);
       }
-      console.log('[FirebaseConfig] Firestore initialized (fallback mode)');
+      logger.log('[FirebaseConfig] Firestore initialized (fallback mode)');
     }
 
     // Initialize Firebase Auth
     firebaseAuth = getAuth(firebaseApp);
-    console.log('[FirebaseConfig] Firebase Auth initialized');
+    logger.log('[FirebaseConfig] Firebase Auth initialized');
 
     return { app: firebaseApp, db: firestoreDb, auth: firebaseAuth };
   } catch (error) {
-    console.error('[FirebaseConfig] Error initializing Firebase:', error);
+    logger.error('[FirebaseConfig] Error initializing Firebase:', error);
     throw error;
   }
 }

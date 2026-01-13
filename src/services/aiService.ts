@@ -18,6 +18,7 @@ import { logError } from '@/utils/errorHandler';
 import { addDays, format, differenceInHours } from 'date-fns';
 import { categorizeMuscleGroup, calculateMuscleImbalances } from '@/utils/analyticsHelpers';
 import { WorkoutPatternAnalysis, WorkoutRecommendation as PatternRecommendation } from './workoutAnalysisService';
+import { logger } from '@/utils/logger';
 
 interface AIAnalysisContext {
   recentWorkouts: Workout[];
@@ -186,7 +187,7 @@ CRITICAL OUTPUT REQUIREMENTS:
 
       const tokenEstimate = estimatePromptTokens(prompt);
       if (tokenEstimate > 100000) {
-        console.warn(`Prompt token estimate (${tokenEstimate}) exceeds safe limit. Consider reducing data.`);
+        logger.warn(`Prompt token estimate (${tokenEstimate}) exceeds safe limit. Consider reducing data.`);
       }
 
       const result = await model.generateContent(prompt);
@@ -319,7 +320,7 @@ CRITICAL OUTPUT REQUIREMENTS:
       const response = await result.response;
       return cleanPlainTextResponse(response.text());
     } catch (error) {
-      console.error('AI service error:', error);
+      logger.error('AI service error:', error);
       const imbalance = focusDistribution.legs < 25 ? 'leg volume is high, but hamstring isolation' : 'training balance';
       return `Your ${imbalance} is notably lower than your quad work. Consider adding Romanian Deadlifts to balance knee stability.`;
     }
@@ -410,7 +411,7 @@ CRITICAL OUTPUT REQUIREMENTS:
 
       const tokenEstimate = estimatePromptTokens(prompt);
       if (tokenEstimate > 100000) {
-        console.warn(`Prompt token estimate (${tokenEstimate}) exceeds safe limit. Consider reducing data.`);
+        logger.warn(`Prompt token estimate (${tokenEstimate}) exceeds safe limit. Consider reducing data.`);
       }
 
       const result = await model.generateContent(prompt);
@@ -472,7 +473,7 @@ CRITICAL OUTPUT REQUIREMENTS:
         };
       }
     } catch (error) {
-      console.error('AI service error:', error);
+      logger.error('AI service error:', error);
     }
 
     return generateMockProgressAnalysis(
@@ -553,7 +554,7 @@ CRITICAL OUTPUT REQUIREMENTS:
 
       const tokenEstimate = estimatePromptTokens(prompt);
       if (tokenEstimate > 100000) {
-        console.warn(`Prompt token estimate (${tokenEstimate}) exceeds safe limit. Consider reducing data.`);
+        logger.warn(`Prompt token estimate (${tokenEstimate}) exceeds safe limit. Consider reducing data.`);
       }
 
       const result = await model.generateContent(prompt);
@@ -600,7 +601,7 @@ CRITICAL OUTPUT REQUIREMENTS:
         };
       }
     } catch (error) {
-      console.error('AI service error:', error);
+      logger.error('AI service error:', error);
     }
 
     return generateMockSmartAlerts(workouts, muscleStatuses, readinessScore);
@@ -690,7 +691,7 @@ CRITICAL OUTPUT REQUIREMENTS:
 
       const tokenEstimate = estimatePromptTokens(prompt);
       if (tokenEstimate > 100000) {
-        console.warn(`Prompt token estimate (${tokenEstimate}) exceeds safe limit. Consider reducing data.`);
+        logger.warn(`Prompt token estimate (${tokenEstimate}) exceeds safe limit. Consider reducing data.`);
       }
 
       const result = await model.generateContent(prompt);

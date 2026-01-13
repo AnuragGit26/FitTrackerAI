@@ -12,6 +12,7 @@ import type { Workout, WorkoutTemplate, PlannedWorkout } from '@/types/workout';
 import type { Exercise } from '@/types/exercise';
 import type { MuscleStatus } from '@/types/muscle';
 import type { SleepLog, RecoveryLog } from '@/types/sleep';
+import { logger } from '@/utils/logger';
 
 interface ExportData {
   version?: string;
@@ -98,9 +99,9 @@ export async function importTestData(
     errors: [] as string[],
   };
 
-  console.group('🔄 Test Data Import');
-  console.log('Options:', options);
-  console.log('Data summary:', data.dataCounts);
+  logger.log('🔄 Test Data Import');
+  logger.log('Options:', options);
+  logger.log('Data summary:', data.dataCounts);
 
   try {
     // Validate data
@@ -113,51 +114,51 @@ export async function importTestData(
     }
 
     const userId = data.userProfile.id;
-    console.log('📝 User ID:', userId);
+    logger.log('📝 User ID:', userId);
 
     // Set user context
     userContextManager.setUserId(userId);
 
     if (options.dryRun) {
-      console.log('🔍 DRY RUN MODE - No data will be imported');
+      logger.log('🔍 DRY RUN MODE - No data will be imported');
     }
 
     // Clear existing data if requested
     if (options.clearExisting && !options.dryRun) {
-      console.log('🗑️  Clearing existing data...');
+      logger.log('🗑️  Clearing existing data...');
       await clearAllData(userId);
-      console.log('✅ Existing data cleared');
+      logger.log('✅ Existing data cleared');
     }
 
     // Import user profile
     if (!options.skipUserProfile && data.userProfile && !options.dryRun) {
       try {
-        console.log('👤 Importing user profile...');
+        logger.log('👤 Importing user profile...');
         await dataService.updateUserProfile(data.userProfile as any);
         result.imported.userProfile = true;
-        console.log('✅ User profile imported');
+        logger.log('✅ User profile imported');
       } catch (error) {
         result.errors.push(`User profile: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        console.error('❌ User profile import failed:', error);
+        logger.error('❌ User profile import failed:', error);
       }
     }
 
     // Import settings
     if (!options.skipSettings && data.settings?.appSettings && !options.dryRun) {
       try {
-        console.log('⚙️  Importing settings...');
+        logger.log('⚙️  Importing settings...');
         await dataService.updateSetting('appSettings', data.settings.appSettings);
         result.imported.settings = true;
-        console.log('✅ Settings imported');
+        logger.log('✅ Settings imported');
       } catch (error) {
         result.errors.push(`Settings: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        console.error('❌ Settings import failed:', error);
+        logger.error('❌ Settings import failed:', error);
       }
     }
 
     // Import workouts
     if (data.workouts && Array.isArray(data.workouts)) {
-      console.log(`💪 Importing ${data.workouts.length} workouts...`);
+      logger.log(`💪 Importing ${data.workouts.length} workouts...`);
       for (const workout of data.workouts) {
         try {
           if (!options.dryRun) {
@@ -176,15 +177,15 @@ export async function importTestData(
           result.imported.workouts++;
         } catch (error) {
           result.errors.push(`Workout ${workout.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          console.error(`❌ Failed to import workout ${workout.id}:`, error);
+          logger.error(`❌ Failed to import workout ${workout.id}:`, error);
         }
       }
-      console.log(`✅ Imported ${result.imported.workouts} workouts`);
+      logger.log(`✅ Imported ${result.imported.workouts} workouts`);
     }
 
     // Import templates
     if (data.templates && Array.isArray(data.templates)) {
-      console.log(`📋 Importing ${data.templates.length} templates...`);
+      logger.log(`📋 Importing ${data.templates.length} templates...`);
       for (const template of data.templates) {
         try {
           if (!options.dryRun) {
@@ -196,15 +197,15 @@ export async function importTestData(
           result.imported.templates++;
         } catch (error) {
           result.errors.push(`Template ${template.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          console.error(`❌ Failed to import template ${template.id}:`, error);
+          logger.error(`❌ Failed to import template ${template.id}:`, error);
         }
       }
-      console.log(`✅ Imported ${result.imported.templates} templates`);
+      logger.log(`✅ Imported ${result.imported.templates} templates`);
     }
 
     // Import planned workouts
     if (data.plannedWorkouts && Array.isArray(data.plannedWorkouts)) {
-      console.log(`📅 Importing ${data.plannedWorkouts.length} planned workouts...`);
+      logger.log(`📅 Importing ${data.plannedWorkouts.length} planned workouts...`);
       for (const planned of data.plannedWorkouts) {
         try {
           if (!options.dryRun) {
@@ -217,15 +218,15 @@ export async function importTestData(
           result.imported.plannedWorkouts++;
         } catch (error) {
           result.errors.push(`Planned workout ${planned.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          console.error(`❌ Failed to import planned workout ${planned.id}:`, error);
+          logger.error(`❌ Failed to import planned workout ${planned.id}:`, error);
         }
       }
-      console.log(`✅ Imported ${result.imported.plannedWorkouts} planned workouts`);
+      logger.log(`✅ Imported ${result.imported.plannedWorkouts} planned workouts`);
     }
 
     // Import custom exercises
     if (data.customExercises && Array.isArray(data.customExercises)) {
-      console.log(`🏋️  Importing ${data.customExercises.length} custom exercises...`);
+      logger.log(`🏋️  Importing ${data.customExercises.length} custom exercises...`);
       for (const exercise of data.customExercises) {
         try {
           if (!options.dryRun) {
@@ -238,15 +239,15 @@ export async function importTestData(
           result.imported.customExercises++;
         } catch (error) {
           result.errors.push(`Exercise ${exercise.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          console.error(`❌ Failed to import exercise ${exercise.id}:`, error);
+          logger.error(`❌ Failed to import exercise ${exercise.id}:`, error);
         }
       }
-      console.log(`✅ Imported ${result.imported.customExercises} custom exercises`);
+      logger.log(`✅ Imported ${result.imported.customExercises} custom exercises`);
     }
 
     // Import muscle statuses
     if (data.muscleStatuses && Array.isArray(data.muscleStatuses)) {
-      console.log(`💪 Importing ${data.muscleStatuses.length} muscle statuses...`);
+      logger.log(`💪 Importing ${data.muscleStatuses.length} muscle statuses...`);
       for (const status of data.muscleStatuses) {
         try {
           if (!options.dryRun) {
@@ -259,15 +260,15 @@ export async function importTestData(
           result.imported.muscleStatuses++;
         } catch (error) {
           result.errors.push(`Muscle status ${status.muscle}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          console.error(`❌ Failed to import muscle status ${status.muscle}:`, error);
+          logger.error(`❌ Failed to import muscle status ${status.muscle}:`, error);
         }
       }
-      console.log(`✅ Imported ${result.imported.muscleStatuses} muscle statuses`);
+      logger.log(`✅ Imported ${result.imported.muscleStatuses} muscle statuses`);
     }
 
     // Import sleep logs
     if (data.sleepLogs && Array.isArray(data.sleepLogs)) {
-      console.log(`😴 Importing ${data.sleepLogs.length} sleep logs...`);
+      logger.log(`😴 Importing ${data.sleepLogs.length} sleep logs...`);
       for (const log of data.sleepLogs) {
         try {
           if (!options.dryRun) {
@@ -282,15 +283,15 @@ export async function importTestData(
           result.imported.sleepLogs++;
         } catch (error) {
           result.errors.push(`Sleep log ${log.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          console.error(`❌ Failed to import sleep log ${log.id}:`, error);
+          logger.error(`❌ Failed to import sleep log ${log.id}:`, error);
         }
       }
-      console.log(`✅ Imported ${result.imported.sleepLogs} sleep logs`);
+      logger.log(`✅ Imported ${result.imported.sleepLogs} sleep logs`);
     }
 
     // Import recovery logs
     if (data.recoveryLogs && Array.isArray(data.recoveryLogs)) {
-      console.log(`🔄 Importing ${data.recoveryLogs.length} recovery logs...`);
+      logger.log(`🔄 Importing ${data.recoveryLogs.length} recovery logs...`);
       for (const log of data.recoveryLogs) {
         try {
           if (!options.dryRun) {
@@ -303,32 +304,29 @@ export async function importTestData(
           result.imported.recoveryLogs++;
         } catch (error) {
           result.errors.push(`Recovery log ${log.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          console.error(`❌ Failed to import recovery log ${log.id}:`, error);
+          logger.error(`❌ Failed to import recovery log ${log.id}:`, error);
         }
       }
-      console.log(`✅ Imported ${result.imported.recoveryLogs} recovery logs`);
+      logger.log(`✅ Imported ${result.imported.recoveryLogs} recovery logs`);
     }
 
     result.success = result.errors.length === 0;
 
-    console.log('\n📊 Import Summary:');
-    console.table(result.imported);
+    logger.log('\n📊 Import Summary:');
+    logger.log(result.imported);
 
     if (result.errors.length > 0) {
-      console.warn('\n⚠️  Errors encountered:');
+      logger.warn('\n⚠️  Errors encountered:');
       result.errors.forEach((error, i) => {
-        console.warn(`${i + 1}. ${error}`);
+        logger.warn(`${i + 1}. ${error}`);
       });
     }
-
-    console.groupEnd();
 
     return result;
   } catch (error) {
     result.success = false;
     result.errors.push(`Fatal error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    console.error('❌ Import failed:', error);
-    console.groupEnd();
+    logger.error('❌ Import failed:', error);
     return result;
   }
 }
@@ -338,7 +336,7 @@ export async function importTestData(
  * @param userId - User ID to clear data for
  */
 export async function clearAllData(userId: string): Promise<void> {
-  console.log('🗑️  Clearing all data for user:', userId);
+  logger.log('🗑️  Clearing all data for user:', userId);
 
   await db.transaction('rw', [
     db.workouts,
@@ -373,7 +371,7 @@ export async function clearAllData(userId: string): Promise<void> {
     await db.recoveryLogs.bulkDelete(recoveryLogs.map(r => r.id!));
   });
 
-  console.log('✅ Data cleared');
+  logger.log('✅ Data cleared');
 }
 
 /**
@@ -381,7 +379,7 @@ export async function clearAllData(userId: string): Promise<void> {
  * @param userId - User ID to export data for
  */
 export async function exportUserData(userId: string): Promise<ExportData> {
-  console.log('📦 Exporting data for user:', userId);
+  logger.log('📦 Exporting data for user:', userId);
 
   const workouts = await db.workouts.where('userId').equals(userId).toArray();
   const templates = await db.workoutTemplates.where('userId').equals(userId).toArray();
@@ -419,8 +417,8 @@ export async function exportUserData(userId: string): Promise<ExportData> {
     userProfile: userProfile ? userProfile as any : undefined,
   };
 
-  console.log('✅ Export complete');
-  console.table(data.dataCounts);
+  logger.log('✅ Export complete');
+  logger.log(data.dataCounts);
 
   return data;
 }
@@ -431,7 +429,7 @@ if (typeof window !== 'undefined') {
   (window as any).exportUserData = exportUserData;
   (window as any).clearAllData = clearAllData;
 
-  console.log(`
+  logger.log(`
   🔧 Test Data Utilities loaded!
 
   Available functions:
@@ -450,7 +448,7 @@ if (typeof window !== 'undefined') {
 
   // Export current data
   const exported = await window.exportUserData('your-user-id');
-  console.log(JSON.stringify(exported, null, 2));
+  logger.log(JSON.stringify(exported, null, 2));
 
   // Clear all data
   await window.clearAllData('your-user-id');

@@ -1,5 +1,6 @@
 import { MuscleGroup } from '@/types/muscle';
 import { db } from './database';
+import { logger } from '@/utils/logger';
 
 export interface MuscleImageCache {
     id?: number;
@@ -148,7 +149,7 @@ class MuscleImageCacheService {
             // Fetch and cache the image (only for external URLs)
             return await this.fetchAndCacheImage(muscle);
         } catch (error) {
-            console.warn(`[MuscleImageCache] Failed to get cached image for ${muscle}:`, error);
+            logger.warn(`[MuscleImageCache] Failed to get cached image for ${muscle}:`, error);
             // Fallback to direct URL
             return imageUrl;
         }
@@ -222,7 +223,7 @@ class MuscleImageCacheService {
             // Return blob URL
             return URL.createObjectURL(imageBlob);
         } catch (error) {
-            console.error(`[MuscleImageCache] Failed to fetch image for ${muscle}:`, error);
+            logger.error(`[MuscleImageCache] Failed to fetch image for ${muscle}:`, error);
             // Fallback to direct URL/data URI
             return imageUrl;
         }
@@ -247,7 +248,7 @@ class MuscleImageCacheService {
             try {
                 await this.fetchAndCacheImage(muscle);
             } catch (error) {
-                console.warn(`[MuscleImageCache] Failed to preload image for ${muscle}:`, error);
+                logger.warn(`[MuscleImageCache] Failed to preload image for ${muscle}:`, error);
             }
         });
 

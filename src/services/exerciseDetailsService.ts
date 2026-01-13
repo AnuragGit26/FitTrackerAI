@@ -1,5 +1,6 @@
 import { ExerciseAdvancedDetails } from '@/types/exercise';
 import { dbHelpers } from './database';
+import { logger } from '@/utils/logger';
 
 const ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
 const STRENGTHLOG_BASE_URL = 'https://www.strengthlog.com';
@@ -150,7 +151,7 @@ async function fetchExerciseDetailsFromWeb(exerciseSlug: string): Promise<Exerci
 
     return details;
   } catch (error) {
-    console.error(`Error fetching exercise details for ${exerciseSlug}:`, error);
+    logger.error(`Error fetching exercise details for ${exerciseSlug}:`, error);
     
     // Return minimal details on error (try to get static URL if available)
     const anatomyUrl = await getAnatomyImageUrlFromExercise(exerciseSlug);
@@ -187,7 +188,7 @@ class ExerciseDetailsService {
 
       return details;
     } catch (error) {
-      console.error(`Error getting exercise details for ${exerciseSlug}:`, error);
+      logger.error(`Error getting exercise details for ${exerciseSlug}:`, error);
       
       // Try to return cached data even if expired, as fallback
       const cached = await dbHelpers.getExerciseDetails(exerciseSlug);

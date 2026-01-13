@@ -5,6 +5,7 @@ import { getMuscleMapping } from './muscleMapping';
 import { calculateWorkloadScore } from './recoveryCalculator';
 import { dataService } from './dataService';
 import { subDays } from 'date-fns';
+import { logger } from '@/utils/logger';
 
 /**
  * Service for calculating and updating muscle recovery statuses from workouts
@@ -133,7 +134,7 @@ class MuscleRecoveryService {
     
     // Check for invalid date
     if (isNaN(workoutDate.getTime())) {
-      console.warn('Invalid workout date in updateMuscleStatusesFromWorkout', workout.id);
+      logger.warn('Invalid workout date in updateMuscleStatusesFromWorkout', workout.id);
       return;
     }
 
@@ -185,14 +186,14 @@ class MuscleRecoveryService {
       // Get the updated workout
       const workout = await dataService.getWorkout(workoutId);
       if (!workout) {
-        console.warn(`Workout ${workoutId} not found for muscle recovery recalculation`);
+        logger.warn(`Workout ${workoutId} not found for muscle recovery recalculation`);
         return;
       }
 
       // Recalculate all muscle statuses (this will include the updated workout)
       await this.recalculateAllMuscleStatuses(userId);
     } catch (error) {
-      console.error('Failed to recalculate muscle statuses after workout update:', error);
+      logger.error('Failed to recalculate muscle statuses after workout update:', error);
       // Don't throw - this is a background operation
     }
   }
@@ -331,7 +332,7 @@ class MuscleRecoveryService {
         await dataService.upsertMuscleStatus(updatedStatus);
       }
     } catch (error) {
-      console.error('Failed to recalculate muscle statuses:', error);
+      logger.error('Failed to recalculate muscle statuses:', error);
       throw error;
     }
   }

@@ -13,24 +13,30 @@ class Logger {
     private isProduction = import.meta.env.PROD;
 
   /**
-   * Log informational messages (disabled - no-op)
+   * Log informational messages
    */
-  log(_message: string, ..._args: unknown[]): void {
-    // Debug logging disabled
+  log(message: string, ...args: unknown[]): void {
+    if (!this.isProduction) {
+      console.log(message, ...args);
+    }
   }
 
   /**
-   * Log debug messages (disabled - no-op)
+   * Log debug messages
    */
-  debug(_message: string, ..._args: unknown[]): void {
-    // Debug logging disabled
+  debug(message: string, ...args: unknown[]): void {
+    if (!this.isProduction) {
+      console.debug(`[DEBUG] ${message}`, ...args);
+    }
   }
 
   /**
-   * Log info messages (disabled - no-op)
+   * Log info messages
    */
-  info(_message: string, ..._args: unknown[]): void {
-    // Debug logging disabled
+  info(message: string, ...args: unknown[]): void {
+    if (!this.isProduction) {
+      console.info(`[INFO] ${message}`, ...args);
+    }
   }
 
   /**

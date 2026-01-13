@@ -371,7 +371,7 @@ export async function initializeDefaultTemplates(userId: string): Promise<void> 
             const exercisesWithIds = template.exercises.map((ex) => {
                 const exerciseId = exerciseMap.get(ex.exerciseName);
                 if (!exerciseId) {
-                    console.warn(`Exercise "${ex.exerciseName}" not found, skipping...`);
+                    logger.warn(`Exercise "${ex.exerciseName}" not found, skipping...`);
                     return null;
                 }
                 return {
@@ -386,7 +386,7 @@ export async function initializeDefaultTemplates(userId: string): Promise<void> 
 
             // Skip template if no valid exercises found
             if (exercisesWithIds.length === 0) {
-                console.warn(`Template "${template.name}" has no valid exercises, skipping...`);
+                logger.warn(`Template "${template.name}" has no valid exercises, skipping...`);
                 continue;
             }
 

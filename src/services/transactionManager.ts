@@ -1,5 +1,6 @@
 import { db } from './database';
 import { Transaction } from 'dexie';
+import { logger } from '@/utils/logger';
 
 export interface TransactionOperation {
   operation: () => Promise<void>;
@@ -87,7 +88,7 @@ class TransactionManager {
                 try {
                   await executedOp.rollback();
                 } catch (rollbackError) {
-                  console.error(`Rollback failed for operation: ${executedOp.description}`, rollbackError);
+                  logger.error(`Rollback failed for operation: ${executedOp.description}`, rollbackError);
                 }
               }
             }
@@ -103,7 +104,7 @@ class TransactionManager {
           try {
             await executedOp.rollback();
           } catch (rollbackError) {
-            console.error(`Rollback failed for operation: ${executedOp.description}`, rollbackError);
+            logger.error(`Rollback failed for operation: ${executedOp.description}`, rollbackError);
           }
         }
       }

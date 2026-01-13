@@ -123,12 +123,12 @@ function App() {
 
           // Preload muscle images in background - independent, non-blocking
           muscleImageCache.preloadAllImages().catch((error) => {
-            console.warn('Failed to preload muscle images:', error);
+            logger.warn('Failed to preload muscle images:', error);
           }),
 
           // Clear expired muscle image cache - independent, non-blocking
           muscleImageCache.clearExpiredCache().catch((error) => {
-            console.warn('Failed to clear expired muscle image cache:', error);
+            logger.warn('Failed to clear expired muscle image cache:', error);
           }),
         ]);
 
@@ -143,7 +143,7 @@ function App() {
         if (user?.id) {
           // Initialize workout event tracker (notifications pulled after Firebase auth in AppRoutes)
           await workoutEventTracker.initialize(user.id).catch((error) => {
-            console.warn('Failed to initialize workout event tracker:', error);
+            logger.warn('Failed to initialize workout event tracker:', error);
           });
         }
 
@@ -211,7 +211,7 @@ function App() {
             .catch((error) => {
               // Only log error if it's not a 404 (file not found)
               if (!error.message?.includes('not found') && !error.message?.includes('404')) {
-                console.error('[SW] Service Worker registration failed:', error);
+                logger.error('[SW] Service Worker registration failed:', error);
               }
               // In dev mode, this might fail initially - that's okay, it will work after VitePWA builds it
             });

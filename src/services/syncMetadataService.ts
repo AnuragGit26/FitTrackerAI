@@ -1,6 +1,7 @@
 import { dbHelpers } from './database';
 import { SyncMetadata, SyncableTable, SyncStatus } from '@/types/sync';
 import { LocalSyncMetadata } from './database';
+import { logger } from '@/utils/logger';
 
 class SyncMetadataService {
     async getLocalMetadata(
@@ -11,7 +12,7 @@ class SyncMetadataService {
             const metadata = await dbHelpers.getSyncMetadata(tableName, userId);
             return metadata || null;
         } catch (error) {
-            console.error(`Failed to get local sync metadata for ${tableName}:`, error);
+            logger.error(`Failed to get local sync metadata for ${tableName}:`, error);
             return null;
         }
     }
@@ -116,7 +117,7 @@ class SyncMetadataService {
         try {
             return await dbHelpers.getAllSyncMetadata(userId);
         } catch (error) {
-            console.error(`Failed to get all sync metadata for user ${userId}:`, error);
+            logger.error(`Failed to get all sync metadata for user ${userId}:`, error);
             return [];
         }
     }

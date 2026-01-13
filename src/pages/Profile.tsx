@@ -30,7 +30,7 @@ export function Profile() {
   // Debug logging for profile state
   useEffect(() => {
     // eslint-disable-next-line no-console
-    console.log('[Profile] Component render - profile:', profile, 'profile?.id:', profile?.id, 'isLoading:', isLoading, 'isAuthenticated:', isAuthenticated);
+    logger.log('[Profile] Component render - profile:', profile, 'profile?.id:', profile?.id, 'isLoading:', isLoading, 'isAuthenticated:', isAuthenticated);
   }, [profile, isLoading, isAuthenticated]);
   const { 
     settings, 
@@ -201,10 +201,10 @@ export function Profile() {
   
   const handleManualSync = async () => {
     // eslint-disable-next-line no-console
-    console.log('[Profile.handleManualSync] Button clicked, profile.id:', profile?.id, 'isSyncing:', isSyncing);
+    logger.log('[Profile.handleManualSync] Button clicked, profile.id:', profile?.id, 'isSyncing:', isSyncing);
 
     if (!profile?.id || isSyncing) {
-      console.warn('[Profile.handleManualSync] Sync aborted - missing profile.id or already syncing');
+      logger.warn('[Profile.handleManualSync] Sync aborted - missing profile.id or already syncing');
       return;
     }
 
@@ -214,28 +214,28 @@ export function Profile() {
     try {
       const useFirestore = import.meta.env.VITE_USE_FIRESTORE === 'true';
       // eslint-disable-next-line no-console
-      console.log('[Profile.handleManualSync] useFirestore:', useFirestore);
+      logger.log('[Profile.handleManualSync] useFirestore:', useFirestore);
 
       let results;
       if (useFirestore) {
         // Use Firestore sync service
         // eslint-disable-next-line no-console
-        console.log('[Profile.handleManualSync] Getting Auth0 token for Firebase authentication...');
+        logger.log('[Profile.handleManualSync] Getting Auth0 token for Firebase authentication...');
 
         // Get Auth0 token and store in localStorage for Firestore sync
         try {
           const token = await getAccessTokenSilently();
           localStorage.setItem('auth0_access_token', token);
           // eslint-disable-next-line no-console
-          console.log('[Profile.handleManualSync] Auth0 token stored in localStorage');
+          logger.log('[Profile.handleManualSync] Auth0 token stored in localStorage');
         } catch (tokenError) {
           // eslint-disable-next-line no-console
-          console.error('[Profile.handleManualSync] Failed to get Auth0 token:', tokenError);
+          logger.error('[Profile.handleManualSync] Failed to get Auth0 token:', tokenError);
           throw new Error('Failed to authenticate with Auth0. Please try logging in again.');
         }
 
         // eslint-disable-next-line no-console
-        console.log('[Profile.handleManualSync] Calling firestoreSyncService.sync...');
+        logger.log('[Profile.handleManualSync] Calling firestoreSyncService.sync...');
         const { firestoreSyncService } = await import('@/services/firestoreSyncService');
         results = await firestoreSyncService.sync(profile.id, {
           direction: 'bidirectional',
@@ -243,14 +243,14 @@ export function Profile() {
       } else {
         // Use MongoDB sync service
         // eslint-disable-next-line no-console
-        console.log('[Profile.handleManualSync] Calling mongodbSyncService.sync...');
+        logger.log('[Profile.handleManualSync] Calling mongodbSyncService.sync...');
         results = await mongodbSyncService.sync(profile.id, {
           direction: 'bidirectional',
         });
       }
       
       // eslint-disable-next-line no-console
-      console.log('[Profile.handleManualSync] Sync completed, results:', results);
+      logger.log('[Profile.handleManualSync] Sync completed, results:', results);
       
       const hasErrors = results.some((r) => r.status === 'error');
       const totalConflicts = results.reduce((sum, r) => sum + r.conflicts, 0);
@@ -291,7 +291,7 @@ export function Profile() {
       setLastSyncTime(new Date());
       await loadSyncStatus();
     } catch (error) {
-      console.error('[Profile.handleManualSync] Sync error:', error);
+      logger.error('[Profile.handleManualSync] Sync error:', error);
       setSyncStatus('error');
       const errorMessage = error instanceof Error ? error.message : 'Failed to sync data';
       
@@ -497,7 +497,7 @@ export function Profile() {
       
       navigate(-1);
     } catch (error) {
-      console.error('Failed to save profile:', error);
+      logger.error('Failed to save profile:', error);
       showError('Failed to save profile. Please try again.');
     } finally {
       setIsSaving(false);

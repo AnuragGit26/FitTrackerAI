@@ -1,4 +1,5 @@
 import { ExerciseTrackingType, WorkoutSet, DistanceUnit } from '@/types/exercise';
+import { logger } from '@/utils/logger';
 
 export function validateWeight(weight: number, unit: 'kg' | 'lbs'): { valid: boolean; error?: string } {
   if (weight <= 0) {
@@ -301,7 +302,7 @@ export function normalizeWorkoutStartTime(
   
   // Check if startTime is valid
   if (isNaN(startTimeDate.getTime())) {
-    console.warn('Invalid startTime detected, using workout date');
+    logger.warn('Invalid startTime detected, using workout date');
     return validWorkoutDate;
   }
   
@@ -321,7 +322,7 @@ export function normalizeWorkoutStartTime(
   let normalized = startTimeDate;
   if (workoutDateLocal.getTime() !== startTimeLocal.getTime()) {
     normalized = adjustStartTimeToMatchDate(validWorkoutDate, startTimeDate);
-    console.warn('Start time adjusted to match workout date', {
+    logger.warn('Start time adjusted to match workout date', {
       original: startTimeDate.toISOString(),
       adjusted: normalized.toISOString(),
     });
@@ -331,7 +332,7 @@ export function normalizeWorkoutStartTime(
   const maxAllowedTime = now.getTime() + toleranceMs;
   if (normalized.getTime() > maxAllowedTime) {
     const capped = new Date(Math.min(normalized.getTime(), maxAllowedTime));
-    console.warn('Start time capped to current time (was in the future)', {
+    logger.warn('Start time capped to current time (was in the future)', {
       original: normalized.toISOString(),
       capped: capped.toISOString(),
     });
@@ -385,7 +386,7 @@ export function normalizeWorkoutTimes(
   
   // Check if endTime is valid
   if (isNaN(endTimeDate.getTime())) {
-    console.warn('Invalid endTime detected, using current time');
+    logger.warn('Invalid endTime detected, using current time');
     endTimeDate = now;
   }
   
@@ -433,7 +434,7 @@ export function normalizeWorkoutTimes(
       normalizedEndTime = new Date(normalizedStartTime.getTime() + fallbackDuration);
     }
     
-    console.warn('End time adjusted to match start time adjustment', {
+    logger.warn('End time adjusted to match start time adjustment', {
       original: endTimeDate.toISOString(),
       adjusted: normalizedEndTime.toISOString(),
       originalDuration: originalDuration > 0 ? `${Math.round(originalDuration / 60000)} minutes` : 'N/A',
@@ -455,7 +456,7 @@ export function normalizeWorkoutTimes(
   if (timeDiff > MAX_WORKOUT_DURATION_MS) {
     // Cap end time to 1 day after start time
     normalizedEndTime = new Date(normalizedStartTime.getTime() + MAX_WORKOUT_DURATION_MS);
-    console.warn('End time capped to 1 day after start time', {
+    logger.warn('End time capped to 1 day after start time', {
       original: normalizedEndTime.toISOString(),
       capped: normalizedEndTime.toISOString(),
     });

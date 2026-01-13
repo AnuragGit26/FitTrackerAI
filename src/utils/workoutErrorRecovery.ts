@@ -1,4 +1,5 @@
 import { Workout } from '@/types/workout';
+import { logger } from '@/utils/logger';
 
 export interface FailedWorkout {
   id: string;
@@ -48,7 +49,7 @@ export function saveFailedWorkout(workout: Workout, error: Error | string): stri
     localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
     return failedWorkout.id;
   } catch (e) {
-    console.error('Failed to save failed workout to localStorage:', e);
+    logger.error('Failed to save failed workout to localStorage:', e);
     throw new Error('Failed to save workout for recovery. Please try again.');
   }
 }
@@ -103,13 +104,13 @@ export function getFailedWorkouts(): FailedWorkout[] {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(validWorkouts));
         }
       } catch (e) {
-        console.warn('Failed to save cleaned failed workouts list:', e);
+        logger.warn('Failed to save cleaned failed workouts list:', e);
       }
     }
     
     return validWorkouts;
   } catch (e) {
-    console.error('Failed to load failed workouts from localStorage:', e);
+    logger.error('Failed to load failed workouts from localStorage:', e);
     return [];
   }
 }
@@ -128,7 +129,7 @@ export function removeFailedWorkout(id: string): void {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
     }
   } catch (e) {
-    console.error('Failed to remove failed workout from localStorage:', e);
+    logger.error('Failed to remove failed workout from localStorage:', e);
   }
 }
 
@@ -144,7 +145,7 @@ export function incrementRetryCount(id: string): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
   } catch (e) {
-    console.error('Failed to update retry count:', e);
+    logger.error('Failed to update retry count:', e);
   }
 }
 
@@ -182,7 +183,7 @@ export function updateFailedWorkout(id: string, workout: Workout, error?: string
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
   } catch (e) {
-    console.error('Failed to update failed workout:', e);
+    logger.error('Failed to update failed workout:', e);
   }
 }
 
@@ -193,7 +194,7 @@ export function clearAllFailedWorkouts(): void {
   try {
     localStorage.removeItem(STORAGE_KEY);
   } catch (e) {
-    console.error('Failed to clear failed workouts:', e);
+    logger.error('Failed to clear failed workouts:', e);
   }
 }
 

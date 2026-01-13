@@ -1,6 +1,7 @@
 import { dataService } from './dataService';
 import { Workout } from '@/types/workout';
 import { dbHelpers } from './database';
+import { logger } from '@/utils/logger';
 
 type WorkoutEventCallback = (workout: Workout) => void;
 
@@ -32,7 +33,7 @@ class WorkoutEventTracker {
 
       this.isInitialized = true;
     } catch (error) {
-      console.error('Failed to initialize workout event tracker:', error);
+      logger.error('Failed to initialize workout event tracker:', error);
     }
   }
 
@@ -66,12 +67,12 @@ class WorkoutEventTracker {
           try {
             callback(mostRecent);
           } catch (error) {
-            console.error('Error in workout event callback:', error);
+            logger.error('Error in workout event callback:', error);
           }
         });
       }
     } catch (error) {
-      console.error('Failed to handle workout event:', error);
+      logger.error('Failed to handle workout event:', error);
     }
   }
 
@@ -126,7 +127,7 @@ class WorkoutEventTracker {
 
       return newWorkouts;
     } catch (error) {
-      console.error('Failed to check for new workouts:', error);
+      logger.error('Failed to check for new workouts:', error);
       return [];
     }
   }

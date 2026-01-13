@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth0 } from '@auth0/auth0-react';
 import { motion } from 'framer-motion';
 import { userContextManager } from '@/services/userContextManager';
+import { logger } from '@/utils/logger';
 
 /**
  * Clear Auth0 cache from localStorage to ensure fresh signup
@@ -37,7 +38,7 @@ function clearAuth0Cache(): void {
       }
     });
   } catch (error) {
-    console.error('Failed to clear Auth0 cache:', error);
+    logger.error('Failed to clear Auth0 cache:', error);
   }
 }
 

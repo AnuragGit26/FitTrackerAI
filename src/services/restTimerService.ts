@@ -19,6 +19,8 @@ export interface RestTimerPreset {
   color: string;
 }
 
+import { logger } from '@/utils/logger';
+
 class RestTimerService {
   private notificationPermission: NotificationPermission = 'default';
   private audioContext: AudioContext | null = null;
@@ -35,7 +37,7 @@ class RestTimerService {
         try {
           this.notificationPermission = await Notification.requestPermission();
         } catch (error) {
-          console.warn('Failed to request notification permission:', error);
+          logger.warn('Failed to request notification permission:', error);
         }
       }
     }
@@ -47,7 +49,7 @@ class RestTimerService {
         (window as typeof window & { webkitAudioContext?: typeof AudioContext })
           .webkitAudioContext)();
     } catch (error) {
-      console.warn('AudioContext not supported:', error);
+      logger.warn('AudioContext not supported:', error);
     }
   }
 
@@ -76,7 +78,7 @@ class RestTimerService {
       oscillator.start(this.audioContext.currentTime);
       oscillator.stop(this.audioContext.currentTime + 0.5);
     } catch (error) {
-      console.warn('Failed to play sound:', error);
+      logger.warn('Failed to play sound:', error);
     }
   }
 
@@ -88,7 +90,7 @@ class RestTimerService {
       try {
         navigator.vibrate(pattern);
       } catch (error) {
-        console.warn('Vibration not supported:', error);
+        logger.warn('Vibration not supported:', error);
       }
     }
   }
@@ -106,7 +108,7 @@ class RestTimerService {
           tag: 'rest-timer',
         } as NotificationOptions);
       } catch (error) {
-        console.warn('Failed to show notification:', error);
+        logger.warn('Failed to show notification:', error);
       }
     }
   }

@@ -651,7 +651,7 @@ export const dbHelpers = {
         .filter(w => !w.deletedAt)
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     } catch (error) {
-      console.error('[database] getAllWorkouts failed:', error);
+      logger.error('[database] getAllWorkouts failed:', error);
       // Return empty array instead of throwing to prevent app crash
       return [];
     }

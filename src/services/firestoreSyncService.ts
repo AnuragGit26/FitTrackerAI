@@ -25,6 +25,7 @@ import { versionManager } from './versionManager';
 import { errorRecovery } from './errorRecovery';
 import { userContextManager } from './userContextManager';
 import { errorLogService } from './errorLogService';
+import { logger } from '@/utils/logger';
 import {
   SyncOptions,
   SyncResult,
@@ -56,7 +57,7 @@ function timestampToLocalDate(timestamp: number | Date | Timestamp | string | nu
   if (typeof timestamp === 'string') {
     const date = new Date(timestamp);
     if (isNaN(date.getTime())) {
-      console.warn(`[timestampToLocalDate] Invalid date string: ${timestamp}`);
+      logger.warn(`[timestampToLocalDate] Invalid date string: ${timestamp}`);
       return null;
     }
     return date;
@@ -71,7 +72,7 @@ function timestampToLocalDate(timestamp: number | Date | Timestamp | string | nu
     const date = new Date(timestamp);
     const year = date.getFullYear();
     if (year < 2000 || year > 2100) {
-      console.warn(`[timestampToLocalDate] Date out of reasonable range (${year}): ${timestamp}`);
+      logger.warn(`[timestampToLocalDate] Date out of reasonable range (${year}): ${timestamp}`);
       return null;
     }
 
@@ -154,15 +155,15 @@ class FirestoreSyncService {
    * Main sync method - queues sync operations
    */
   async sync(userId: string, options: SyncOptions = {}): Promise<SyncResult[]> {
-    console.log('[FirestoreSyncService.sync] Starting sync for userId:', userId, 'options:', options);
+    logger.log('[FirestoreSyncService.sync] Starting sync for userId:', userId, 'options:', options);
 
     this.syncQueue = this.syncQueue
       .then(async () => {
-        console.log('[FirestoreSyncService.sync] Executing performSync...');
+        logger.log('[FirestoreSyncService.sync] Executing performSync...');
         return await this.performSync(userId, options);
       })
       .catch((error) => {
-        console.error('[FirestoreSyncService.sync] Sync failed:', error);
+        logger.error('[FirestoreSyncService.sync] Sync failed:', error);
         this.isSyncing = false;
         this.currentProgress = null;
         throw error;
@@ -212,7 +213,7 @@ class FirestoreSyncService {
     };
 
     try {
-      console.log('[FirestoreSyncService.performSync] Setting userId context...');
+      logger.log('[FirestoreSyncService.performSync] Setting userId context...');
       userContextManager.setUserId(validatedUserId);
 
       // Ensure Firebase authentication
@@ -226,9 +227,9 @@ class FirestoreSyncService {
       const pullOnlyTables = tables.filter((t) => t === 'notifications');
 
       // Sync independent tables in parallel
-      console.log('[FirestoreSyncService.performSync] Syncing independent tables:', independentTables);
+      logger.log('[FirestoreSyncService.performSync] Syncing independent tables:', independentTables);
       const independentPromises = independentTables.map(async (table) => {
-        console.log(`[FirestoreSyncService.performSync] Syncing table: ${table}`);
+        logger.log(`[FirestoreSyncService.performSync] Syncing table: ${table}`);
         try {
           const result = await this.syncTable(validatedUserId, table, direction, options);
           this.updateProgress({
@@ -238,7 +239,7 @@ class FirestoreSyncService {
           return result;
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          console.error(`[FirestoreSyncService.performSync] Error syncing table ${table}:`, errorMessage);
+          logger.error(`[FirestoreSyncService.performSync] Error syncing table ${table}:`, errorMessage);
 
           await errorLogService
             .logSyncError(
@@ -250,7 +251,7 @@ class FirestoreSyncService {
               { direction }
             )
             .catch((logError) => {
-              console.error('Failed to log sync error:', logError);
+              logger.error('Failed to log sync error:', logError);
             });
 
           return {
@@ -390,16 +391,16 @@ class FirestoreSyncService {
             },
           });
         } catch (logError) {
-          console.error('Failed to log sync summary error:', logError);
+          logger.error('Failed to log sync summary error:', logError);
         }
       }
     } catch (error) {
-      console.error('[FirestoreSyncService.performSync] Sync error:', error);
+      logger.error('[FirestoreSyncService.performSync] Sync error:', error);
       throw error;
     } finally {
       this.isSyncing = false;
       this.currentProgress = null;
-      console.log('[FirestoreSyncService.performSync] Sync completed, results count:', results.length);
+      logger.log('[FirestoreSyncService.performSync] Sync completed, results count:', results.length);
     }
 
     return results;
@@ -414,10 +415,10 @@ class FirestoreSyncService {
       const currentUserId = firebaseAuthBridge.getCurrentUserId();
       // Verify it's the correct user
       if (currentUserId && currentUserId === userId) {
-        console.log('[FirestoreSyncService] Firebase already authenticated for user:', userId);
+        logger.log('[FirestoreSyncService] Firebase already authenticated for user:', userId);
         return;
       } else {
-        console.log('[FirestoreSyncService] Firebase authenticated for different user, re-authenticating...');
+        logger.log('[FirestoreSyncService] Firebase authenticated for different user, re-authenticating...');
       }
     }
 
@@ -427,17 +428,17 @@ class FirestoreSyncService {
       throw new Error('Auth0 token not found - user must be authenticated. Please reload the page or log in again.');
     }
 
-    console.log('[FirestoreSyncService] Authenticating Firebase with Auth0 token for user:', userId);
+    logger.log('[FirestoreSyncService] Authenticating Firebase with Auth0 token for user:', userId);
     try {
       await firebaseAuthBridge.authenticateWithAuth0(auth0Token, userId);
-      console.log('[FirestoreSyncService] Firebase authentication successful');
+      logger.log('[FirestoreSyncService] Firebase authentication successful');
 
       // Verify authentication succeeded
       if (!firebaseAuthBridge.isAuthenticated()) {
         throw new Error('Firebase authentication failed - no current user after sign in');
       }
     } catch (error) {
-      console.error('[FirestoreSyncService] Firebase authentication error:', error);
+      logger.error('[FirestoreSyncService] Firebase authentication error:', error);
       // Clear the cached token and retry once
       firebaseAuthBridge.clearTokenCache(userId);
       throw error;
@@ -662,7 +663,7 @@ class FirestoreSyncService {
       additionalInfo: { tableName },
     });
 
-    console.log(`[FirestoreSyncService.syncPush] Starting push sync for table: ${tableName}, userId: ${validatedUserId}`);
+    logger.log(`[FirestoreSyncService.syncPush] Starting push sync for table: ${tableName}, userId: ${validatedUserId}`);
 
     const startTime = Date.now();
     const result: SyncResult = {
@@ -718,7 +719,7 @@ class FirestoreSyncService {
               if (conflict) {
                 result.conflicts++;
                 await syncMetadataService.incrementConflictCount(tableName, validatedUserId);
-                console.warn(`[FirestoreSyncService.syncPush] Conflict detected for ${tableName} record:`, this.getRecordId(localRecord, tableName));
+                logger.warn(`[FirestoreSyncService.syncPush] Conflict detected for ${tableName} record:`, this.getRecordId(localRecord, tableName));
                 // Local-first strategy: overwrite remote with local
               }
             }
@@ -757,7 +758,7 @@ class FirestoreSyncService {
         // Commit batch
         if (batchCount > 0) {
           await firestoreBatch.commit();
-          console.log(`[FirestoreSyncService.syncPush] Committed batch of ${batchCount} records for ${tableName}`);
+          logger.log(`[FirestoreSyncService.syncPush] Committed batch of ${batchCount} records for ${tableName}`);
         }
       }
 
@@ -807,7 +808,7 @@ class FirestoreSyncService {
       additionalInfo: { tableName },
     });
 
-    console.debug(
+    logger.debug(
       `[FirestoreSyncService.fetchRemoteRecords] Fetching ${tableName} from Firestore for userId: ${validatedUserId}`,
       since ? `since ${since.toISOString()}` : ''
     );
@@ -878,7 +879,7 @@ class FirestoreSyncService {
       });
     });
 
-    console.debug(
+    logger.debug(
       `[FirestoreSyncService.fetchRemoteRecords] Fetched ${records.length} records for ${tableName} (userId: ${validatedUserId})`
     );
 
@@ -898,7 +899,7 @@ class FirestoreSyncService {
       additionalInfo: { tableName },
     });
 
-    console.debug(
+    logger.debug(
       `[FirestoreSyncService.fetchLocalRecords] Fetching ${tableName} from IndexedDB for userId: ${validatedUserId}`,
       since ? `since ${since.toISOString()}` : ''
     );
@@ -915,7 +916,7 @@ class FirestoreSyncService {
       });
     }
 
-    console.debug(
+    logger.debug(
       `[FirestoreSyncService.fetchLocalRecords] Fetched ${records.length} local records for ${tableName}`
     );
 

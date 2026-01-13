@@ -1,4 +1,5 @@
 import { db, InsightType, AICacheMetadata as DBAICacheMetadata } from './database';
+import { logger } from '@/utils/logger';
 
 export type { InsightType };
 
@@ -20,7 +21,7 @@ class AICacheManager {
 
             return metadata || null;
         } catch (error) {
-            console.error('Failed to get cache metadata:', error);
+            logger.error('Failed to get cache metadata:', error);
             return null;
         }
     }
@@ -57,7 +58,7 @@ class AICacheManager {
                 });
             }
         } catch (error) {
-            console.error('Failed to update cache metadata:', error);
+            logger.error('Failed to update cache metadata:', error);
         }
     }
 
@@ -186,7 +187,7 @@ class AICacheManager {
                 }
             }
         } catch (error) {
-            console.error('Failed to clear cache metadata:', error);
+            logger.error('Failed to clear cache metadata:', error);
         }
     }
 

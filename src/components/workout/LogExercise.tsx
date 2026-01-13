@@ -28,6 +28,7 @@ import { useToast } from '@/hooks/useToast';
 import { validateNotes, validateSet, validateReps, validateWeight } from '@/utils/validators';
 import { sanitizeNotes } from '@/utils/sanitize';
 import { prefersReducedMotion } from '@/utils/animations';
+import { logger } from '@/utils/logger';
 import { useSetDuration } from '@/hooks/useSetDuration';
 import { useSettingsStore } from '@/store/settingsStore';
 import { saveLogWorkoutState, saveLogExerciseState, loadLogExerciseState, clearLogExerciseState, saveWorkoutState } from '@/utils/workoutStatePersistence';
@@ -160,7 +161,7 @@ export function LogExercise({
               }
             })
             .catch((err) => {
-              console.error('Failed to restore exercise from persisted state:', err);
+              logger.error('Failed to restore exercise from persisted state:', err);
             });
         } else if (persistedState.sets.length > 0) {
           // Restore sets even without exercise (user might have been in middle of selecting)
@@ -233,7 +234,7 @@ export function LogExercise({
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : 'Failed to load exercise';
           showError(errorMessage);
-          console.error('Error loading exercise:', err);
+          logger.error('Error loading exercise:', err);
           handleForceClose();
         } finally {
           setIsLoadingExercise(false);
@@ -518,7 +519,7 @@ export function LogExercise({
           setDurationElapsed = Math.floor((now.getTime() - startTime.getTime()) / 1000);
         }
       } catch (error) {
-        console.error('Failed to read set duration state:', error);
+        logger.error('Failed to read set duration state:', error);
       }
 
       saveLogWorkoutState({
@@ -847,7 +848,7 @@ export function LogExercise({
         }
       } catch (error) {
         showError('Failed to start workout. Please try again.');
-        console.error('Error starting workout:', error);
+        logger.error('Error starting workout:', error);
         return;
       }
     }
@@ -863,7 +864,7 @@ export function LogExercise({
       
       // Ensure we have at least some muscles - fallback to a default if empty
       if (musclesWorked.length === 0) {
-        console.warn(`No muscles found for exercise "${selectedExercise.name}", using default`);
+        logger.warn(`No muscles found for exercise "${selectedExercise.name}", using default`);
         musclesWorked = [MuscleGroup.CHEST]; // Default fallback
       }
 
@@ -934,7 +935,7 @@ export function LogExercise({
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to save exercise';
       showError(errorMessage);
-      console.error('Error saving exercise:', err);
+      logger.error('Error saving exercise:', err);
     } finally {
       setIsSaving(false);
     }
@@ -992,7 +993,7 @@ export function LogExercise({
         await startWorkout(profile.id);
         workout = useWorkoutStore.getState().currentWorkout;
         if (!workout) {
-          console.warn('Failed to start workout for auto-save');
+          logger.warn('Failed to start workout for auto-save');
           return;
         }
       }
@@ -1065,7 +1066,7 @@ export function LogExercise({
         addExercise(workoutExercise);
       }
     } catch (error) {
-      console.error('Error auto-saving exercise sets:', error);
+      logger.error('Error auto-saving exercise sets:', error);
     }
   }, [selectedExercise, sets, exerciseId, workoutDate, notes, currentWorkout, profile, startWorkout, updateExercise, addExercise]);
 
@@ -1130,7 +1131,7 @@ export function LogExercise({
       currentSetStartTimeRef.current = new Date();
       startSet();
     } catch (error) {
-      console.error('Error in handleRestComplete:', error);
+      logger.error('Error in handleRestComplete:', error);
       // Still reset timer state even if there's an error
       if (isMountedRef.current) {
         setRestTimerVisible(false);
@@ -1202,7 +1203,7 @@ export function LogExercise({
     
     // Ensure we have a set to complete
     if (!setToComplete || setToComplete.completed) {
-      console.error('No set to complete');
+      logger.error('No set to complete');
       return;
     }
 
@@ -1276,7 +1277,7 @@ export function LogExercise({
         await handleSave();
       } catch (error) {
         // If save fails, don't navigate
-        console.error('Failed to save exercise before navigation:', error);
+        logger.error('Failed to save exercise before navigation:', error);
         return;
       }
     }

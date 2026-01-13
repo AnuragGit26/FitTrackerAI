@@ -3,7 +3,9 @@
  * Handles communication between main thread and service worker for background AI fetching
  */
 
-type MessageType = 
+import { logger } from '@/utils/logger';
+
+type MessageType =  
   | 'FETCH_AI_INSIGHTS'
   | 'AI_INSIGHTS_READY'
   | 'AI_INSIGHTS_ERROR'
@@ -71,7 +73,7 @@ class SWCommunication {
         try {
           handler(message);
         } catch (error) {
-          console.error(`[SW Communication] Error in message handler for ${message.type}:`, error);
+          logger.error(`[SW Communication] Error in message handler for ${message.type}:`, error);
         }
       });
     }
@@ -135,7 +137,7 @@ class SWCommunication {
   async sendMessage(type: MessageType, data: Record<string, unknown> = {}): Promise<void> {
     const sw = this.getServiceWorker();
     if (!sw) {
-      console.warn('[SW Communication] Service worker not available, message not sent:', type);
+      logger.warn('[SW Communication] Service worker not available, message not sent:', type);
       return;
     }
 
@@ -148,7 +150,7 @@ class SWCommunication {
         ...serializedData,
       });
     } catch (error) {
-      console.error('[SW Communication] Failed to send message:', error);
+      logger.error('[SW Communication] Failed to send message:', error);
     }
   }
 

@@ -2,6 +2,7 @@
 // Triggers Supabase Edge Function to sync data to MongoDB when client sync starts
 
 import type { SyncableTable, SyncDirection } from '@/types/sync';
+import { logger } from '@/utils/logger';
 
 const WEBHOOK_TIMEOUT = 5000; // 5 seconds
 
@@ -14,7 +15,7 @@ function getSupabaseUrl(): string {
         import.meta.env.REACT_APP_SUPABASE_URL;
 
     if (!url) {
-        console.warn('[SupabaseSyncWebhook] Supabase URL not configured');
+        logger.warn('[SupabaseSyncWebhook] Supabase URL not configured');
         return '';
     }
 
@@ -47,14 +48,14 @@ export async function triggerSyncWebhook(
     // Don't block if Supabase URL is not configured
     const supabaseUrl = getSupabaseUrl();
     if (!supabaseUrl) {
-        console.warn('[SupabaseSyncWebhook] Skipping webhook - Supabase URL not configured');
+        logger.warn('[SupabaseSyncWebhook] Skipping webhook - Supabase URL not configured');
         return;
     }
 
     // Fire and forget - don't await, catch errors silently
     triggerSyncWebhookInternal(userId, options).catch((error) => {
         // Log error but don't throw - this is non-critical
-        console.warn('[SupabaseSyncWebhook] Failed to trigger webhook:', error);
+        logger.warn('[SupabaseSyncWebhook] Failed to trigger webhook:', error);
     });
 }
 
@@ -155,8 +156,7 @@ async function triggerSyncWebhookInternal(
             throw new Error(`Webhook failed: ${response.status} ${response.statusText} - ${errorText}`);
         }
 
-        // eslint-disable-next-line no-console
-        console.log('[SupabaseSyncWebhook] Webhook triggered successfully for userId:', userId);
+        logger.log('[SupabaseSyncWebhook] Webhook triggered successfully for userId:', userId);
     } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') {
             throw new Error('Webhook request timed out');

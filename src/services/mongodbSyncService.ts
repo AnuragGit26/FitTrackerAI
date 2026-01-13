@@ -26,6 +26,7 @@ import { userContextManager } from './userContextManager';
 import { db } from './database';
 import { sleepRecoveryService } from './sleepRecoveryService';
 import { errorLogService } from './errorLogService';
+import { logger } from '@/utils/logger';
 
 /**
  * Convert a timestamp (number) to a local Date object
@@ -39,7 +40,7 @@ function timestampToLocalDate(timestamp: number | Date | string | null | undefin
         const date = new Date(timestamp);
         // Validate the date is valid
         if (isNaN(date.getTime())) {
-            console.warn(`[timestampToLocalDate] Invalid date string: ${timestamp}`);
+            logger.warn(`[timestampToLocalDate] Invalid date string: ${timestamp}`);
             return null;
         }
         return date;
@@ -61,7 +62,7 @@ function timestampToLocalDate(timestamp: number | Date | string | null | undefin
         // Validate the date is reasonable (between 2000 and 2100)
         const year = date.getFullYear();
         if (year < 2000 || year > 2100) {
-            console.warn(`[timestampToLocalDate] Date out of reasonable range (${year}): ${timestamp}`);
+            logger.warn(`[timestampToLocalDate] Date out of reasonable range (${year}): ${timestamp}`);
             return null;
         }
 
@@ -119,12 +120,10 @@ class MongoDBSyncService {
         userId: string,
         options: SyncOptions = {}
     ): Promise<SyncResult[]> {
-        // eslint-disable-next-line no-console
-        console.log('[MongoDBSyncService.sync] Starting sync for userId:', userId, 'options:', options);
+        logger.log('[MongoDBSyncService.sync] Starting sync for userId:', userId, 'options:', options);
         this.syncQueue = this.syncQueue
             .then(async () => {
-                // eslint-disable-next-line no-console
-                console.log('[MongoDBSyncService.sync] Executing performSync...');
+                logger.log('[MongoDBSyncService.sync] Executing performSync...');
                 const results = await this.performSync(userId, options);
                 
                 // Trigger webhook AFTER sync completes to ensure data is in Supabase
@@ -137,18 +136,17 @@ class MongoDBSyncService {
                             tables: options.tables,
                             direction: options.direction,
                         });
-                        // eslint-disable-next-line no-console
-                        console.log('[MongoDBSyncService.sync] Webhook triggered after successful sync');
+                        logger.log('[MongoDBSyncService.sync] Webhook triggered after successful sync');
                     } catch (error) {
                         // Log but don't block - webhook failure doesn't affect sync success
-                        console.warn('[MongoDBSyncService.sync] Failed to trigger webhook after sync:', error);
+                        logger.warn('[MongoDBSyncService.sync] Failed to trigger webhook after sync:', error);
                     }
                 }
                 
                 return results;
             })
             .catch((error) => {
-                console.error('[MongoDBSyncService.sync] Sync failed:', error);
+                logger.error('[MongoDBSyncService.sync] Sync failed:', error);
                 this.isSyncing = false;
                 this.currentProgress = null;
                 
@@ -197,8 +195,7 @@ class MongoDBSyncService {
         };
 
         try {
-            // eslint-disable-next-line no-console
-            console.log('[MongoDBSyncService.performSync] Using Prisma Client, setting userId...');
+            logger.log('[MongoDBSyncService.performSync] Using Prisma Client, setting userId...');
             userContextManager.setUserId(validatedUserId);
 
             // Filter independent tables (exclude user_profiles, settings, notifications, and error_logs)
@@ -213,12 +210,10 @@ class MongoDBSyncService {
                 t === 'notifications'
             );
 
-            // eslint-disable-next-line no-console
-            console.log('[MongoDBSyncService.performSync] Syncing independent tables:', independentTables);
+            logger.log('[MongoDBSyncService.performSync] Syncing independent tables:', independentTables);
             // Use Promise.allSettled instead of Promise.all to prevent one failure from stopping others
             const independentPromises = independentTables.map(async (table) => {
-                // eslint-disable-next-line no-console
-                console.log(`[MongoDBSyncService.performSync] Syncing table: ${table}`);
+                logger.log(`[MongoDBSyncService.performSync] Syncing table: ${table}`);
                 try {
                     const result = await this.syncTable(validatedUserId, table, direction, options);
                     this.updateProgress({
@@ -228,7 +223,7 @@ class MongoDBSyncService {
                     return result;
                 } catch (error) {
                     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-                    console.error(`[MongoDBSyncService.performSync] Error syncing table ${table}:`, errorMessage);
+                    logger.error(`[MongoDBSyncService.performSync] Error syncing table ${table}:`, errorMessage);
                     const errorResult: SyncResult = {
                         tableName: table,
                         direction,
@@ -255,15 +250,14 @@ class MongoDBSyncService {
                         'read',
                         { direction }
                     ).catch((logError) => {
-                        console.error('Failed to log sync error:', logError);
+                        logger.error('Failed to log sync error:', logError);
                     });
                     return errorResult;
                 }
             });
             const independentResults = await Promise.all(independentPromises);
             results.push(...independentResults);
-            // eslint-disable-next-line no-console
-            console.log('[MongoDBSyncService.performSync] Independent tables synced, results:', independentResults);
+            logger.log('[MongoDBSyncService.performSync] Independent tables synced, results:', independentResults);
 
             for (const table of dependentTables) {
                 this.updateProgress({
@@ -310,7 +304,7 @@ class MongoDBSyncService {
                         'read',
                         { direction }
                     ).catch((logError) => {
-                        console.error('Failed to log sync error:', logError);
+                        logger.error('Failed to log sync error:', logError);
                     });
                 }
             }
@@ -360,7 +354,7 @@ class MongoDBSyncService {
                         'read',
                         { direction: 'pull' }
                     ).catch((logError) => {
-                        console.error('Failed to log sync error:', logError);
+                        logger.error('Failed to log sync error:', logError);
                     });
                 }
             }
@@ -386,23 +380,22 @@ class MongoDBSyncService {
                         },
                     });
                 } catch (logError) {
-                    console.error('Failed to log sync summary error:', logError);
+                    logger.error('Failed to log sync summary error:', logError);
                 }
 
                 errorLogService.syncToMongoDB(validatedUserId).catch((syncError) => {
-                    console.error('Failed to sync error logs to MongoDB:', syncError);
+                    logger.error('Failed to sync error logs to MongoDB:', syncError);
                 });
             }
         } catch (error) {
-            console.error('[MongoDBSyncService.performSync] Sync error:', error);
+            logger.error('[MongoDBSyncService.performSync] Sync error:', error);
             this.isSyncing = false;
             this.currentProgress = null;
             throw error;
         } finally {
             this.isSyncing = false;
             this.currentProgress = null;
-            // eslint-disable-next-line no-console
-            console.log('[MongoDBSyncService.performSync] Sync completed, results count:', results.length);
+            logger.log('[MongoDBSyncService.performSync] Sync completed, results count:', results.length);
         }
 
         return results;
@@ -547,7 +540,7 @@ class MongoDBSyncService {
                     error instanceof Error ? error : new Error(errorMessage),
                     'read'
                 ).catch((logError) => {
-                    console.error('Failed to log sync error:', logError);
+                    logger.error('Failed to log sync error:', logError);
                 });
                 }
             }
@@ -578,7 +571,7 @@ class MongoDBSyncService {
                 error instanceof Error ? error : new Error(errorMessage),
                 'read'
             ).catch((logError) => {
-                console.error('Failed to log sync error:', logError);
+                logger.error('Failed to log sync error:', logError);
             });
             
             return result;
@@ -595,8 +588,7 @@ class MongoDBSyncService {
             additionalInfo: { tableName },
         });
 
-        // eslint-disable-next-line no-console
-        console.log(`[MongoDBSyncService.syncPush] Starting push sync for table: ${tableName}, userId: ${validatedUserId}`);
+        logger.log(`[MongoDBSyncService.syncPush] Starting push sync for table: ${tableName}, userId: ${validatedUserId}`);
 
         const startTime = Date.now();
         const result: SyncResult = {
@@ -613,17 +605,13 @@ class MongoDBSyncService {
         };
 
         try {
-            // eslint-disable-next-line no-console
-            console.log(`[MongoDBSyncService.syncPush] Fetching local records for ${tableName}...`);
+            logger.log(`[MongoDBSyncService.syncPush] Fetching local records for ${tableName}...`);
             const allLocalRecords = await this.fetchLocalRecords(userId, tableName);
-            // eslint-disable-next-line no-console
-            console.log(`[MongoDBSyncService.syncPush] Fetched ${allLocalRecords.length} local records`);
+            logger.log(`[MongoDBSyncService.syncPush] Fetched ${allLocalRecords.length} local records`);
             
-            // eslint-disable-next-line no-console
-            console.log(`[MongoDBSyncService.syncPush] Fetching remote records for ${tableName}...`);
+            logger.log(`[MongoDBSyncService.syncPush] Fetching remote records for ${tableName}...`);
             const allRemoteRecords = await this.fetchRemoteRecords(validatedUserId, tableName);
-            // eslint-disable-next-line no-console
-            console.log(`[MongoDBSyncService.syncPush] Fetched ${allRemoteRecords.length} remote records`);
+            logger.log(`[MongoDBSyncService.syncPush] Fetched ${allRemoteRecords.length} remote records`);
             
             const remoteMap = new Map<string | number, Record<string, unknown>>();
             for (const remoteRecord of allRemoteRecords) {
@@ -643,8 +631,7 @@ class MongoDBSyncService {
                 if (!remoteRecord) {
                     // Local doesn't exist remotely, always push
                     recordsToPush.push(localRecord);
-                    // eslint-disable-next-line no-console
-                    console.log(`[MongoDBSyncService.syncPush] Including ${tableName} ${recordId} in push (new record)`);
+                    logger.log(`[MongoDBSyncService.syncPush] Including ${tableName} ${recordId} in push (new record)`);
                 } else {
                     const localUpdatedAt = this.getUpdatedAt(localRecord as Record<string, unknown>);
                     const remoteUpdatedAt = this.getUpdatedAt(remoteRecord);
@@ -675,8 +662,7 @@ class MongoDBSyncService {
                     
                     if (needsUpdate) {
                         recordsToPush.push(localRecord);
-                        // eslint-disable-next-line no-console
-                        console.log(`[MongoDBSyncService.syncPush] Including ${tableName} ${recordId} in push. Local version: ${localVersion ?? 'N/A'}, remote version: ${remoteVersion ?? 'N/A'}, queued: ${wasQueuedForPush ?? false}, offline: ${wasModifiedOffline}`);
+                        logger.log(`[MongoDBSyncService.syncPush] Including ${tableName} ${recordId} in push. Local version: ${localVersion ?? 'N/A'}, remote version: ${remoteVersion ?? 'N/A'}, queued: ${wasQueuedForPush ?? false}, offline: ${wasModifiedOffline}`);
                     }
                 }
             }
@@ -685,8 +671,7 @@ class MongoDBSyncService {
             const key = `${validatedUserId}:${tableName}`;
             this.recordsToPushAfterConflict.delete(key);
 
-            // eslint-disable-next-line no-console
-            console.log(`[MongoDBSyncService.syncPush] Found ${recordsToPush.length} records to push to ${tableName}`);
+            logger.log(`[MongoDBSyncService.syncPush] Found ${recordsToPush.length} records to push to ${tableName}`);
 
             this.updateProgress({
                 currentOperation: `Pushing ${recordsToPush.length} records to ${tableName}...`,
@@ -694,16 +679,13 @@ class MongoDBSyncService {
             });
 
             const batches = this.chunkArray(recordsToPush, options.batchSize || BATCH_SIZE);
-            // eslint-disable-next-line no-console
-            console.log(`[MongoDBSyncService.syncPush] Split into ${batches.length} batches`);
+            logger.log(`[MongoDBSyncService.syncPush] Split into ${batches.length} batches`);
 
             for (const batch of batches) {
                 try {
-                    // eslint-disable-next-line no-console
-                    console.log(`[MongoDBSyncService.syncPush] Pushing batch of ${batch.length} records to ${tableName}...`);
+                    logger.log(`[MongoDBSyncService.syncPush] Pushing batch of ${batch.length} records to ${tableName}...`);
                     const batchResult = await this.pushBatch(validatedUserId, tableName, batch);
-                    // eslint-disable-next-line no-console
-                    console.log(`[MongoDBSyncService.syncPush] Batch result:`, batchResult);
+                    logger.log(`[MongoDBSyncService.syncPush] Batch result:`, batchResult);
                     result.recordsProcessed += batchResult.recordsProcessed;
                     result.recordsCreated += batchResult.recordsCreated;
                     result.recordsUpdated += batchResult.recordsUpdated;
@@ -731,7 +713,7 @@ class MongoDBSyncService {
                         'create',
                         { batchSize: batch.length }
                     ).catch((logError) => {
-                        console.error('Failed to log sync error:', logError);
+                        logger.error('Failed to log sync error:', logError);
                     });
                 }
             }
@@ -762,7 +744,7 @@ class MongoDBSyncService {
                 error instanceof Error ? error : new Error(errorMessage),
                 'create'
             ).catch((logError) => {
-                console.error('Failed to log sync error:', logError);
+                logger.error('Failed to log sync error:', logError);
             });
             
             return result;
@@ -779,8 +761,7 @@ class MongoDBSyncService {
             additionalInfo: { tableName },
         });
 
-        // eslint-disable-next-line no-console
-        console.debug(`[MongoDBSyncService.fetchRemoteRecords] Fetching ${tableName} from Supabase for userId: ${validatedUserId}`, since ? `since ${since.toISOString()}` : '');
+        logger.debug(`[MongoDBSyncService.fetchRemoteRecords] Fetching ${tableName} from Supabase for userId: ${validatedUserId}`, since ? `since ${since.toISOString()}` : '');
         
         let records: unknown[] = [];
 
@@ -806,12 +787,11 @@ class MongoDBSyncService {
             
             records = data || [];
         } catch (error) {
-            console.error(`[MongoDBSyncService.fetchRemoteRecords] Error fetching ${tableName} from Supabase:`, error);
+            logger.error(`[MongoDBSyncService.fetchRemoteRecords] Error fetching ${tableName} from Supabase:`, error);
             records = [];
         }
 
-        // eslint-disable-next-line no-console
-        console.debug(`[MongoDBSyncService.fetchRemoteRecords] Fetched ${records.length} records for ${tableName} (userId: ${validatedUserId})`);
+        logger.debug(`[MongoDBSyncService.fetchRemoteRecords] Fetched ${records.length} records for ${tableName} (userId: ${validatedUserId})`);
 
         return records;
     }
@@ -1020,26 +1000,21 @@ class MongoDBSyncService {
             // Edge case: Handle deleted records
             if (localDeletedAt && !remoteDeletedAt) {
                 // Local is deleted, remote is not - keep local deletion, queue for push
-                // eslint-disable-next-line no-console
-                console.log(`[MongoDBSyncService.applyRemoteRecord] Local record ${recordId} is deleted, keeping deletion (local-first) and queuing for push`);
+                logger.log(`[MongoDBSyncService.applyRemoteRecord] Local record ${recordId} is deleted, keeping deletion (local-first) and queuing for push`);
                 this.queueLocalForPush(userId, tableName, recordId);
                 return { conflictHandled: false };
             } else if (!localDeletedAt && remoteDeletedAt) {
                 // Remote is deleted but local exists - keep local (user may have restored)
-                // eslint-disable-next-line no-console
-                console.log(`[MongoDBSyncService.applyRemoteRecord] Remote record ${recordId} is deleted but local exists, keeping local (restored) and queuing for push`);
+                logger.log(`[MongoDBSyncService.applyRemoteRecord] Remote record ${recordId} is deleted but local exists, keeping local (restored) and queuing for push`);
                 this.queueLocalForPush(userId, tableName, recordId);
                 return { conflictHandled: false };
             }
 
             if (conflictInfo.hasConflict) {
                 // Local-first strategy: keep local data, queue it for push
-                // eslint-disable-next-line no-console
-                console.log(`[MongoDBSyncService.applyRemoteRecord] Conflict detected for ${tableName} ${recordId}, keeping local data (local-first strategy)`);
-                // eslint-disable-next-line no-console
-                console.log(`[MongoDBSyncService.applyRemoteRecord] Local version: ${localVersion}, remote version: ${remoteVersion}`);
-                // eslint-disable-next-line no-console
-                console.log(`[MongoDBSyncService.applyRemoteRecord] Local updatedAt: ${localUpdatedAt.toISOString()}, remote updatedAt: ${remoteUpdatedAt.toISOString()}`);
+                logger.log(`[MongoDBSyncService.applyRemoteRecord] Conflict detected for ${tableName} ${recordId}, keeping local data (local-first strategy)`);
+                logger.log(`[MongoDBSyncService.applyRemoteRecord] Local version: ${localVersion}, remote version: ${remoteVersion}`);
+                logger.log(`[MongoDBSyncService.applyRemoteRecord] Local updatedAt: ${localUpdatedAt.toISOString()}, remote updatedAt: ${remoteUpdatedAt.toISOString()}`);
 
                 // FIX: Log conflict to database for audit trail
                 try {
@@ -1083,8 +1058,7 @@ class MongoDBSyncService {
                         version: 1,
                     });
                 } catch (error) {
-                    // eslint-disable-next-line no-console
-                    console.error('[MongoDBSyncService.applyRemoteRecord] Failed to log conflict:', error);
+                    logger.error('[MongoDBSyncService.applyRemoteRecord] Failed to log conflict:', error);
                     // Non-blocking - continue with conflict resolution
                 }
 
@@ -1099,31 +1073,26 @@ class MongoDBSyncService {
                 this.queueLocalForPush(userId, tableName, recordId);
 
                 // Log conflict for user awareness
-                // eslint-disable-next-line no-console
-                console.log(`[MongoDBSyncService.applyRemoteRecord] Local data preserved for ${tableName} ${recordId}, queued for push to remote`);
+                logger.log(`[MongoDBSyncService.applyRemoteRecord] Local data preserved for ${tableName} ${recordId}, queued for push to remote`);
                 // FIX: Return conflict handled status for proper tracking
                 return { conflictHandled: true };
             } else if (remoteVersion > localVersion) {
                 // Remote is definitively newer (higher version), update local
-                // eslint-disable-next-line no-console
-                console.log(`[MongoDBSyncService.applyRemoteRecord] Remote is newer for ${tableName} ${recordId} (remote version: ${remoteVersion} > local version: ${localVersion}), updating local`);
+                logger.log(`[MongoDBSyncService.applyRemoteRecord] Remote is newer for ${tableName} ${recordId} (remote version: ${remoteVersion} > local version: ${localVersion}), updating local`);
                 await this.updateLocalRecord(userId, tableName, remoteRecord);
             } else if (remoteVersion === localVersion && remoteUpdatedAt > localUpdatedAt) {
                 // Same version but remote has newer timestamp - this is edge case
                 // For local-first, we still keep local but queue for push
-                // eslint-disable-next-line no-console
-                console.log(`[MongoDBSyncService.applyRemoteRecord] Same version but remote newer timestamp for ${tableName} ${recordId}, keeping local (local-first) and queuing for push`);
+                logger.log(`[MongoDBSyncService.applyRemoteRecord] Same version but remote newer timestamp for ${tableName} ${recordId}, keeping local (local-first) and queuing for push`);
                 this.queueLocalForPush(userId, tableName, recordId);
             } else {
                 // Local is newer or equal, keep local and queue for push
-                // eslint-disable-next-line no-console
-                console.log(`[MongoDBSyncService.applyRemoteRecord] Local is newer or equal for ${tableName} ${recordId} (local version: ${localVersion} >= remote version: ${remoteVersion}), keeping local and queuing for push`);
+                logger.log(`[MongoDBSyncService.applyRemoteRecord] Local is newer or equal for ${tableName} ${recordId} (local version: ${localVersion} >= remote version: ${remoteVersion}), keeping local and queuing for push`);
                 this.queueLocalForPush(userId, tableName, recordId);
             }
         } else {
             // Local doesn't exist, create from remote
-            // eslint-disable-next-line no-console
-            console.log(`[MongoDBSyncService.applyRemoteRecord] Creating new local record for ${tableName} ${recordId} from remote`);
+            logger.log(`[MongoDBSyncService.applyRemoteRecord] Creating new local record for ${tableName} ${recordId} from remote`);
             await this.createLocalRecord(userId, tableName, remoteRecord);
         }
 
@@ -1313,8 +1282,7 @@ class MongoDBSyncService {
             additionalInfo: { tableName, batchSize: batch.length },
         });
 
-        // eslint-disable-next-line no-console
-        console.log(`[MongoDBSyncService.pushBatch] Processing batch of ${batch.length} records for ${tableName}`);
+        logger.log(`[MongoDBSyncService.pushBatch] Processing batch of ${batch.length} records for ${tableName}`);
 
         const result = {
             recordsProcessed: 0,
@@ -1324,8 +1292,7 @@ class MongoDBSyncService {
             errors: [] as SyncError[],
         };
 
-        // eslint-disable-next-line no-console
-        console.log(`[MongoDBSyncService.pushBatch] Processing ${tableName} with Supabase`);
+        logger.log(`[MongoDBSyncService.pushBatch] Processing ${tableName} with Supabase`);
         
         const supabase = await getSupabaseClientWithAuth(validatedUserId);
 
@@ -1389,8 +1356,7 @@ class MongoDBSyncService {
                 }
                 
                 // Fetch existing record using Supabase
-                // eslint-disable-next-line no-console
-                console.log(`[MongoDBSyncService.pushBatch] Looking for existing ${tableName} record`);
+                logger.log(`[MongoDBSyncService.pushBatch] Looking for existing ${tableName} record`);
                 let existing: unknown = null;
                 try {
                     const { data, error } = await selectQuery.limit(1).single();
@@ -1398,11 +1364,10 @@ class MongoDBSyncService {
                         throw error;
                     }
                     existing = data || null;
-                    // eslint-disable-next-line no-console
-                    console.log(`[MongoDBSyncService.pushBatch] findFirst result for ${tableName} ${recordId}:`, existing ? 'FOUND' : 'NOT FOUND');
+                    logger.log(`[MongoDBSyncService.pushBatch] findFirst result for ${tableName} ${recordId}:`, existing ? 'FOUND' : 'NOT FOUND');
                 } catch (findError) {
                     const errorMessage = findError instanceof Error ? findError.message : 'Unknown error';
-                    console.error(`[MongoDBSyncService.pushBatch] Error finding existing record for ${tableName} ${recordId}:`, errorMessage);
+                    logger.error(`[MongoDBSyncService.pushBatch] Error finding existing record for ${tableName} ${recordId}:`, errorMessage);
                     result.errors.push({
                         tableName,
                         recordId,
@@ -1417,7 +1382,7 @@ class MongoDBSyncService {
                         findError instanceof Error ? findError : new Error(errorMessage),
                         'read'
                     ).catch((logError) => {
-                        console.error('Failed to log sync error:', logError);
+                        logger.error('Failed to log sync error:', logError);
                     });
                     continue; // Skip to next record if we can't find existing
                 }
@@ -1428,7 +1393,7 @@ class MongoDBSyncService {
                     const existingObj = existing as Record<string, unknown>;
                     if (Object.keys(existingObj).length === 1 && 'success' in existingObj) {
                         // This is likely a response wrapper, not an actual record
-                        console.warn(`[MongoDBSyncService.pushBatch] Received response wrapper instead of record for ${tableName} ${recordId}, treating as not found`);
+                        logger.warn(`[MongoDBSyncService.pushBatch] Received response wrapper instead of record for ${tableName} ${recordId}, treating as not found`);
                         existing = null;
                     }
                 }
@@ -1437,16 +1402,13 @@ class MongoDBSyncService {
                     // Extract existingId early so it's available in all code paths
                     const existingId = (existing as Record<string, unknown>).id;
                     
-                    // eslint-disable-next-line no-console
-                    console.log(`[MongoDBSyncService.pushBatch] Found existing record for ${tableName} ${recordId}, existing version: ${(existing as { version?: number }).version || 1}, local version: ${(localRecord as { version?: number }).version || 1}`);
+                    logger.log(`[MongoDBSyncService.pushBatch] Found existing record for ${tableName} ${recordId}, existing version: ${(existing as { version?: number }).version || 1}, local version: ${(localRecord as { version?: number }).version || 1}`);
                     
                     if (tableName === 'workouts') {
-                        // eslint-disable-next-line no-console
-                        console.log(`[MongoDBSyncService.pushBatch] Workout existing record keys:`, Object.keys(existing as Record<string, unknown>));
-                        // eslint-disable-next-line no-console
-                        console.log(`[MongoDBSyncService.pushBatch] Workout existingId extracted:`, existingId, `type:`, typeof existingId);
+                        logger.log(`[MongoDBSyncService.pushBatch] Workout existing record keys:`, Object.keys(existing as Record<string, unknown>));
+                        logger.log(`[MongoDBSyncService.pushBatch] Workout existingId extracted:`, existingId, `type:`, typeof existingId);
                         if (!existingId) {
-                            console.error(`[MongoDBSyncService.pushBatch] Workout existing record (no id):`, JSON.stringify(existing, null, 2));
+                            logger.error(`[MongoDBSyncService.pushBatch] Workout existing record (no id):`, JSON.stringify(existing, null, 2));
                         }
                     }
                     
@@ -1458,10 +1420,8 @@ class MongoDBSyncService {
                     );
 
                     if (conflictInfo.hasConflict) {
-                        // eslint-disable-next-line no-console
-                        console.log(`[MongoDBSyncService.pushBatch] Conflict detected for ${tableName} record ${recordId} (local-first strategy), pushing local data to Supabase`);
-                        // eslint-disable-next-line no-console
-                        console.log(`[MongoDBSyncService.pushBatch] Local version: ${(localRecord as { version?: number }).version ?? 1}, remote version: ${(existing as { version?: number }).version ?? 1}`);
+                        logger.log(`[MongoDBSyncService.pushBatch] Conflict detected for ${tableName} record ${recordId} (local-first strategy), pushing local data to Supabase`);
+                        logger.log(`[MongoDBSyncService.pushBatch] Local version: ${(localRecord as { version?: number }).version ?? 1}, remote version: ${(existing as { version?: number }).version ?? 1}`);
                         
                         // Local-first strategy: always push local data to remote
                         // This ensures user's local changes are preserved and synced
@@ -1477,23 +1437,10 @@ class MongoDBSyncService {
                         const localVersion = ((localRecord as Record<string, unknown>)?.version as number) || 1;
                         const existingVersion = ((existing as Record<string, unknown>)?.version as number) || 1;
                         const newVersion = Math.max(localVersion, existingVersion) + 1;
-                        resolvedRecord.version = newVersion;
-                        resolvedRecord.updated_at = new Date().toISOString();
-                        
-                        // Don't update created_at
-                        delete resolvedRecord.created_at;
-                        
-                        try {
-                            // eslint-disable-next-line no-console
-                            console.log(`[MongoDBSyncService.pushBatch] Attempting to upsert ${tableName} record ${recordId} to Supabase`);
-                            await this.upsertToSupabase(supabase, tableName, resolvedRecord, validatedUserId);
-                            // eslint-disable-next-line no-console
-                            console.log(`[MongoDBSyncService.pushBatch] Successfully resolved conflict and updated ${tableName} record ${recordId}`);
-                            result.recordsUpdated++;
                             result.conflicts++;
                         } catch (upsertError) {
                             const errorMessage = upsertError instanceof Error ? upsertError.message : 'Unknown error';
-                            console.error(`[MongoDBSyncService.pushBatch] Error upserting conflict-resolved record for ${tableName} ${recordId}:`, errorMessage);
+                            logger.error(`[MongoDBSyncService.pushBatch] Error upserting conflict-resolved record for ${tableName} ${recordId}:`, errorMessage);
                             result.errors.push({
                                 tableName,
                                 recordId,
@@ -1509,7 +1456,7 @@ class MongoDBSyncService {
                                 upsertError instanceof Error ? upsertError : new Error(errorMessage),
                                 'update'
                             ).catch((logError) => {
-                                console.error('Failed to log sync error:', logError);
+                                logger.error('Failed to log sync error:', logError);
                             });
                         }
                     } else if (versionManager.compareVersions(
@@ -1517,8 +1464,7 @@ class MongoDBSyncService {
                         existing as { version?: number; updatedAt?: Date; deletedAt?: Date | null }
                     ) > 0) {
                         // Local record is newer, update remote
-                        // eslint-disable-next-line no-console
-                        console.log(`[MongoDBSyncService.pushBatch] Local record is newer for ${tableName} ${recordId}, updating Supabase`);
+                        logger.log(`[MongoDBSyncService.pushBatch] Local record is newer for ${tableName} ${recordId}, updating Supabase`);
                         
                         const updateRecord = this.convertToSupabaseFormat(tableName, localRecord, validatedUserId);
                         
@@ -1545,20 +1491,16 @@ class MongoDBSyncService {
                         const localDeletedAt = (localRecord as Record<string, unknown>)?.deletedAt;
                         const existingDeletedAt = (existing as Record<string, unknown>)?.deletedAt;
                         
-                        // eslint-disable-next-line no-console
-                        console.log(`[MongoDBSyncService.pushBatch] Remote record is newer or same for ${tableName} ${recordId}, but pushing local data anyway (local-first strategy)`);
-                        // eslint-disable-next-line no-console
-                        console.log(`[MongoDBSyncService.pushBatch] Local version: ${localVersion}, remote version: ${existingVersion}`);
+                        logger.log(`[MongoDBSyncService.pushBatch] Remote record is newer or same for ${tableName} ${recordId}, but pushing local data anyway (local-first strategy)`);
+                        logger.log(`[MongoDBSyncService.pushBatch] Local version: ${localVersion}, remote version: ${existingVersion}`);
                         
                         // Handle deleted records edge case
                         if (localDeletedAt && !existingDeletedAt) {
                             // Local is deleted, push deletion to remote
-                            // eslint-disable-next-line no-console
-                            console.log(`[MongoDBSyncService.pushBatch] Local record ${recordId} is deleted, pushing deletion to remote`);
+                            logger.log(`[MongoDBSyncService.pushBatch] Local record ${recordId} is deleted, pushing deletion to remote`);
                         } else if (!localDeletedAt && existingDeletedAt) {
                             // Remote is deleted but local exists, keep local (user may have restored)
-                            // eslint-disable-next-line no-console
-                            console.log(`[MongoDBSyncService.pushBatch] Remote record ${recordId} is deleted but local exists, keeping local (restored)`);
+                            logger.log(`[MongoDBSyncService.pushBatch] Remote record ${recordId} is deleted but local exists, keeping local (restored)`);
                         }
                         
                         const pushRecord = this.convertToSupabaseFormat(tableName, localRecord, validatedUserId);
@@ -1568,24 +1510,20 @@ class MongoDBSyncService {
                         if (existingId && (tableName === 'workouts' || tableName === 'error_logs')) {
                             pushRecord.id = existingId;
                         }
-                        
                         // Update with version increment (use max to ensure version is always incremented)
                         const newVersion = Math.max(localVersion, existingVersion) + 1;
                         pushRecord.version = newVersion;
                         pushRecord.updated_at = new Date().toISOString();
-                        delete pushRecord.created_at;
                         
                         try {
-                            // eslint-disable-next-line no-console
-                            console.log(`[MongoDBSyncService.pushBatch] Attempting to upsert ${tableName} record ${recordId} to Supabase (remote newer but pushing local)`);
+                            logger.log(`[MongoDBSyncService.pushBatch] Attempting to upsert ${tableName} record ${recordId} to Supabase (remote newer but pushing local)`);
                             await this.upsertToSupabase(supabase, tableName, pushRecord, validatedUserId);
-                            // eslint-disable-next-line no-console
-                            console.log(`[MongoDBSyncService.pushBatch] Successfully pushed local data for ${tableName} record ${recordId} (remote was newer)`);
+                            logger.log(`[MongoDBSyncService.pushBatch] Successfully pushed local data for ${tableName} record ${recordId} (remote was newer)`);
                             result.recordsUpdated++;
                             result.conflicts++;
                         } catch (upsertError) {
                             const errorMessage = upsertError instanceof Error ? upsertError.message : 'Unknown error';
-                            console.error(`[MongoDBSyncService.pushBatch] Error upserting record for ${tableName} ${recordId} (remote newer case):`, errorMessage);
+                            logger.error(`[MongoDBSyncService.pushBatch] Error upserting record for ${tableName} ${recordId} (remote newer case):`, errorMessage);
                             result.errors.push({
                                 tableName,
                                 recordId,
@@ -1601,14 +1539,13 @@ class MongoDBSyncService {
                                 upsertError instanceof Error ? upsertError : new Error(errorMessage),
                                 'update'
                             ).catch((logError) => {
-                                console.error('Failed to log sync error:', logError);
+                                logger.error('Failed to log sync error:', logError);
                             });
                         }
                     }
                 } else {
                     // No existing record - create new record
-                    // eslint-disable-next-line no-console
-                    console.log(`[MongoDBSyncService.pushBatch] Creating new record in ${tableName}`);
+                    logger.log(`[MongoDBSyncService.pushBatch] Creating new record in ${tableName}`);
                     
                     try {
                         // Remove id for tables that auto-generate it
@@ -1627,12 +1564,11 @@ class MongoDBSyncService {
                         }
                         
                         await this.upsertToSupabase(supabase, tableName, createRecord, validatedUserId);
-                        // eslint-disable-next-line no-console
-                        console.log(`[MongoDBSyncService.pushBatch] Successfully created record in ${tableName}`);
+                        logger.log(`[MongoDBSyncService.pushBatch] Successfully created record in ${tableName}`);
                         result.recordsCreated++;
                     } catch (createError) {
                         const errorMessage = createError instanceof Error ? createError.message : 'Unknown error';
-                        console.error(`[MongoDBSyncService.pushBatch] Error creating new record for ${tableName} ${recordId}:`, errorMessage);
+                        logger.error(`[MongoDBSyncService.pushBatch] Error creating new record for ${tableName} ${recordId}:`, errorMessage);
                         result.errors.push({
                             tableName,
                             recordId,
@@ -1647,7 +1583,7 @@ class MongoDBSyncService {
                             createError instanceof Error ? createError : new Error(errorMessage),
                             'create'
                         ).catch((logError) => {
-                            console.error('Failed to log sync error:', logError);
+                            logger.error('Failed to log sync error:', logError);
                         });
                     }
                 }
@@ -1671,7 +1607,7 @@ class MongoDBSyncService {
                     error instanceof Error ? error : new Error(errorMessage),
                     'create'
                 ).catch((logError) => {
-                    console.error('Failed to log sync error:', logError);
+                    logger.error('Failed to log sync error:', logError);
                 });
             }
         }
@@ -2287,8 +2223,7 @@ class MongoDBSyncService {
             this.recordsToPushAfterConflict.set(key, new Set());
         }
         this.recordsToPushAfterConflict.get(key)!.add(recordId);
-        // eslint-disable-next-line no-console
-        console.log(`[MongoDBSyncService.queueLocalForPush] Queued ${tableName} ${recordId} for push after conflict`);
+        logger.log(`[MongoDBSyncService.queueLocalForPush] Queued ${tableName} ${recordId} for push after conflict`);
     }
 
     /**
@@ -2313,7 +2248,7 @@ class MongoDBSyncService {
             return localUpdatedAt > lastSyncAt;
         } catch (error) {
             // On error, assume it was modified offline to be safe
-            console.warn(`[MongoDBSyncService.isLocalModifiedOffline] Error checking offline modification for ${tableName}:`, error);
+            logger.warn(`[MongoDBSyncService.isLocalModifiedOffline] Error checking offline modification for ${tableName}:`, error);
             return true;
         }
     }

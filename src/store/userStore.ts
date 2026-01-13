@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { dataService } from '@/services/dataService';
 import { userContextManager } from '@/services/userContextManager';
 import { auth0ManagementService } from '@/services/auth0ManagementService';
+import { logger } from '@/utils/logger';
 
 export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
 export type Goal = 'build_muscle' | 'gain_strength' | 'lose_fat' | 'improve_endurance' | 'general_fitness';
@@ -235,7 +236,7 @@ export const useUserStore = create<UserState>((set, get) => ({
             });
           } catch (syncError) {
             // Log sync failure but don't affect profile save
-            console.warn('MongoDB sync failed for profile (will retry later):', syncError);
+            logger.warn('MongoDB sync failed for profile (will retry later):', syncError);
           }
         })();
       }
@@ -304,7 +305,7 @@ export const useUserStore = create<UserState>((set, get) => ({
       try {
         await dataService.deleteUserProfile(userId);
       } catch (error) {
-        console.error('Failed to delete profile from IndexedDB:', error);
+        logger.error('Failed to delete profile from IndexedDB:', error);
         // Don't throw - clearing from memory is more important
       }
     }

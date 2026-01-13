@@ -8,6 +8,7 @@ import { SleepLog, RecoveryLog } from '@/types/sleep';
 import { useToast } from '@/hooks/useToast';
 import { cn } from '@/utils/cn';
 import { prefersReducedMotion } from '@/utils/animations';
+import { logger } from '@/utils/logger';
 
 export function SleepRecovery() {
   const navigate = useNavigate();
@@ -136,7 +137,7 @@ export function SleepRecovery() {
           }
         }
       } catch (error) {
-        console.error('Failed to load sleep/recovery data:', error);
+        logger.error('Failed to load sleep/recovery data:', error);
       }
     };
 
@@ -255,7 +256,7 @@ export function SleepRecovery() {
       navigate(-1);
     } catch (error) {
       showError('Failed to save sleep & recovery data');
-      console.error('Error saving sleep/recovery:', error);
+      logger.error('Error saving sleep/recovery:', error);
     } finally {
       setIsSaving(false);
     }

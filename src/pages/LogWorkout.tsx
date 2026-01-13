@@ -28,6 +28,7 @@ import { calculateVolume, convertWeight } from '@/utils/calculations';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { normalizeWorkoutStartTime } from '@/utils/validators';
 import { debounce } from '@/utils/debounce';
+import { logger } from '@/utils/logger';
 
 // Helper function to format date for datetime-local input (local time, not UTC)
 function formatDateTimeLocal(date: Date): string {
@@ -91,7 +92,7 @@ export function LogWorkout() {
         // Validate userId matches current user to prevent cross-user data leakage
         if (persistedWorkoutState.currentWorkout.userId && 
             persistedWorkoutState.currentWorkout.userId !== profile.id) {
-          console.warn('Recovered workout belongs to different user, clearing state');
+          logger.warn('Recovered workout belongs to different user, clearing state');
           clearWorkoutState();
           startWorkout(profile.id);
           return;
@@ -200,7 +201,7 @@ export function LogWorkout() {
           // Use getWorkoutStore to get current workout at message time
           const currentWorkoutState = getWorkoutStore.getState().currentWorkout;
           if (currentWorkoutState && workoutId && workoutId !== currentWorkoutState.id) {
-            console.warn('Another tab has an active workout. Consider closing other tabs to avoid conflicts.');
+            logger.warn('Another tab has an active workout. Consider closing other tabs to avoid conflicts.');
             // Optionally show a toast notification
             showError('Another tab has an active workout. Please close other tabs to avoid conflicts.');
           }
@@ -285,7 +286,7 @@ export function LogWorkout() {
           } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Failed to load recommended workout';
             showError(errorMessage);
-            console.error('Error loading recommended workout:', err);
+            logger.error('Error loading recommended workout:', err);
             repeatWorkoutProcessedRef.current = null;
           }
         };
@@ -406,7 +407,7 @@ export function LogWorkout() {
           } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Failed to load previous workout';
             showError(errorMessage);
-            console.error('Error repeating workout:', err);
+            logger.error('Error repeating workout:', err);
             // Reset the ref on error so user can try again
             repeatWorkoutProcessedRef.current = null;
           }
@@ -452,7 +453,7 @@ export function LogWorkout() {
         await startWorkout(profile.id);
       } catch (error) {
         showError('Failed to start workout. Please try again.');
-        console.error('Error starting workout:', error);
+        logger.error('Error starting workout:', error);
         return;
       }
     } else if (!currentWorkout) {
@@ -503,7 +504,7 @@ export function LogWorkout() {
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to remove exercise';
         showError(errorMessage);
-        console.error('Error removing exercise:', err);
+        logger.error('Error removing exercise:', err);
       }
     }
   };
@@ -791,7 +792,7 @@ export function LogWorkout() {
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to save workout';
-      console.error('Error finishing workout:', err);
+      logger.error('Error finishing workout:', err);
       
       // Save failed workout to localStorage for recovery
       try {
@@ -833,7 +834,7 @@ export function LogWorkout() {
           `Your workout has been saved for recovery. Please review and retry.`
         );
       } catch (recoveryErr) {
-        console.error('Failed to save workout for recovery:', recoveryErr);
+        logger.error('Failed to save workout for recovery:', recoveryErr);
         showError(
           `Failed to save workout: ${errorMessage}. ` +
           `Unable to save for recovery. Please try again.`
@@ -1086,7 +1087,7 @@ export function LogWorkout() {
           </div>
         }
         onError={(error, errorInfo) => {
-          console.error('LogExercise error:', error, errorInfo);
+          logger.error('LogExercise error:', error, errorInfo);
         }}
       >
         <LogExercise
@@ -1461,7 +1462,7 @@ export function LogWorkout() {
               setShowRecoveryModal(false);
               setRecoveredWorkout(null);
             } catch (err) {
-              console.error('Failed to save recovered workout:', err);
+              logger.error('Failed to save recovered workout:', err);
             }
           }}
         />

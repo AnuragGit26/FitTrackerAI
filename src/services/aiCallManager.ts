@@ -1,3 +1,5 @@
+import { logger } from '@/utils/logger';
+
 interface CachedResponse<T> {
   data: T;
   timestamp: number;
@@ -41,7 +43,7 @@ class AICallManager {
       // For now, we'll use the existing database structure
       this.idbInitialized = true;
     } catch (error) {
-      console.warn('[AICallManager] IndexedDB initialization check failed, using in-memory only:', error);
+      logger.warn('[AICallManager] IndexedDB initialization check failed, using in-memory only:', error);
     }
   }
 
@@ -86,7 +88,7 @@ class AICallManager {
         }
       }
     } catch (error) {
-      console.warn('[AICallManager] Failed to get from persistent cache:', error);
+      logger.warn('[AICallManager] Failed to get from persistent cache:', error);
     }
 
     return null;
@@ -122,7 +124,7 @@ class AICallManager {
         await cache.put(`/ai-cache/${type}/${fingerprint}`, response);
       }
     } catch (error) {
-      console.warn('[AICallManager] Failed to persist to cache:', error);
+      logger.warn('[AICallManager] Failed to persist to cache:', error);
       // Continue - in-memory cache is still set
     }
   }
@@ -147,7 +149,7 @@ class AICallManager {
           }
         }
       } catch (error) {
-        console.warn('[AICallManager] Failed to invalidate persistent cache:', error);
+        logger.warn('[AICallManager] Failed to invalidate persistent cache:', error);
       }
     } else {
       // Invalidate all cache
@@ -160,7 +162,7 @@ class AICallManager {
           await cache.delete('/ai-cache/');
         }
       } catch (error) {
-        console.warn('[AICallManager] Failed to clear persistent cache:', error);
+        logger.warn('[AICallManager] Failed to clear persistent cache:', error);
       }
     }
   }

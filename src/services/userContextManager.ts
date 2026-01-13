@@ -1,4 +1,5 @@
 import { dbHelpers } from './database';
+import { logger } from '@/utils/logger';
 
 class UserContextManager {
   private currentUserId: string | null = null;
@@ -136,7 +137,7 @@ class UserContextManager {
       // Note: Settings are keyed, so we need to get all and filter
       // This is a simplified version - in production, you'd want a more efficient approach
     } catch (error) {
-      console.error(`Failed to cleanup data for user ${userId}:`, error);
+      logger.error(`Failed to cleanup data for user ${userId}:`, error);
       throw error;
     }
   }

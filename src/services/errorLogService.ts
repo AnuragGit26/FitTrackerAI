@@ -3,6 +3,7 @@ import { userScopedQuery } from './supabaseQueryBuilder';
 import { requireUserId } from '@/utils/userIdValidation';
 import { ErrorLog, ErrorLogCreateInput, ErrorType, ErrorSeverity } from '@/types/error';
 import { db } from './database';
+import { logger } from '@/utils/logger';
 
 interface LocalErrorLog {
     id?: number;
@@ -61,7 +62,7 @@ class ErrorLogService {
             });
         } catch (error) {
             // Silently fail - don't block error logging if Vercel endpoint is unavailable
-            console.warn('Failed to send error log to Vercel:', error);
+            logger.warn('Failed to send error log to Vercel:', error);
         }
     }
 
@@ -121,7 +122,7 @@ class ErrorLogService {
             
             return id as number;
         } catch (error) {
-            console.error('Failed to save error log to IndexedDB:', error);
+            logger.error('Failed to save error log to IndexedDB:', error);
             throw error;
         }
     }
@@ -283,8 +284,7 @@ class ErrorLogService {
                     // If a duplicate exists, skip creating a new one
                     // Error logs are append-only, so we don't update existing ones
                     if (existing && existing.id) {
-                        // eslint-disable-next-line no-console
-                        console.log('[ErrorLogService] Skipping duplicate error log:', existing.id);
+                        logger.log('[ErrorLogService] Skipping duplicate error log:', existing.id);
                         return null;
                     }
                     
@@ -325,7 +325,7 @@ class ErrorLogService {
                 await Promise.all(promises);
             }
         } catch (error) {
-            console.error('Error syncing error logs to MongoDB:', error);
+            logger.error('Error syncing error logs to MongoDB:', error);
             throw error;
         }
     }
@@ -391,7 +391,7 @@ class ErrorLogService {
                 await db.errorLogs.bulkPut(errorLogsForDb);
             }
         } catch (error) {
-            console.error('Error pulling error logs from Supabase:', error);
+            logger.error('Error pulling error logs from Supabase:', error);
             throw error;
         }
     }

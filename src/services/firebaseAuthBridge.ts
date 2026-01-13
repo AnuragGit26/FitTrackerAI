@@ -1,5 +1,6 @@
 import { getFirebaseAuth } from './firebaseConfig';
 import { signInWithCustomToken, User as FirebaseUser, signOut } from 'firebase/auth';
+import { logger } from '@/utils/logger';
 
 interface CustomTokenCache {
   token: string;
@@ -35,21 +36,21 @@ export class FirebaseAuthBridge {
       // Check if we have a valid cached token
       const cached = this.customTokenCache.get(userId);
       if (cached && cached.expiresAt > Date.now() + this.TOKEN_EXPIRY_BUFFER) {
-        console.log('[FirebaseAuthBridge] Using cached custom token for user:', userId);
+        logger.log('[FirebaseAuthBridge] Using cached custom token for user:', userId);
         try {
           const auth = getFirebaseAuth();
           const userCredential = await signInWithCustomToken(auth, cached.token);
-          console.log('[FirebaseAuthBridge] Successfully signed in with cached token');
+          logger.log('[FirebaseAuthBridge] Successfully signed in with cached token');
           return userCredential.user;
         } catch (error) {
           // Token might be invalid, clear cache and try fresh
-          console.warn('[FirebaseAuthBridge] Cached token failed, fetching new token:', error);
+          logger.warn('[FirebaseAuthBridge] Cached token failed, fetching new token:', error);
           this.customTokenCache.delete(userId);
         }
       }
 
       // Request custom token from backend API
-      console.log('[FirebaseAuthBridge] Requesting new custom token from backend for user:', userId);
+      logger.log('[FirebaseAuthBridge] Requesting new custom token from backend for user:', userId);
       const response = await fetch('/api/auth/firebase-token', {
         method: 'POST',
         headers: {
@@ -76,16 +77,16 @@ export class FirebaseAuthBridge {
         token: customToken,
         expiresAt: Date.now() + this.TOKEN_CACHE_DURATION,
       });
-      console.log('[FirebaseAuthBridge] Custom token cached for user:', userId);
+      logger.log('[FirebaseAuthBridge] Custom token cached for user:', userId);
 
       // Sign into Firebase with custom token
       const auth = getFirebaseAuth();
       const userCredential = await signInWithCustomToken(auth, customToken);
-      console.log('[FirebaseAuthBridge] Successfully signed into Firebase');
+      logger.log('[FirebaseAuthBridge] Successfully signed into Firebase');
 
       return userCredential.user;
     } catch (error) {
-      console.error('[FirebaseAuthBridge] Error authenticating with Firebase:', error);
+      logger.error('[FirebaseAuthBridge] Error authenticating with Firebase:', error);
       throw error;
     }
   }
@@ -99,9 +100,9 @@ export class FirebaseAuthBridge {
       const auth = getFirebaseAuth();
       await signOut(auth);
       this.customTokenCache.clear();
-      console.log('[FirebaseAuthBridge] Signed out from Firebase and cleared token cache');
+      logger.log('[FirebaseAuthBridge] Signed out from Firebase and cleared token cache');
     } catch (error) {
-      console.error('[FirebaseAuthBridge] Error signing out from Firebase:', error);
+      logger.error('[FirebaseAuthBridge] Error signing out from Firebase:', error);
       throw error;
     }
   }
@@ -137,10 +138,10 @@ export class FirebaseAuthBridge {
   clearTokenCache(userId?: string): void {
     if (userId) {
       this.customTokenCache.delete(userId);
-      console.log('[FirebaseAuthBridge] Cleared token cache for user:', userId);
+      logger.log('[FirebaseAuthBridge] Cleared token cache for user:', userId);
     } else {
       this.customTokenCache.clear();
-      console.log('[FirebaseAuthBridge] Cleared all token cache');
+      logger.log('[FirebaseAuthBridge] Cleared all token cache');
     }
   }
 

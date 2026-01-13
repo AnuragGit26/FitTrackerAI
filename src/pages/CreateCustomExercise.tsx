@@ -6,6 +6,7 @@ import { MuscleGroup } from '@/types/muscle';
 import { exerciseLibrary } from '@/services/exerciseLibrary';
 import { useUserStore } from '@/store/userStore';
 import { cn } from '@/utils/cn';
+import { logger } from '@/utils/logger';
 
 // Map simplified muscle names to MuscleGroup enum
 const muscleGroupMap: Record<string, MuscleGroup[]> = {
@@ -67,7 +68,7 @@ export function CreateCustomExercise() {
       // Navigate back to log workout page
       navigate('/log-workout');
     } catch (error) {
-      console.error('Failed to create custom exercise:', error);
+      logger.error('Failed to create custom exercise:', error);
       // TODO: Show error toast
     } finally {
       setIsSaving(false);
