@@ -25,8 +25,12 @@ export interface RecoveryInsight {
 export function calculateOverallRecoveryScore(muscleStatuses: MuscleStatus[]): number {
   if (muscleStatuses.length === 0) return 100;
   
-  const total = muscleStatuses.reduce((sum, status) => sum + status.recoveryPercentage, 0);
-  return Math.round(total / muscleStatuses.length);
+  const total = muscleStatuses.reduce((sum, status) => {
+    const val = status.recoveryPercentage;
+    return sum + (isNaN(val) ? 0 : val);
+  }, 0);
+  const average = isNaN(total / muscleStatuses.length) ? 100 : Math.round(total / muscleStatuses.length);
+  return isNaN(average) ? 100 : average;
 }
 
 /**
@@ -91,20 +95,29 @@ export function calculateRecoveryTrend(
     const workloadMultiplier = 1 + (status.workloadScore / 100);
     const adjustedRecoveryHours = baseRecoveryHours * workloadMultiplier;
 
+    // Safety check for division by zero or invalid values
+    if (!adjustedRecoveryHours || isNaN(adjustedRecoveryHours)) {
+      totalRecovery7DaysAgo += 100; // Assume fully recovered if calc fails
+      count++;
+      return;
+    }
+
     const recovery7DaysAgo = Math.min(
       100,
       Math.max(0, (hoursSinceWorkout7DaysAgo / adjustedRecoveryHours) * 100)
     );
 
-    totalRecovery7DaysAgo += recovery7DaysAgo;
+    totalRecovery7DaysAgo += isNaN(recovery7DaysAgo) ? 100 : recovery7DaysAgo;
     count++;
   });
 
   const previous = count > 0 ? Math.round(totalRecovery7DaysAgo / count) : current;
   const change = current - previous;
-  const changePercentage = previous > 0 
+  let changePercentage = previous > 0 
     ? Math.round((change / previous) * 100) 
     : (current > 0 ? 100 : 0);
+    
+  if (isNaN(changePercentage)) changePercentage = 0;
 
   return {
     current,
@@ -267,6 +280,13 @@ export function calculateRecoveryTrendData(
         ? status.lastWorked 
         : new Date(status.lastWorked);
 
+      // Handle invalid dates same as null/undefined (fully recovered)
+      if (isNaN(lastWorked.getTime())) {
+        totalRecovery += 100;
+        count++;
+        return;
+      }
+
       const hoursSinceWorkout = differenceInHours(targetDate, lastWorked);
       
       if (hoursSinceWorkout < 0) {
@@ -288,7 +308,7 @@ export function calculateRecoveryTrendData(
         Math.max(0, (hoursSinceWorkout / adjustedRecoveryHours) * 100)
       );
 
-      totalRecovery += recoveryOnDate;
+      totalRecovery += isNaN(recoveryOnDate) ? 100 : recoveryOnDate;
       count++;
     });
 

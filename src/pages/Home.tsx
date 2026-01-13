@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play } from 'lucide-react';
+import { Play, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { useWorkoutStore } from '@/store/workoutStore';
+import { useWorkoutStore, useWorkoutError } from '@/store/workoutStore';
 import { useUserStore } from '@/store/userStore';
 import { HomeHeader } from '@/components/layout/HomeHeader';
 import { StatsCarousel } from '@/components/home/StatsCarousel';
@@ -16,10 +16,14 @@ export function Home() {
   const navigate = useNavigate();
   const { loadWorkouts } = useWorkoutStore();
   const { profile } = useUserStore();
+  const error = useWorkoutError();
 
   useEffect(() => {
     if (profile?.id) {
-      loadWorkouts(profile.id);
+      loadWorkouts(profile.id).catch(err => {
+        console.error('[Home] Failed to load workouts:', err);
+        // Error is already handled by workoutStore, just log it
+      });
     }
   }, [profile?.id, loadWorkouts]);
 
@@ -40,7 +44,29 @@ export function Home() {
         <motion.div variants={shouldReduceMotion ? {} : slideUp}>
           <HomeHeader />
         </motion.div>
-        
+
+        {/* Error message */}
+        {error && (
+          <motion.div
+            variants={shouldReduceMotion ? {} : slideUp}
+            className="mx-4 mt-4 mb-2"
+          >
+            <div className="bg-error/10 border border-error/20 rounded-lg p-4 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm text-error font-medium mb-2">Unable to load workouts</p>
+                <p className="text-xs text-error/80 mb-3">{error}</p>
+                <button
+                  onClick={() => profile?.id && loadWorkouts(profile.id)}
+                  className="text-xs font-medium text-error hover:text-error/80 underline"
+                >
+                  Try Again
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         <motion.div variants={shouldReduceMotion ? {} : slideUp}>
           <StatsCarousel />
         </motion.div>

@@ -597,6 +597,26 @@ class FitTrackAIDB extends Dexie {
       // NEW: Persistent sync queue indexed by queuedAt for FIFO processing
       pendingSyncQueue: '++id, tableName, queuedAt, userId',
     });
+
+    // Version 16: Add deletedAt index to workouts for efficient trash queries
+    // FIX: Optimize getDeletedWorkouts query performance
+    this.version(16).stores({
+      workouts: 'id, userId, date, deletedAt, version, [userId+date], [userId+deletedAt], [userId+updatedAt], *musclesTargeted',
+      exercises: 'id, name, category, userId, version, [name+category], [userId+isCustom], [userId+updatedAt], *primaryMuscles, *secondaryMuscles, *equipment',
+      muscleStatuses: '++id, muscle, userId, version, [userId+muscle], [userId+updatedAt], lastWorked',
+      settings: 'key, userId, version, [userId+key]',
+      workoutTemplates: 'id, userId, category, name, version, [userId+category], [name+userId], [userId+updatedAt], *musclesTargeted',
+      aiCacheMetadata: '++id, insightType, userId, [insightType+userId], lastFetchTimestamp',
+      plannedWorkouts: 'id, userId, scheduledDate, isCompleted, version, [userId+scheduledDate], [userId+isCompleted], [userId+updatedAt]',
+      exerciseDetailsCache: '++id, exerciseSlug, cachedAt',
+      muscleImageCache: '++id, muscle, cachedAt',
+      syncMetadata: '++id, tableName, userId, [userId+tableName], syncStatus, lastSyncAt',
+      sleepLogs: '++id, userId, date, version, [userId+date], [userId+updatedAt]',
+      recoveryLogs: '++id, userId, date, version, [userId+date], [userId+updatedAt]',
+      notifications: 'id, userId, isRead, createdAt, [userId+isRead], [userId+createdAt], type',
+      errorLogs: '++id, userId, errorType, severity, resolved, [userId+resolved], [userId+createdAt], tableName',
+      pendingSyncQueue: '++id, tableName, queuedAt, userId',
+    });
   }
 }
 
@@ -619,13 +639,22 @@ export const dbHelpers = {
   },
 
   async getAllWorkouts(userId: string): Promise<Workout[]> {
-    const workouts = await db.workouts
-      .where('userId')
-      .equals(userId)
-      .sortBy('date');
-    
-    // Sort descending (most recent first) by reversing the array
-    return workouts.reverse();
+    try {
+      // Fetch all workouts for user first
+      const workouts = await db.workouts
+        .where('userId')
+        .equals(userId)
+        .toArray();
+
+      // Filter and sort in memory (more reliable than chaining .filter().sortBy())
+      return workouts
+        .filter(w => !w.deletedAt)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    } catch (error) {
+      console.error('[database] getAllWorkouts failed:', error);
+      // Return empty array instead of throwing to prevent app crash
+      return [];
+    }
   },
 
   async getWorkoutsByDateRange(
@@ -638,9 +667,23 @@ export const dbHelpers = {
       .equals(userId)
       .filter(workout => {
         const workoutDate = new Date(workout.date);
-        return workoutDate >= startDate && workoutDate <= endDate;
+        return workoutDate >= startDate && workoutDate <= endDate
+          && !workout.deletedAt;
       })
       .toArray();
+  },
+
+  async getDeletedWorkouts(userId: string): Promise<Workout[]> {
+    // Use compound index [userId+deletedAt] for efficient query
+    // Query where deletedAt is not null by using the compound index
+    const workouts = await db.workouts
+      .where('[userId+deletedAt]')
+      .between([userId, Dexie.minKey], [userId, Dexie.maxKey], true, true)
+      .reverse() // Most recently deleted first
+      .toArray();
+
+    // Filter out null deletedAt values (though index should handle this)
+    return workouts.filter(w => w.deletedAt !== null && w.deletedAt !== undefined);
   },
 
   async updateWorkout(id: string, updates: Partial<Workout>): Promise<string> {
@@ -1421,6 +1464,87 @@ export const dbHelpers = {
     await Promise.all(oldLogs.map((log) => db.errorLogs.delete(log.id!)));
 
     return oldLogs.length;
+  },
+
+  // Database health and repair operations
+  async checkDatabaseHealth(): Promise<{
+    isHealthy: boolean;
+    issues: string[];
+    version: number;
+  }> {
+    const issues: string[] = [];
+
+    try {
+      // Check database version
+      const currentVersion = db.verno;
+
+      // Check if workouts table exists and is accessible
+      const workoutCount = await db.workouts.count();
+      logger.info(`[database] Health check: ${workoutCount} workouts found`);
+
+      // Sample a workout to check ID type
+      const sampleWorkout = await db.workouts.limit(1).first();
+      if (sampleWorkout && typeof sampleWorkout.id !== 'string') {
+        issues.push('Workout IDs are not strings (schema mismatch)');
+        logger.warn('[database] Health check: Found workout with non-string ID');
+      }
+
+      // Check indexes
+      const schema = db.tables.find(t => t.name === 'workouts')?.schema;
+      if (!schema?.indexes.some(idx => idx.name === 'userId')) {
+        issues.push('userId index missing');
+        logger.warn('[database] Health check: userId index missing');
+      }
+
+      return {
+        isHealthy: issues.length === 0,
+        issues,
+        version: currentVersion,
+      };
+    } catch (error) {
+      logger.error('[database] Health check failed:', error);
+      return {
+        isHealthy: false,
+        issues: [`Database check failed: ${error}`],
+        version: -1,
+      };
+    }
+  },
+
+  async repairDatabase(): Promise<void> {
+    logger.info('[database] Starting database repair...');
+
+    try {
+      // Get all workouts (may include corrupted records)
+      const allWorkouts = await db.workouts.toArray();
+      logger.info(`[database] Found ${allWorkouts.length} workouts to check`);
+
+      // Fix workout IDs if needed
+      const fixedWorkouts = allWorkouts.map(workout => {
+        if (typeof workout.id !== 'string') {
+          logger.warn(`[database] Converting workout ID from ${typeof workout.id} to string: ${workout.id}`);
+          // Convert old integer IDs to strings
+          return { ...workout, id: `workout_${workout.id}` };
+        }
+        return workout;
+      });
+
+      // Check if any fixes were needed
+      const needsRepair = fixedWorkouts.some((w, i) => w.id !== allWorkouts[i].id);
+
+      if (needsRepair) {
+        logger.info('[database] Applying repairs...');
+        // Clear and repopulate
+        await db.workouts.clear();
+        await db.workouts.bulkPut(fixedWorkouts);
+        logger.info('[database] Repair complete');
+      } else {
+        logger.info('[database] No repairs needed');
+      }
+    } catch (error) {
+      logger.error('[database] Repair failed:', error);
+      throw new Error('Database repair failed. Please export your data and clear the database.');
+    }
   },
 };
 

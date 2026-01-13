@@ -186,12 +186,17 @@ export const workoutAnalysisService = {
     const recentWorkouts = workouts
       .filter(w => {
         const workoutDate = w.date instanceof Date ? w.date : new Date(w.date);
+        // Check for invalid date
+        if (isNaN(workoutDate.getTime())) return false;
         return workoutDate >= thirtyDaysAgo;
       })
       .sort((a, b) => {
         const dateA = a.date instanceof Date ? a.date : new Date(a.date);
         const dateB = b.date instanceof Date ? b.date : new Date(b.date);
-        return dateB.getTime() - dateA.getTime();
+        // Handle invalid dates in sort (though filter should catch them)
+        const timeA = isNaN(dateA.getTime()) ? 0 : dateA.getTime();
+        const timeB = isNaN(dateB.getTime()) ? 0 : dateB.getTime();
+        return timeB - timeA;
       });
 
     // Calculate consecutive workout days
@@ -208,6 +213,7 @@ export const workoutAnalysisService = {
     while (consecutiveDays < 30) {
       const hasWorkoutOnDate = recentWorkouts.some(w => {
         const workoutDate = w.date instanceof Date ? w.date : new Date(w.date);
+        if (isNaN(workoutDate.getTime())) return false;
         return isSameDay(workoutDate, checkDate);
       });
 
@@ -230,11 +236,13 @@ export const workoutAnalysisService = {
     const workoutsPerWeek = weeks.map(([start, end]) => {
       return recentWorkouts.filter(w => {
         const workoutDate = w.date instanceof Date ? w.date : new Date(w.date);
+        if (isNaN(workoutDate.getTime())) return false;
         return workoutDate >= start && workoutDate <= end;
       }).length;
     });
 
-    const avgWorkoutsPerWeek = workoutsPerWeek.reduce((sum, count) => sum + count, 0) / 4;
+    const avgWorkoutsPerWeekRaw = workoutsPerWeek.reduce((sum, count) => sum + count, 0) / 4;
+    const avgWorkoutsPerWeek = isNaN(avgWorkoutsPerWeekRaw) ? 0 : avgWorkoutsPerWeekRaw;
 
     // Calculate workout type distribution
     const last7Days = subDays(today, 7);
@@ -242,11 +250,13 @@ export const workoutAnalysisService = {
 
     const workoutsLast7Days = recentWorkouts.filter(w => {
       const workoutDate = w.date instanceof Date ? w.date : new Date(w.date);
+      if (isNaN(workoutDate.getTime())) return false;
       return workoutDate >= last7Days;
     });
 
     const workoutsLast14Days = recentWorkouts.filter(w => {
       const workoutDate = w.date instanceof Date ? w.date : new Date(w.date);
+      if (isNaN(workoutDate.getTime())) return false;
       return workoutDate >= last14Days;
     });
 
@@ -325,12 +335,13 @@ export const workoutAnalysisService = {
       return startOfDay(workoutDate).getTime();
     });
     const uniqueWorkoutDays = new Set(workoutDates).size;
-    const restDaysLastWeek = 7 - uniqueWorkoutDays;
+    const restDaysLastWeek = Math.max(0, 7 - uniqueWorkoutDays);
 
     // Average rest days per week (last 4 weeks)
     const restDaysPerWeek = weeks.map(([start, end]) => {
       const weekWorkouts = recentWorkouts.filter(w => {
         const workoutDate = w.date instanceof Date ? w.date : new Date(w.date);
+        if (isNaN(workoutDate.getTime())) return false;
         return workoutDate >= start && workoutDate <= end;
       });
       const weekWorkoutDates = new Set(
@@ -339,10 +350,11 @@ export const workoutAnalysisService = {
           return startOfDay(workoutDate).getTime();
         })
       );
-      return 7 - weekWorkoutDates.size;
+      return Math.max(0, 7 - weekWorkoutDates.size);
     });
 
-    const avgRestDaysPerWeek = restDaysPerWeek.reduce((sum, count) => sum + count, 0) / 4;
+    const avgRestDaysPerWeekRaw = restDaysPerWeek.reduce((sum, count) => sum + count, 0) / 4;
+    const avgRestDaysPerWeek = isNaN(avgRestDaysPerWeekRaw) ? 0 : avgRestDaysPerWeekRaw;
 
     return {
       hasWorkoutToday,

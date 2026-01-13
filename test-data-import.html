@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FitTrackAI - Test Data Import</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      padding: 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+      background: #f5f5f5;
+    }
+
+    .container {
+      background: white;
+      border-radius: 8px;
+      padding: 2rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 2rem;
+    }
+
+    .section {
+      margin-bottom: 2rem;
+    }
+
+    .section h2 {
+      color: #555;
+      margin-bottom: 1rem;
+      font-size: 1.25rem;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+      color: #333;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 300px;
+      padding: 1rem;
+      border: 2px solid #e0e0e0;
+      border-radius: 4px;
+      font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+      font-size: 12px;
+      resize: vertical;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: #4CAF50;
+    }
+
+    .options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .checkbox-group input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    button {
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 4px;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    .btn-primary {
+      background: #4CAF50;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #45a049;
+    }
+
+    .btn-secondary {
+      background: #2196F3;
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: #0b7dda;
+    }
+
+    .btn-warning {
+      background: #FF9800;
+      color: white;
+    }
+
+    .btn-warning:hover {
+      background: #e68900;
+    }
+
+    .btn-danger {
+      background: #f44336;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #da190b;
+    }
+
+    #output {
+      margin-top: 2rem;
+      padding: 1rem;
+      background: #f8f8f8;
+      border-left: 4px solid #4CAF50;
+      border-radius: 4px;
+      font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      max-height: 400px;
+      overflow-y: auto;
+      display: none;
+    }
+
+    #output.show {
+      display: block;
+    }
+
+    #output.error {
+      border-left-color: #f44336;
+    }
+
+    #output.warning {
+      border-left-color: #FF9800;
+    }
+
+    .alert {
+      padding: 1rem;
+      background: #fff3cd;
+      border-left: 4px solid #ffc107;
+      border-radius: 4px;
+      margin-bottom: 2rem;
+    }
+
+    .alert-info {
+      background: #d1ecf1;
+      border-left-color: #0c5460;
+    }
+
+    .code {
+      background: #f5f5f5;
+      padding: 0.25rem 0.5rem;
+      border-radius: 3px;
+      font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+      font-size: 0.9em;
+    }
+
+    .instructions {
+      background: #e8f5e9;
+      padding: 1.5rem;
+      border-radius: 4px;
+      margin-bottom: 2rem;
+    }
+
+    .instructions ol {
+      margin-left: 1.5rem;
+      margin-top: 0.5rem;
+    }
+
+    .instructions li {
+      margin-bottom: 0.5rem;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🏋️ FitTrackAI Test Data Import</h1>
+    <p class="subtitle">Import real user data into IndexedDB for testing</p>
+
+    <div class="alert alert-info">
+      <strong>⚠️ Development Only:</strong> This page is for development testing only.
+      Make sure you're running the app in development mode and have the dev server running
+      at <span class="code">http://localhost:5173</span>
+    </div>
+
+    <div class="instructions">
+      <h3>📋 Quick Start Instructions</h3>
+      <ol>
+        <li>Start your development server: <code class="code">npm run dev</code></li>
+        <li>Open the app in your browser and open DevTools console</li>
+        <li>Paste your exported JSON data in the textarea below</li>
+        <li>Select your import options</li>
+        <li>Click "Test Import (Dry Run)" first to validate</li>
+        <li>If no errors, click "Import Data" to perform the actual import</li>
+        <li>Refresh the app to see your imported data</li>
+      </ol>
+    </div>
+
+    <div class="section">
+      <h2>📦 Import Data</h2>
+      <label for="jsonData">Paste your exported JSON data here:</label>
+      <textarea
+        id="jsonData"
+        placeholder='Paste your exported JSON data here, e.g.:
+{
+  "version": "2.0.0",
+  "workouts": [...],
+  "templates": [...],
+  "userProfile": {
+    "id": "your-user-id",
+    "name": "Your Name"
+  }
+}'
+      ></textarea>
+    </div>
+
+    <div class="section">
+      <h2>⚙️ Import Options</h2>
+      <div class="options">
+        <div class="checkbox-group">
+          <input type="checkbox" id="clearExisting" checked>
+          <label for="clearExisting">Clear existing data first</label>
+        </div>
+        <div class="checkbox-group">
+          <input type="checkbox" id="skipUserProfile">
+          <label for="skipUserProfile">Skip user profile import</label>
+        </div>
+        <div class="checkbox-group">
+          <input type="checkbox" id="skipSettings">
+          <label for="skipSettings">Skip settings import</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="button-group">
+        <button class="btn-secondary" onclick="testImport()">
+          🧪 Test Import (Dry Run)
+        </button>
+        <button class="btn-primary" onclick="doImport()">
+          ✅ Import Data
+        </button>
+        <button class="btn-warning" onclick="validateJSON()">
+          📋 Validate JSON
+        </button>
+        <button class="btn-danger" onclick="clearData()">
+          🗑️ Clear All Data
+        </button>
+      </div>
+    </div>
+
+    <div id="output"></div>
+  </div>
+
+  <script>
+    // Helper function to show output
+    function showOutput(message, type = 'info') {
+      const output = document.getElementById('output');
+      output.textContent = message;
+      output.className = `show ${type}`;
+      output.scrollTop = output.scrollHeight;
+    }
+
+    // Helper function to get JSON data
+    function getJSONData() {
+      const textarea = document.getElementById('jsonData');
+      const jsonText = textarea.value.trim();
+
+      if (!jsonText) {
+        throw new Error('Please paste your JSON data first');
+      }
+
+      try {
+        return JSON.parse(jsonText);
+      } catch (error) {
+        throw new Error(`Invalid JSON: ${error.message}`);
+      }
+    }
+
+    // Helper function to get options
+    function getOptions(dryRun = false) {
+      return {
+        clearExisting: document.getElementById('clearExisting').checked,
+        skipUserProfile: document.getElementById('skipUserProfile').checked,
+        skipSettings: document.getElementById('skipSettings').checked,
+        dryRun: dryRun
+      };
+    }
+
+    // Validate JSON
+    function validateJSON() {
+      try {
+        const data = getJSONData();
+
+        let validation = '✅ JSON is valid!\n\n';
+        validation += '📊 Data Summary:\n';
+        validation += `Version: ${data.version || 'N/A'}\n`;
+        validation += `Export Date: ${data.exportDate || 'N/A'}\n\n`;
+
+        if (data.dataCounts) {
+          validation += 'Data Counts:\n';
+          for (const [key, value] of Object.entries(data.dataCounts)) {
+            validation += `  ${key}: ${value}\n`;
+          }
+        }
+
+        if (!data.userProfile?.id) {
+          validation += '\n⚠️ Warning: No user profile ID found';
+        } else {
+          validation += `\n👤 User ID: ${data.userProfile.id}`;
+        }
+
+        showOutput(validation, 'info');
+      } catch (error) {
+        showOutput(`❌ Validation Error:\n${error.message}`, 'error');
+      }
+    }
+
+    // Test import (dry run)
+    async function testImport() {
+      try {
+        const data = getJSONData();
+        const options = getOptions(true);
+
+        showOutput('🧪 Testing import (dry run)...\nCheck browser console for details', 'info');
+
+        // This requires the app to be running and the utilities to be loaded
+        if (typeof window.opener?.importTestData === 'function') {
+          const result = await window.opener.importTestData(data, options);
+
+          let output = result.success ? '✅ Test Passed!\n\n' : '⚠️ Test had warnings:\n\n';
+          output += '📊 Would Import:\n';
+          for (const [key, value] of Object.entries(result.imported)) {
+            output += `  ${key}: ${value}\n`;
+          }
+
+          if (result.errors.length > 0) {
+            output += '\n❌ Errors:\n';
+            result.errors.forEach((error, i) => {
+              output += `  ${i + 1}. ${error}\n`;
+            });
+          }
+
+          showOutput(output, result.success ? 'info' : 'warning');
+        } else {
+          showOutput(
+            '❌ Error: Import utilities not available\n\n' +
+            'Please:\n' +
+            '1. Make sure the development server is running\n' +
+            '2. Open this page from within the app (not directly)\n' +
+            '3. Or use the browser console directly on the app',
+            'error'
+          );
+        }
+      } catch (error) {
+        showOutput(`❌ Test Error:\n${error.message}`, 'error');
+      }
+    }
+
+    // Do actual import
+    async function doImport() {
+      if (!confirm('⚠️ This will import data into IndexedDB. Continue?')) {
+        return;
+      }
+
+      try {
+        const data = getJSONData();
+        const options = getOptions(false);
+
+        showOutput('⏳ Importing data...\nCheck browser console for detailed progress', 'info');
+
+        if (typeof window.opener?.importTestData === 'function') {
+          const result = await window.opener.importTestData(data, options);
+
+          let output = result.success ? '✅ Import Successful!\n\n' : '⚠️ Import completed with errors:\n\n';
+          output += '📊 Imported:\n';
+          for (const [key, value] of Object.entries(result.imported)) {
+            output += `  ${key}: ${value}\n`;
+          }
+
+          if (result.errors.length > 0) {
+            output += '\n❌ Errors:\n';
+            result.errors.forEach((error, i) => {
+              output += `  ${i + 1}. ${error}\n`;
+            });
+          }
+
+          output += '\n💡 Tip: Refresh the app to see your imported data';
+
+          showOutput(output, result.success ? 'info' : 'warning');
+        } else {
+          showOutput(
+            '❌ Error: Import utilities not available\n\n' +
+            'Please use the browser console directly on the app:\n\n' +
+            '1. Open your app at http://localhost:5173\n' +
+            '2. Open browser DevTools (F12)\n' +
+            '3. Go to Console tab\n' +
+            '4. Paste your data:\n' +
+            '   const data = { /* your data */ };\n' +
+            '5. Run:\n' +
+            '   await window.importTestData(data, { clearExisting: true });',
+            'error'
+          );
+        }
+      } catch (error) {
+        showOutput(`❌ Import Error:\n${error.message}`, 'error');
+      }
+    }
+
+    // Clear all data
+    async function clearData() {
+      try {
+        const data = getJSONData();
+
+        if (!data.userProfile?.id) {
+          throw new Error('User ID not found in data');
+        }
+
+        if (!confirm(`⚠️ This will DELETE all data for user: ${data.userProfile.id}\n\nAre you sure?`)) {
+          return;
+        }
+
+        showOutput('🗑️ Clearing data...', 'info');
+
+        if (typeof window.opener?.clearAllData === 'function') {
+          await window.opener.clearAllData(data.userProfile.id);
+          showOutput('✅ All data cleared successfully!', 'info');
+        } else {
+          showOutput(
+            '❌ Error: Clear utilities not available\n\n' +
+            'Please use the browser console directly on the app',
+            'error'
+          );
+        }
+      } catch (error) {
+        showOutput(`❌ Clear Error:\n${error.message}`, 'error');
+      }
+    }
+
+    // Show initial instructions
+    window.addEventListener('load', () => {
+      showOutput(
+        '👋 Welcome to FitTrackAI Test Data Import!\n\n' +
+        '📝 Instructions:\n' +
+        '1. Paste your JSON data above\n' +
+        '2. Select your options\n' +
+        '3. Click "Validate JSON" to check your data\n' +
+        '4. Click "Test Import" to do a dry run\n' +
+        '5. Click "Import Data" to actually import\n\n' +
+        '💡 For best results, open this page from within your running app or use the browser console directly.',
+        'info'
+      );
+    });
+  </script>
+</body>
+</html>

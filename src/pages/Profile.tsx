@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth0 } from '@auth0/auth0-react';
-import { ArrowLeft, ArrowRight, Scale, Ruler, Moon, Sun, Monitor, Bell, Volume2, Vibrate, Download, Upload, AlertCircle, Clock, Cloud, CloudOff, RefreshCw, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Scale, Ruler, Moon, Sun, Monitor, Bell, Volume2, Vibrate, Download, Upload, Trash2, AlertCircle, Clock, Cloud, CloudOff, RefreshCw, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import { useUserStore, Gender, UnitSystem, unitHelpers, Goal } from '@/store/userStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { notificationService } from '@/services/notificationService';
@@ -202,21 +202,52 @@ export function Profile() {
   const handleManualSync = async () => {
     // eslint-disable-next-line no-console
     console.log('[Profile.handleManualSync] Button clicked, profile.id:', profile?.id, 'isSyncing:', isSyncing);
-    
+
     if (!profile?.id || isSyncing) {
       console.warn('[Profile.handleManualSync] Sync aborted - missing profile.id or already syncing');
       return;
     }
-    
+
     setIsSyncing(true);
     setSyncStatus('syncing');
-    
+
     try {
+      const useFirestore = import.meta.env.VITE_USE_FIRESTORE === 'true';
       // eslint-disable-next-line no-console
-      console.log('[Profile.handleManualSync] Calling mongodbSyncService.sync...');
-      const results = await mongodbSyncService.sync(profile.id, {
-        direction: 'bidirectional',
-      });
+      console.log('[Profile.handleManualSync] useFirestore:', useFirestore);
+
+      let results;
+      if (useFirestore) {
+        // Use Firestore sync service
+        // eslint-disable-next-line no-console
+        console.log('[Profile.handleManualSync] Getting Auth0 token for Firebase authentication...');
+
+        // Get Auth0 token and store in localStorage for Firestore sync
+        try {
+          const token = await getAccessTokenSilently();
+          localStorage.setItem('auth0_access_token', token);
+          // eslint-disable-next-line no-console
+          console.log('[Profile.handleManualSync] Auth0 token stored in localStorage');
+        } catch (tokenError) {
+          // eslint-disable-next-line no-console
+          console.error('[Profile.handleManualSync] Failed to get Auth0 token:', tokenError);
+          throw new Error('Failed to authenticate with Auth0. Please try logging in again.');
+        }
+
+        // eslint-disable-next-line no-console
+        console.log('[Profile.handleManualSync] Calling firestoreSyncService.sync...');
+        const { firestoreSyncService } = await import('@/services/firestoreSyncService');
+        results = await firestoreSyncService.sync(profile.id, {
+          direction: 'bidirectional',
+        });
+      } else {
+        // Use MongoDB sync service
+        // eslint-disable-next-line no-console
+        console.log('[Profile.handleManualSync] Calling mongodbSyncService.sync...');
+        results = await mongodbSyncService.sync(profile.id, {
+          direction: 'bidirectional',
+        });
+      }
       
       // eslint-disable-next-line no-console
       console.log('[Profile.handleManualSync] Sync completed, results:', results);
@@ -907,6 +938,8 @@ export function Profile() {
                   ? 'Please wait for profile to load'
                   : isSyncing
                   ? 'Sync in progress...'
+                  : import.meta.env.VITE_USE_FIRESTORE === 'true'
+                  ? 'Sync your data to Firestore'
                   : 'Sync your data to MongoDB'
               }
             >
@@ -1127,6 +1160,19 @@ export function Profile() {
               ) : (
                 <ArrowRight className="w-4 h-4 text-slate-400" />
               )}
+            </button>
+            <button
+              onClick={() => navigate('/trash')}
+              className={cn(
+                'w-full flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border',
+                'hover:bg-gray-50 dark:hover:bg-surface-dark-light transition-colors touch-manipulation active:scale-[0.98] min-h-[44px]'
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <Trash2 className="w-5 h-5 text-slate-400" />
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Trash</span>
+              </div>
+              <ArrowRight className="w-4 h-4 text-slate-400" />
             </button>
             <input
               ref={fileInputRef}

@@ -21,7 +21,10 @@ class CacheVersionService {
         try {
             const currentVersion = await this.fetchCurrentVersion();
             if (!currentVersion) {
-                logger.warn('[CacheVersionService] Could not fetch version.json, skipping cache check');
+                // Only warn in production - version.json is expected to be missing in dev mode
+                if (import.meta.env.PROD) {
+                    logger.warn('[CacheVersionService] Could not fetch version.json, skipping cache check');
+                }
                 return false;
             }
 

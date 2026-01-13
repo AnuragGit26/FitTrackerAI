@@ -11,15 +11,22 @@ interface ToastProps {
   type?: ToastType;
   duration?: number;
   onClose: () => void;
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
 }
 
-export function Toast({ message, type = 'info', duration = 3000, onClose }: ToastProps) {
+export function Toast({ message, type = 'info', duration = 3000, onClose, action }: ToastProps) {
+  // Use longer duration for toasts with actions to give user time to click
+  const effectiveDuration = action && duration === 3000 ? 8000 : duration;
+
   useEffect(() => {
-    if (duration > 0) {
-      const timer = setTimeout(onClose, duration);
+    if (effectiveDuration > 0) {
+      const timer = setTimeout(onClose, effectiveDuration);
       return () => clearTimeout(timer);
     }
-  }, [duration, onClose]);
+  }, [effectiveDuration, onClose]);
 
   const icons = {
     success: CheckCircle,
@@ -60,6 +67,14 @@ export function Toast({ message, type = 'info', duration = 3000, onClose }: Toas
         <Icon className="w-5 h-5 flex-shrink-0" />
       </motion.div>
       <p className="flex-1 text-sm font-medium">{message}</p>
+      {action && (
+        <button
+          onClick={action.onClick}
+          className="px-3 py-1.5 text-sm font-medium rounded hover:bg-white/10 transition-colors"
+        >
+          {action.label}
+        </button>
+      )}
       <motion.button
         onClick={onClose}
         className="p-2 rounded hover:bg-black/10 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center touch-manipulation"
@@ -74,7 +89,12 @@ export function Toast({ message, type = 'info', duration = 3000, onClose }: Toas
 }
 
 interface ToastContainerProps {
-  toasts: Array<{ id: string; message: string; type?: ToastType }>;
+  toasts: Array<{
+    id: string;
+    message: string;
+    type?: ToastType;
+    action?: { label: string; onClick: () => void };
+  }>;
   onRemove: (id: string) => void;
 }
 
@@ -91,6 +111,7 @@ export function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
             <Toast
               message={toast.message}
               type={toast.type}
+              action={toast.action}
               onClose={() => onRemove(toast.id)}
             />
           </motion.div>

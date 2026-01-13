@@ -21,7 +21,6 @@ import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { RouteLoader } from '@/components/common/RouteLoader';
 import { OfflineIndicator } from '@/components/common/OfflineIndicator';
 import { InstallPrompt } from '@/components/common/InstallPrompt';
-import { MobileOnlyModal } from '@/components/common/MobileOnlyModal';
 import { analytics } from '@/utils/analytics';
 import { seedWorkoutLogs } from '@/utils/seedWorkoutLogs';
 import { cacheVersionService } from '@/services/cacheVersionService';
@@ -39,6 +38,7 @@ const Analytics = lazy(() => import('@/pages/Analytics').then(m => ({ default: m
 const Insights = lazy(() => import('@/pages/Insights').then(m => ({ default: m.Insights })));
 const Rest = lazy(() => import('@/pages/Rest').then(m => ({ default: m.Rest })));
 const Profile = lazy(() => import('@/pages/Profile').then(m => ({ default: m.Profile })));
+const Trash = lazy(() => import('@/pages/Trash').then(m => ({ default: m.Trash })));
 const Planner = lazy(() => import('@/pages/Planner').then(m => ({ default: m.Planner })));
 const SleepRecovery = lazy(() => import('@/pages/SleepRecovery').then(m => ({ default: m.SleepRecovery })));
 const WorkoutSummary = lazy(() => import('@/pages/WorkoutSummary'));
@@ -141,21 +141,10 @@ function App() {
         // User might not be available yet (loaded in AppRoutes), so we check
         const user = getUserStore.getState().profile;
         if (user?.id) {
-          // Run user-dependent tasks in parallel
-          await Promise.allSettled([
-            // Pull notifications from MongoDB
-            notificationService.pullFromMongoDB(user.id)
-              .then(() => {
-                // Start periodic notification pulling (every hour)
-                notificationService.startPeriodicPull(user.id, 60);
-              })
-              .catch((error) => {
-                console.warn('Failed to initialize notifications:', error);
-              }),
-
-            // Initialize workout event tracker
-            workoutEventTracker.initialize(user.id),
-          ]);
+          // Initialize workout event tracker (notifications pulled after Firebase auth in AppRoutes)
+          await workoutEventTracker.initialize(user.id).catch((error) => {
+            console.warn('Failed to initialize workout event tracker:', error);
+          });
         }
 
         // Register service worker (enabled in both dev and prod for end-to-end testing)
@@ -343,10 +332,14 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <BrowserRouter>
+      <BrowserRouter
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
         <VercelAnalytics />
         <SpeedInsights />
-        <MobileOnlyModal />
         <OfflineIndicator />
         <InstallPrompt />
         <AppRoutes />
@@ -357,7 +350,7 @@ function App() {
 
 function AppRoutes() {
   const location = useLocation();
-  const { isAuthenticated, isLoading, user: auth0User, error: auth0Error } = useAuth0();
+  const { isAuthenticated, isLoading, user: auth0User, error: auth0Error, getAccessTokenSilently } = useAuth0();
   const initializeUser = useUserStore((state) => state.initializeUser);
 
 
@@ -370,13 +363,59 @@ function AppRoutes() {
         firstName: auth0User.given_name || auth0User.nickname || null,
         username: auth0User.nickname || auth0User.name || null,
         emailAddresses: auth0User.email ? [{ emailAddress: auth0User.email }] : [],
-      }).then(() => {
+      }).then(async () => {
         const userId = auth0User.sub || auth0User.email || 'user-unknown';
+
+        // Authenticate with Firebase (if Firestore is enabled)
+        const useFirestore = import.meta.env.VITE_USE_FIRESTORE === 'true';
+        logger.info('[App.tsx] VITE_USE_FIRESTORE:', import.meta.env.VITE_USE_FIRESTORE);
+        logger.info('[App.tsx] useFirestore:', useFirestore);
+        if (useFirestore) {
+          logger.info('[App.tsx] Initializing Firebase authentication');
+          try {
+            const { firebaseAuthBridge } = await import('@/services/firebaseAuthBridge');
+
+            // Get Auth0 access token
+            const token = await getAccessTokenSilently();
+
+            // Store token in localStorage for Firestore sync service
+            localStorage.setItem('auth0_access_token', token);
+
+            // Authenticate with Firebase using Auth0 token
+            await firebaseAuthBridge.authenticateWithAuth0(token, userId);
+            logger.info('Firebase authentication successful');
+
+            // Now that Firebase is authenticated, pull notifications
+            await notificationService.pullFromMongoDB(userId)
+              .then(() => {
+                // Start periodic notification pulling (every hour)
+                notificationService.startPeriodicPull(userId, 60);
+              })
+              .catch((error) => {
+                logger.warn('Failed to pull notifications after Firebase auth:', error);
+              });
+          } catch (error) {
+            logger.warn('Firebase authentication failed (non-blocking):', error);
+            // Non-blocking - app can still function with IndexedDB only
+          }
+        } else {
+          logger.info('[App.tsx] Firestore disabled, using Supabase/MongoDB');
+          // If not using Firestore, pull notifications directly (uses Supabase/MongoDB)
+          await notificationService.pullFromMongoDB(userId)
+            .then(() => {
+              // Start periodic notification pulling (every hour)
+              notificationService.startPeriodicPull(userId, 60);
+            })
+            .catch((error) => {
+              logger.warn('Failed to pull notifications:', error);
+            });
+        }
+
         // Initialize workout event tracker for this user
         workoutEventTracker.initialize(userId).catch((error) => {
           logger.error('Failed to initialize workout event tracker', error);
         });
-        
+
         // Initialize default templates after user is loaded
         initializeDefaultTemplates(userId).catch((error) => {
           logger.error('Failed to initialize templates', error);
@@ -550,6 +589,20 @@ function AppRoutes() {
                     <ErrorBoundary>
                       <Suspense fallback={<RouteLoader />}>
                         <Profile />
+                      </Suspense>
+                    </ErrorBoundary>
+                  </AnimatedPage>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/trash"
+              element={
+                <ProtectedRoute>
+                  <AnimatedPage>
+                    <ErrorBoundary>
+                      <Suspense fallback={<RouteLoader />}>
+                        <Trash />
                       </Suspense>
                     </ErrorBoundary>
                   </AnimatedPage>

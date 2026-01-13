@@ -54,10 +54,14 @@ export function calculateRecoveryStatus(params: RecoveryCalculationParams): Musc
   );
 
   // Calculate recovery percentage
-  const recoveryPercentage = Math.min(
+  let recoveryPercentage = Math.min(
     100,
     Math.max(0, (hoursSinceWorkout / adjustedRecoveryHours) * 100)
   );
+
+  if (isNaN(recoveryPercentage)) {
+    recoveryPercentage = 100;
+  }
 
   // Determine recovery status
   let recoveryStatus: RecoveryStatus;

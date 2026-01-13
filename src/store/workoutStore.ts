@@ -10,6 +10,7 @@ import { saveFailedWorkout } from '@/utils/workoutErrorRecovery';
 import { calculateVolume, convertWeight } from '@/utils/calculations';
 import { userContextManager } from '@/services/userContextManager';
 import { normalizeWorkoutTimes } from '@/utils/validators';
+import { logger } from '@/utils/logger';
 
 interface RemoveExerciseResult {
   dissolved: boolean;
@@ -168,7 +169,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
               }
             } catch (error) {
               // Use planned workout muscles if exercise not found
-              console.warn('Exercise not found in library, using planned workout muscles');
+              logger.warn('Exercise not found in library, using planned workout muscles');
             }
 
             const sets: WorkoutSet[] = Array.from({ length: ex.sets }, (_, i) => ({
@@ -500,7 +501,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
             totalDurationMinutes = 0;
           }
           if (totalDurationMinutes > 1440) {
-            console.warn(`Duration ${totalDurationMinutes} minutes exceeds 24 hours, capping at 1440 minutes`);
+            logger.warn(`Duration ${totalDurationMinutes} minutes exceeds 24 hours, capping at 1440 minutes`);
             totalDurationMinutes = 1440;
           }
         } else {
@@ -520,7 +521,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
           totalDurationMinutes = 0;
         }
         if (totalDurationMinutes > 1440) {
-          console.warn(`Duration ${totalDurationMinutes} minutes exceeds 24 hours, capping at 1440 minutes`);
+          logger.warn(`Duration ${totalDurationMinutes} minutes exceeds 24 hours, capping at 1440 minutes`);
           totalDurationMinutes = 1440;
         }
         
@@ -540,13 +541,13 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
           }
         } catch {
           // Fallback: use current time if startTime is invalid
-          console.warn('Invalid startTime, using current time as fallback');
+          logger.warn('Invalid startTime, using current time as fallback');
           startTime = endTime;
         }
         
         // Validate startTime is a valid date
         if (isNaN(startTime.getTime())) {
-          console.warn('Corrupted startTime detected, using current time as fallback');
+          logger.warn('Corrupted startTime detected, using current time as fallback');
           startTime = endTime;
         }
         
@@ -554,7 +555,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         
         // Ensure duration is non-negative
         if (durationMs < 0) {
-          console.warn('Negative duration detected, using current time as both start and end');
+          logger.warn('Negative duration detected, using current time as both start and end');
           startTime = endTime;
           totalDurationMinutes = 0;
         } else {
@@ -568,7 +569,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
           totalDurationMinutes = 0;
         }
         if (totalDurationMinutes > 1440) {
-          console.warn(`Duration ${totalDurationMinutes} minutes exceeds 24 hours, capping at 1440 minutes`);
+          logger.warn(`Duration ${totalDurationMinutes} minutes exceeds 24 hours, capping at 1440 minutes`);
           totalDurationMinutes = 1440;
           // Recalculate startTime to match capped duration
           const durationMs = totalDurationMinutes * 60000;
@@ -578,12 +579,12 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
 
       // Final validation - ensure we have valid values
       if (isNaN(startTime.getTime())) {
-        console.warn('StartTime is still invalid, using current time');
+        logger.warn('StartTime is still invalid, using current time');
         startTime = endTime;
       }
       
       if (totalDurationMinutes < 0 || totalDurationMinutes > 1440) {
-        console.warn('Duration out of range, using safe defaults');
+        logger.warn('Duration out of range, using safe defaults');
         totalDurationMinutes = Math.max(0, Math.min(1440, totalDurationMinutes));
         const durationMs = totalDurationMinutes * 60000;
         startTime = new Date(endTime.getTime() - durationMs);
@@ -595,7 +596,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
       
       // Warn if workout was started with a different user ID (shouldn't happen normally)
       if (currentWorkout.userId && currentWorkout.userId !== currentUserId) {
-        console.warn(
+        logger.warn(
           `Workout user ID mismatch: workout started with ${currentWorkout.userId}, ` +
           `but finishing with ${currentUserId}. Using current user ID.`
         );
@@ -653,9 +654,9 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
             tables: ['workouts'],
             direction: 'push',
           });
-        } catch (syncError) {
+          } catch (syncError) {
           // Log sync failure but don't affect workout save
-          console.warn('Supabase sync failed for workout (will retry later):', syncError);
+          logger.warn('Supabase sync failed for workout (will retry later):', syncError);
           // Sync will be retried on next sync cycle
         }
       })();
@@ -668,7 +669,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
           currentUserId // Use current user ID from context manager
         );
       } catch (muscleError) {
-        console.error('Failed to update muscle statuses:', muscleError);
+        logger.error('Failed to update muscle statuses:', muscleError);
         // Continue even if muscle status update fails
       }
 
@@ -678,7 +679,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         try {
           await plannedWorkoutService.markAsCompleted(plannedWorkoutId, workoutId);
         } catch (plannedError) {
-          console.error('Failed to mark planned workout as completed:', plannedError);
+          logger.error('Failed to mark planned workout as completed:', plannedError);
           // Continue even if marking as completed fails
         }
       }
@@ -713,12 +714,12 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
                 { templateId: get().templateId, plannedWorkoutId: get().plannedWorkoutId }
               );
             } catch (logError) {
-              console.error('Failed to log workout error:', logError);
+              logger.error('Failed to log workout error:', logError);
             }
           })();
         }
       } catch (recoveryError) {
-        console.error('Failed to save failed workout for recovery:', recoveryError);
+        logger.error('Failed to save failed workout for recovery:', recoveryError);
       }
       
       throw error;

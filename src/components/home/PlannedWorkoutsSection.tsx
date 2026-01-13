@@ -33,12 +33,20 @@ export function PlannedWorkoutsSection() {
 
     return (plannedWorkouts ?? [])
       .filter((pw) => {
-        const scheduledDate = startOfDay(new Date(pw.scheduledDate));
-        return (
-          (isAfter(scheduledDate, today) || scheduledDate.getTime() === today.getTime()) &&
-          scheduledDate <= nextWeek &&
-          !pw.isCompleted
-        );
+        const dateObj = new Date(pw.scheduledDate);
+        if (isNaN(dateObj.getTime())) return false;
+        
+        try {
+          const scheduledDate = startOfDay(dateObj);
+          return (
+            (isAfter(scheduledDate, today) || scheduledDate.getTime() === today.getTime()) &&
+            scheduledDate <= nextWeek &&
+            !pw.isCompleted
+          );
+        } catch (e) {
+          console.warn('Invalid date in planned workout:', pw.id, e);
+          return false;
+        }
       })
       .sort((a, b) => {
         const dateA = new Date(a.scheduledDate).getTime();

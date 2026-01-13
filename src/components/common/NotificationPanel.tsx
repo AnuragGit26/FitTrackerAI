@@ -39,6 +39,8 @@ const NOTIFICATION_COLORS: Record<NotificationType, string> = {
 };
 
 function formatRelativeTime(timestamp: number): string {
+    if (!timestamp || isNaN(timestamp)) return '';
+
     const now = Date.now();
     const diff = now - timestamp;
     const seconds = Math.floor(diff / 1000);
@@ -52,6 +54,8 @@ function formatRelativeTime(timestamp: number): string {
     if (days < 7) return `${days}d ago`;
 
     const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return '';
+
     const nowDate = new Date();
     const diffDays = Math.floor((nowDate.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
 
@@ -84,6 +88,8 @@ function groupNotificationsByDate(notifications: Notification[]): {
 
     notifications.forEach((notification) => {
         const notificationDate = new Date(notification.createdAt);
+        if (isNaN(notificationDate.getTime())) return;
+
         if (notificationDate >= today) {
             groups.today.push(notification);
         } else if (notificationDate >= yesterday) {

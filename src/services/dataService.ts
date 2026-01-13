@@ -1,4 +1,5 @@
 import { dbHelpers } from './database';
+import { logger } from '@/utils/logger';
 import { Workout } from '@/types/workout';
 import { Exercise, ExerciseTrackingType } from '@/types/exercise';
 import { MuscleStatus, MuscleGroup } from '@/types/muscle';
@@ -58,7 +59,7 @@ class DataService {
       const value = localStorage.getItem(key);
       return value || null;
     } catch (error) {
-      console.warn('Failed to read profile picture from LocalStorage:', error);
+      logger.warn('Failed to read profile picture from LocalStorage:', error);
       return null;
     }
   }
@@ -72,7 +73,7 @@ class DataService {
         localStorage.removeItem(key);
       }
     } catch (error) {
-      console.warn('Failed to write profile picture to LocalStorage:', error);
+      logger.warn('Failed to write profile picture to LocalStorage:', error);
     }
   }
 
@@ -124,7 +125,7 @@ class DataService {
         const userId = userContextManager.getUserId();
         await dbHelpers.addToPendingSyncQueue(table, userId);
       } catch (error) {
-        console.warn('Failed to persist sync queue to IndexedDB:', error);
+        logger.warn('Failed to persist sync queue to IndexedDB:', error);
         // Non-blocking - continue with in-memory queue
       }
 
@@ -146,15 +147,14 @@ class DataService {
       }
 
       if (pendingItems.length > 0) {
-        // eslint-disable-next-line no-console
-        console.log(`[DataService] Loaded ${pendingItems.length} pending sync items from IndexedDB`);
+        logger.info(`[DataService] Loaded ${pendingItems.length} pending sync items from IndexedDB`);
         // Trigger sync processing if there are items
         this.debounceSync();
       }
 
       this.syncQueueLoaded = true;
     } catch (error) {
-      console.error('Failed to load pending sync queue:', error);
+      logger.error('Failed to load pending sync queue:', error);
       this.syncQueueLoaded = true; // Mark as loaded even on error to avoid retry loops
     }
   }
@@ -169,6 +169,20 @@ class DataService {
     }, 5000);
   }
 
+  /**
+   * Get sync service based on environment configuration
+   * Returns Firestore sync service if VITE_USE_FIRESTORE is true, otherwise MongoDB sync service
+   */
+  private async getSyncService() {
+    const useFirestore = import.meta.env.VITE_USE_FIRESTORE === 'true';
+    if (useFirestore) {
+      const { firestoreSyncService } = await import('./firestoreSyncService');
+      return firestoreSyncService;
+    }
+    const { mongodbSyncService } = await import('./mongodbSyncService');
+    return mongodbSyncService;
+  }
+
   private async processSyncQueue(): Promise<void> {
     if (this.syncQueue.size === 0) return;
 
@@ -176,12 +190,12 @@ class DataService {
     this.syncQueue.clear();
 
     try {
-      const { mongodbSyncService } = await import('./mongodbSyncService');
+      const syncService = await this.getSyncService();
       const { useUserStore } = await import('@/store/userStore');
       const userStore = useUserStore.getState();
 
       if (userStore.profile?.id) {
-        await mongodbSyncService.sync(userStore.profile.id, {
+        await syncService.sync(userStore.profile.id, {
           tables: tables as SyncableTable[],
           direction: 'push',
         });
@@ -191,13 +205,13 @@ class DataService {
           try {
             await dbHelpers.clearPendingSyncQueue(table as SyncableTable);
           } catch (error) {
-            console.warn(`Failed to clear sync queue for table ${table}:`, error);
+            logger.warn(`Failed to clear sync queue for table ${table}:`, error);
             // Non-blocking - continue processing
           }
         }
       }
     } catch (error) {
-      console.error('Failed to process sync queue:', error);
+      logger.error('Failed to process sync queue:', error);
       // FIX: On sync failure, keep items in persistent queue for retry
       // Re-add failed tables to in-memory queue for next attempt
       tables.forEach(table => this.syncQueue.add(table as SyncableTable));
@@ -218,13 +232,13 @@ class DataService {
 
   async triggerManualSync(userId: string, tables?: SyncableTable[]): Promise<void> {
     try {
-      const { mongodbSyncService } = await import('./mongodbSyncService');
-      await mongodbSyncService.sync(userId, {
+      const syncService = await this.getSyncService();
+      await syncService.sync(userId, {
         tables,
         direction: 'bidirectional',
       });
     } catch (error) {
-      console.error('Failed to trigger manual sync:', error);
+      logger.error('Failed to trigger manual sync:', error);
       throw error;
     }
   }
@@ -295,7 +309,7 @@ class DataService {
       if (endTime.getTime() > now.getTime() + toleranceMs) {
         // Auto-adjust endTime to current time if it's in the future
         const cappedEndTime = new Date(Math.min(endTime.getTime(), now.getTime() + toleranceMs));
-        console.warn('End time capped to current time (was in the future)', {
+        logger.warn('End time capped to current time (was in the future)', {
           original: endTime.toISOString(),
           capped: cappedEndTime.toISOString(),
         });
@@ -349,7 +363,7 @@ class DataService {
       }
       if ((exercise.musclesWorked ?? []).length === 0) {
         // Allow empty array but log a warning - this might cause issues with muscle distribution
-        console.warn(`Exercise "${exercise.exerciseName}" at index ${index} has no musclesWorked. This may cause issues with muscle distribution calculations.`);
+        logger.warn(`Exercise "${exercise.exerciseName}" at index ${index} has no musclesWorked. This may cause issues with muscle distribution calculations.`);
       }
       
       // Validate each set using centralized validators
@@ -580,15 +594,13 @@ class DataService {
   }
 
   async getAllWorkouts(userId: string): Promise<Workout[]> {
-    // eslint-disable-next-line no-console
-    console.debug('[DataService.getAllWorkouts] Called with userId:', userId);
+    logger.debug('[DataService.getAllWorkouts] Called with userId:', userId);
     try {
       const workouts = await dbHelpers.getAllWorkouts(userId);
-      // eslint-disable-next-line no-console
-      console.debug(`[DataService.getAllWorkouts] Returning ${workouts.length} workouts for userId: ${userId}`);
+      logger.debug(`[DataService.getAllWorkouts] Returning ${workouts.length} workouts for userId: ${userId}`);
       return workouts;
     } catch (error) {
-      console.error('[DataService.getAllWorkouts] Error:', error);
+      logger.error('[DataService.getAllWorkouts] Error:', error);
       throw new Error(`Failed to get workouts: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -732,21 +744,151 @@ class DataService {
 
   async deleteWorkout(id: string): Promise<void> {
     userContextManager.requireUserId();
-    
+
     // Get current workout for soft delete
     const current = await dbHelpers.getWorkout(id);
     if (!current) {
       throw new Error(`Workout with id ${id} not found`);
     }
-    
+
     userContextManager.validateUserId(current.userId);
-    
+
     // Soft delete with version increment
     const softDeleted = versionManager.softDelete(current);
-    
+
     return await errorRecovery.withRetry(async () => {
-      await transactionManager.execute(['workouts'], async () => {
+      await transactionManager.execute(['workouts', 'syncMetadata'], async () => {
         await dbHelpers.updateWorkout(id, softDeleted);
+
+        // Clear any pending sync operations for this workout
+        // The soft delete itself will be synced as a normal update
+        await db.syncMetadata
+          .where('[tableName+recordId]')
+          .equals(['workouts', id])
+          .delete();
+
+        this.emit('workout');
+      });
+    });
+  }
+
+  async restoreWorkout(id: string): Promise<void> {
+    userContextManager.requireUserId();
+
+    const current = await dbHelpers.getWorkout(id);
+    if (!current) {
+      throw new Error(`Workout with id ${id} not found`);
+    }
+
+    if (!current.deletedAt) {
+      throw new Error(`Workout with id ${id} is not deleted`);
+    }
+
+    userContextManager.validateUserId(current.userId);
+
+    // Restore with version increment
+    const restored = versionManager.restore(current);
+
+    return await errorRecovery.withRetry(async () => {
+      await transactionManager.execute(['workouts', 'syncMetadata'], async () => {
+        await dbHelpers.updateWorkout(id, restored);
+
+        // Clear any pending sync operations for this workout
+        // The restore will be synced as a normal update
+        await db.syncMetadata
+          .where('[tableName+recordId]')
+          .equals(['workouts', id])
+          .delete();
+
+        this.emit('workout');
+      });
+    });
+  }
+
+  async getDeletedWorkouts(userId: string): Promise<Workout[]> {
+    const currentUserId = userContextManager.requireUserId();
+    userContextManager.validateUserId(userId);
+
+    try {
+      return await dbHelpers.getDeletedWorkouts(userId);
+    } catch (error) {
+      throw new Error(`Failed to get deleted workouts: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Clean up old deleted workouts based on retention policy
+   * @param userId User ID to clean up workouts for
+   * @param retentionDays Number of days to keep deleted workouts (default: 30)
+   * @returns Number of workouts permanently deleted
+   */
+  async cleanupOldDeletedWorkouts(userId: string, retentionDays: number = 30): Promise<number> {
+    const currentUserId = userContextManager.requireUserId();
+    userContextManager.validateUserId(userId);
+
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+
+    try {
+      const deletedWorkouts = await dbHelpers.getDeletedWorkouts(userId);
+      const workoutsToDelete = deletedWorkouts.filter(
+        w => w.deletedAt && new Date(w.deletedAt) < cutoffDate
+      );
+
+      for (const workout of workoutsToDelete) {
+        if (workout.id) {
+          await this.permanentlyDeleteWorkout(workout.id);
+        }
+      }
+
+      return workoutsToDelete.length;
+    } catch (error) {
+      logger.error('Failed to cleanup old deleted workouts:', error);
+      return 0;
+    }
+  }
+
+  async permanentlyDeleteWorkout(id: string): Promise<void> {
+    userContextManager.requireUserId();
+
+    const current = await dbHelpers.getWorkout(id);
+    if (!current) {
+      throw new Error(`Workout with id ${id} not found`);
+    }
+
+    if (!current.deletedAt) {
+      throw new Error(`Workout must be soft-deleted before permanent deletion`);
+    }
+
+    userContextManager.validateUserId(current.userId);
+
+    return await errorRecovery.withRetry(async () => {
+      // Use transaction for all related deletions
+      await transactionManager.execute(['workouts', 'plannedWorkouts', 'syncMetadata'], async () => {
+        // 1. Delete the workout itself
+        await dbHelpers.deleteWorkout(id);
+
+        // 2. Clear completedWorkoutId from any planned workouts that reference this workout
+        const plannedWorkouts = await db.plannedWorkouts
+          .where('userId')
+          .equals(current.userId)
+          .filter(pw => pw.completedWorkoutId === id)
+          .toArray();
+
+        for (const plannedWorkout of plannedWorkouts) {
+          await db.plannedWorkouts.update(plannedWorkout.id!, {
+            completedWorkoutId: undefined,
+            isCompleted: false,
+            updatedAt: new Date()
+          });
+        }
+
+        // 3. Remove from sync queue if pending
+        await db.syncMetadata
+          .where('[tableName+recordId]')
+          .equals(['workouts', id])
+          .delete();
+
         this.emit('workout');
       });
     });
@@ -871,7 +1013,7 @@ class DataService {
       
       // Double-check: ensure profile belongs to requested user
       if (profile.id !== userId) {
-        console.warn(`Profile ID mismatch: requested ${userId}, got ${profile.id}`);
+        logger.warn(`Profile ID mismatch: requested ${userId}, got ${profile.id}`);
         return null;
       }
       
@@ -1111,6 +1253,27 @@ class DataService {
   ): Promise<void> {
     userContextManager.requireUserId();
     return await transactionManager.batch(storeName, items, operation, batchSize);
+  }
+
+  // Database health and maintenance
+  async checkDatabaseHealth(): Promise<{
+    isHealthy: boolean;
+    issues: string[];
+    version: number;
+  }> {
+    try {
+      return await dbHelpers.checkDatabaseHealth();
+    } catch (error) {
+      throw new Error(`Failed to check database health: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async repairDatabase(): Promise<void> {
+    try {
+      await dbHelpers.repairDatabase();
+    } catch (error) {
+      throw new Error(`Failed to repair database: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 }
 

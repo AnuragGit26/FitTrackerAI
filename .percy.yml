@@ -1,0 +1,34 @@
+version: 2
+snapshot:
+  widths:
+    - 375   # Mobile
+    - 768   # Tablet
+    - 1280  # Desktop
+  min-height: 1024
+  percy-css: |
+    /* Hide dynamic content that changes between snapshots */
+    [data-cy="workout-timer"],
+    [data-cy="rest-timer"],
+    [data-cy="current-time"],
+    [data-cy="date-display"] {
+      visibility: hidden;
+    }
+
+    /* Hide animations for consistent snapshots */
+    * {
+      animation-duration: 0s !important;
+      transition-duration: 0s !important;
+    }
+
+static:
+  include: /build/**
+  exclude:
+    - /build/**/*.map
+
+agent:
+  asset-discovery:
+    network-idle-timeout: 750
+    allowed-hostnames:
+      - localhost
+      - fonts.googleapis.com
+      - fonts.gstatic.com

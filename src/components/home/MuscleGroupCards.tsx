@@ -111,10 +111,18 @@ export function MuscleGroupCards() {
       if (!existing) {
         acc.push(status);
       } else {
-        const existingDate = existing.lastWorked ? new Date(existing.lastWorked).getTime() : 0;
-        const currentDate = status.lastWorked ? new Date(status.lastWorked).getTime() : 0;
+        const existingDate = existing.lastWorked 
+          ? (existing.lastWorked instanceof Date ? existing.lastWorked.getTime() : new Date(existing.lastWorked).getTime())
+          : 0;
+        const currentDate = status.lastWorked 
+          ? (status.lastWorked instanceof Date ? status.lastWorked.getTime() : new Date(status.lastWorked).getTime())
+          : 0;
         
-        if (currentDate > existingDate) {
+        // Handle invalid dates
+        const t1 = isNaN(existingDate) ? 0 : existingDate;
+        const t2 = isNaN(currentDate) ? 0 : currentDate;
+        
+        if (t2 > t1) {
           const index = acc.indexOf(existing);
           acc[index] = status;
         }

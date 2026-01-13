@@ -66,7 +66,13 @@ export function useAIInsights() {
     });
     
     // Calculate current streak
-    const workoutDates = workouts.map(w => new Date(w.date));
+    const workoutDates = workouts
+      .map(w => {
+        const d = new Date(w.date);
+        return isNaN(d.getTime()) ? null : d;
+      })
+      .filter((d): d is Date => d !== null);
+      
     const currentStreak = calculateStreak(workoutDates);
     
     // Get fingerprint for caching (include pattern analysis in fingerprint)

@@ -5,14 +5,19 @@ export interface Toast {
   id: string;
   message: string;
   type: ToastType;
+  action?: { label: string; onClick: () => void };
 }
 
 export function useToast() {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const showToast = useCallback((message: string, type: ToastType = 'info') => {
+  const showToast = useCallback((
+    message: string,
+    type: ToastType = 'info',
+    action?: { label: string; onClick: () => void }
+  ) => {
     const id = `toast-${Date.now()}-${Math.random()}`;
-    setToasts((prev) => [...prev, { id, message, type }]);
+    setToasts((prev) => [...prev, { id, message, type, action }]);
     return id;
   }, []);
 
@@ -20,10 +25,14 @@ export function useToast() {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
 
-  const success = useCallback((message: string) => showToast(message, 'success'), [showToast]);
-  const error = useCallback((message: string) => showToast(message, 'error'), [showToast]);
-  const warning = useCallback((message: string) => showToast(message, 'warning'), [showToast]);
-  const info = useCallback((message: string) => showToast(message, 'info'), [showToast]);
+  const success = useCallback((message: string, action?: { label: string; onClick: () => void }) =>
+    showToast(message, 'success', action), [showToast]);
+  const error = useCallback((message: string, action?: { label: string; onClick: () => void }) =>
+    showToast(message, 'error', action), [showToast]);
+  const warning = useCallback((message: string, action?: { label: string; onClick: () => void }) =>
+    showToast(message, 'warning', action), [showToast]);
+  const info = useCallback((message: string, action?: { label: string; onClick: () => void }) =>
+    showToast(message, 'info', action), [showToast]);
 
   return {
     toasts,

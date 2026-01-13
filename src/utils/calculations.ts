@@ -49,7 +49,7 @@ export function calculateVolume(
     exerciseName?: string;
   }
 ): number {
-  return sets.reduce((total, set) => {
+  const volume = sets.reduce((total, set) => {
     if (!set.completed) return total;
 
     // If tracking type not provided, infer from set data
@@ -107,6 +107,8 @@ export function calculateVolume(
         return total;
     }
   }, 0);
+  
+  return isNaN(volume) ? 0 : volume;
 }
 
 export function convertWeight(weight: number, from: 'kg' | 'lbs', to: 'kg' | 'lbs'): number {
@@ -207,12 +209,13 @@ function validateRollingWindows(
 export function calculateStreak(workoutDates: Date[]): number {
   if (workoutDates.length === 0) return 0;
   
-  // Need at least 3 workouts to form a valid streak
-  if (workoutDates.length < 3) return 0;
+  // Filter out invalid dates
+  const validDates = workoutDates.filter(d => !isNaN(d.getTime()));
+  if (validDates.length < 3) return 0;
 
   // Remove duplicates and sort by date (most recent first)
   const uniqueDates = Array.from(
-    new Set(workoutDates.map(date => date.getTime()))
+    new Set(validDates.map(date => date.getTime()))
   ).map(time => new Date(time));
   
   const sortedDates = uniqueDates.sort((a, b) => b.getTime() - a.getTime());
@@ -258,13 +261,16 @@ export function calculateStreak(workoutDates: Date[]): number {
 }
 
 export function estimateEnergy(workouts: Array<{ totalVolume: number; totalDuration: number }>): number {
-  const totalVolume = workouts.reduce((sum, w) => sum + w.totalVolume, 0);
-  const totalDuration = workouts.reduce((sum, w) => sum + w.totalDuration, 0);
+  if (!workouts || workouts.length === 0) return 0;
+
+  const totalVolume = workouts.reduce((sum, w) => sum + (w.totalVolume || 0), 0);
+  const totalDuration = workouts.reduce((sum, w) => sum + (w.totalDuration || 0), 0);
 
   const volumeCalories = totalVolume * 0.1;
   const timeCalories = totalDuration * 8;
 
-  return Math.round(volumeCalories + timeCalories);
+  const total = Math.round(volumeCalories + timeCalories);
+  return isNaN(total) ? 0 : total;
 }
 
 /**

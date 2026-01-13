@@ -15,27 +15,36 @@ export function StatsCarousel() {
   const navigate = useNavigate();
 
   // Calculate values (hooks must be called unconditionally)
-  const totalVolume = (workouts ?? []).reduce((sum, w) => sum + w.totalVolume, 0);
+  const totalVolumeRaw = (workouts ?? []).reduce((sum, w) => sum + (w.totalVolume || 0), 0);
+  const totalVolume = isNaN(totalVolumeRaw) ? 0 : totalVolumeRaw;
+  
   const workoutDates = (workouts ?? []).map(w => w.date);
   const streak = calculateStreak(workoutDates);
-  const energy = estimateEnergy(workouts ?? []);
+  const energyRaw = estimateEnergy(workouts ?? []);
+  const energy = isNaN(energyRaw) ? 0 : energyRaw;
 
   // Only calculate change percentages if user has enough workouts for meaningful averages
   const hasEnoughWorkouts = hasEnoughWorkoutsForAverages(workouts ?? []);
   
-  const previousVolume = hasEnoughWorkouts && (workouts ?? []).length > 1
-    ? (workouts ?? []).slice(0, Math.floor((workouts ?? []).length / 2)).reduce((sum, w) => sum + w.totalVolume, 0)
+  const previousVolumeRaw = hasEnoughWorkouts && (workouts ?? []).length > 1
+    ? (workouts ?? []).slice(0, Math.floor((workouts ?? []).length / 2)).reduce((sum, w) => sum + (w.totalVolume || 0), 0)
     : totalVolume * 0.95;
-  const volumeChange = hasEnoughWorkouts && previousVolume > 0 
+  const previousVolume = isNaN(previousVolumeRaw) ? 0 : previousVolumeRaw;
+
+  const volumeChangeRaw = hasEnoughWorkouts && previousVolume > 0 
     ? ((totalVolume - previousVolume) / previousVolume) * 100 
     : 0;
+  const volumeChange = isNaN(volumeChangeRaw) || !isFinite(volumeChangeRaw) ? 0 : volumeChangeRaw;
 
-  const previousEnergy = hasEnoughWorkouts && (workouts ?? []).length > 1
+  const previousEnergyRaw = hasEnoughWorkouts && (workouts ?? []).length > 1
     ? estimateEnergy((workouts ?? []).slice(0, Math.floor((workouts ?? []).length / 2)))
     : energy * 0.88;
-  const energyChange = hasEnoughWorkouts && previousEnergy > 0
+  const previousEnergy = isNaN(previousEnergyRaw) ? 0 : previousEnergyRaw;
+
+  const energyChangeRaw = hasEnoughWorkouts && previousEnergy > 0
     ? ((energy - previousEnergy) / previousEnergy) * 100
     : 0;
+  const energyChange = isNaN(energyChangeRaw) || !isFinite(energyChangeRaw) ? 0 : energyChangeRaw;
 
   // All hooks must be called before any conditional returns
   const shouldReduceMotion = prefersReducedMotion();

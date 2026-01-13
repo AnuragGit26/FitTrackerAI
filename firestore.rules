@@ -1,0 +1,169 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ========================================
+    // Helper Functions
+    // ========================================
+
+    /**
+     * Check if user is authenticated
+     */
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    /**
+     * Check if user owns the resource
+     */
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    /**
+     * Check if userId in document matches authenticated user
+     */
+    function userIdMatches() {
+      return isAuthenticated() &&
+             request.resource.data.userId == request.auth.uid;
+    }
+
+    // ========================================
+    // Global Collections
+    // ========================================
+
+    /**
+     * Global exercises collection
+     * Read-only for all authenticated users
+     * Write access only via Firebase Admin SDK (server-side)
+     */
+    match /exercises/{exerciseId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Admin-only via Firebase Admin SDK
+    }
+
+    // ========================================
+    // User-Scoped Collections
+    // ========================================
+
+    /**
+     * User profile documents
+     * Each user can only access their own profile
+     */
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+
+      /**
+       * Workouts subcollection
+       * Completed workout sessions
+       */
+      match /workouts/{workoutId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && userIdMatches();
+        allow update, delete: if isOwner(userId) &&
+                                  resource.data.userId == request.auth.uid;
+      }
+
+      /**
+       * Workout templates subcollection
+       */
+      match /templates/{templateId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && userIdMatches();
+        allow update, delete: if isOwner(userId) &&
+                                  resource.data.userId == request.auth.uid;
+      }
+
+      /**
+       * Planned workouts subcollection
+       */
+      match /plannedWorkouts/{plannedWorkoutId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && userIdMatches();
+        allow update, delete: if isOwner(userId) &&
+                                  resource.data.userId == request.auth.uid;
+      }
+
+      /**
+       * Custom exercises subcollection
+       * User-created exercises
+       */
+      match /customExercises/{exerciseId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && userIdMatches();
+        allow update, delete: if isOwner(userId) &&
+                                  resource.data.userId == request.auth.uid;
+      }
+
+      /**
+       * Muscle status subcollection
+       * Recovery and workout tracking per muscle group
+       */
+      match /muscleStatus/{muscleGroup} {
+        allow read, write: if isOwner(userId);
+      }
+
+      /**
+       * Sleep logs subcollection
+       */
+      match /sleepLogs/{dateString} {
+        allow read, write: if isOwner(userId);
+      }
+
+      /**
+       * Recovery logs subcollection
+       */
+      match /recoveryLogs/{dateString} {
+        allow read, write: if isOwner(userId);
+      }
+
+      /**
+       * Notifications subcollection
+       * Read-only for users (created server-side)
+       */
+      match /notifications/{notificationId} {
+        allow read: if isOwner(userId);
+        allow write: if false; // Server-created only
+      }
+
+      /**
+       * Error logs subcollection
+       */
+      match /errorLogs/{errorLogId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      /**
+       * Sync metadata subcollection
+       * Tracks sync status for each table
+       */
+      match /syncMetadata/{tableName} {
+        allow read, write: if isOwner(userId);
+      }
+
+      /**
+       * Settings subcollection
+       * App settings and preferences
+       */
+      match /settings/{document=**} {
+        allow read, write: if isOwner(userId);
+      }
+
+      /**
+       * Analytics subcollection (future use)
+       * Cached analytics and insights
+       */
+      match /analytics/{document=**} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // ========================================
+    // Deny all other access
+    // ========================================
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

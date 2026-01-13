@@ -5,6 +5,7 @@ import { dbHelpers } from './database';
 import { getSupabaseClientWithAuth } from './supabaseClient';
 import { userScopedQuery } from './supabaseQueryBuilder';
 import { requireUserId } from '@/utils/userIdValidation';
+import { logger } from '@/utils/logger';
 
 interface ScheduledNotification {
   id: string;
@@ -26,7 +27,7 @@ class NotificationService {
         const registration = await navigator.serviceWorker.ready;
         this.swRegistration = registration;
       } catch (error) {
-        console.error('[NotificationService] Failed to get service worker registration:', error);
+        logger.error('[NotificationService] Failed to get service worker registration:', error);
       }
     }
   }
@@ -86,7 +87,7 @@ class NotificationService {
         });
       }
     } catch (error) {
-      console.error('[NotificationService] Failed to schedule workout reminder:', error);
+      logger.error('[NotificationService] Failed to schedule workout reminder:', error);
     }
   }
 
@@ -106,7 +107,7 @@ class NotificationService {
         });
       }
     } catch (error) {
-      console.error('[NotificationService] Failed to cancel workout reminder:', error);
+      logger.error('[NotificationService] Failed to cancel workout reminder:', error);
     }
   }
 
@@ -168,7 +169,7 @@ class NotificationService {
         });
       }
     } catch (error) {
-      console.error('[NotificationService] Failed to notify muscle recovery:', error);
+      logger.error('[NotificationService] Failed to notify muscle recovery:', error);
     }
   }
 
@@ -225,11 +226,11 @@ class NotificationService {
             });
           }
         } catch (error) {
-          console.warn('[NotificationService] Periodic sync not supported:', error);
+          logger.warn('[NotificationService] Periodic sync not supported:', error);
         }
       }
     } catch (error) {
-      console.error('[NotificationService] Failed to schedule recovery check:', error);
+      logger.error('[NotificationService] Failed to schedule recovery check:', error);
     }
   }
 
@@ -245,7 +246,7 @@ class NotificationService {
         .map((setting: { value: unknown }) => setting.value as ScheduledNotification)
         .filter((n) => n && n.scheduledTime > Date.now());
     } catch (error) {
-      console.error('[NotificationService] Failed to get scheduled notifications:', error);
+      logger.error('[NotificationService] Failed to get scheduled notifications:', error);
       return [];
     }
   }
@@ -269,7 +270,7 @@ class NotificationService {
         });
       }
     } catch (error) {
-      console.error('[NotificationService] Failed to clear notifications:', error);
+      logger.error('[NotificationService] Failed to clear notifications:', error);
     }
   }
 
@@ -340,7 +341,7 @@ class NotificationService {
     }
 
     if (isDuplicate) {
-      console.warn(`[NotificationService] Duplicate notification prevented for type: ${input.type}`);
+      logger.warn(`[NotificationService] Duplicate notification prevented for type: ${input.type}`);
       // Return the existing notification instead of creating a new one
       // Use the same criteria as the isDuplicate check to ensure we return a valid (non-deleted, recent) notification
       const duplicate = existingNotifications.find(n => {
@@ -392,7 +393,7 @@ class NotificationService {
 
     // Try to sync to MongoDB (non-blocking)
     this.syncToMongoDB(notification).catch(error => {
-      console.error('[NotificationService] Failed to sync notification to MongoDB:', error);
+      logger.error('[NotificationService] Failed to sync notification to MongoDB:', error);
     });
 
     return notification;
@@ -435,7 +436,7 @@ class NotificationService {
     const notification = await dbHelpers.getNotification(id);
     if (notification) {
       this.syncToMongoDB(notification).catch(error => {
-        console.error('[NotificationService] Failed to sync notification update to MongoDB:', error);
+        logger.error('[NotificationService] Failed to sync notification update to MongoDB:', error);
       });
     }
   }
@@ -450,7 +451,7 @@ class NotificationService {
     const notifications = await dbHelpers.getAllNotifications(userId, { isRead: false });
     await Promise.all(
       notifications.map(n => this.syncToMongoDB(n).catch(error => {
-        console.error('[NotificationService] Failed to sync notification update to MongoDB:', error);
+        logger.error('[NotificationService] Failed to sync notification update to MongoDB:', error);
       }))
     );
 
@@ -467,7 +468,7 @@ class NotificationService {
     const notification = await dbHelpers.getNotification(id);
     if (notification) {
       this.syncToMongoDB(notification).catch(error => {
-        console.error('[NotificationService] Failed to sync notification delete to MongoDB:', error);
+        logger.error('[NotificationService] Failed to sync notification delete to MongoDB:', error);
       });
     }
   }
@@ -543,7 +544,7 @@ class NotificationService {
         throw new Error(`Failed to upsert notification to Supabase: ${error.message}`);
       }
     } catch (error) {
-      console.error('[NotificationService] Failed to sync notification to Supabase:', error);
+      logger.error('[NotificationService] Failed to sync notification to Supabase:', error);
       throw error; // Re-throw to allow callers to handle the error
     }
   }
@@ -559,7 +560,7 @@ class NotificationService {
   }
 
   /**
-   * Pull notifications from MongoDB and merge with local
+   * Pull notifications from backend (MongoDB via Supabase or Firestore) and merge with local
    * Only pulls notifications that don't exist locally or have newer versions
    */
   async pullFromMongoDB(userId: string): Promise<number> {
@@ -569,7 +570,26 @@ class NotificationService {
         additionalInfo: { operation: 'pull_notifications' },
       });
 
-      // Get all notifications from Supabase using user-scoped query
+      const useFirestore = import.meta.env.VITE_USE_FIRESTORE === 'true';
+      logger.info('[NotificationService.pullFromMongoDB] VITE_USE_FIRESTORE:', import.meta.env.VITE_USE_FIRESTORE);
+      logger.info('[NotificationService.pullFromMongoDB] useFirestore:', useFirestore);
+
+      // If using Firestore, use the sync service instead of direct pull
+      if (useFirestore) {
+        logger.info('[NotificationService.pullFromMongoDB] Using Firestore sync service');
+        // Firestore sync happens automatically via firestoreSyncService
+        // Just trigger a pull sync for notifications table
+        const { firestoreSyncService } = await import('./firestoreSyncService');
+        const results = await firestoreSyncService.sync(validatedUserId, {
+          tables: ['notifications'],
+          direction: 'pull',
+        });
+
+        const notificationsResult = results.find((r) => r.tableName === 'notifications');
+        return notificationsResult?.recordsCreated || 0;
+      }
+
+      // Get all notifications from Supabase using user-scoped query (MongoDB backend)
       // Only get unread notifications or notifications from last 7 days
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -629,7 +649,7 @@ class NotificationService {
             try {
               notificationData = typeof n.data === 'string' ? JSON.parse(n.data) : n.data;
             } catch (e) {
-              console.warn('[NotificationService] Failed to parse notification data:', e);
+              logger.warn('[NotificationService] Failed to parse notification data:', e);
               notificationData = {};
             }
           }
@@ -642,10 +662,10 @@ class NotificationService {
             message: n.message,
             data: notificationData,
             isRead: n.read || false, // Use 'read' from Supabase
-            readAt: n.read_at ? new Date(n.read_at).getTime() : null, // Use 'read_at' from Supabase
-            createdAt: n.created_at ? new Date(n.created_at).getTime() : Date.now(), // Use 'created_at' from Supabase
+            readAt: n.read_at && !isNaN(new Date(n.read_at).getTime()) ? new Date(n.read_at).getTime() : null,
+            createdAt: n.created_at && !isNaN(new Date(n.created_at).getTime()) ? new Date(n.created_at).getTime() : Date.now(),
             version: remoteVersion,
-            deletedAt: n.deleted_at ? new Date(n.deleted_at).getTime() : null, // Use 'deleted_at' from Supabase
+            deletedAt: n.deleted_at && !isNaN(new Date(n.deleted_at).getTime()) ? new Date(n.deleted_at).getTime() : null,
           });
         }
       }
@@ -659,7 +679,7 @@ class NotificationService {
 
       return notificationsToSave.length;
     } catch (error) {
-      console.error('[NotificationService] Failed to pull notifications from MongoDB:', error);
+      logger.error('[NotificationService] Failed to pull notifications from MongoDB:', error);
       throw error;
     }
   }
@@ -682,7 +702,7 @@ class NotificationService {
       try {
         await this.pullFromMongoDB(userId);
       } catch (error) {
-        console.error('[NotificationService] Periodic pull failed:', error);
+        logger.error('[NotificationService] Periodic pull failed:', error);
       }
     };
 

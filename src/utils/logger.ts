@@ -71,19 +71,60 @@ class Logger {
   }
 
   /**
-   * Send error to tracking service (e.g., Sentry)
-   * This is a placeholder - integrate with your error tracking service
+   * Send error to tracking service (e.g., Sentry, Vercel Logs)
    */
   private sendToErrorTracking(
-    _level: LogLevel,
-    _message: string,
-    _data: unknown
+    level: LogLevel,
+    message: string,
+    data: unknown
   ): void {
-    // TODO: Integrate with error tracking service (e.g., Sentry)
-    // Example:
-    // if (level === 'error' && typeof window !== 'undefined' && window.Sentry) {
-    //   window.Sentry.captureException(new Error(message), { extra: data });
-    // }
+    try {
+      // Use the Vercel API endpoint
+      const vercelApiUrl = '/api/logs/error';
+      
+      // Extract stack trace if available
+      let errorStack: string | undefined;
+      if (typeof data === 'object' && data !== null) {
+        if ('stack' in data) {
+          errorStack = (data as { stack: string }).stack;
+        } else if ('error' in data && typeof (data as any).error === 'string') {
+           // sometimes we pass { error: error.message }
+        }
+      }
+
+      const payload = {
+        // Default to 'system' - the API handles optional userId
+        userId: 'system', 
+        errorType: level === 'error' ? 'application_error' : 'application_warning',
+        errorMessage: message,
+        errorStack,
+        context: typeof data === 'object' ? data as Record<string, unknown> : { data },
+        severity: level === 'warn' ? 'warning' : level,
+        timestamp: new Date().toISOString(),
+        operation: 'log'
+      };
+
+      // Use fetch to send the log
+      // Use keepalive: true to ensure it sends even if the page unloads
+      fetch(vercelApiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+        keepalive: true,
+      }).catch(err => {
+        // Silent failure in production to avoid infinite loops
+        if (!this.isProduction) {
+          console.error('Failed to send log to Vercel:', err);
+        }
+      });
+    } catch (e) {
+      // Prevent logger from causing crashes
+      if (!this.isProduction) {
+        console.error('Logger internal error:', e);
+      }
+    }
   }
 }
 

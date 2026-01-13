@@ -120,9 +120,14 @@ export function useMuscleRecovery() {
         // Convert date strings to Date objects
         let lastWorked: Date | null = null;
         if (status.lastWorked) {
-          lastWorked = status.lastWorked instanceof Date 
+          const parsedDate = status.lastWorked instanceof Date 
             ? status.lastWorked 
             : new Date(status.lastWorked);
+            
+          // Check if date is valid
+          if (!isNaN(parsedDate.getTime())) {
+            lastWorked = parsedDate;
+          }
         }
 
         if (!lastWorked || !profile) {

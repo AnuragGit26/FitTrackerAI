@@ -1,7 +1,9 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Home, Database } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { analytics } from '@/utils/analytics';
+import { dataService } from '@/services/dataService';
+import { logger } from '@/utils/logger';
 
 interface Props {
     children: ReactNode;
@@ -66,6 +68,31 @@ export class ErrorBoundary extends Component<Props, State> {
         window.location.href = '/';
     };
 
+    handleRepairDatabase = async () => {
+        try {
+            await dataService.repairDatabase();
+            // After successful repair, reload the page
+            window.location.reload();
+        } catch (error) {
+            logger.error('Failed to repair database:', error);
+            alert('Database repair failed. Please try clearing your browser data or contact support.');
+        }
+    };
+
+    isDatabaseError = (error: Error | null): boolean => {
+        if (!error) return false;
+        const errorStr = error.toString().toLowerCase();
+        const messageStr = error.message?.toLowerCase() || '';
+        return (
+            errorStr.includes('database') ||
+            errorStr.includes('indexeddb') ||
+            errorStr.includes('dexie') ||
+            messageStr.includes('database') ||
+            messageStr.includes('indexeddb') ||
+            messageStr.includes('dexie')
+        );
+    };
+
     render() {
         if (this.state.hasError) {
             if (this.props.fallback) {
@@ -88,10 +115,12 @@ export class ErrorBoundary extends Component<Props, State> {
 
                             <div>
                                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                                    Something went wrong
+                                    {this.isDatabaseError(this.state.error) ? 'Database Error' : 'Something went wrong'}
                                 </h1>
                                 <p className="text-gray-600 dark:text-gray-400">
-                                    We&apos;re sorry, but something unexpected happened. Please try refreshing the page or return to the home page.
+                                    {this.isDatabaseError(this.state.error)
+                                        ? 'We encountered an issue with the local database. You can try repairing it to fix the problem.'
+                                        : "We're sorry, but something unexpected happened. Please try refreshing the page or return to the home page."}
                                 </p>
                             </div>
 
@@ -119,13 +148,23 @@ export class ErrorBoundary extends Component<Props, State> {
                                     <Home className="w-4 h-4" />
                                     Go Home
                                 </button>
-                                <button
-                                    onClick={this.handleReset}
-                                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary text-background-dark rounded-lg font-semibold hover:bg-primary/90 transition-colors"
-                                >
-                                    <RefreshCw className="w-4 h-4" />
-                                    Try Again
-                                </button>
+                                {this.isDatabaseError(this.state.error) ? (
+                                    <button
+                                        onClick={this.handleRepairDatabase}
+                                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary text-background-dark rounded-lg font-semibold hover:bg-primary/90 transition-colors"
+                                    >
+                                        <Database className="w-4 h-4" />
+                                        Repair Database
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={this.handleReset}
+                                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary text-background-dark rounded-lg font-semibold hover:bg-primary/90 transition-colors"
+                                    >
+                                        <RefreshCw className="w-4 h-4" />
+                                        Try Again
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </motion.div>

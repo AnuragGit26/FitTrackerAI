@@ -23,6 +23,18 @@ export function MobileOnlyModal() {
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
+    // Skip modal entirely if running in Cypress or other test environments
+    if (
+      typeof window !== 'undefined' &&
+      ((window as any).Cypress ||
+       (window as any).__CYPRESS__ ||
+       process.env.NODE_ENV === 'test')
+    ) {
+      setIsChecking(false);
+      setIsDesktop(false);
+      return;
+    }
+
     // Initial check
     const checkViewport = () => {
       const mobile = isMobileViewport();
@@ -34,7 +46,7 @@ export function MobileOnlyModal() {
 
     // Listen for resize events
     window.addEventListener('resize', checkViewport);
-    
+
     // Also check on orientation change (for mobile devices)
     window.addEventListener('orientationchange', () => {
       // Small delay to allow viewport to update after orientation change

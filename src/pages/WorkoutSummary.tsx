@@ -14,6 +14,9 @@ import { WorkoutRating } from '@/components/workout/summary/WorkoutRating';
 import { RecoveryLog } from '@/components/workout/summary/RecoveryLog';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { EditableWorkoutName } from '@/components/common/EditableWorkoutName';
+import { DeleteConfirmationModal } from '@/components/common/DeleteConfirmationModal';
+import { ToastContainer } from '@/components/common/Toast';
+import { useToast } from '@/hooks/useToast';
 import { formatDuration } from '@/utils/calculations';
 
 export function WorkoutSummary() {
@@ -23,6 +26,10 @@ export function WorkoutSummary() {
   const [summaryData, setSummaryData] = useState<WorkoutSummaryData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const { toasts, removeToast, success } = useToast();
 
   useEffect(() => {
     const loadSummary = async () => {
@@ -98,6 +105,42 @@ export function WorkoutSummary() {
     });
   };
 
+  const handleDeleteWorkout = async () => {
+    if (!workoutId) return;
+
+    // Capture value for undo closure to prevent stale references
+    const deletedWorkoutId = workoutId;
+
+    setIsDeleting(true);
+    try {
+      await dataService.deleteWorkout(deletedWorkoutId);
+
+      setDeleteModalOpen(false);
+
+      // Navigate to history
+      navigate('/workout-history');
+
+      // Show success toast with undo (will be visible after navigation)
+      success('Workout deleted', {
+        label: 'Undo',
+        onClick: async () => {
+          try {
+            await dataService.restoreWorkout(deletedWorkoutId);
+            success('Workout restored');
+          } catch (error) {
+            console.error('Failed to restore workout:', error);
+            alert('Failed to restore workout. Please try again.');
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Failed to delete workout:', error);
+      alert('Failed to delete workout. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const formatWorkoutDate = (date: Date): string => {
     const d = new Date(date);
     const today = new Date();
@@ -161,13 +204,45 @@ export function WorkoutSummary() {
         </div>
         <div className="flex items-center gap-3 justify-end">
           {summaryData?.workout?.id && (
-            <button
-              onClick={() => navigate(`/edit-workout/${summaryData.workout.id}`)}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-black/20 text-gray-500 dark:text-gray-400 hover:text-primary transition-colors"
-              title="Edit workout"
-            >
-              <span className="material-symbols-outlined">edit</span>
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setMenuOpen(!menuOpen)}
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-black/20 text-gray-500 dark:text-gray-400 transition-colors"
+              >
+                <span className="material-symbols-outlined">more_vert</span>
+              </button>
+
+              {menuOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setMenuOpen(false)}
+                  />
+                  <div className="absolute right-0 top-10 bg-white dark:bg-surface-dark border border-gray-200 dark:border-white/10 rounded-lg shadow-lg z-20 min-w-[120px]">
+                    <button
+                      onClick={() => {
+                        navigate(`/edit-workout/${summaryData.workout.id}`);
+                        setMenuOpen(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors flex items-center gap-2"
+                    >
+                      <span className="material-symbols-outlined text-base">edit</span>
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => {
+                        setDeleteModalOpen(true);
+                        setMenuOpen(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors flex items-center gap-2"
+                    >
+                      <span className="material-symbols-outlined text-base">delete</span>
+                      Delete
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           )}
           <button
             onClick={handleDone}
@@ -236,6 +311,19 @@ export function WorkoutSummary() {
           />
         )}
       </main>
+
+      {/* Delete confirmation modal */}
+      <DeleteConfirmationModal
+        isOpen={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        onConfirm={handleDeleteWorkout}
+        title="Delete Workout?"
+        message="You can restore it from the Trash or undo immediately after deletion."
+        isDeleting={isDeleting}
+      />
+
+      {/* Toast container */}
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
   );
 }

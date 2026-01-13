@@ -50,6 +50,9 @@ class MuscleRecoveryService {
 
     workouts.forEach((workout) => {
       const workoutDate = new Date(workout.date);
+      // Skip invalid dates
+      if (isNaN(workoutDate.getTime())) return;
+      
       if (workoutDate < sevenDaysAgo) return;
 
       workout.exercises.forEach((exercise) => {
@@ -79,6 +82,9 @@ class MuscleRecoveryService {
 
     workouts.forEach((workout) => {
       const workoutDate = new Date(workout.date);
+      // Skip invalid dates
+      if (isNaN(workoutDate.getTime())) return;
+
       if (workoutDate < thirtyDaysAgo) return;
 
       workout.exercises.forEach((exercise) => {
@@ -124,6 +130,12 @@ class MuscleRecoveryService {
   async updateMuscleStatusesFromWorkout(workout: Workout, userId: string): Promise<void> {
     const muscles = this.getMusclesFromWorkout(workout);
     const workoutDate = new Date(workout.date);
+    
+    // Check for invalid date
+    if (isNaN(workoutDate.getTime())) {
+      console.warn('Invalid workout date in updateMuscleStatusesFromWorkout', workout.id);
+      return;
+    }
 
     // Get all workouts for calculating volume and frequency
     const allWorkouts = await dataService.getAllWorkouts(userId);
@@ -284,6 +296,9 @@ class MuscleRecoveryService {
           const muscles = this.getMusclesFromWorkout(workout);
           if (muscles.has(muscle)) {
             const workoutDate = new Date(workout.date);
+            // Skip invalid dates
+            if (isNaN(workoutDate.getTime())) return;
+
             if (!mostRecentDate || workoutDate > mostRecentDate) {
               mostRecentDate = workoutDate;
               mostRecentWorkout = workout;
