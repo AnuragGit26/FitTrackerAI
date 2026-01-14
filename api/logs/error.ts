@@ -50,40 +50,9 @@ export default async function handler(
             deployment: process.env.VERCEL_URL || 'local',
         });
 
-        // Optionally store in Supabase if configured
-        const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-        const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-        if (supabaseUrl && supabaseServiceKey) {
-            try {
-                const { createClient } = await import('@supabase/supabase-js');
-                const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-                    auth: {
-                        autoRefreshToken: false,
-                        persistSession: false,
-                    },
-                });
-
-                await supabase.from('error_logs').insert({
-                    user_id: errorLog.userId,
-                    error_type: errorLog.errorType,
-                    error_message: errorLog.errorMessage,
-                    error_stack: errorLog.errorStack || null,
-                    context: errorLog.context ? JSON.stringify(errorLog.context) : null,
-                    table_name: errorLog.tableName || null,
-                    record_id: errorLog.recordId ? String(errorLog.recordId) : null,
-                    operation: errorLog.operation || null,
-                    severity: errorLog.severity || 'error',
-                    resolved: false,
-                    version: 1,
-                    created_at: errorLog.timestamp || new Date().toISOString(),
-                    updated_at: new Date().toISOString(),
-                });
-            } catch (supabaseError) {
-                // Log Supabase error but don't fail the request
-                console.error('[Error Log API] Failed to store in Supabase:', supabaseError);
-            }
-        }
+        // Note: Error logs are now captured in Vercel logs only
+        // Previously stored in Supabase, now local-only (client-side IndexedDB)
+        // Future enhancement: Store in Firestore if cloud error tracking is needed
 
         return res.status(200).json({
             success: true,
