@@ -122,7 +122,8 @@ class SyncMetadataService {
         }
     }
 
-    async convertToSupabaseFormat(
+    // Convert local format to cloud format (Firestore)
+    async convertToCloudFormat(
         local: LocalSyncMetadata
     ): Promise<SyncMetadata> {
         return {
@@ -140,7 +141,8 @@ class SyncMetadataService {
         };
     }
 
-    async convertFromSupabaseFormat(
+    // Convert cloud format (Firestore) to local format
+    async convertFromCloudFormat(
         remote: SyncMetadata
     ): Promise<LocalSyncMetadata> {
         return {
@@ -156,6 +158,17 @@ class SyncMetadataService {
             lastErrorAt: remote.lastErrorAt ? remote.lastErrorAt.getTime() : undefined,
             recordCount: remote.recordCount,
         };
+    }
+
+    // Legacy method names for backwards compatibility (deprecated)
+    /** @deprecated Use convertToCloudFormat instead */
+    async convertToSupabaseFormat(local: LocalSyncMetadata): Promise<SyncMetadata> {
+        return this.convertToCloudFormat(local);
+    }
+
+    /** @deprecated Use convertFromCloudFormat instead */
+    async convertFromSupabaseFormat(remote: SyncMetadata): Promise<LocalSyncMetadata> {
+        return this.convertFromCloudFormat(remote);
     }
 }
 
