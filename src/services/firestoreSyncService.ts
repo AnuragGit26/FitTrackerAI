@@ -85,7 +85,6 @@ class FirestoreSyncService {
   private syncQueue: Promise<SyncResult[]> = Promise.resolve([]);
   private currentProgress: SyncProgress | null = null;
   private progressCallback: ProgressCallback | null = null;
-  private recordsToPushAfterConflict: Map<string, Set<string | number>> = new Map();
 
   getIsSyncing(): boolean {
     return this.isSyncing;
@@ -701,7 +700,7 @@ class FirestoreSyncService {
               recordId,
               error: errorMessage,
               timestamp: new Date(),
-              operation: 'write',
+              operation: 'update',
             });
 
             await errorLogService
@@ -710,7 +709,7 @@ class FirestoreSyncService {
                 tableName,
                 recordId,
                 error instanceof Error ? error : new Error(errorMessage),
-                'write'
+                'update'
               )
               .catch(() => {});
           }
@@ -738,7 +737,7 @@ class FirestoreSyncService {
         recordId: 'all',
         error: errorMessage,
         timestamp: new Date(),
-        operation: 'write',
+        operation: 'update',
       });
       result.duration = Date.now() - startTime;
 
@@ -748,7 +747,7 @@ class FirestoreSyncService {
           tableName,
           'all',
           error instanceof Error ? error : new Error(errorMessage),
-          'write'
+          'update'
         )
         .catch(() => {});
 
@@ -872,7 +871,9 @@ class FirestoreSyncService {
       records = records.filter((record) => {
         const updatedAt = (record as Record<string, unknown>).updatedAt;
         if (!updatedAt) return true; // Include records without updatedAt
-        const updatedDate = timestampToLocalDate(updatedAt);
+        const updatedDate = timestampToLocalDate(
+          updatedAt as number | Date | Timestamp | string | null | undefined
+        );
         return updatedDate && updatedDate >= since;
       });
     }
@@ -952,7 +953,7 @@ class FirestoreSyncService {
   /**
    * Convert Firestore record to IndexedDB format
    */
-  private convertFromFirestoreFormat(tableName: SyncableTable, record: Record<string, unknown>): Record<string, unknown> {
+  private convertFromFirestoreFormat(_tableName: SyncableTable, record: Record<string, unknown>): Record<string, unknown> {
     const converted = { ...record };
 
     // Convert Firestore Timestamps to Date objects
@@ -972,7 +973,7 @@ class FirestoreSyncService {
    * Apply remote record to IndexedDB
    */
   private async applyRemoteRecord(
-    userId: string,
+    _userId: string,
     tableName: SyncableTable,
     remoteRecord: unknown
   ): Promise<{ conflictHandled: boolean }> {
@@ -985,7 +986,7 @@ class FirestoreSyncService {
    * Resolve conflict between local and remote records
    */
   private async resolveConflict(
-    userId: string,
+    _userId: string,
     tableName: SyncableTable,
     remoteRecord: unknown,
     _direction: SyncDirection

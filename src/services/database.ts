@@ -1546,5 +1546,138 @@ export const dbHelpers = {
       throw new Error('Database repair failed. Please export your data and clear the database.');
     }
   },
+
+  // Generic method to get records by userId for any syncable table
+  async getRecordsByUserId(
+    tableName: SyncableTable,
+    userId: string
+  ): Promise<Record<string, unknown>[]> {
+    switch (tableName) {
+      case 'workouts':
+        return (await this.getAllWorkouts(userId)) as unknown as Record<string, unknown>[];
+      case 'workout_templates':
+        return (await this.getAllTemplates(userId)) as unknown as Record<string, unknown>[];
+      case 'planned_workouts':
+        return (await this.getAllPlannedWorkouts(userId)) as unknown as Record<string, unknown>[];
+      case 'exercises':
+        // Exercises are global, but filter by userId for custom exercises
+        const allExercises = await this.getAllExercises();
+        return allExercises.filter(ex => !ex.userId || ex.userId === userId) as unknown as Record<string, unknown>[];
+      case 'user_profiles':
+        // User profiles - single document per user
+        return [];
+      case 'muscle_statuses':
+        // Muscle statuses are user-scoped
+        const allStatuses = await this.getAllMuscleStatuses();
+        return allStatuses.filter(status => status.userId === userId) as unknown as Record<string, unknown>[];
+      case 'sleep_logs':
+        return (await this.getAllSleepLogs(userId)) as unknown as Record<string, unknown>[];
+      case 'recovery_logs':
+        return (await this.getAllRecoveryLogs(userId)) as unknown as Record<string, unknown>[];
+      case 'settings':
+        // Settings - single document per user
+        return [];
+      case 'notifications':
+        return (await this.getAllNotifications(userId)) as unknown as Record<string, unknown>[];
+      case 'error_logs':
+        return (await this.getAllErrorLogs(userId)) as unknown as Record<string, unknown>[];
+      default:
+        logger.error(`[database] Unknown table name: ${tableName}`);
+        return [];
+    }
+  },
+
+  // Generic method to get a single record by ID from any syncable table
+  async getRecordById(
+    tableName: SyncableTable,
+    recordId: string | number
+  ): Promise<Record<string, unknown> | undefined> {
+    switch (tableName) {
+      case 'workouts':
+        return (await this.getWorkout(recordId as string)) as unknown as Record<string, unknown> | undefined;
+      case 'workout_templates':
+        return (await this.getTemplate(recordId as string)) as unknown as Record<string, unknown> | undefined;
+      case 'planned_workouts':
+        return (await this.getPlannedWorkout(recordId as string)) as unknown as Record<string, unknown> | undefined;
+      case 'exercises':
+        return (await this.getExercise(recordId as string)) as unknown as Record<string, unknown> | undefined;
+      case 'user_profiles':
+        // User profiles don't have separate IDs, they use userId
+        return undefined;
+      case 'muscle_statuses':
+        const allStatuses = await this.getAllMuscleStatuses();
+        return allStatuses.find(s => s.id === recordId) as unknown as Record<string, unknown> | undefined;
+      case 'sleep_logs':
+        return (await this.getSleepLog(recordId as number)) as unknown as Record<string, unknown> | undefined;
+      case 'recovery_logs':
+        return (await this.getRecoveryLog(recordId as number)) as unknown as Record<string, unknown> | undefined;
+      case 'settings':
+        const value = await this.getSetting(recordId as string);
+        if (value !== undefined) {
+          return { key: recordId as string, value };
+        }
+        return undefined;
+      case 'notifications':
+        return (await this.getNotification(recordId as string)) as unknown as Record<string, unknown> | undefined;
+      case 'error_logs':
+        return (await this.getErrorLog(recordId as number)) as unknown as Record<string, unknown> | undefined;
+      default:
+        logger.error(`[database] Unknown table name for getRecordById: ${tableName}`);
+        return undefined;
+    }
+  },
+
+  // Generic method to upsert (insert or update) a record in any syncable table
+  async upsertRecord(
+    tableName: SyncableTable,
+    record: Record<string, unknown>
+  ): Promise<string | number> {
+    switch (tableName) {
+      case 'workouts':
+        return await this.saveWorkout(record as unknown as Workout);
+      case 'workout_templates':
+        return await this.saveTemplate(record as unknown as WorkoutTemplate);
+      case 'planned_workouts':
+        return await this.savePlannedWorkout(record as unknown as PlannedWorkout);
+      case 'exercises':
+        return await this.saveExercise(record as unknown as Exercise);
+      case 'user_profiles':
+        // User profiles are not stored in IndexedDB in this implementation
+        // They are managed by Firebase Auth and settings
+        logger.warn('[database] User profiles are not stored in IndexedDB');
+        return record.id as string;
+      case 'muscle_statuses':
+        return await this.upsertMuscleStatus(record as unknown as MuscleStatus);
+      case 'sleep_logs':
+        if (record.id) {
+          await this.updateSleepLog(record.id as number, record as unknown as Partial<SleepLog>);
+          return record.id as number;
+        } else {
+          return await this.saveSleepLog(record as unknown as Omit<SleepLog, 'id'>);
+        }
+      case 'recovery_logs':
+        if (record.id) {
+          await this.updateRecoveryLog(record.id as number, record as unknown as Partial<RecoveryLog>);
+          return record.id as number;
+        } else {
+          return await this.saveRecoveryLog(record as unknown as Omit<RecoveryLog, 'id'>);
+        }
+      case 'settings':
+        await this.setSetting(record.key as string, record.value);
+        return record.key as string;
+      case 'notifications':
+        return await this.saveNotification(record as unknown as Notification);
+      case 'error_logs':
+        if (record.id) {
+          await this.updateErrorLog(record.id as number, record as unknown as Partial<ErrorLog>);
+          return record.id as number;
+        } else {
+          return await this.saveErrorLog(record as unknown as Omit<ErrorLog, 'id'>);
+        }
+      default:
+        logger.error(`[database] Unknown table name for upsertRecord: ${tableName}`);
+        throw new Error(`Cannot upsert record for unknown table: ${tableName}`);
+    }
+  },
 };
 
