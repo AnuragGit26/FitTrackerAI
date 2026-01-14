@@ -9,6 +9,7 @@ import { logger } from './utils/logger'
 // Load test data utilities in development
 if (import.meta.env.DEV) {
   import('./utils/testDataImporter')
+  import('./utils/legacyDataImporter')
 }
 
 // Initialize Firebase early in the app lifecycle
