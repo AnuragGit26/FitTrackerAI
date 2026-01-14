@@ -1,33 +1,55 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useAuth0 } from '@auth0/auth0-react';
+import { useState, FormEvent } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 
 export function Login() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const { loginWithRedirect, error: authError } = useAuth0();
+  const [isLoading, setIsLoading] = useState(false);
+  const { signIn, signInWithGoogle, signInWithApple } = useAuth();
+  const navigate = useNavigate();
 
-  const login = () => {
-    loginWithRedirect({
-      authorizationParams: {
-        connection: 'Username-Password-Authentication',
-      },
-    }).catch((err) => {
-      setError(err.message || 'Failed to initiate login. Please try again.');
-    });
+  const handleEmailLogin = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) {
+      setError('Please enter both email and password');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await signIn({ email, password });
+      navigate('/');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to sign in');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleSocialLogin = (connection: 'google-oauth2' | 'apple') => {
-    loginWithRedirect({
-      authorizationParams: {
-        connection,
-      },
-    }).catch((err) => {
-      setError(err.message || 'Failed to sign in with social provider.');
-    });
+  const handleSocialLogin = async (provider: 'google' | 'apple') => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      if (provider === 'google') {
+        await signInWithGoogle();
+      } else {
+        await signInWithApple();
+      }
+      navigate('/');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to sign in with social provider');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const displayError = error || authError?.message;
+  const displayError = error;
 
   return (
     <div className="relative flex min-h-screen w-full flex-col overflow-x-hidden bg-background-light dark:bg-background-dark font-display">
@@ -68,17 +90,64 @@ export function Login() {
           </motion.div>
         )}
 
-        {/* Login Button */}
-        <div className="pt-4">
+        {/* Login Form */}
+        <form onSubmit={handleEmailLogin} className="flex flex-col gap-4 pt-2">
+          <div>
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+            >
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="your@email.com"
+              disabled={isLoading}
+              className="w-full h-12 px-4 rounded-lg border border-gray-300 dark:border-border-dark bg-white dark:bg-surface-dark text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
+              required
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="password"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+            >
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter your password"
+              disabled={isLoading}
+              className="w-full h-12 px-4 rounded-lg border border-gray-300 dark:border-border-dark bg-white dark:bg-surface-dark text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
+              required
+            />
+          </div>
+
           <button
-            type="button"
-            onClick={login}
-            className="w-full bg-primary hover:bg-primary/90 text-background-dark font-bold text-lg h-14 rounded-full transition-all transform active:scale-[0.98] flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(13,242,105,0.2)]"
+            type="submit"
+            disabled={isLoading}
+            className="w-full bg-primary hover:bg-primary/90 disabled:bg-primary/50 text-background-dark font-bold text-lg h-14 rounded-full transition-all transform active:scale-[0.98] flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(13,242,105,0.2)] disabled:cursor-not-allowed"
           >
-            Log In
-            <span className="material-symbols-outlined text-xl">arrow_forward</span>
+            {isLoading ? (
+              <>
+                <span className="material-symbols-outlined text-xl animate-spin">refresh</span>
+                Signing in...
+              </>
+            ) : (
+              <>
+                Log In
+                <span className="material-symbols-outlined text-xl">arrow_forward</span>
+              </>
+            )}
           </button>
-        </div>
+        </form>
 
         {/* Social Login Divider */}
         <div className="relative py-4 flex items-center">
@@ -93,8 +162,9 @@ export function Login() {
         <div className="grid grid-cols-2 gap-4">
           <button
             type="button"
-            onClick={() => handleSocialLogin('google-oauth2')}
-            className="flex items-center justify-center gap-2 h-12 rounded-lg border border-gray-300 dark:border-border-dark bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-surface-dark/80 text-gray-900 dark:text-white transition-colors group"
+            onClick={() => handleSocialLogin('google')}
+            disabled={isLoading}
+            className="flex items-center justify-center gap-2 h-12 rounded-lg border border-gray-300 dark:border-border-dark bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-surface-dark/80 text-gray-900 dark:text-white transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg
               className="w-5 h-5"
@@ -128,7 +198,8 @@ export function Login() {
           <button
             type="button"
             onClick={() => handleSocialLogin('apple')}
-            className="flex items-center justify-center gap-2 h-12 rounded-lg border border-gray-300 dark:border-border-dark bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-surface-dark/80 text-gray-900 dark:text-white transition-colors group"
+            disabled={isLoading}
+            className="flex items-center justify-center gap-2 h-12 rounded-lg border border-gray-300 dark:border-border-dark bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-surface-dark/80 text-gray-900 dark:text-white transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <img
               src="https://i.pinimg.com/736x/65/22/5a/65225ab6d965e5804a632b643e317bf4.jpg"

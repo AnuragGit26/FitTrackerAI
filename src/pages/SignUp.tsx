@@ -1,106 +1,68 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useAuth0 } from '@auth0/auth0-react';
+import { useState, FormEvent } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { userContextManager } from '@/services/userContextManager';
-import { logger } from '@/utils/logger';
 
-/**
- * Clear Auth0 cache from localStorage to ensure fresh signup
- */
-function clearAuth0Cache(): void {
-  try {
-    const auth0Domain = import.meta.env.VITE_AUTH0_DOMAIN;
-    const auth0ClientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
-    
-    if (!auth0Domain || !auth0ClientId) {
+export function SignUp() {
+  const [displayName, setDisplayName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const { signUp, signInWithGoogle, signInWithApple } = useAuth();
+  const navigate = useNavigate();
+
+  const handleEmailSignUp = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!email || !password || !displayName) {
+      setError('Please fill in all fields');
       return;
     }
 
-    // Clear all Auth0-related localStorage entries
-    const keysToRemove: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && (
-        key.includes('@@auth0spa-js') ||
-        key.includes(auth0ClientId) ||
-        key.includes(auth0Domain.replace(/\./g, '_'))
-      )) {
-        keysToRemove.push(key);
-      }
+    if (password.length < 6) {
+      setError('Password should be at least 6 characters');
+      return;
     }
-    
-    keysToRemove.forEach(key => {
-      try {
-        localStorage.removeItem(key);
-      } catch (e) {
-        // Ignore errors when removing items
-      }
-    });
-  } catch (error) {
-    logger.error('Failed to clear Auth0 cache:', error);
-  }
-}
 
-export function SignUp() {
-  const [error, setError] = useState<string | null>(null);
-  const { loginWithRedirect, logout, isAuthenticated, error: authError } = useAuth0();
+    setIsLoading(true);
+    setError(null);
 
-  const signup = async () => {
     try {
-      // If user is already authenticated, log them out first
-      if (isAuthenticated) {
-        logout();
-        // Wait a moment for logout to complete
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-      
-      // Clear Auth0 cache and user context before signup to prevent auto-login
-      clearAuth0Cache();
+      // Clear user context before signup
       userContextManager.clear();
-      
-      loginWithRedirect({
-        authorizationParams: {
-          screen_hint: 'signup',
-          connection: 'Username-Password-Authentication',
-          prompt: 'login', // Force showing login/signup screen instead of auto-logging in
-        },
-      }).catch((err) => {
-        setError(err.message || 'Failed to initiate signup. Please try again.');
-      });
+
+      await signUp({ email, password, displayName });
+      navigate('/');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to initiate signup. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to create account');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleSocialLogin = async (connection: 'google-oauth2' | 'apple') => {
+  const handleSocialSignUp = async (provider: 'google' | 'apple') => {
+    setIsLoading(true);
+    setError(null);
+
     try {
-      // If user is already authenticated, log them out first
-      if (isAuthenticated) {
-        logout();
-        // Wait a moment for logout to complete
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-      
-      // Clear Auth0 cache and user context before signup to prevent auto-login
-      clearAuth0Cache();
+      // Clear user context before signup
       userContextManager.clear();
-      
-      loginWithRedirect({
-        authorizationParams: {
-          connection,
-          screen_hint: 'signup',
-          prompt: 'login', // Force showing login/signup screen instead of auto-logging in
-        },
-      }).catch((err) => {
-        setError(err.message || 'Failed to sign up with social provider.');
-      });
+
+      if (provider === 'google') {
+        await signInWithGoogle();
+      } else {
+        await signInWithApple();
+      }
+      navigate('/');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to sign up with social provider.');
+      setError(err instanceof Error ? err.message : 'Failed to sign up with social provider');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const displayError = error || authError?.message;
+  const displayError = error;
 
   return (
     <div className="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white font-display min-h-screen flex flex-col antialiased overflow-x-hidden selection:bg-primary selection:text-background-dark">
@@ -149,17 +111,84 @@ export function SignUp() {
             </motion.div>
           )}
 
-          {/* Signup Button */}
-          <button
-            type="button"
-            onClick={signup}
-            className="mt-4 w-full bg-primary hover:bg-green-400 text-background-dark font-bold text-lg py-4 rounded-xl shadow-[0_4px_20px_rgba(13,242,105,0.25)] hover:shadow-[0_4px_25px_rgba(13,242,105,0.4)] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-          >
-            Create Account
-            <span className="material-symbols-outlined text-xl leading-none">
-              arrow_forward
-            </span>
-          </button>
+          {/* Signup Form */}
+          <form onSubmit={handleEmailSignUp} className="flex flex-col gap-4">
+            <div>
+              <label
+                htmlFor="displayName"
+                className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
+              >
+                Full Name
+              </label>
+              <input
+                id="displayName"
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="John Doe"
+                disabled={isLoading}
+                className="w-full h-12 px-4 rounded-lg border border-slate-200 dark:border-emerald-900/50 bg-white dark:bg-surface-dark text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
+                required
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
+              >
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your@email.com"
+                disabled={isLoading}
+                className="w-full h-12 px-4 rounded-lg border border-slate-200 dark:border-emerald-900/50 bg-white dark:bg-surface-dark text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
+                required
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
+              >
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="At least 6 characters"
+                disabled={isLoading}
+                className="w-full h-12 px-4 rounded-lg border border-slate-200 dark:border-emerald-900/50 bg-white dark:bg-surface-dark text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
+                required
+                minLength={6}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="mt-4 w-full bg-primary hover:bg-green-400 disabled:bg-primary/50 text-background-dark font-bold text-lg py-4 rounded-xl shadow-[0_4px_20px_rgba(13,242,105,0.25)] hover:shadow-[0_4px_25px_rgba(13,242,105,0.4)] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:cursor-not-allowed"
+            >
+              {isLoading ? (
+                <>
+                  <span className="material-symbols-outlined text-xl animate-spin">refresh</span>
+                  Creating Account...
+                </>
+              ) : (
+                <>
+                  Create Account
+                  <span className="material-symbols-outlined text-xl leading-none">arrow_forward</span>
+                </>
+              )}
+            </button>
+          </form>
         </div>
 
         {/* Divider */}
@@ -178,8 +207,9 @@ export function SignUp() {
         <div className="grid grid-cols-2 gap-4">
           <button
             type="button"
-            onClick={() => handleSocialLogin('google-oauth2')}
-            className="flex items-center justify-center gap-2 bg-white dark:bg-surface-dark border border-slate-200 dark:border-emerald-900/50 hover:border-primary/50 dark:hover:border-primary/50 rounded-xl py-3 transition-all group"
+            onClick={() => handleSocialSignUp('google')}
+            disabled={isLoading}
+            className="flex items-center justify-center gap-2 bg-white dark:bg-surface-dark border border-slate-200 dark:border-emerald-900/50 hover:border-primary/50 dark:hover:border-primary/50 rounded-xl py-3 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg
               className="w-5 h-5"
@@ -214,8 +244,9 @@ export function SignUp() {
           </button>
           <button
             type="button"
-            onClick={() => handleSocialLogin('apple')}
-            className="flex items-center justify-center gap-2 bg-white dark:bg-surface-dark border border-slate-200 dark:border-emerald-900/50 hover:border-primary/50 dark:hover:border-primary/50 rounded-xl py-3 transition-all group"
+            onClick={() => handleSocialSignUp('apple')}
+            disabled={isLoading}
+            className="flex items-center justify-center gap-2 bg-white dark:bg-surface-dark border border-slate-200 dark:border-emerald-900/50 hover:border-primary/50 dark:hover:border-primary/50 rounded-xl py-3 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <img
               src="https://i.pinimg.com/736x/65/22/5a/65225ab6d965e5804a632b643e317bf4.jpg"

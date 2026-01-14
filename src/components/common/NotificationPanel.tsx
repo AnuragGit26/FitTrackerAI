@@ -114,14 +114,7 @@ export function NotificationPanel({ isOpen, onClose, userId }: NotificationPanel
     const loadNotifications = useCallback(async () => {
         setIsLoading(true);
         try {
-            // Pull new notifications from MongoDB first
-            try {
-                await notificationService.pullFromMongoDB(userId);
-            } catch (error) {
-                console.warn('Failed to pull notifications from MongoDB:', error);
-                // Continue loading local notifications even if pull fails
-            }
-
+            // Load notifications from IndexedDB
             const [allNotifications, unread] = await Promise.all([
                 notificationService.getNotifications({ userId, limit: 50 }),
                 notificationService.getUnreadCount(userId),

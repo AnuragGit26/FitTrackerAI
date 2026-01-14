@@ -644,19 +644,19 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
       // Clear persisted state after successful IndexedDB save
       clearWorkoutState();
 
-      // Trigger Supabase sync non-blocking (fire-and-forget)
+      // Trigger Firestore sync non-blocking (fire-and-forget)
       // The sync is already queued via dataService.emit('workout'), but we ensure it doesn't block
       // If sync fails, it will be retried later via the sync service
       (async () => {
         try {
-          const { mongodbSyncService } = await import('@/services/mongodbSyncService');
-          await mongodbSyncService.sync(currentUserId, {
+          const { firestoreSyncService } = await import('@/services/firestoreSyncService');
+          await firestoreSyncService.sync(currentUserId, {
             tables: ['workouts'],
             direction: 'push',
           });
-          } catch (syncError) {
+        } catch (syncError) {
           // Log sync failure but don't affect workout save
-          logger.warn('Supabase sync failed for workout (will retry later):', syncError);
+          logger.warn('Firestore sync failed for workout (will retry later):', syncError);
           // Sync will be retried on next sync cycle
         }
       })();

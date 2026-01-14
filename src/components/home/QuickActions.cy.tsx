@@ -1,4 +1,3 @@
-import React from 'react';
 import { QuickActions } from './QuickActions';
 import { useWorkoutStore } from '@/store/workoutStore';
 

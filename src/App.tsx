@@ -1,7 +1,7 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useAuth0 } from '@auth0/auth0-react';
+import { useAuth } from '@/contexts/AuthContext';
 import { Analytics as VercelAnalytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Layout } from '@/components/layout/Layout';
@@ -47,11 +47,11 @@ const EditWorkout = lazy(() => import('@/pages/EditWorkout'));
 const Login = lazy(() => import('@/pages/Login').then(m => ({ default: m.Login })));
 const SignUp = lazy(() => import('@/pages/SignUp').then(m => ({ default: m.SignUp })));
 
-// Component to handle OAuth callback - Auth0 handles this automatically
+// Component to handle OAuth callback - Firebase handles this automatically
 function SsoCallbackHandler() {
-  const { isLoading, isAuthenticated } = useAuth0();
+  const { loading, currentUser } = useAuth();
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-background-light dark:bg-background-dark">
         <LoadingSpinner size="lg" />
@@ -59,7 +59,7 @@ function SsoCallbackHandler() {
     );
   }
 
-  if (isAuthenticated) {
+  if (currentUser) {
     return <Navigate to="/" replace />;
   }
 
@@ -70,31 +70,6 @@ function App() {
   const [isInitializing, setIsInitializing] = useState(true);
   const loadSettings = useSettingsStore((state) => state.loadSettings);
   const settings = useSettingsStore((state) => state.settings);
-
-  // Global error handlers for Auth0 debugging
-  useEffect(() => {
-    const handleError = (event: ErrorEvent) => {
-      const errorMsg = event.message || String(event.error);
-      if (errorMsg.includes('auth0') || errorMsg.includes('400') || errorMsg.includes('Bad Request')) {
-        // Silently handle Auth0 errors to prevent console noise
-      }
-    };
-
-    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      const errorMsg = event.reason?.message || String(event.reason);
-      if (errorMsg.includes('auth0') || errorMsg.includes('400') || errorMsg.includes('Bad Request')) {
-        // Silently handle Auth0 errors to prevent console noise
-      }
-    };
-
-    window.addEventListener('error', handleError);
-    window.addEventListener('unhandledrejection', handleUnhandledRejection);
-
-    return () => {
-      window.removeEventListener('error', handleError);
-      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
-    };
-  }, []);
 
   useEffect(() => {
     async function init() {
@@ -350,66 +325,24 @@ function App() {
 
 function AppRoutes() {
   const location = useLocation();
-  const { isAuthenticated, isLoading, user: auth0User, error: auth0Error, getAccessTokenSilently } = useAuth0();
+  const { currentUser, loading } = useAuth();
   const initializeUser = useUserStore((state) => state.initializeUser);
 
-
-
-  // Sync user store with Auth0 user when authenticated
+  // Sync user store with Firebase user when authenticated
   useEffect(() => {
-    if (!isLoading && isAuthenticated && auth0User) {
+    if (!loading && currentUser) {
+      const userId = currentUser.uid;
+
+      // Extract first name from display name (if available)
+      const firstName = currentUser.displayName?.split(' ')[0] || null;
+
       initializeUser({
-        id: auth0User.sub || auth0User.email || 'user-unknown',
-        firstName: auth0User.given_name || auth0User.nickname || null,
-        username: auth0User.nickname || auth0User.name || null,
-        emailAddresses: auth0User.email ? [{ emailAddress: auth0User.email }] : [],
+        id: userId,
+        firstName,
+        username: currentUser.displayName || currentUser.email?.split('@')[0] || null,
+        emailAddresses: currentUser.email ? [{ emailAddress: currentUser.email }] : [],
       }).then(async () => {
-        const userId = auth0User.sub || auth0User.email || 'user-unknown';
-
-        // Authenticate with Firebase (if Firestore is enabled)
-        const useFirestore = import.meta.env.VITE_USE_FIRESTORE === 'true';
-        logger.info('[App.tsx] VITE_USE_FIRESTORE:', import.meta.env.VITE_USE_FIRESTORE);
-        logger.info('[App.tsx] useFirestore:', useFirestore);
-        if (useFirestore) {
-          logger.info('[App.tsx] Initializing Firebase authentication');
-          try {
-            const { firebaseAuthBridge } = await import('@/services/firebaseAuthBridge');
-
-            // Get Auth0 access token
-            const token = await getAccessTokenSilently();
-
-            // Store token in localStorage for Firestore sync service
-            localStorage.setItem('auth0_access_token', token);
-
-            // Authenticate with Firebase using Auth0 token
-            await firebaseAuthBridge.authenticateWithAuth0(token, userId);
-            logger.info('Firebase authentication successful');
-
-            // Now that Firebase is authenticated, pull notifications
-            await notificationService.pullFromMongoDB(userId)
-              .then(() => {
-                // Start periodic notification pulling (every hour)
-                notificationService.startPeriodicPull(userId, 60);
-              })
-              .catch((error) => {
-                logger.warn('Failed to pull notifications after Firebase auth:', error);
-              });
-          } catch (error) {
-            logger.warn('Firebase authentication failed (non-blocking):', error);
-            // Non-blocking - app can still function with IndexedDB only
-          }
-        } else {
-          logger.info('[App.tsx] Firestore disabled, using Supabase/MongoDB');
-          // If not using Firestore, pull notifications directly (uses Supabase/MongoDB)
-          await notificationService.pullFromMongoDB(userId)
-            .then(() => {
-              // Start periodic notification pulling (every hour)
-              notificationService.startPeriodicPull(userId, 60);
-            })
-            .catch((error) => {
-              logger.warn('Failed to pull notifications:', error);
-            });
-        }
+        logger.info('[App.tsx] User initialized with Firebase UID:', userId);
 
         // Initialize workout event tracker for this user
         workoutEventTracker.initialize(userId).catch((error) => {
@@ -420,11 +353,22 @@ function AppRoutes() {
         initializeDefaultTemplates(userId).catch((error) => {
           logger.error('Failed to initialize templates', error);
         });
+
+        // Pull notifications (Note: MongoDB/Supabase will be removed in Phase 6)
+        // This is temporary until we fully migrate to Firestore
+        await notificationService.pullFromMongoDB(userId)
+          .then(() => {
+            // Start periodic notification pulling (every hour)
+            notificationService.startPeriodicPull(userId, 60);
+          })
+          .catch((error) => {
+            logger.warn('Failed to pull notifications:', error);
+          });
       }).catch((err) => {
         logger.error('Failed to initialize user', err);
       });
     }
-  }, [isLoading, isAuthenticated, auth0User, initializeUser, auth0Error]);
+  }, [loading, currentUser, initializeUser]);
 
   // Public routes (no auth required, no layout)
   const publicRoutes = (
@@ -438,7 +382,7 @@ function AppRoutes() {
       <Route
         path="/login"
         element={
-          !isLoading && isAuthenticated ? (
+          !loading && currentUser ? (
             <Navigate to="/" replace />
           ) : (
             <Suspense fallback={<RouteLoader />}>
@@ -450,7 +394,7 @@ function AppRoutes() {
       <Route
         path="/signup"
         element={
-          !isLoading && isAuthenticated ? (
+          !loading && currentUser ? (
             <Navigate to="/" replace />
           ) : (
             <Suspense fallback={<RouteLoader />}>
@@ -686,8 +630,8 @@ function AppRoutes() {
     </Layout>
   );
 
-  // Show loading while Auth0 is loading
-  if (isLoading) {
+  // Show loading while Firebase auth is loading
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-background-light dark:bg-background-dark">
         <LoadingSpinner size="lg" />
@@ -695,7 +639,7 @@ function AppRoutes() {
     );
   }
 
-  return isAuthenticated ? protectedRoutes : publicRoutes;
+  return currentUser ? protectedRoutes : publicRoutes;
 }
 
 export default App;

@@ -1087,7 +1087,9 @@ export function LogWorkout() {
           </div>
         }
         onError={(error, errorInfo) => {
-          logger.error('LogExercise error:', error, errorInfo);
+          logger.error('LogExercise error:', error, {
+            componentStack: errorInfo.componentStack,
+          });
         }}
       >
         <LogExercise

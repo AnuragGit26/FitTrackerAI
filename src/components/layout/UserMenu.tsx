@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { User, LogOut, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth0 } from '@auth0/auth0-react';
+import { useAuth } from '@/contexts/AuthContext';
 import { useUserStore } from '@/store/userStore';
 import { userContextManager } from '@/services/userContextManager';
 import { cn } from '@/utils/cn';
@@ -10,16 +10,16 @@ export function UserMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-  const { logout, user: auth0User } = useAuth0();
+  const { signOut, currentUser } = useAuth();
   const { profile, clearProfile } = useUserStore();
-  
-  // Prefer profile store data (user-editable), fallback to Auth0 data
+
+  // Prefer profile store data (user-editable), fallback to Firebase user data
   // This ensures the menu shows what the user sees in their profile
-  const userName = profile?.name || auth0User?.name || auth0User?.nickname || auth0User?.given_name || 'User';
-  // Use Auth0 email as fallback since email is not editable in profile
-  const userEmail = auth0User?.email;
-  
-  // Use only user-uploaded profile picture (no Auth0 fallback)
+  const userName = profile?.name || currentUser?.displayName || currentUser?.email?.split('@')[0] || 'User';
+  // Use Firebase email as fallback since email is not editable in profile
+  const userEmail = currentUser?.email;
+
+  // Use only user-uploaded profile picture (no Firebase Auth picture fallback)
   const profilePictureUrl = profile?.profilePicture;
   
 
@@ -56,7 +56,8 @@ export function UserMenu() {
         try {
           userContextManager.clear();
           await clearProfile();
-          logout();
+          await signOut();
+          navigate('/login');
         } catch (error) {
           console.error('Failed to sign out:', error);
         }

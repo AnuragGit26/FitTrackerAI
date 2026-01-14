@@ -2,9 +2,8 @@ import { useRef, useState } from 'react';
 import { Camera, Upload, X } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { processImage, validateImageFile } from '@/utils/imageProcessor';
-import { getSupabaseClientWithAuth } from '@/services/supabaseClient';
-import { userScopedStorage } from '@/services/supabaseQueryBuilder';
-import { requireUserId } from '@/utils/userIdValidation';
+import { firebaseStorageService } from '@/services/firebaseStorageService';
+import { useAuth } from '@/contexts/AuthContext';
 import { useUserStore } from '@/store/userStore';
 import { useToast } from '@/hooks/useToast';
 
@@ -13,46 +12,24 @@ interface ProfilePictureUploadProps {
   onPictureChange: (picture: string) => void;
 }
 
-/**
- * Sanitizes a string for use in Supabase Storage keys
- * Replaces invalid characters with underscores
- */
-function sanitizeStorageKey(key: string): string {
-  // Supabase Storage keys can contain: alphanumeric, hyphens, underscores, forward slashes
-  // Replace pipe characters and other invalid characters with underscores
-  // Invalid characters: | < > : " \ ? * and control characters
-  return key
-    .split('')
-    .map((char) => {
-      const code = char.charCodeAt(0);
-      // Allow: alphanumeric, hyphen, underscore, forward slash, period
-      if (
-        (code >= 48 && code <= 57) || // 0-9
-        (code >= 65 && code <= 90) || // A-Z
-        (code >= 97 && code <= 122) || // a-z
-        char === '-' ||
-        char === '_' ||
-        char === '/' ||
-        char === '.'
-      ) {
-        return char;
-      }
-      return '_';
-    })
-    .join('');
-}
-
 export function ProfilePictureUpload({ picture, onPictureChange }: ProfilePictureUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const { currentUser } = useAuth();
   const { profile } = useUserStore();
   const { error: showError, success } = useToast();
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    // Check if user is authenticated
+    if (!currentUser) {
+      showError('Please sign in to upload a profile picture');
+      return;
+    }
 
     // Validate file
     const validation = validateImageFile(file);
@@ -70,64 +47,26 @@ export function ProfilePictureUpload({ picture, onPictureChange }: ProfilePictur
       const processed = await processImage(file);
       setPreviewUrl(processed.dataUrl);
 
-      // Validate and get user ID
-      const userId = requireUserId(profile?.id, {
-        functionName: 'handleFileSelect',
-        additionalInfo: { operation: 'profile_photo_upload' },
-      });
+      setUploadProgress(30);
 
-      // Get authenticated Supabase client
-      const supabase = await getSupabaseClientWithAuth(userId);
-      
-      // IMPORTANT: The 'profile-photos' bucket must be PUBLIC in Supabase Dashboard
-      // See supabase/migrations/002_storage_policies.sql for setup instructions
-      // The migration creates public bucket policies that work with Auth0
+      // Compress image before upload using Firebase Storage service
+      const compressedFile = await firebaseStorageService.compressImage(
+        processed.file,
+        800,
+        800,
+        0.85
+      );
 
-      // Use user-scoped storage helper
-      const storage = userScopedStorage(supabase, 'profile-photos', userId);
+      setUploadProgress(50);
 
-      // Sanitize file name for storage key (user_id is already in path from userScopedStorage)
-      const sanitizedFileName = sanitizeStorageKey(processed.file.name);
-      const fileName = `${Date.now()}-${sanitizedFileName}`;
-
-      // Delete old profile photo if exists
-      if (picture && picture.includes('profile-photos')) {
-        try {
-          const oldPath = picture.split('/profile-photos/')[1];
-          if (oldPath) {
-            // Decode the path in case it was URL encoded
-            const decodedPath = decodeURIComponent(oldPath);
-            // Remove user_id prefix if present (userScopedStorage will add it)
-            const pathWithoutUserId = decodedPath.startsWith(`${userId}/`)
-              ? decodedPath.substring(userId.length + 1)
-              : decodedPath;
-            await storage.remove([pathWithoutUserId]);
-          }
-        } catch (error) {
-          // Ignore errors when deleting old photo
-          console.warn('Failed to delete old profile photo:', error);
-        }
-      }
-
-      // Upload new photo using user-scoped storage (automatically includes user_id in path)
-      const { error: uploadError } = await storage.upload(fileName, processed.file, {
-        cacheControl: '3600',
-        upsert: true,
-      });
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      // Get public URL (path already includes user_id from userScopedStorage)
-      const { data: urlData } = storage.getPublicUrl(fileName);
-
-      if (!urlData?.publicUrl) {
-        throw new Error('Failed to get public URL');
-      }
+      // Upload to Firebase Storage
+      const result = await firebaseStorageService.uploadProfilePicture(
+        currentUser.uid,
+        compressedFile
+      );
 
       setUploadProgress(100);
-      onPictureChange(urlData.publicUrl);
+      onPictureChange(result.url);
       success('Profile photo uploaded successfully');
     } catch (error) {
       console.error('Failed to upload profile photo:', error);
@@ -147,27 +86,22 @@ export function ProfilePictureUpload({ picture, onPictureChange }: ProfilePictur
   const handleRemovePhoto = async () => {
     if (!picture) return;
 
-    try {
-      // Validate and get user ID
-      const userId = requireUserId(profile?.id, {
-        functionName: 'handleRemovePhoto',
-        additionalInfo: { operation: 'profile_photo_removal' },
-      });
+    // Check if user is authenticated
+    if (!currentUser) {
+      showError('Please sign in to remove profile picture');
+      return;
+    }
 
-      // Delete from Supabase Storage if it's a Supabase URL
-      if (picture.includes('profile-photos')) {
-        const supabase = await getSupabaseClientWithAuth(userId);
-        const storage = userScopedStorage(supabase, 'profile-photos', userId);
-        
-        const fileName = picture.split('/profile-photos/')[1];
-        if (fileName) {
-          // Decode the path in case it was URL encoded
-          const decodedPath = decodeURIComponent(fileName);
-          // Remove user_id prefix if present (userScopedStorage will add it)
-          const pathWithoutUserId = decodedPath.startsWith(`${userId}/`)
-            ? decodedPath.substring(userId.length + 1)
-            : decodedPath;
-          await storage.remove([pathWithoutUserId]);
+    try {
+      // Delete from Firebase Storage if it's a Firebase Storage URL
+      if (picture.includes('firebase')) {
+        // Extract storage path from URL
+        // Firebase Storage URLs look like: https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{path}?alt=media...
+        const pathMatch = picture.match(/\/o\/(.+?)\?/);
+        if (pathMatch) {
+          const encodedPath = pathMatch[1];
+          const storagePath = decodeURIComponent(encodedPath);
+          await firebaseStorageService.deleteProfilePicture(storagePath);
         }
       }
 

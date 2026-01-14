@@ -47,11 +47,11 @@ export function initializeFirebase(): { app: FirebaseApp; db: Firestore; auth: A
       });
       persistenceEnabled = true;
       logger.log('[FirebaseConfig] Firestore initialized with offline persistence');
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Fallback to default Firestore if initialization fails
       // This handles cases where persistence isn't supported
       firestoreDb = getFirestore(firebaseApp);
-      if (err.code === 'failed-precondition') {
+      if (err && typeof err === 'object' && 'code' in err && err.code === 'failed-precondition') {
         logger.warn(
           '[FirebaseConfig] Multiple tabs open. Persistence enabled in first tab only.'
         );

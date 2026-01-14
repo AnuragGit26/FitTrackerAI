@@ -17,6 +17,7 @@ class Logger {
    */
   log(message: string, ...args: unknown[]): void {
     if (!this.isProduction) {
+      // eslint-disable-next-line no-console
       console.log(message, ...args);
     }
   }
@@ -26,6 +27,7 @@ class Logger {
    */
   debug(message: string, ...args: unknown[]): void {
     if (!this.isProduction) {
+      // eslint-disable-next-line no-console
       console.debug(`[DEBUG] ${message}`, ...args);
     }
   }
@@ -35,6 +37,7 @@ class Logger {
    */
   info(message: string, ...args: unknown[]): void {
     if (!this.isProduction) {
+      // eslint-disable-next-line no-console
       console.info(`[INFO] ${message}`, ...args);
     }
   }
@@ -93,7 +96,7 @@ class Logger {
       if (typeof data === 'object' && data !== null) {
         if ('stack' in data) {
           errorStack = (data as { stack: string }).stack;
-        } else if ('error' in data && typeof (data as any).error === 'string') {
+        } else if ('error' in data && typeof (data as Record<string, unknown>).error === 'string') {
            // sometimes we pass { error: error.message }
         }
       }

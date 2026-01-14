@@ -1,7 +1,6 @@
 import {
   collection,
   doc,
-  setDoc,
   getDoc,
   getDocs,
   query,
@@ -9,19 +8,14 @@ import {
   writeBatch,
   Timestamp,
   orderBy,
-  limit as firestoreLimit,
   QueryConstraint,
-  QueryDocumentSnapshot,
-  DocumentData,
-  CollectionReference,
   DocumentReference,
+  Firestore,
 } from 'firebase/firestore';
-import { getFirestoreDb } from './firebaseConfig';
-import { firebaseAuthBridge } from './firebaseAuthBridge';
+import { getFirestoreDb, getFirebaseAuth } from './firebaseConfig';
 import { dbHelpers } from './database';
 import { requireUserId } from '@/utils/userIdValidation';
 import { syncMetadataService } from './syncMetadataService';
-import { versionManager } from './versionManager';
 import { errorRecovery } from './errorRecovery';
 import { userContextManager } from './userContextManager';
 import { errorLogService } from './errorLogService';
@@ -31,16 +25,9 @@ import {
   SyncResult,
   SyncableTable,
   SyncDirection,
-  SyncError,
   SyncProgress,
   SyncStatus,
 } from '@/types/sync';
-import type { Workout, WorkoutTemplate, PlannedWorkout } from '@/types/workout';
-import type { Exercise } from '@/types/exercise';
-import type { MuscleStatus } from '@/types/muscle';
-import type { Notification } from '@/types/notification';
-import type { SleepLog, RecoveryLog } from '@/types/sleep';
-import type { ErrorLog } from '@/types/error';
 
 const BATCH_SIZE = 500; // Firestore batch limit
 
@@ -82,16 +69,6 @@ function timestampToLocalDate(timestamp: number | Date | Timestamp | string | nu
   return null;
 }
 
-/**
- * Convert Date to Firestore Timestamp
- */
-function dateToTimestamp(date: Date | string | number | null | undefined): Timestamp | null {
-  if (!date) return null;
-  if (date instanceof Date) return Timestamp.fromDate(date);
-
-  const parsedDate = timestampToLocalDate(date);
-  return parsedDate ? Timestamp.fromDate(parsedDate) : null;
-}
 
 /**
  * Firestore Sync Service
@@ -407,42 +384,26 @@ class FirestoreSyncService {
   }
 
   /**
-   * Ensure Firebase is authenticated with Auth0 custom token
+   * Ensure Firebase is authenticated
    */
   private async ensureFirebaseAuth(userId: string): Promise<void> {
+    const auth = getFirebaseAuth();
+    const currentUser = auth.currentUser;
+
     // Check if already authenticated
-    if (firebaseAuthBridge.isAuthenticated()) {
-      const currentUserId = firebaseAuthBridge.getCurrentUserId();
+    if (currentUser) {
       // Verify it's the correct user
-      if (currentUserId && currentUserId === userId) {
+      if (currentUser.uid === userId) {
         logger.log('[FirestoreSyncService] Firebase already authenticated for user:', userId);
         return;
       } else {
-        logger.log('[FirestoreSyncService] Firebase authenticated for different user, re-authenticating...');
+        logger.log('[FirestoreSyncService] Firebase authenticated for different user');
+        throw new Error('Firebase authenticated for different user. Please log out and log in again.');
       }
     }
 
-    // Get Auth0 token from localStorage
-    const auth0Token = localStorage.getItem('auth0_access_token');
-    if (!auth0Token) {
-      throw new Error('Auth0 token not found - user must be authenticated. Please reload the page or log in again.');
-    }
-
-    logger.log('[FirestoreSyncService] Authenticating Firebase with Auth0 token for user:', userId);
-    try {
-      await firebaseAuthBridge.authenticateWithAuth0(auth0Token, userId);
-      logger.log('[FirestoreSyncService] Firebase authentication successful');
-
-      // Verify authentication succeeded
-      if (!firebaseAuthBridge.isAuthenticated()) {
-        throw new Error('Firebase authentication failed - no current user after sign in');
-      }
-    } catch (error) {
-      logger.error('[FirestoreSyncService] Firebase authentication error:', error);
-      // Clear the cached token and retry once
-      firebaseAuthBridge.clearTokenCache(userId);
-      throw error;
-    }
+    // User is not authenticated
+    throw new Error('Firebase user not authenticated. Please log in again.');
   }
 
   /**
@@ -909,7 +870,7 @@ class FirestoreSyncService {
     // Filter by updated date if since is provided
     if (since) {
       records = records.filter((record) => {
-        const updatedAt = (record as any).updatedAt;
+        const updatedAt = (record as Record<string, unknown>).updatedAt;
         if (!updatedAt) return true; // Include records without updatedAt
         const updatedDate = timestampToLocalDate(updatedAt);
         return updatedDate && updatedDate >= since;
@@ -927,7 +888,7 @@ class FirestoreSyncService {
    * Get document reference for Firestore
    */
   private getDocumentReference(
-    db: any,
+    db: Firestore,
     tableName: SyncableTable,
     userId: string,
     record: Record<string, unknown>
@@ -1027,7 +988,7 @@ class FirestoreSyncService {
     userId: string,
     tableName: SyncableTable,
     remoteRecord: unknown,
-    direction: SyncDirection
+    _direction: SyncDirection
   ): Promise<boolean> {
     const recordId = this.getRecordId(remoteRecord as Record<string, unknown>, tableName);
     const localRecord = await dbHelpers.getRecordById(tableName, recordId);
@@ -1052,7 +1013,7 @@ class FirestoreSyncService {
   /**
    * Get record ID from record
    */
-  private getRecordId(record: Record<string, unknown>, tableName: SyncableTable): string {
+  private getRecordId(record: Record<string, unknown>, _tableName: SyncableTable): string {
     return (record.id as string) || (record.key as string) || 'unknown';
   }
 }

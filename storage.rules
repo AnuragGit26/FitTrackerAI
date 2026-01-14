@@ -1,0 +1,53 @@
+rules_version = '2';
+
+// Firebase Storage Security Rules for FitTrackAI
+// Docs: https://firebase.google.com/docs/storage/security
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if user owns the resource
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // Helper function to validate image file
+    function isValidImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    // Helper function to validate file size (max 5MB)
+    function isValidSize() {
+      return request.resource.size < 5 * 1024 * 1024;
+    }
+
+    // Profile pictures: /profile-pictures/{userId}/{fileName}
+    match /profile-pictures/{userId}/{fileName} {
+      // Allow read if authenticated (users can see other profile pictures)
+      allow read: if isAuthenticated();
+
+      // Allow write (create/update) only if:
+      // 1. User is authenticated
+      // 2. User is the owner of the profile picture
+      // 3. File is a valid image
+      // 4. File size is under 5MB
+      allow write: if isAuthenticated()
+                   && isOwner(userId)
+                   && isValidImage()
+                   && isValidSize();
+
+      // Allow delete only if user is the owner
+      allow delete: if isAuthenticated() && isOwner(userId);
+    }
+
+    // Deny all other storage access by default
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

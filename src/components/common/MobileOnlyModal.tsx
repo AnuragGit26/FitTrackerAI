@@ -26,8 +26,8 @@ export function MobileOnlyModal() {
     // Skip modal entirely if running in Cypress or other test environments
     if (
       typeof window !== 'undefined' &&
-      ((window as any).Cypress ||
-       (window as any).__CYPRESS__ ||
+      ((window as Window & { Cypress?: unknown; __CYPRESS__?: unknown }).Cypress ||
+       (window as Window & { Cypress?: unknown; __CYPRESS__?: unknown }).__CYPRESS__ ||
        process.env.NODE_ENV === 'test')
     ) {
       setIsChecking(false);

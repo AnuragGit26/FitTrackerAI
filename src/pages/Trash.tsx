@@ -20,6 +20,7 @@ export function Trash() {
 
   useEffect(() => {
     loadDeletedWorkouts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id]);
 
   const loadDeletedWorkouts = async () => {

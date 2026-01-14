@@ -170,17 +170,11 @@ class DataService {
   }
 
   /**
-   * Get sync service based on environment configuration
-   * Returns Firestore sync service if VITE_USE_FIRESTORE is true, otherwise MongoDB sync service
+   * Get sync service - now always uses Firestore
    */
   private async getSyncService() {
-    const useFirestore = import.meta.env.VITE_USE_FIRESTORE === 'true';
-    if (useFirestore) {
-      const { firestoreSyncService } = await import('./firestoreSyncService');
-      return firestoreSyncService;
-    }
-    const { mongodbSyncService } = await import('./mongodbSyncService');
-    return mongodbSyncService;
+    const { firestoreSyncService } = await import('./firestoreSyncService');
+    return firestoreSyncService;
   }
 
   private async processSyncQueue(): Promise<void> {
@@ -806,7 +800,7 @@ class DataService {
   }
 
   async getDeletedWorkouts(userId: string): Promise<Workout[]> {
-    const currentUserId = userContextManager.requireUserId();
+    userContextManager.requireUserId();
     userContextManager.validateUserId(userId);
 
     try {
@@ -823,7 +817,7 @@ class DataService {
    * @returns Number of workouts permanently deleted
    */
   async cleanupOldDeletedWorkouts(userId: string, retentionDays: number = 30): Promise<number> {
-    const currentUserId = userContextManager.requireUserId();
+    userContextManager.requireUserId();
     userContextManager.validateUserId(userId);
 
     const cutoffDate = new Date();

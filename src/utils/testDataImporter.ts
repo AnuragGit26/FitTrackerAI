@@ -134,7 +134,7 @@ export async function importTestData(
     if (!options.skipUserProfile && data.userProfile && !options.dryRun) {
       try {
         logger.log('👤 Importing user profile...');
-        await dataService.updateUserProfile(data.userProfile as any);
+        await dataService.updateUserProfile(data.userProfile as Record<string, unknown> as Parameters<typeof dataService.updateUserProfile>[0]);
         result.imported.userProfile = true;
         logger.log('✅ User profile imported');
       } catch (error) {
@@ -172,7 +172,7 @@ export async function importTestData(
             };
 
             // Use bulk insert for better performance
-            await db.workouts.put(workoutToImport as any);
+            await db.workouts.put(workoutToImport as Workout);
           }
           result.imported.workouts++;
         } catch (error) {
@@ -192,7 +192,7 @@ export async function importTestData(
             await db.workoutTemplates.put({
               ...template,
               userId: template.userId || userId,
-            } as any);
+            } as WorkoutTemplate);
           }
           result.imported.templates++;
         } catch (error) {
@@ -213,7 +213,7 @@ export async function importTestData(
               ...planned,
               userId: planned.userId || userId,
               date: planned.date instanceof Date ? planned.date : new Date(planned.date),
-            } as any);
+            } as PlannedWorkout);
           }
           result.imported.plannedWorkouts++;
         } catch (error) {
@@ -234,7 +234,7 @@ export async function importTestData(
               ...exercise,
               userId: exercise.userId || userId,
               isCustom: true,
-            } as any);
+            } as Exercise);
           }
           result.imported.customExercises++;
         } catch (error) {
@@ -255,7 +255,7 @@ export async function importTestData(
               ...status,
               userId: status.userId || userId,
               lastWorked: status.lastWorked instanceof Date ? status.lastWorked : new Date(status.lastWorked),
-            } as any);
+            } as MuscleStatus);
           }
           result.imported.muscleStatuses++;
         } catch (error) {
@@ -278,7 +278,7 @@ export async function importTestData(
               date: log.date instanceof Date ? log.date : new Date(log.date),
               bedtime: log.bedtime instanceof Date ? log.bedtime : new Date(log.bedtime),
               wakeTime: log.wakeTime instanceof Date ? log.wakeTime : new Date(log.wakeTime),
-            } as any);
+            } as SleepLog);
           }
           result.imported.sleepLogs++;
         } catch (error) {
@@ -299,7 +299,7 @@ export async function importTestData(
               ...log,
               userId: log.userId || userId,
               date: log.date instanceof Date ? log.date : new Date(log.date),
-            } as any);
+            } as RecoveryLog);
           }
           result.imported.recoveryLogs++;
         } catch (error) {
@@ -414,7 +414,7 @@ export async function exportUserData(userId: string): Promise<ExportData> {
     sleepLogs,
     recoveryLogs,
     settings: appSettings ? { appSettings } : undefined,
-    userProfile: userProfile ? userProfile as any : undefined,
+    userProfile: userProfile ? userProfile as ExportData['userProfile'] : undefined,
   };
 
   logger.log('✅ Export complete');
@@ -425,9 +425,21 @@ export async function exportUserData(userId: string): Promise<ExportData> {
 
 // Attach to window for console access
 if (typeof window !== 'undefined') {
-  (window as any).importTestData = importTestData;
-  (window as any).exportUserData = exportUserData;
-  (window as any).clearAllData = clearAllData;
+  (window as Window & {
+    importTestData?: typeof importTestData;
+    exportUserData?: typeof exportUserData;
+    clearAllData?: typeof clearAllData;
+  }).importTestData = importTestData;
+  (window as Window & {
+    importTestData?: typeof importTestData;
+    exportUserData?: typeof exportUserData;
+    clearAllData?: typeof clearAllData;
+  }).exportUserData = exportUserData;
+  (window as Window & {
+    importTestData?: typeof importTestData;
+    exportUserData?: typeof exportUserData;
+    clearAllData?: typeof clearAllData;
+  }).clearAllData = clearAllData;
 
   logger.log(`
   🔧 Test Data Utilities loaded!

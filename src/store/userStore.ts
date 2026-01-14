@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { dataService } from '@/services/dataService';
 import { userContextManager } from '@/services/userContextManager';
-import { auth0ManagementService } from '@/services/auth0ManagementService';
 import { logger } from '@/utils/logger';
 
 export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
@@ -31,13 +30,9 @@ interface UserState {
   profile: UserProfile | null;
   isLoading: boolean;
   error: string | null;
-  auth0SyncStatus: 'idle' | 'syncing' | 'success' | 'error';
-  auth0SyncError: string | null;
-  
+
   // Actions
-  initializeUser: (auth0User?: { id: string; firstName?: string | null; username?: string | null; emailAddresses?: Array<{ emailAddress: string }> }) => Promise<void>;
-  syncWithAuth0: (auth0User: { id: string; firstName?: string | null; username?: string | null; emailAddresses?: Array<{ emailAddress: string }> }) => Promise<void>;
-  syncToAuth0: (auth0User: { sub?: string; email?: string }, accessToken: string) => Promise<void>;
+  initializeUser: (firebaseUser?: { id: string; firstName?: string | null; username?: string | null; emailAddresses?: Array<{ emailAddress: string }> }) => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   clearProfile: () => Promise<void>;
   setExperienceLevel: (level: ExperienceLevel) => Promise<void>;
@@ -91,51 +86,49 @@ export const useUserStore = create<UserState>((set, get) => ({
   profile: null,
   isLoading: false,
   error: null,
-  auth0SyncStatus: 'idle',
-  auth0SyncError: null,
 
-  initializeUser: async (auth0User) => {
+  initializeUser: async (firebaseUser) => {
     set({ isLoading: true, error: null });
 
     try {
-      // REQUIRE Auth0 user for authenticated sessions
-      if (!auth0User?.id) {
-        // No Auth0 user - cannot initialize without user ID
+      // REQUIRE Firebase user for authenticated sessions
+      if (!firebaseUser?.id) {
+        // No Firebase user - cannot initialize without user ID
         set({ profile: null, isLoading: false });
         return;
       }
 
-      const auth0UserId = auth0User.id;
-      const auth0Name = auth0User.firstName ?? auth0User.username ?? auth0User.emailAddresses?.[0]?.emailAddress ?? 'User';
-      
+      const userId = firebaseUser.id;
+      const userName = firebaseUser.firstName ?? firebaseUser.username ?? firebaseUser.emailAddresses?.[0]?.emailAddress ?? 'User';
+
       // Get profile for this specific user ID (strictly user-specific)
-      let savedProfile = await dataService.getUserProfile(auth0UserId);
-      
-      // If no saved profile exists, create one with Auth0 data
+      let savedProfile = await dataService.getUserProfile(userId);
+
+      // If no saved profile exists, create one with Firebase data
       if (!savedProfile) {
         savedProfile = {
           ...DEFAULT_PROFILE,
-          id: auth0UserId,
-          name: auth0Name,
+          id: userId,
+          name: userName,
         };
         await dataService.updateUserProfile(savedProfile);
       } else {
-        // Profile exists - ensure it's up to date with Auth0 data if needed
+        // Profile exists - ensure it's up to date with Firebase data if needed
         // Only update name if it's empty or default, preserve user-saved custom names
         const shouldUpdateName = !savedProfile.name || savedProfile.name === 'User' || savedProfile.name === DEFAULT_PROFILE.name;
-        const shouldUpdateId = savedProfile.id !== auth0UserId;
-        
+        const shouldUpdateId = savedProfile.id !== userId;
+
         if (shouldUpdateId || shouldUpdateName) {
-          const nameToUse = shouldUpdateName ? auth0Name : savedProfile.name;
+          const nameToUse = shouldUpdateName ? userName : savedProfile.name;
           savedProfile = {
             ...savedProfile,
-            id: auth0UserId,
+            id: userId,
             name: nameToUse,
           };
           await dataService.updateUserProfile(savedProfile);
         }
       }
-      
+
       // Migrate profile picture from IndexedDB to LocalStorage if it exists and user has an ID
       // This ensures backward compatibility and dual storage
       // Only migrate if not already in LocalStorage to prevent infinite loops
@@ -144,65 +137,24 @@ export const useUserStore = create<UserState>((set, get) => ({
         const existingInLocalStorage = dataService.getProfilePictureFromLocalStorage(savedProfile.id);
         if (!existingInLocalStorage || existingInLocalStorage !== savedProfile.profilePicture) {
           // The updateUserProfile will handle writing to LocalStorage, but we ensure it's there
-          await dataService.updateUserProfile({ 
+          await dataService.updateUserProfile({
             id: savedProfile.id, // REQUIRED: must include id
-            profilePicture: savedProfile.profilePicture 
+            profilePicture: savedProfile.profilePicture
           });
           // Re-fetch to get the updated profile
-          savedProfile = await dataService.getUserProfile(auth0UserId) || savedProfile;
+          savedProfile = await dataService.getUserProfile(userId) || savedProfile;
         }
       }
-      
+
       // Set user ID in context manager for data operations
       userContextManager.setUserId(savedProfile.id);
-      
+
       set({ profile: savedProfile, isLoading: false });
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to initialize user',
         isLoading: false,
       });
-    }
-  },
-
-  syncWithAuth0: async (auth0User) => {
-    const { profile } = get();
-    if (!profile) return;
-
-    const auth0UserId = auth0User.id;
-    const auth0Name = auth0User.firstName ?? auth0User.username ?? auth0User.emailAddresses?.[0]?.emailAddress ?? 'User';
-
-    // Update profile with Auth0 ID, but only update name if it's empty or default
-    // Preserve user-saved custom names
-    const shouldUpdateName = !profile.name || profile.name === 'User' || profile.name === DEFAULT_PROFILE.name;
-    const shouldUpdateId = profile.id !== auth0UserId;
-    
-    if (shouldUpdateId || shouldUpdateName) {
-      const nameToUse = shouldUpdateName ? auth0Name : profile.name;
-      const updatedProfile = {
-        ...profile,
-        id: auth0UserId,
-        name: nameToUse,
-      };
-      await get().updateProfile(updatedProfile);
-    }
-  },
-
-  syncToAuth0: async (auth0User, accessToken) => {
-    const { profile } = get();
-    if (!profile) {
-      throw new Error('No profile to sync');
-    }
-
-    set({ auth0SyncStatus: 'syncing', auth0SyncError: null });
-
-    try {
-      await auth0ManagementService.updateUserProfile(auth0User, accessToken, profile);
-      set({ auth0SyncStatus: 'success', auth0SyncError: null });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to sync to Auth0';
-      set({ auth0SyncStatus: 'error', auth0SyncError: errorMessage });
-      throw error;
     }
   },
 
@@ -224,19 +176,19 @@ export const useUserStore = create<UserState>((set, get) => ({
         userContextManager.setUserId(updatedProfile.id);
       }
       set({ profile: updatedProfile, isLoading: false });
-      
-      // Sync to MongoDB/Supabase in production (non-blocking, similar to workout sync)
+
+      // Sync to Firestore in production (non-blocking)
       if (updatedProfile.id) {
         (async () => {
           try {
-            const { mongodbSyncService } = await import('@/services/mongodbSyncService');
-            await mongodbSyncService.sync(updatedProfile.id, {
+            const { firestoreSyncService } = await import('@/services/firestoreSyncService');
+            await firestoreSyncService.sync(updatedProfile.id, {
               tables: ['user_profiles'],
               direction: 'push',
             });
           } catch (syncError) {
             // Log sync failure but don't affect profile save
-            logger.warn('MongoDB sync failed for profile (will retry later):', syncError);
+            logger.warn('Firestore sync failed for profile (will retry later):', syncError);
           }
         })();
       }
