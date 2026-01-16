@@ -27,6 +27,10 @@ export default defineConfig({
       TEST_USER_PASSWORD: "Test123!@#",
       API_URL: "http://localhost:3001",
       COVERAGE: false,
+      // Firebase config for mocking
+      VITE_FIREBASE_API_KEY: "mock-api-key",
+      VITE_FIREBASE_PROJECT_ID: "fittrackai2026",
+      VITE_FIREBASE_AUTH_DOMAIN: "fittrackai2026.firebaseapp.com",
     },
     setupNodeEvents(on, config) {
       // Import Percy plugin
