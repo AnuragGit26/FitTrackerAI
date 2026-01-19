@@ -3,8 +3,56 @@
  * RPE scale: 1-10 (1 = very easy, 10 = maximum effort)
  */
 
-export function validateRPE(rpe: number): boolean {
+/**
+ * Validates RPE value
+ * Handles null, undefined, NaN, and edge cases
+ */
+export function validateRPE(rpe: number | null | undefined): boolean {
+  if (rpe === null || rpe === undefined) {
+    return false;
+  }
+
+  if (typeof rpe !== 'number') {
+    return false;
+  }
+
+  if (!Number.isFinite(rpe)) {
+    return false;
+  }
+
   return rpe >= 1 && rpe <= 10;
+}
+
+/**
+ * Sanitizes RPE value
+ * - null/undefined → undefined
+ * - NaN/non-number → undefined
+ * - < 1 → 1 (clamp to minimum)
+ * - > 10 → 10 (clamp to maximum)
+ * - Valid number → keep as-is
+ */
+export function sanitizeRPE(rpe: unknown): number | undefined {
+  if (rpe === null || rpe === undefined) {
+    return undefined;
+  }
+
+  if (typeof rpe !== 'number') {
+    return undefined;
+  }
+
+  if (!Number.isFinite(rpe)) {
+    return undefined;
+  }
+
+  // Clamp to valid range
+  if (rpe < 1) {
+    return 1;
+  }
+  if (rpe > 10) {
+    return 10;
+  }
+
+  return rpe;
 }
 
 export function rpeToPercentage(rpe: number): number {

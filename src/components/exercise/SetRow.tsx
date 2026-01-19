@@ -148,11 +148,17 @@ export function SetRow({ set, onUpdate, unit, trackingType, distanceUnit = 'km',
       return;
     }
     const numValue = parseFloat(value);
-    if (!isNaN(numValue) && numValue >= 1 && numValue <= 10) {
-      onUpdate({ rpe: numValue });
+    // Sanitize RPE value - clamp to valid range instead of rejecting
+    if (!isNaN(numValue)) {
+      const sanitizedRPE = numValue < 1 ? 1 : numValue > 10 ? 10 : numValue;
+      onUpdate({ rpe: sanitizedRPE });
+      // Update display if value was clamped
+      if (sanitizedRPE !== numValue) {
+        setRpe(sanitizedRPE.toString());
+      }
     } else if (value !== '') {
-      // Keep the value for user feedback but don't update
-      setRpe(value);
+      // Invalid input - clear RPE
+      onUpdate({ rpe: undefined });
     }
   };
 

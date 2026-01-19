@@ -11,6 +11,7 @@ import { errorRecovery } from './errorRecovery';
 import { sanitizeString } from '@/utils/sanitize';
 import { Transaction } from 'dexie';
 import { validateWeight, validateDuration, validateCalories, validateRPE, normalizeWorkoutStartTime } from '@/utils/validators';
+import { sanitizeWorkout } from '@/utils/workoutSanitizer';
 import { calculateVolume, convertWeight } from '@/utils/calculations';
 import { generateWorkoutId } from '@/utils/idGenerator';
 
@@ -251,6 +252,9 @@ class DataService {
   }
 
   // Validation helpers
+  /**
+   * @deprecated Use sanitizeAndValidate instead - it auto-fixes issues instead of throwing
+   */
   private validateWorkout(workout: Omit<Workout, 'id'>): void {
     if (!workout.userId) {
       throw new Error('Workout must have a userId');
@@ -405,7 +409,8 @@ class DataService {
         }
         
         // Validate RPE (if present)
-        if (set.rpe !== undefined) {
+        // Note: In sanitizeAndValidate, RPE is auto-fixed instead of throwing
+        if (set.rpe !== undefined && set.rpe !== null) {
           if (!validateRPE(set.rpe)) {
             throw new Error(
               `Exercise at index ${index}, set ${setIndex + 1}: RPE must be between 1 and 10`
@@ -466,6 +471,43 @@ class DataService {
     }
   }
 
+  /**
+   * Sanitizes and validates workout data
+   * Auto-fixes issues instead of throwing errors
+   * Returns sanitized workout and validation warnings
+   */
+  private sanitizeAndValidate(workout: Omit<Workout, 'id'>): {
+    sanitizedWorkout: Omit<Workout, 'id'>;
+    warnings: string[];
+  } {
+    // First, sanitize the workout data (auto-fixes issues)
+    const { sanitizedWorkout, warnings } = sanitizeWorkout(workout);
+
+    // Additional validation checks (non-throwing, just log warnings)
+    // These are checks that can't be auto-fixed
+
+    // Check for critical issues that can't be auto-fixed
+    if (!sanitizedWorkout.userId || sanitizedWorkout.userId === 'unknown') {
+      warnings.push('CRITICAL: Workout missing userId - this should not happen');
+    }
+
+    if (sanitizedWorkout.exercises.length === 0) {
+      warnings.push('CRITICAL: Workout has no exercises after sanitization');
+    }
+
+    // Validate each exercise has at least one set
+    sanitizedWorkout.exercises.forEach((exercise, index) => {
+      if (!exercise.sets || exercise.sets.length === 0) {
+        warnings.push(`Exercise "${exercise.exerciseName}" at index ${index} has no sets after sanitization`);
+      }
+    });
+
+    return {
+      sanitizedWorkout,
+      warnings,
+    };
+  }
+
   private validateExercise(exercise: Exercise): void {
     if (!exercise.id) {
       throw new Error('Exercise must have an id');
@@ -523,35 +565,38 @@ class DataService {
 
   // Workout operations with ACID transactions and versioning
   async createWorkout(workout: Omit<Workout, 'id'>): Promise<string> {
-    // Normalize start time before validation to handle stale dates gracefully
-    const workoutDate = workout.date instanceof Date ? workout.date : new Date(workout.date);
-    const normalizedStartTime = normalizeWorkoutStartTime(workoutDate, workout.startTime);
-    
-    // Sanitize user inputs to prevent XSS and normalize duration
-    const sanitizedWorkout: Omit<Workout, 'id'> = {
-      ...workout,
-      startTime: normalizedStartTime, // Use normalized start time
-      // Normalize totalDuration to integer minutes to handle floating point precision
-      totalDuration: workout.totalDuration !== undefined 
-        ? Math.round(workout.totalDuration) 
-        : workout.totalDuration,
-      notes: workout.notes ? sanitizeString(workout.notes) : undefined,
-      exercises: (workout.exercises ?? []).map(ex => ({
+    // Sanitize and validate workout data (auto-fixes issues, doesn't throw)
+    const { sanitizedWorkout, warnings } = this.sanitizeAndValidate(workout);
+
+    // Log warnings (non-blocking)
+    if (warnings.length > 0) {
+      logger.warn('[createWorkout] Workout sanitization warnings:', { warnings, workoutId: 'pending' });
+      warnings.forEach(warning => {
+        if (warning.startsWith('CRITICAL:')) {
+          logger.error(`[createWorkout] ${warning}`);
+        } else {
+          logger.warn(`[createWorkout] ${warning}`);
+        }
+      });
+    }
+
+    // Sanitize user inputs to prevent XSS (additional sanitization for notes)
+    const finalWorkout: Omit<Workout, 'id'> = {
+      ...sanitizedWorkout,
+      notes: sanitizedWorkout.notes ? sanitizeString(sanitizedWorkout.notes) : undefined,
+      exercises: sanitizedWorkout.exercises.map(ex => ({
         ...ex,
         notes: ex.notes ? sanitizeString(ex.notes) : undefined,
-        sets: (ex.sets ?? []).map(set => ({
+        sets: ex.sets.map(set => ({
           ...set,
           notes: set.notes ? sanitizeString(set.notes) : undefined,
         })),
       })),
     };
     
-    // Validate workout (will use normalized start time)
-    this.validateWorkout(sanitizedWorkout);
-    
     // Ensure user context
     const userId = userContextManager.requireUserId();
-    const workoutWithUser = userContextManager.ensureUserId(sanitizedWorkout as Workout);
+    const workoutWithUser = userContextManager.ensureUserId(finalWorkout as Workout);
     
     // Generate workout ID with username and datetime
     const workoutId = generateWorkoutId(

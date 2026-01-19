@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -11,7 +11,9 @@ import { AIFocusCard } from '@/components/home/AIFocusCard';
 import { MuscleRecoverySection } from '@/components/home/MuscleRecoverySection';
 import { QuickActions } from '@/components/home/QuickActions';
 import { PlannedWorkoutsSection } from '@/components/home/PlannedWorkoutsSection';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { staggerContainerSlow, slideUp, prefersReducedMotion } from '@/utils/animations';
+import { logger } from '@/utils/logger';
 
 export function Home() {
   const navigate = useNavigate();
@@ -19,21 +21,88 @@ export function Home() {
   const { profile } = useUserStore();
   const error = useWorkoutError();
 
+  // Safe workouts array with fallback
+  const safeWorkouts = useMemo(() => {
+    try {
+      return Array.isArray(workouts) ? workouts : [];
+    } catch {
+      return [];
+    }
+  }, [workouts]);
+
   useEffect(() => {
-    if (profile?.id) {
-      loadWorkouts(profile.id).catch(err => {
-        console.error('[Home] Failed to load workouts:', err);
-        // Error is already handled by workoutStore, just log it
-      });
+    try {
+      if (profile?.id) {
+        loadWorkouts(profile.id).catch(err => {
+          logger.warn('[Home] Failed to load workouts:', err);
+        });
+      }
+    } catch (err) {
+      logger.error('[Home] Error in useEffect:', err);
     }
   }, [profile?.id, loadWorkouts]);
 
   const handleStartWorkout = () => {
-    navigate('/workout-templates');
+    try {
+      navigate('/workout-templates');
+    } catch (err) {
+      logger.error('[Home] Navigation error:', err);
+      // Fallback to window location if navigate fails
+      try {
+        window.location.href = '/workout-templates';
+      } catch (fallbackErr) {
+        logger.error('[Home] Fallback navigation also failed:', fallbackErr);
+      }
+    }
   };
 
-  const shouldReduceMotion = prefersReducedMotion();
-  const containerVariants = shouldReduceMotion ? {} : staggerContainerSlow;
+  // Safe prefersReducedMotion with fallback
+  const shouldReduceMotion = useMemo(() => {
+    try {
+      return prefersReducedMotion();
+    } catch {
+      return false;
+    }
+  }, []);
+
+  // Safe animation variants with fallback
+  const containerVariants = useMemo(() => {
+    try {
+      return shouldReduceMotion ? {} : (staggerContainerSlow || {});
+    } catch {
+      return {};
+    }
+  }, [shouldReduceMotion]);
+
+  const slideUpVariant = useMemo(() => {
+    try {
+      return shouldReduceMotion ? {} : (slideUp || {});
+    } catch {
+      return {};
+    }
+  }, [shouldReduceMotion]);
+
+  // Safe error message with fallback
+  const safeError = useMemo(() => {
+    try {
+      return typeof error === 'string' ? error : String(error || '');
+    } catch {
+      return '';
+    }
+  }, [error]);
+
+  // Safe handle retry with error handling
+  const handleRetry = () => {
+    try {
+      if (profile?.id) {
+        loadWorkouts(profile.id).catch(err => {
+          logger.warn('[Home] Retry failed:', err);
+        });
+      }
+    } catch (err) {
+      logger.error('[Home] Error in retry handler:', err);
+    }
+  };
 
   return (
     <div className="relative flex flex-col h-full w-full max-w-md mx-auto min-h-screen bg-background-light dark:bg-background-dark pb-36">
@@ -42,29 +111,33 @@ export function Home() {
         initial="hidden"
         animate="visible"
       >
-        <motion.div variants={shouldReduceMotion ? {} : slideUp}>
-          <HomeHeader />
-        </motion.div>
-
-        {workouts.length === 0 && (
-          <motion.div variants={shouldReduceMotion ? {} : slideUp} className="mx-4 mt-4">
-            <EmptyStateAIMessage screenName="Home" />
+        <ErrorBoundary fallback={null}>
+          <motion.div variants={slideUpVariant}>
+            <HomeHeader />
           </motion.div>
+        </ErrorBoundary>
+
+        {safeWorkouts.length === 0 && (
+          <ErrorBoundary fallback={null}>
+            <motion.div variants={slideUpVariant} className="mx-4 mt-4">
+              <EmptyStateAIMessage screenName="Home" />
+            </motion.div>
+          </ErrorBoundary>
         )}
 
         {/* Error message */}
-        {error && (
+        {safeError && (
           <motion.div
-            variants={shouldReduceMotion ? {} : slideUp}
+            variants={slideUpVariant}
             className="mx-4 mt-4 mb-2"
           >
             <div className="bg-error/10 border border-error/20 rounded-lg p-4 flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="text-sm text-error font-medium mb-2">Unable to load workouts</p>
-                <p className="text-xs text-error/80 mb-3">{error}</p>
+                <p className="text-xs text-error/80 mb-3">{safeError}</p>
                 <button
-                  onClick={() => profile?.id && loadWorkouts(profile.id)}
+                  onClick={handleRetry}
                   className="text-xs font-medium text-error hover:text-error/80 underline"
                 >
                   Try Again
@@ -74,25 +147,35 @@ export function Home() {
           </motion.div>
         )}
 
-        <motion.div variants={shouldReduceMotion ? {} : slideUp}>
-          <StatsCarousel />
-        </motion.div>
+        <ErrorBoundary fallback={null}>
+          <motion.div variants={slideUpVariant}>
+            <StatsCarousel />
+          </motion.div>
+        </ErrorBoundary>
         
-        <motion.div variants={shouldReduceMotion ? {} : slideUp}>
-          <QuickActions />
-        </motion.div>
+        <ErrorBoundary fallback={null}>
+          <motion.div variants={slideUpVariant}>
+            <QuickActions />
+          </motion.div>
+        </ErrorBoundary>
         
-        <motion.div variants={shouldReduceMotion ? {} : slideUp}>
-          <AIFocusCard />
-        </motion.div>
+        <ErrorBoundary fallback={null}>
+          <motion.div variants={slideUpVariant}>
+            <AIFocusCard />
+          </motion.div>
+        </ErrorBoundary>
         
-        <motion.div variants={shouldReduceMotion ? {} : slideUp}>
-          <MuscleRecoverySection />
-        </motion.div>
+        <ErrorBoundary fallback={null}>
+          <motion.div variants={slideUpVariant}>
+            <MuscleRecoverySection />
+          </motion.div>
+        </ErrorBoundary>
         
-        <motion.div variants={shouldReduceMotion ? {} : slideUp}>
-          <PlannedWorkoutsSection />
-        </motion.div>
+        <ErrorBoundary fallback={null}>
+          <motion.div variants={slideUpVariant}>
+            <PlannedWorkoutsSection />
+          </motion.div>
+        </ErrorBoundary>
       </motion.div>
       
       {/* Floating Action Button (Main Start) */}
@@ -113,7 +196,7 @@ export function Home() {
               '0 0 30px rgba(255,153,51,0.6)',
               '0 0 20px rgba(255,153,51,0.4)',
             ],
-          }}
+          } || {}}
           transition={{
             boxShadow: {
               duration: 2,

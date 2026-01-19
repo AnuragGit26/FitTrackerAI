@@ -11,6 +11,7 @@ import { scaleIn, prefersReducedMotion } from '@/utils/animations';
 import { cleanPlainTextResponse } from '@/utils/aiResponseCleaner';
 import { workoutAnalysisService } from '@/services/workoutAnalysisService';
 import { cn } from '@/utils/cn';
+import { logger } from '@/utils/logger';
 
 export function AIFocusCard() {
   const navigate = useNavigate();
@@ -18,24 +19,66 @@ export function AIFocusCard() {
   const { workouts } = useWorkoutStore();
   const { muscleStatuses } = useMuscleRecovery();
 
+  // Safe workouts array with fallback
+  const safeWorkouts = useMemo(() => {
+    try {
+      return Array.isArray(workouts) ? workouts : [];
+    } catch {
+      return [];
+    }
+  }, [workouts]);
+
+  // Safe muscle statuses with fallback
+  const safeMuscleStatuses = useMemo(() => {
+    try {
+      return Array.isArray(muscleStatuses) ? muscleStatuses : [];
+    } catch {
+      return [];
+    }
+  }, [muscleStatuses]);
+
   useEffect(() => {
-    if ((workouts ?? []).length > 0) {
-      generateInsights();
+    try {
+      if (safeWorkouts.length > 0) {
+        generateInsights().catch(err => {
+          logger.warn('[AIFocusCard] Error generating insights:', err);
+        });
+      }
+    } catch (err) {
+      logger.error('[AIFocusCard] Error in useEffect:', err);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [(workouts ?? []).length]);
+  }, [safeWorkouts.length]);
 
   // Analyze workout patterns to check if workout completed today
   const patternAnalysis = useMemo(() => {
-    if ((workouts ?? []).length === 0) return null;
-    return workoutAnalysisService.analyzeWorkoutPatterns(workouts ?? []);
-  }, [workouts]);
+    try {
+      if (safeWorkouts.length === 0) return null;
+      return workoutAnalysisService.analyzeWorkoutPatterns(safeWorkouts);
+    } catch (err) {
+      logger.warn('[AIFocusCard] Error analyzing workout patterns:', err);
+      return null;
+    }
+  }, [safeWorkouts]);
 
-  const hasWorkoutToday = patternAnalysis?.hasWorkoutToday ?? false;
-  const todayWorkout = patternAnalysis?.todayWorkout ?? null;
+  const hasWorkoutToday = useMemo(() => {
+    try {
+      return patternAnalysis?.hasWorkoutToday ?? false;
+    } catch {
+      return false;
+    }
+  }, [patternAnalysis]);
+
+  const todayWorkout = useMemo(() => {
+    try {
+      return patternAnalysis?.todayWorkout ?? null;
+    } catch {
+      return null;
+    }
+  }, [patternAnalysis]);
 
   // Show loading skeleton while insights are being generated
-  if (isLoading && (workouts ?? []).length > 0) {
+  if (isLoading && safeWorkouts.length > 0) {
     return (
       <div className="px-5 mt-6">
         <div className="flex items-center gap-2 mb-3">
@@ -50,7 +93,7 @@ export function AIFocusCard() {
   }
 
   // Show empty state only if not loading and no data
-  if ((workouts ?? []).length === 0 || (!isLoading && !insights?.recommendations?.[0])) {
+  if (safeWorkouts.length === 0 || (!isLoading && !insights?.recommendations?.[0])) {
     return (
       <div className="px-5 mt-6">
         <div className="flex items-center gap-2 mb-3">
@@ -63,12 +106,12 @@ export function AIFocusCard() {
             title="No recommendations yet"
             description="Log a few workouts to get personalized AI recommendations based on your training patterns."
             action={
-              <button
-                onClick={() => navigate('/log-workout')}
-                className="px-4 py-2 rounded-lg bg-primary text-background-dark font-bold text-sm hover:bg-primary/90 transition-colors"
-              >
-                Start Logging Workouts
-              </button>
+                <button
+                  onClick={handleNavigateToLogWorkout}
+                  className="px-4 py-2 rounded-lg bg-primary text-background-dark font-bold text-sm hover:bg-primary/90 transition-colors"
+                >
+                  Start Logging Workouts
+                </button>
             }
             className="py-8"
           />
@@ -78,8 +121,23 @@ export function AIFocusCard() {
   }
 
   // Clean AI-generated text to remove markdown formatting and gibberish
-  const cleanedTitle = cleanPlainTextResponse(insights?.recommendations?.[0] || '');
-  const cleanedDescription = cleanPlainTextResponse(insights?.analysis || 'Based on your recent training patterns and recovery status.');
+  const cleanedTitle = useMemo(() => {
+    try {
+      return cleanPlainTextResponse(insights?.recommendations?.[0] || '');
+    } catch (err) {
+      logger.warn('[AIFocusCard] Error cleaning title:', err);
+      return 'Recommended Workout';
+    }
+  }, [insights?.recommendations]);
+
+  const cleanedDescription = useMemo(() => {
+    try {
+      return cleanPlainTextResponse(insights?.analysis || 'Based on your recent training patterns and recovery status.');
+    } catch (err) {
+      logger.warn('[AIFocusCard] Error cleaning description:', err);
+      return 'Based on your recent training patterns and recovery status.';
+    }
+  }, [insights?.analysis]);
 
   // Determine recommendation type from title
   const getRecommendationType = (title: string): 'rest' | 'cardio' | 'strength' | 'light_activity' => {
@@ -130,14 +188,69 @@ export function AIFocusCard() {
   const TypeIcon = getTypeIcon();
   const typeLabel = getTypeLabel();
 
-  // Calculate overall recovery percentage
+  // Calculate overall recovery percentage with safe division
   const overallRecovery = useMemo(() => {
-    if (!muscleStatuses || muscleStatuses.length === 0) return null;
-    const readyMuscles = muscleStatuses.filter(m => m.recoveryStatus === 'ready').length;
-    return Math.round((readyMuscles / muscleStatuses.length) * 100);
-  }, [muscleStatuses]);
+    try {
+      if (!safeMuscleStatuses || safeMuscleStatuses.length === 0) return null;
+      const readyMuscles = safeMuscleStatuses.filter(m => m?.recoveryStatus === 'ready').length;
+      if (safeMuscleStatuses.length === 0) return null;
+      const percentage = (readyMuscles / safeMuscleStatuses.length) * 100;
+      return isNaN(percentage) || !isFinite(percentage) ? null : Math.round(percentage);
+    } catch (err) {
+      logger.warn('[AIFocusCard] Error calculating overall recovery:', err);
+      return null;
+    }
+  }, [safeMuscleStatuses]);
 
-  const shouldReduceMotion = prefersReducedMotion();
+  const shouldReduceMotion = useMemo(() => {
+    try {
+      return prefersReducedMotion();
+    } catch {
+      return false;
+    }
+  }, []);
+
+  // Safe navigation handlers
+  const handleNavigateToInsights = () => {
+    try {
+      navigate('/insights');
+    } catch (err) {
+      logger.error('[AIFocusCard] Navigation error to insights:', err);
+      try {
+        window.location.href = '/insights';
+      } catch (fallbackErr) {
+        logger.error('[AIFocusCard] Fallback navigation also failed:', fallbackErr);
+      }
+    }
+  };
+
+  const handleNavigateToLogWorkout = (e?: React.MouseEvent) => {
+    try {
+      e?.stopPropagation();
+      navigate('/log-workout');
+    } catch (err) {
+      logger.error('[AIFocusCard] Navigation error to log workout:', err);
+      try {
+        window.location.href = '/log-workout';
+      } catch (fallbackErr) {
+        logger.error('[AIFocusCard] Fallback navigation also failed:', fallbackErr);
+      }
+    }
+  };
+
+  const handleNavigateToRest = (e?: React.MouseEvent) => {
+    try {
+      e?.stopPropagation();
+      navigate('/rest');
+    } catch (err) {
+      logger.error('[AIFocusCard] Navigation error to rest:', err);
+      try {
+        window.location.href = '/rest';
+      } catch (fallbackErr) {
+        logger.error('[AIFocusCard] Fallback navigation also failed:', fallbackErr);
+      }
+    }
+  };
 
   return (
     <div className="px-5 mt-6">
@@ -149,7 +262,7 @@ export function AIFocusCard() {
         className={`relative overflow-hidden rounded-2xl bg-surface-dark shadow-lg group cursor-pointer ${
           hasWorkoutToday ? 'border-2 border-primary/30' : ''
         }`}
-        onClick={() => navigate('/insights')}
+        onClick={handleNavigateToInsights}
         variants={shouldReduceMotion ? {} : scaleIn}
         initial="hidden"
         animate="visible"
@@ -183,10 +296,10 @@ export function AIFocusCard() {
               <div className="flex items-center gap-1.5 text-primary text-xs">
                 <Activity className="w-3 h-3" />
                 <span className="font-medium">
-                  {(todayWorkout.exercises ?? []).length} exercise{(todayWorkout.exercises ?? []).length !== 1 ? 's' : ''} • {todayWorkout.totalDuration} min
+                  {(todayWorkout?.exercises ?? []).length || 0} exercise{((todayWorkout?.exercises ?? []).length || 0) !== 1 ? 's' : ''} • {todayWorkout?.totalDuration || 0} min
                 </span>
               </div>
-              {todayWorkout.totalVolume > 0 && (
+              {todayWorkout && typeof todayWorkout.totalVolume === 'number' && todayWorkout.totalVolume > 0 && (
                 <div className="flex items-center gap-1.5 text-primary/80 text-xs">
                   <Dumbbell className="w-3 h-3" />
                   <span>{Math.round(todayWorkout.totalVolume)}kg volume</span>
@@ -238,20 +351,14 @@ export function AIFocusCard() {
               {/* Quick Actions */}
               <div className="flex gap-2 mt-3">
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate('/log-workout');
-                  }}
+                  onClick={handleNavigateToLogWorkout}
                   className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-primary hover:bg-primary-dark text-background-dark rounded-lg font-semibold text-sm transition-colors"
                 >
                   <Dumbbell className="w-4 h-4" />
                   Start Workout
                 </button>
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate('/rest');
-                  }}
+                  onClick={handleNavigateToRest}
                   className="px-3 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium text-sm transition-colors"
                 >
                   <TrendingUp className="w-4 h-4" />

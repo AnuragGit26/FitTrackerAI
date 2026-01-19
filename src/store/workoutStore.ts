@@ -480,9 +480,11 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
       throw new Error('No active workout to finish');
     }
 
-    // FIX: Validate that workout has exercises to prevent finishing empty workout
+    // Note: Sanitization will handle most data issues, but we still check for critical problems
+    // Empty exercises will be handled by sanitization (it will log a warning but allow save)
     if (!currentWorkout.exercises || currentWorkout.exercises.length === 0) {
-      throw new Error('Cannot finish workout with no exercises');
+      logger.warn('[finishWorkout] Workout has no exercises - sanitization will handle this');
+      // Don't throw - let sanitization handle it
     }
 
     set({ isLoading: true, error: null });

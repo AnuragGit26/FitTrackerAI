@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/useToast';
 import { addDays, isAfter, startOfDay } from 'date-fns';
 import { PlannedWorkout } from '@/types/workout';
 import { slideUp, prefersReducedMotion } from '@/utils/animations';
+import { logger } from '@/utils/logger';
 
 export function PlannedWorkoutsSection() {
   const navigate = useNavigate();
@@ -17,67 +18,158 @@ export function PlannedWorkoutsSection() {
   const { plannedWorkouts, loadPlannedWorkoutsByDateRange } = usePlannedWorkoutStore();
   const { success, error: showError } = useToast();
 
-  // Load upcoming planned workouts (next 7 days)
-  useEffect(() => {
-    if (!profile?.id) {
-    return;
-  }
+  // Safe profile with fallback
+  const safeProfile = useMemo(() => {
+    try {
+      return profile || null;
+    } catch {
+      return null;
+    }
+  }, [profile]);
 
-    const today = startOfDay(new Date());
-    const nextWeek = addDays(today, 7);
-
-    loadPlannedWorkoutsByDateRange(profile.id, today, nextWeek);
-  }, [profile?.id, loadPlannedWorkoutsByDateRange]);
-
-  const upcomingWorkouts = useMemo(() => {
-    const today = startOfDay(new Date());
-    const nextWeek = addDays(today, 7);
-
-    return (plannedWorkouts ?? [])
-      .filter((pw) => {
-        const dateObj = new Date(pw.scheduledDate);
-        if (isNaN(dateObj.getTime())) {return false;}
-        
-        try {
-          const scheduledDate = startOfDay(dateObj);
-          return (
-            (isAfter(scheduledDate, today) || scheduledDate.getTime() === today.getTime()) &&
-            scheduledDate <= nextWeek &&
-            !pw.isCompleted
-          );
-        } catch (e) {
-          console.warn('Invalid date in planned workout:', pw.id, e);
-          return false;
-        }
-      })
-      .sort((a, b) => {
-        const dateA = new Date(a.scheduledDate).getTime();
-        const dateB = new Date(b.scheduledDate).getTime();
-        return dateA - dateB;
-      })
-      .slice(0, 3); // Show max 3 upcoming workouts
+  // Safe planned workouts with fallback
+  const safePlannedWorkouts = useMemo(() => {
+    try {
+      return Array.isArray(plannedWorkouts) ? plannedWorkouts : [];
+    } catch {
+      return [];
+    }
   }, [plannedWorkouts]);
 
-  const handleStartWorkout = async (plannedWorkout: PlannedWorkout) => {
-    if (!profile?.id) {
-    return;
-  }
-
+  // Load upcoming planned workouts (next 7 days)
+  useEffect(() => {
     try {
+      if (!safeProfile?.id) {
+        return;
+      }
+
+      const today = startOfDay(new Date());
+      if (isNaN(today.getTime())) {
+        logger.warn('[PlannedWorkoutsSection] Invalid today date');
+        return;
+      }
+
+      const nextWeek = addDays(today, 7);
+      if (isNaN(nextWeek.getTime())) {
+        logger.warn('[PlannedWorkoutsSection] Invalid nextWeek date');
+        return;
+      }
+
+      loadPlannedWorkoutsByDateRange(safeProfile.id, today, nextWeek).catch(err => {
+        logger.warn('[PlannedWorkoutsSection] Error loading planned workouts:', err);
+      });
+    } catch (err) {
+      logger.error('[PlannedWorkoutsSection] Error in useEffect:', err);
+    }
+  }, [safeProfile?.id, loadPlannedWorkoutsByDateRange]);
+
+  const upcomingWorkouts = useMemo(() => {
+    try {
+      const today = startOfDay(new Date());
+      if (isNaN(today.getTime())) {
+        logger.warn('[PlannedWorkoutsSection] Invalid today date in upcomingWorkouts');
+        return [];
+      }
+
+      const nextWeek = addDays(today, 7);
+      if (isNaN(nextWeek.getTime())) {
+        logger.warn('[PlannedWorkoutsSection] Invalid nextWeek date in upcomingWorkouts');
+        return [];
+      }
+
+      return safePlannedWorkouts
+        .filter((pw) => {
+          try {
+            if (!pw || !pw.scheduledDate) {
+              return false;
+            }
+
+            const dateObj = new Date(pw.scheduledDate);
+            if (isNaN(dateObj.getTime())) {
+              return false;
+            }
+            
+            const scheduledDate = startOfDay(dateObj);
+            if (isNaN(scheduledDate.getTime())) {
+              return false;
+            }
+
+            return (
+              (isAfter(scheduledDate, today) || scheduledDate.getTime() === today.getTime()) &&
+              scheduledDate <= nextWeek &&
+              !pw.isCompleted
+            );
+          } catch (e) {
+            logger.warn('[PlannedWorkoutsSection] Invalid date in planned workout:', pw?.id, e);
+            return false;
+          }
+        })
+        .sort((a, b) => {
+          try {
+            const dateA = new Date(a.scheduledDate).getTime();
+            const dateB = new Date(b.scheduledDate).getTime();
+            if (isNaN(dateA) || isNaN(dateB)) {
+              return 0;
+            }
+            return dateA - dateB;
+          } catch {
+            return 0;
+          }
+        })
+        .slice(0, 3); // Show max 3 upcoming workouts
+    } catch (err) {
+      logger.error('[PlannedWorkoutsSection] Error calculating upcoming workouts:', err);
+      return [];
+    }
+  }, [safePlannedWorkouts]);
+
+  const handleStartWorkout = async (plannedWorkout: PlannedWorkout) => {
+    try {
+      if (!safeProfile?.id || !plannedWorkout?.id) {
+        logger.warn('[PlannedWorkoutsSection] Missing profile or planned workout ID');
+        return;
+      }
+
       const { startWorkoutFromPlanned } = useWorkoutStore.getState();
       await startWorkoutFromPlanned(plannedWorkout.id);
       success('Workout started!');
-      navigate('/log-workout');
+      
+      try {
+        navigate('/log-workout');
+      } catch (navErr) {
+        logger.error('[PlannedWorkoutsSection] Navigation error:', navErr);
+        try {
+          window.location.href = '/log-workout';
+        } catch (fallbackErr) {
+          logger.error('[PlannedWorkoutsSection] Fallback navigation also failed:', fallbackErr);
+        }
+      }
     } catch (error) {
+      logger.error('[PlannedWorkoutsSection] Error starting workout:', error);
       showError(error instanceof Error ? error.message : 'Failed to start workout');
     }
   };
 
   const handleViewAll = () => {
-    navigate('/planner');
+    try {
+      navigate('/planner');
+    } catch (err) {
+      logger.error('[PlannedWorkoutsSection] Navigation error to planner:', err);
+      try {
+        window.location.href = '/planner';
+      } catch (fallbackErr) {
+        logger.error('[PlannedWorkoutsSection] Fallback navigation also failed:', fallbackErr);
+      }
+    }
   };
 
-  const shouldReduceMotion = prefersReducedMotion();
+  const shouldReduceMotion = useMemo(() => {
+    try {
+      return prefersReducedMotion();
+    } catch {
+      return false;
+    }
+  }, []);
 
   if (upcomingWorkouts.length === 0) {
     return null;

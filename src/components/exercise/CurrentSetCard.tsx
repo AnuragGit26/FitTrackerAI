@@ -136,8 +136,10 @@ export function CurrentSetCard({
   };
 
   const handleRpeChange = (value: number) => {
-    setRpe(value);
-    onUpdate({ rpe: value });
+    // Sanitize RPE value - clamp to valid range
+    const sanitizedRPE = value < 1 ? 1 : value > 10 ? 10 : value;
+    setRpe(sanitizedRPE);
+    onUpdate({ rpe: sanitizedRPE });
   };
 
   // Determine active side mode

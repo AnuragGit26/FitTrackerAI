@@ -4,31 +4,89 @@ import { motion } from 'framer-motion';
 import { useWorkoutStore } from '@/store/workoutStore';
 import { staggerContainer, slideUp, prefersReducedMotion } from '@/utils/animations';
 import { getWorkoutName } from '@/utils/workoutHelpers';
+import { logger } from '@/utils/logger';
+import { useMemo } from 'react';
 
 export function QuickActions() {
   const navigate = useNavigate();
   const { workouts } = useWorkoutStore();
 
-  const lastWorkout = workouts.length > 0 ? workouts[0] : null;
-  const workoutName = getWorkoutName(lastWorkout);
+  // Safe workouts array with fallback
+  const safeWorkouts = useMemo(() => {
+    try {
+      return Array.isArray(workouts) ? workouts : [];
+    } catch {
+      return [];
+    }
+  }, [workouts]);
+
+  const lastWorkout = useMemo(() => {
+    try {
+      return safeWorkouts.length > 0 && safeWorkouts[0] ? safeWorkouts[0] : null;
+    } catch {
+      return null;
+    }
+  }, [safeWorkouts]);
+
+  const workoutName = useMemo(() => {
+    try {
+      return getWorkoutName(lastWorkout);
+    } catch (err) {
+      logger.warn('[QuickActions] Error getting workout name:', err);
+      return 'Workout';
+    }
+  }, [lastWorkout]);
 
   const handleRepeatLast = () => {
-    if (lastWorkout) {
-      navigate('/log-workout', { state: { repeatWorkout: lastWorkout } });
-    } else {
-      navigate('/log-workout');
+    try {
+      if (lastWorkout) {
+        navigate('/log-workout', { state: { repeatWorkout: lastWorkout } });
+      } else {
+        navigate('/log-workout');
+      }
+    } catch (err) {
+      logger.error('[QuickActions] Navigation error in handleRepeatLast:', err);
+      try {
+        window.location.href = '/log-workout';
+      } catch (fallbackErr) {
+        logger.error('[QuickActions] Fallback navigation also failed:', fallbackErr);
+      }
     }
   };
 
   const handleCustomWorkout = () => {
-    navigate('/log-workout');
+    try {
+      navigate('/log-workout');
+    } catch (err) {
+      logger.error('[QuickActions] Navigation error in handleCustomWorkout:', err);
+      try {
+        window.location.href = '/log-workout';
+      } catch (fallbackErr) {
+        logger.error('[QuickActions] Fallback navigation also failed:', fallbackErr);
+      }
+    }
   };
 
   const handlePlanWorkout = () => {
-    navigate('/planner');
+    try {
+      navigate('/planner');
+    } catch (err) {
+      logger.error('[QuickActions] Navigation error in handlePlanWorkout:', err);
+      try {
+        window.location.href = '/planner';
+      } catch (fallbackErr) {
+        logger.error('[QuickActions] Fallback navigation also failed:', fallbackErr);
+      }
+    }
   };
 
-  const shouldReduceMotion = prefersReducedMotion();
+  const shouldReduceMotion = useMemo(() => {
+    try {
+      return prefersReducedMotion();
+    } catch {
+      return false;
+    }
+  }, []);
 
   return (
     <div className="px-5 mt-6 pb-6">

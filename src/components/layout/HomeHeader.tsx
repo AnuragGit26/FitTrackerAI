@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Bell, BellRing } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUserStore } from '@/store/userStore';
@@ -7,45 +7,111 @@ import { UserMenu } from './UserMenu';
 import { NotificationPanel } from '@/components/common/NotificationPanel';
 import { notificationService } from '@/services/notificationService';
 import { fadeIn, prefersReducedMotion } from '@/utils/animations';
+import { logger } from '@/utils/logger';
 
 export function HomeHeader() {
   const { profile } = useUserStore();
-  const greeting = getTimeBasedGreeting();
-  const userName = profile?.name || 'User';
+  
+  // Safe profile with fallback
+  const safeProfile = useMemo(() => {
+    try {
+      return profile || null;
+    } catch {
+      return null;
+    }
+  }, [profile]);
+
+  // Safe greeting with fallback
+  const greeting = useMemo(() => {
+    try {
+      return getTimeBasedGreeting();
+    } catch (err) {
+      logger.warn('[HomeHeader] Error getting greeting:', err);
+      return 'Hello';
+    }
+  }, []);
+
+  // Safe user name with fallback
+  const userName = useMemo(() => {
+    try {
+      return safeProfile?.name || 'User';
+    } catch {
+      return 'User';
+    }
+  }, [safeProfile]);
+
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  const shouldReduceMotion = prefersReducedMotion();
+  const shouldReduceMotion = useMemo(() => {
+    try {
+      return prefersReducedMotion();
+    } catch {
+      return false;
+    }
+  }, []);
 
   const loadUnreadCount = useCallback(async () => {
-    if (!profile?.id) {
-    return;
-  }
     try {
-      const count = await notificationService.getUnreadCount(profile.id);
-      setUnreadCount(count);
+      if (!safeProfile?.id) {
+        return;
+      }
+      const count = await notificationService.getUnreadCount(safeProfile.id);
+      // Safe count with fallback
+      const safeCount = typeof count === 'number' && !isNaN(count) && isFinite(count) ? Math.max(0, Math.round(count)) : 0;
+      setUnreadCount(safeCount);
     } catch (error) {
-      console.error('Failed to load unread count:', error);
+      logger.warn('[HomeHeader] Failed to load unread count:', error);
+      setUnreadCount(0);
     }
-  }, [profile?.id]);
+  }, [safeProfile?.id]);
 
   // Load unread count
   useEffect(() => {
-    if (profile?.id) {
-      loadUnreadCount();
-      // Refresh unread count every 30 seconds
-      const interval = setInterval(loadUnreadCount, 30000);
-      return () => clearInterval(interval);
+    try {
+      if (safeProfile?.id) {
+        loadUnreadCount();
+        // Refresh unread count every 30 seconds
+        const interval = setInterval(() => {
+          try {
+            loadUnreadCount();
+          } catch (err) {
+            logger.warn('[HomeHeader] Error in interval callback:', err);
+          }
+        }, 30000);
+        return () => {
+          try {
+            clearInterval(interval);
+          } catch (err) {
+            logger.warn('[HomeHeader] Error clearing interval:', err);
+          }
+        };
+      }
+    } catch (err) {
+      logger.error('[HomeHeader] Error in useEffect:', err);
     }
-  }, [profile?.id, loadUnreadCount]);
+  }, [safeProfile?.id, loadUnreadCount]);
 
   const handleNotificationClick = () => {
-    setIsNotificationPanelOpen(!isNotificationPanelOpen);
-    // Refresh notifications when opening
-    if (!isNotificationPanelOpen && profile?.id) {
-      loadUnreadCount();
+    try {
+      setIsNotificationPanelOpen(!isNotificationPanelOpen);
+      // Refresh notifications when opening
+      if (!isNotificationPanelOpen && safeProfile?.id) {
+        loadUnreadCount();
+      }
+    } catch (err) {
+      logger.error('[HomeHeader] Error in handleNotificationClick:', err);
     }
   };
+
+  // Safe unread count with fallback
+  const safeUnreadCount = useMemo(() => {
+    try {
+      return typeof unreadCount === 'number' && !isNaN(unreadCount) && isFinite(unreadCount) ? Math.max(0, Math.round(unreadCount)) : 0;
+    } catch {
+      return 0;
+    }
+  }, [unreadCount]);
 
   return (
     <>
@@ -71,31 +137,37 @@ export function HomeHeader() {
           whileHover={shouldReduceMotion ? {} : { scale: 1.1 }}
           whileTap={shouldReduceMotion ? {} : { scale: 0.9 }}
           onClick={handleNotificationClick}
-          aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
+          aria-label={`Notifications${safeUnreadCount > 0 ? ` (${safeUnreadCount} unread)` : ''}`}
         >
-          {unreadCount > 0 ? (
+          {safeUnreadCount > 0 ? (
             <BellRing className="w-5 h-5" />
           ) : (
             <Bell className="w-5 h-5" />
           )}
-          {unreadCount > 0 && (
+          {safeUnreadCount > 0 && (
             <motion.span 
               className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-primary text-black text-[10px] font-bold rounded-full flex items-center justify-center px-1 border-2 border-background-light dark:border-background-dark"
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ type: 'spring', stiffness: 500, damping: 30 }}
             >
-              {unreadCount > 99 ? '99+' : unreadCount}
+              {safeUnreadCount > 99 ? '99+' : safeUnreadCount}
             </motion.span>
           )}
         </motion.button>
       </motion.header>
 
-      {profile?.id && (
+      {safeProfile?.id && (
         <NotificationPanel
           isOpen={isNotificationPanelOpen}
-          onClose={() => setIsNotificationPanelOpen(false)}
-          userId={profile.id}
+          onClose={() => {
+            try {
+              setIsNotificationPanelOpen(false);
+            } catch (err) {
+              logger.error('[HomeHeader] Error closing notification panel:', err);
+            }
+          }}
+          userId={safeProfile.id}
         />
       )}
     </>

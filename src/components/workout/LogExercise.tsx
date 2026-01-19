@@ -1033,6 +1033,13 @@ export function LogExercise({
         }
       }
 
+      // Clear animations first
+      setJustCompletedSetNumber(null);
+      if (justCompletedSetTimeoutRef.current) {
+        clearTimeout(justCompletedSetTimeoutRef.current);
+        justCompletedSetTimeoutRef.current = null;
+      }
+
       // Reset state
       setSelectedExercise(null);
       setSets([]);
@@ -1364,24 +1371,28 @@ export function LogExercise({
 
     handleUpdateSet(setToComplete.setNumber, setUpdates);
 
-    // Trigger completion animation - ensure it triggers properly
-    // Clear any existing timeout to prevent race conditions when sets are completed rapidly
-    if (justCompletedSetTimeoutRef.current) {
-      clearTimeout(justCompletedSetTimeoutRef.current);
-      justCompletedSetTimeoutRef.current = null;
-    }
-
-    setJustCompletedSetNumber(null); // Reset first to ensure animation triggers
-    // Use requestAnimationFrame to ensure state update happens after render
-    requestAnimationFrame(() => {
-      setJustCompletedSetNumber(setToComplete.setNumber);
-      // Keep animation state longer for better visibility (matches celebration duration)
-      // Store timeout in ref so it can be cancelled if a new set is completed
-      justCompletedSetTimeoutRef.current = setTimeout(() => {
-        setJustCompletedSetNumber(null);
+    // Only trigger completion animation for NEW sets, not when editing existing exercise
+    // Check if we're editing (exerciseId exists) - if so, skip animations
+    if (!exerciseId) {
+      // Trigger completion animation - ensure it triggers properly
+      // Clear any existing timeout to prevent race conditions when sets are completed rapidly
+      if (justCompletedSetTimeoutRef.current) {
+        clearTimeout(justCompletedSetTimeoutRef.current);
         justCompletedSetTimeoutRef.current = null;
-      }, 2000);
-    });
+      }
+
+      setJustCompletedSetNumber(null); // Reset first to ensure animation triggers
+      // Use requestAnimationFrame to ensure state update happens after render
+      requestAnimationFrame(() => {
+        setJustCompletedSetNumber(setToComplete.setNumber);
+        // Keep animation state longer for better visibility (matches celebration duration)
+        // Store timeout in ref so it can be cancelled if a new set is completed
+        justCompletedSetTimeoutRef.current = setTimeout(() => {
+          setJustCompletedSetNumber(null);
+          justCompletedSetTimeoutRef.current = null;
+        }, 2000);
+      });
+    }
 
     // If in superset and has next exercise, show group rest timer
     if (isInSuperset && nextExercise && !isLastInSuperset) {
@@ -1757,10 +1768,17 @@ export function LogExercise({
           </div>
           <div className="flex items-center justify-end shrink-0">
             <button
-              onClick={() => {
-                handleSave();
-                clearLogExerciseState();
-                onClose();
+              onClick={async () => {
+                try {
+                  // Wait for save to complete before clearing state
+                  await handleSave();
+                  // handleSave already clears state and closes modal on success
+                  // If we reach here, save was successful and everything is already cleared
+                } catch (error) {
+                  // If save fails, error is already shown in handleSave
+                  // Don't clear state or close modal on error
+                  logger.error('Error in save button handler:', error);
+                }
               }}
               disabled={isSaveButtonDisabled}
               className="text-primary text-base font-bold leading-normal tracking-[0.015em] shrink-0 hover:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
