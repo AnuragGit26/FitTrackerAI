@@ -44,13 +44,62 @@ class Logger {
 
   /**
    * Log warning messages (always logged)
+   * Supports: warn(message), warn(message, error), warn(message, context), warn(message, error, context)
    */
-  warn(message: string, ...args: unknown[]): void {
-    console.warn(`[WARN] ${message}`, ...args);
+  warn(message: string, errorOrContext?: Error | unknown | LogContext, context?: LogContext): void {
+    // Detect if second arg is context object (plain object) or error
+    let error: Error | unknown | undefined;
+    let logContext: LogContext | undefined;
+    
+    if (errorOrContext === undefined) {
+      // warn(message) - no args
+      logContext = context;
+    } else if (errorOrContext instanceof Error) {
+      // warn(message, error) or warn(message, error, context)
+      error = errorOrContext;
+      logContext = context;
+    } else if (typeof errorOrContext === 'object' && errorOrContext !== null && !Array.isArray(errorOrContext)) {
+      // Check if it looks like a context object (has string keys) vs error-like
+      const keys = Object.keys(errorOrContext);
+      const hasErrorLikeKeys = keys.some(k => k === 'error' || k === 'stack' || k === 'message');
+      const isPlainContext = keys.length > 0 && !hasErrorLikeKeys;
+      
+      if (isPlainContext) {
+        // warn(message, context) - second arg is context
+        logContext = errorOrContext as LogContext;
+      } else {
+        // warn(message, error) - treat as error
+        error = errorOrContext;
+        logContext = context;
+      }
+    } else {
+      // warn(message, error) - primitive or other type
+      error = errorOrContext;
+      logContext = context;
+    }
+    
+    const errorObj = error instanceof Error ? error : error ? new Error(String(error)) : undefined;
+    
+    if (errorObj) {
+      console.warn(`[WARN] ${message}`, errorObj, logContext || '');
+    } else {
+      console.warn(`[WARN] ${message}`, logContext || '');
+    }
     
     // In production, send to error tracking service
     if (this.isProduction) {
-      this.sendToErrorTracking('warn', message, args);
+      const trackingData: Record<string, unknown> = {
+        ...(logContext || {}),
+      };
+      
+      if (errorObj) {
+        trackingData.error = errorObj.message;
+        trackingData.stack = errorObj.stack;
+      } else if (error !== undefined) {
+        trackingData.error = String(error);
+      }
+      
+      this.sendToErrorTracking('warn', message, trackingData);
     }
   }
 

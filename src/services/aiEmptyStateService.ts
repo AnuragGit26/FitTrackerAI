@@ -102,18 +102,36 @@ class AIEmptyStateService {
         - Output ONLY the raw text message.
       `;
 
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            const text = cleanPlainTextResponse(response.text());
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
-            if (!text) {
-    throw new Error('Empty response');
-  }
+            try {
+                const result = await model.generateContent(prompt);
+                clearTimeout(timeoutId);
+                const response = await result.response;
+                const text = cleanPlainTextResponse(response.text());
 
-            this.setCachedMessage(cacheKey, text);
-            return text;
+                if (!text) {
+                    throw new Error('Empty response from AI');
+                }
+
+                this.setCachedMessage(cacheKey, text);
+                return text;
+            } catch (apiError) {
+                clearTimeout(timeoutId);
+                throw apiError;
+            }
         } catch (error) {
-            logger.warn('Failed to generate AI empty state message', error);
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            const isTimeout = error instanceof Error && error.name === 'AbortError';
+            const isNetworkError = errorMessage.includes('network') || errorMessage.includes('fetch') || errorMessage.includes('Failed to fetch');
+            
+            logger.warn('Failed to generate AI empty state message', error, {
+                screenName: context.screenName,
+                userName: context.userName,
+                timeOfDay: context.timeOfDay,
+                errorType: isTimeout ? 'timeout' : isNetworkError ? 'network' : 'api',
+            });
             return this.getFallbackMessage(context);
         }
     }
