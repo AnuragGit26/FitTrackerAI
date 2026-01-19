@@ -5,6 +5,7 @@ interface VolumeTrendChartProps {
   previousVolume: number;
   changePercent: number;
   weeklyData: Array<{ week: string; volume: number }>;
+  comparisonPeriod?: string;
 }
 
 export function VolumeTrendChart({
@@ -12,6 +13,7 @@ export function VolumeTrendChart({
   previousVolume: _previousVolume,
   changePercent,
   weeklyData,
+  comparisonPeriod,
 }: VolumeTrendChartProps) {
   const maxVolume = Math.max(...weeklyData.map((d) => d.volume), 1);
   const normalizedData = weeklyData.map((d) => ({
@@ -44,7 +46,7 @@ export function VolumeTrendChart({
     <section className="rounded-xl border border-gray-100 dark:border-border-dark bg-white dark:bg-surface-card p-5 shadow-sm">
       <div className="flex justify-between items-start mb-4">
         <div>
-          <p className="text-slate-500 dark:text-secondary-text text-sm font-medium">Volume vs Last Month</p>
+          <p className="text-slate-500 dark:text-secondary-text text-sm font-medium">Volume vs {comparisonPeriod || 'Last Month'}</p>
           <div className="flex items-baseline gap-2">
             {changePercent !== 0 && (
               <p className="text-slate-900 dark:text-white text-3xl font-bold">

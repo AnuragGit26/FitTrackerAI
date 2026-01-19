@@ -14,6 +14,7 @@ import { logger } from '@/utils/logger';
 interface BackgroundFetchContext {
   currentMonthWorkouts: Workout[];
   previousMonthWorkouts: Workout[];
+  comparisonPeriodLabel?: string;
   muscleStatuses: MuscleStatus[];
   personalRecords: PersonalRecord[];
   strengthProgression: StrengthProgression[];
@@ -69,6 +70,7 @@ export class BackgroundAIFetcher {
     const swContext = {
       currentMonthWorkouts: this.serializeWorkouts(context.currentMonthWorkouts),
       previousMonthWorkouts: this.serializeWorkouts(context.previousMonthWorkouts),
+      comparisonPeriodLabel: context.comparisonPeriodLabel || 'last month',
       muscleStatuses: this.serializeMuscleStatuses(context.muscleStatuses),
       personalRecords: this.serializePersonalRecords(context.personalRecords),
       strengthProgression: this.serializeStrengthProgression(context.strengthProgression),

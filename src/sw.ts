@@ -411,6 +411,7 @@ async function fetchAIInsightsInBackground(
                     context.previousMetrics?.consistencyScore ?? 0,
                     context.metrics?.workoutCount ?? 0,
                     context.previousMetrics?.workoutCount ?? 0,
+                    context.comparisonPeriodLabel || 'last month',
                     apiKey
                 );
             } else if (insightType === 'insights') {
@@ -466,6 +467,7 @@ async function generateProgressAnalysisInSW(
     previousConsistencyScore: number,
     workoutCount: number,
     previousWorkoutCount: number,
+    comparisonPeriodLabel: string = 'last month',
     apiKey?: string
 ): Promise<ProgressAnalysis> {
     if (!apiKey) {
@@ -516,8 +518,8 @@ async function generateProgressAnalysisInSW(
 
 Performance Metrics:
 - Consistency Score: ${consistencyScore}% (${consistencyChange >= 0 ? '+' : ''}${consistencyChange}% change from previous period)
-- Workout Count: ${workoutCount} workouts this month (${workoutCountChange >= 0 ? '+' : ''}${workoutCountChange} vs previous)
-- Volume Trend: ${volumeChange >= 0 ? '+' : ''}${volumeChange}% change (Current: ${Math.round(volumeTrend[volumeTrend.length - 1]?.totalVolume || 0)}kg, Previous: ${Math.round(volumeTrend[0]?.totalVolume || 0)}kg)
+- Workout Count: ${workoutCount} workouts this month (${workoutCountChange >= 0 ? '+' : ''}${workoutCountChange} vs ${comparisonPeriodLabel})
+- Volume Trend: ${volumeChange >= 0 ? '+' : ''}${volumeChange}% change vs ${comparisonPeriodLabel} (Current: ${Math.round(volumeTrend[volumeTrend.length - 1]?.totalVolume || 0)}kg, Previous: ${Math.round(volumeTrend[0]?.totalVolume || 0)}kg)
 - Personal Records: ${prCount} total PRs, ${recentPRs} in last 7 days
 
 Workout Data:

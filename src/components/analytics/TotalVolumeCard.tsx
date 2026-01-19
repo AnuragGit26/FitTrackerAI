@@ -7,9 +7,10 @@ interface TotalVolumeCardProps {
   totalVolume: number;
   trendPercentage: number;
   unit: 'kg' | 'lbs';
+  comparisonPeriod?: string;
 }
 
-export function TotalVolumeCard({ totalVolume, trendPercentage, unit }: TotalVolumeCardProps) {
+export function TotalVolumeCard({ totalVolume, trendPercentage, unit, comparisonPeriod }: TotalVolumeCardProps) {
   const volumeCount = useCountUp(totalVolume, 0, { duration: 1.5, decimals: 0 });
   const shouldReduceMotion = prefersReducedMotion();
 
@@ -58,7 +59,7 @@ export function TotalVolumeCard({ totalVolume, trendPercentage, unit }: TotalVol
           <TrendingUp className="w-4 h-4" />
           <span>
             {trendPercentage > 0 ? '+' : ''}
-            {trendPercentage}% vs last month
+            {trendPercentage}% vs {comparisonPeriod || 'last month'}
           </span>
         </div>
       )}

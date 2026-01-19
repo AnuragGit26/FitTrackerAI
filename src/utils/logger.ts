@@ -136,53 +136,65 @@ class Logger {
     message: string,
     data: unknown
   ): void {
-    try {
-      // Use the Vercel API endpoint
-      const vercelApiUrl = '/api/logs/error';
-      
-      // Extract stack trace if available
-      let errorStack: string | undefined;
-      if (typeof data === 'object' && data !== null) {
-        if ('stack' in data) {
-          errorStack = (data as { stack: string }).stack;
-        } else if ('error' in data && typeof (data as Record<string, unknown>).error === 'string') {
-           // sometimes we pass { error: error.message }
+    // Use IIFE to handle async user ID retrieval without blocking
+    (async () => {
+      try {
+        // Use the Vercel API endpoint
+        const vercelApiUrl = '/api/logs/error';
+        
+        // Extract stack trace if available
+        let errorStack: string | undefined;
+        if (typeof data === 'object' && data !== null) {
+          if ('stack' in data) {
+            errorStack = (data as { stack: string }).stack;
+          } else if ('error' in data && typeof (data as Record<string, unknown>).error === 'string') {
+             // sometimes we pass { error: error.message }
+          }
         }
-      }
 
-      const payload = {
-        // Default to 'system' - the API handles optional userId
-        userId: 'system', 
-        errorType: level === 'error' ? 'application_error' : 'application_warning',
-        errorMessage: message,
-        errorStack,
-        context: typeof data === 'object' ? data as Record<string, unknown> : { data },
-        severity: level === 'warn' ? 'warning' : level,
-        timestamp: new Date().toISOString(),
-        operation: 'log'
-      };
+        // Get actual user ID from userContextManager (lazy import to avoid circular dependency)
+        let userId: string | null = null;
+        try {
+          const { userContextManager } = await import('@/services/userContextManager');
+          userId = userContextManager.getUserId();
+        } catch (e) {
+          // If userContextManager is not available, fall back to null
+          // This can happen during initialization or if there's a circular dependency issue
+        }
 
-      // Use fetch to send the log
-      // Use keepalive: true to ensure it sends even if the page unloads
-      fetch(vercelApiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-        keepalive: true,
-      }).catch(err => {
-        // Silent failure in production to avoid infinite loops
+        const payload = {
+          userId: userId || 'anonymous',
+          errorType: level === 'error' ? 'application_error' : 'application_warning',
+          errorMessage: message,
+          errorStack,
+          context: typeof data === 'object' ? data as Record<string, unknown> : { data },
+          severity: level === 'warn' ? 'warning' : level,
+          timestamp: new Date().toISOString(),
+          operation: 'log'
+        };
+
+        // Use fetch to send the log
+        // Use keepalive: true to ensure it sends even if the page unloads
+        fetch(vercelApiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+          keepalive: true,
+        }).catch(err => {
+          // Silent failure in production to avoid infinite loops
+          if (!this.isProduction) {
+            console.error('Failed to send log to Vercel:', err);
+          }
+        });
+      } catch (e) {
+        // Prevent logger from causing crashes
         if (!this.isProduction) {
-          console.error('Failed to send log to Vercel:', err);
+          console.error('Logger internal error:', e);
         }
-      });
-    } catch (e) {
-      // Prevent logger from causing crashes
-      if (!this.isProduction) {
-        console.error('Logger internal error:', e);
       }
-    }
+    })();
   }
 }
 

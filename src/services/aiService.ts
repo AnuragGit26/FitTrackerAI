@@ -252,7 +252,8 @@ CRITICAL OUTPUT REQUIREMENTS:
     workoutCount: number,
     trendPercentage: number,
     topMuscle?: string,
-    unit: 'kg' | 'lbs' = 'kg'
+    unit: 'kg' | 'lbs' = 'kg',
+    comparisonPeriodLabel: string = 'last month'
   ): Promise<string> {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
@@ -271,7 +272,7 @@ CRITICAL OUTPUT REQUIREMENTS:
       const prompt = `Generate a brief, encouraging progress insight (1-2 sentences) for a fitness tracker user:
 - Total volume: ${formattedVolume} ${unit}
 - Workouts this month: ${workoutCount}
-- Trend: ${trendPercentage > 0 ? '+' : ''}${trendPercentage}% vs last month
+- Trend: ${trendPercentage > 0 ? '+' : ''}${trendPercentage}% vs ${comparisonPeriodLabel}
 - Top muscle group: ${topMuscle || 'N/A'}
 
 CRITICAL OUTPUT REQUIREMENTS:
@@ -339,7 +340,8 @@ CRITICAL OUTPUT REQUIREMENTS:
     consistencyScore: number,
     previousConsistencyScore: number,
     workoutCount: number,
-    previousWorkoutCount: number
+    previousWorkoutCount: number,
+    comparisonPeriodLabel: string = 'last month'
   ): Promise<ProgressAnalysis> {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
@@ -394,8 +396,8 @@ CRITICAL OUTPUT REQUIREMENTS:
 
 Performance Metrics:
 - Consistency Score: ${consistencyScore}% (${consistencyChange >= 0 ? '+' : ''}${consistencyChange}% change from previous period)
-- Workout Count: ${workoutCount} workouts this month (${workoutCountChange >= 0 ? '+' : ''}${workoutCountChange} vs previous)
-- Volume Trend: ${volumeChange >= 0 ? '+' : ''}${volumeChange}% change (Current: ${Math.round((volumeTrend ?? [])[(volumeTrend ?? []).length - 1]?.totalVolume || 0)}kg, Previous: ${Math.round((volumeTrend ?? [])[0]?.totalVolume || 0)}kg)
+- Workout Count: ${workoutCount} workouts this month (${workoutCountChange >= 0 ? '+' : ''}${workoutCountChange} vs ${comparisonPeriodLabel})
+- Volume Trend: ${volumeChange >= 0 ? '+' : ''}${volumeChange}% change vs ${comparisonPeriodLabel} (Current: ${Math.round((volumeTrend ?? [])[(volumeTrend ?? []).length - 1]?.totalVolume || 0)}kg, Previous: ${Math.round((volumeTrend ?? [])[0]?.totalVolume || 0)}kg)
 - Personal Records: ${prCount} total PRs, ${recentPRs} in last 7 days
 
 Workout Data:

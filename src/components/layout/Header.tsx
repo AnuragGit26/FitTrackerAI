@@ -16,7 +16,7 @@ export function Header({ title, showBack = false, rightAction, className }: Head
   return (
     <header
       className={cn(
-        'sticky top-0 z-40 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-gray-100 dark:border-border-dark',
+        'sticky top-0 z-40 bg-white/80 dark:bg-background-dark backdrop-blur-md border-b border-gray-100 dark:border-border-dark',
         className
       )}
     >

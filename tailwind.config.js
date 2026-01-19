@@ -12,7 +12,7 @@ export default {
         'primary-dark': '#E67E22',
         'primary-content': '#0F0F0F',
         'background-light': '#fdf8f5',
-        'background-dark': '#050505',
+        'background-dark': '#000000',
         'surface-light': '#ffffff',
         'surface-dark': '#18181b',
         'surface-dark-light': '#27272a',

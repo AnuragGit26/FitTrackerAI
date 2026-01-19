@@ -19,7 +19,7 @@ import {
 import { Workout } from '@/types/workout';
 import { MuscleStatus } from '@/types/muscle';
 import { PersonalRecord, StrengthProgression } from '@/types/analytics';
-import { getDateRange, filterWorkoutsByDateRange } from '@/utils/analyticsHelpers';
+import { getDateRange, filterWorkoutsByDateRange, getComparisonPeriodWithFallback } from '@/utils/analyticsHelpers';
 
 export function useInsightsData() {
   const { workouts, loadWorkouts } = useWorkoutStore();
@@ -191,6 +191,7 @@ export function useInsightsData() {
   const loadInsightsDirectly = useCallback(async (
     currentMonthWorkouts: Workout[],
     _previousMonthWorkouts: Workout[],
+    comparisonPeriodLabel: string,
     muscleStatuses: MuscleStatus[],
     personalRecords: PersonalRecord[],
     strengthProgression: StrengthProgression[],
@@ -229,7 +230,8 @@ export function useInsightsData() {
           metrics.consistencyScore,
           previousMetrics.consistencyScore,
           metrics.workoutCount,
-          previousMetrics.workoutCount
+          previousMetrics.workoutCount,
+          comparisonPeriodLabel
         ),
         profile?.id,
         1
@@ -316,20 +318,12 @@ export function useInsightsData() {
       // Get fresh workouts from store after loadWorkouts completes (store updates synchronously)
       const loadedWorkouts = useWorkoutStore.getState().workouts;
 
-      const { start: monthStart } = getDateRange('30d');
-      const previousMonthStart = new Date(monthStart);
-      previousMonthStart.setMonth(previousMonthStart.getMonth() - 1);
-
       const currentMonthWorkouts = filterWorkoutsByDateRange(loadedWorkouts, '30d');
-      const previousMonthWorkouts = loadedWorkouts.filter(
-        (w) => {
-          const workoutDate = new Date(w.date);
-          return workoutDate >= previousMonthStart && workoutDate < monthStart;
-        }
-      );
+      const comparisonPeriod = getComparisonPeriodWithFallback(loadedWorkouts);
+      const previousPeriodWorkouts = comparisonPeriod.workouts;
 
       const metrics = await analyticsService.getAllMetrics(currentMonthWorkouts, '30d');
-      const previousMetrics = await analyticsService.getAllMetrics(previousMonthWorkouts, '30d');
+      const previousMetrics = await analyticsService.getAllMetrics(previousPeriodWorkouts, '30d');
 
       const volumeTrend = analyticsService.calculateVolumeTrend(currentMonthWorkouts, '30d');
       const personalRecords = analyticsService.getPersonalRecords(currentMonthWorkouts);
@@ -366,7 +360,8 @@ export function useInsightsData() {
         await backgroundAIFetcher.triggerBackgroundFetch(
           {
             currentMonthWorkouts,
-            previousMonthWorkouts,
+            previousMonthWorkouts: previousPeriodWorkouts,
+            comparisonPeriodLabel: comparisonPeriod.periodLabel,
             muscleStatuses,
             personalRecords,
             strengthProgression,
@@ -391,7 +386,8 @@ export function useInsightsData() {
         logger.warn('[useInsightsData] Service worker not available, using direct fetch');
         await loadInsightsDirectly(
           currentMonthWorkouts,
-          previousMonthWorkouts,
+          previousPeriodWorkouts,
+          comparisonPeriod.periodLabel,
           muscleStatuses,
           personalRecords,
           strengthProgression,

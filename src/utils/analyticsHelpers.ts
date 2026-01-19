@@ -325,6 +325,137 @@ export function hasEnoughWorkoutsForAverages(workouts: Workout[]): boolean {
 }
 
 /**
+ * Get comparison period with fallback logic for volume comparison.
+ * Validates data availability and falls back to shorter periods if insufficient data.
+ * 
+ * @param workouts - All available workouts
+ * @returns Object with filtered workouts, period label, days count, and period type
+ */
+export function getComparisonPeriodWithFallback(workouts: Workout[]): {
+  workouts: Workout[];
+  periodLabel: string;
+  days: number;
+  periodType: 'month' | '10d' | '7d' | '3d';
+} {
+  const now = new Date();
+  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+  lastMonthEnd.setHours(23, 59, 59, 999);
+
+  // Get workouts from last month
+  const lastMonthWorkouts = (workouts ?? []).filter((w) => {
+    const workoutDate = new Date(w.date);
+    return workoutDate >= lastMonthStart && workoutDate <= lastMonthEnd;
+  });
+
+  // Count unique days with workouts in last month
+  const uniqueDays = new Set<string>();
+  lastMonthWorkouts.forEach((w) => {
+    const workoutDate = new Date(w.date);
+    const dayKey = `${workoutDate.getFullYear()}-${workoutDate.getMonth()}-${workoutDate.getDate()}`;
+    uniqueDays.add(dayKey);
+  });
+
+  const daysWithData = uniqueDays.size;
+
+  // Determine comparison period based on data availability
+  let comparisonWorkouts: Workout[];
+  let periodLabel: string;
+  let days: number;
+  let periodType: 'month' | '10d' | '7d' | '3d';
+
+  if (daysWithData > 15) {
+    // Use last month
+    comparisonWorkouts = lastMonthWorkouts;
+    periodLabel = 'last month';
+    days = daysWithData;
+    periodType = 'month';
+  } else {
+    // Calculate fallback periods (going backwards from today)
+    const endDate = new Date(currentMonthStart);
+    endDate.setDate(endDate.getDate() - 1); // Day before current month starts
+    endDate.setHours(23, 59, 59, 999);
+
+    // Try 10 days
+    const tenDaysStart = new Date(endDate);
+    tenDaysStart.setDate(tenDaysStart.getDate() - 9); // 10 days total (0-9 = 10 days)
+    tenDaysStart.setHours(0, 0, 0, 0);
+
+    const tenDaysWorkouts = (workouts ?? []).filter((w) => {
+      const workoutDate = new Date(w.date);
+      return workoutDate >= tenDaysStart && workoutDate <= endDate;
+    });
+
+    const tenDaysUnique = new Set<string>();
+    tenDaysWorkouts.forEach((w) => {
+      const workoutDate = new Date(w.date);
+      const dayKey = `${workoutDate.getFullYear()}-${workoutDate.getMonth()}-${workoutDate.getDate()}`;
+      tenDaysUnique.add(dayKey);
+    });
+
+    if (tenDaysUnique.size >= 10) {
+      comparisonWorkouts = tenDaysWorkouts;
+      periodLabel = 'last 10 days';
+      days = tenDaysUnique.size;
+      periodType = '10d';
+    } else {
+      // Try 7 days
+      const sevenDaysStart = new Date(endDate);
+      sevenDaysStart.setDate(sevenDaysStart.getDate() - 6); // 7 days total
+      sevenDaysStart.setHours(0, 0, 0, 0);
+
+      const sevenDaysWorkouts = (workouts ?? []).filter((w) => {
+        const workoutDate = new Date(w.date);
+        return workoutDate >= sevenDaysStart && workoutDate <= endDate;
+      });
+
+      const sevenDaysUnique = new Set<string>();
+      sevenDaysWorkouts.forEach((w) => {
+        const workoutDate = new Date(w.date);
+        const dayKey = `${workoutDate.getFullYear()}-${workoutDate.getMonth()}-${workoutDate.getDate()}`;
+        sevenDaysUnique.add(dayKey);
+      });
+
+      if (sevenDaysUnique.size >= 7) {
+        comparisonWorkouts = sevenDaysWorkouts;
+        periodLabel = 'last 7 days';
+        days = sevenDaysUnique.size;
+        periodType = '7d';
+      } else {
+        // Fallback to 3 days
+        const threeDaysStart = new Date(endDate);
+        threeDaysStart.setDate(threeDaysStart.getDate() - 2); // 3 days total
+        threeDaysStart.setHours(0, 0, 0, 0);
+
+        comparisonWorkouts = (workouts ?? []).filter((w) => {
+          const workoutDate = new Date(w.date);
+          return workoutDate >= threeDaysStart && workoutDate <= endDate;
+        });
+
+        const threeDaysUnique = new Set<string>();
+        comparisonWorkouts.forEach((w) => {
+          const workoutDate = new Date(w.date);
+          const dayKey = `${workoutDate.getFullYear()}-${workoutDate.getMonth()}-${workoutDate.getDate()}`;
+          threeDaysUnique.add(dayKey);
+        });
+
+        periodLabel = 'last 3 days';
+        days = threeDaysUnique.size;
+        periodType = '3d';
+      }
+    }
+  }
+
+  return {
+    workouts: comparisonWorkouts,
+    periodLabel,
+    days,
+    periodType,
+  };
+}
+
+/**
  * Calculate muscle imbalances from actual workout data.
  * Uses side-specific tracking data (left/right volumes) to detect imbalances.
  * For unilateral exercises tracked with sides, it calculates exact imbalance.

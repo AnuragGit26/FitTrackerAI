@@ -321,6 +321,48 @@ export function LogExercise({
     if (selectedExercise && !exerciseId) {
       // Only initialize once per exercise selection
       if (initializedExerciseIdRef.current === selectedExercise.id) {
+        // If profile weight becomes available after initial setup, update bodyweight exercises
+        // Only update if weight hasn't been set yet (still 0 or undefined)
+        const trackingType = selectedExercise.trackingType;
+        const isBodyweightExercise = selectedExercise.equipment.length === 0 ||
+          selectedExercise.equipment.some(eq => {
+            const eqLower = eq.toLowerCase();
+            return eqLower.includes('body') ||
+              eqLower.includes('none') ||
+              eqLower.includes('bodyweight') ||
+              eqLower === 'none' ||
+              eqLower === '';
+          });
+
+        // Check if we need to update weight for bodyweight exercises
+        if (trackingType === 'weight_reps' && isBodyweightExercise) {
+          const hasValidWeight = profile?.weight !== undefined &&
+            profile.weight !== null &&
+            typeof profile.weight === 'number' &&
+            profile.weight > 0;
+
+          if (hasValidWeight) {
+            // Use a ref to get current sets to avoid dependency issues
+            const currentSets = currentSetsRef.current;
+            if (currentSets.length > 0) {
+              const firstSet = currentSets[0];
+              // Update weight only if it's currently 0 or undefined (not user-modified)
+              if ((firstSet.weight === undefined || firstSet.weight === 0) && profile.weight) {
+                const updatedSets = currentSets.map((set, index) =>
+                  index === 0
+                    ? { ...set, weight: profile.weight as number, unit: profile?.preferredUnit || 'kg' }
+                    : set
+                );
+                setSets(updatedSets);
+                logger.log('[LogExercise] Updated bodyweight from profile after load:', {
+                  exerciseName: selectedExercise.name,
+                  weight: profile.weight,
+                  unit: profile?.preferredUnit
+                });
+              }
+            }
+          }
+        }
         return;
       }
 
@@ -330,14 +372,43 @@ export function LogExercise({
       const trackingType = selectedExercise.trackingType;
 
       // Helper to determine if exercise is bodyweight-only
+      // Check for empty equipment, or equipment containing bodyweight-related terms
       const isBodyweightExercise = selectedExercise.equipment.length === 0 ||
-        selectedExercise.equipment.some(eq => eq.toLowerCase().includes('body') || eq.toLowerCase().includes('none'));
+        selectedExercise.equipment.some(eq => {
+          const eqLower = eq.toLowerCase();
+          return eqLower.includes('body') ||
+            eqLower.includes('none') ||
+            eqLower.includes('bodyweight') ||
+            eqLower === 'none' ||
+            eqLower === '';
+        });
 
       // Get user's body weight in their preferred unit for bodyweight exercises
       const getInitialWeight = (): number => {
-        if (isBodyweightExercise && profile?.weight) {
-          // Use user's body weight in their preferred unit
-          return profile.weight;
+        // Check if exercise is bodyweight and profile has valid weight
+        if (isBodyweightExercise) {
+          // Validate profile weight: must be defined, not null, a number, and > 0
+          const hasValidWeight = profile?.weight !== undefined &&
+            profile.weight !== null &&
+            typeof profile.weight === 'number' &&
+            profile.weight > 0;
+
+          if (hasValidWeight && profile.weight) {
+            logger.log('[LogExercise] Auto-populating bodyweight:', {
+              exerciseName: selectedExercise.name,
+              weight: profile.weight,
+              unit: profile?.preferredUnit,
+              isBodyweightExercise: true
+            });
+            return profile.weight;
+          } else {
+            logger.warn('[LogExercise] Bodyweight exercise but no valid profile weight:', {
+              exerciseName: selectedExercise.name,
+              profileWeight: profile?.weight,
+              hasProfile: !!profile,
+              equipment: selectedExercise.equipment
+            });
+          }
         }
         // Default to 0 for weighted exercises (user will enter weight manually)
         return 0;
@@ -422,7 +493,7 @@ export function LogExercise({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedExercise?.id, exerciseId, isOpen, profile?.preferredUnit]);
+  }, [selectedExercise?.id, exerciseId, isOpen, profile?.preferredUnit, profile?.weight]);
 
   // Use refs to track state for saving - avoids infinite loops from array dependencies
   const stateSnapshotRef = useRef({
@@ -1770,13 +1841,8 @@ export function LogExercise({
             <button
               onClick={async () => {
                 try {
-                  // Wait for save to complete before clearing state
                   await handleSave();
-                  // handleSave already clears state and closes modal on success
-                  // If we reach here, save was successful and everything is already cleared
                 } catch (error) {
-                  // If save fails, error is already shown in handleSave
-                  // Don't clear state or close modal on error
                   logger.error('Error in save button handler:', error);
                 }
               }}

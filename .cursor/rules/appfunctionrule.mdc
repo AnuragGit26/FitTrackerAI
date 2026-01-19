@@ -29,8 +29,9 @@ selfEvolving: true
 ## 1. End-User Safety First (NON-NEGOTIABLE)
 
 - Assume **end users cannot handle runtime errors**.
+- **Zero runtime errors should occur** - prevent errors entirely rather than catching them.
 - Zero unhandled runtime errors across:
-  - UI
+  - UI components
   - Domain logic
   - Edge functions
   - Prisma/MongoDB
@@ -39,6 +40,12 @@ selfEvolving: true
   - Degrade gracefully
   - Provide user-safe recovery
   - Log internally (no technical leakage)
+  - Never expose technical error messages to end users
+- **Error handling strategy:**
+  - Prevent errors through validation and defensive programming
+  - Catch and handle errors at component level (not page level)
+  - Use optimistic logging to Vercel for monitoring
+  - Display graceful UI fallbacks instead of error states
 
 ---
 
@@ -108,18 +115,73 @@ Before coding, document:
 
 ## 5. Runtime Error Prevention (STRICT)
 
+- **Component-Level Error Handling (MANDATORY):**
+  - Wrap all component logic in try-catch blocks at the component level
+  - Never rely on page-level error boundaries alone
+  - Each component must handle its own errors gracefully
+  - Use error boundaries only as a last resort fallback
+
+- **Error Handling Pattern:**
+  ```tsx
+  // Component-level error handling example
+  const MyComponent = () => {
+    const [error, setError] = useState<string | null>(null);
+    
+    const handleAction = async () => {
+      try {
+        // Component logic here
+        await someAsyncOperation();
+      } catch (err) {
+        // Log to Vercel for monitoring
+        logger.error('Component action failed', err, { component: 'MyComponent' });
+        
+        // Set user-friendly error state
+        setError('Something went wrong. Please try again.');
+        
+        // Graceful degradation - continue with fallback behavior
+        // Never throw or crash the component
+      }
+    };
+    
+    // Render graceful UI fallback instead of error state when possible
+    if (error) {
+      return <GracefulFallback message={error} />;
+    }
+    
+    return <NormalUI />;
+  };
+  ```
+
 - Defensive programming everywhere:
-- Null checks
-- Schema validation
-- AI output sanitization
+  - Null checks
+  - Schema validation
+  - AI output sanitization
+  - Type guards
+  - Default values for all optional data
+
 - All async calls require:
-- Timeout
-- Retry
-- Fallback
+  - Timeout
+  - Retry with exponential backoff
+  - Fallback behavior
+  - Component-level try-catch
+
+- **Optimistic Logging:**
+  - Log all errors to Vercel using `logger.error()` or `logger.warn()`
+  - Include component context, user context, and error details
+  - Never log sensitive user data
+  - Use structured logging for better debugging
+
+- **Graceful UI Components:**
+  - Components must handle all error states internally
+  - Display user-friendly messages, not technical errors
+  - Provide recovery actions (retry, skip, use defaults)
+  - Never show error boundaries or crash screens to users
+
 - AI-generated insights must:
-- Be validated
-- Be explainable
-- Never silently fail
+  - Be validated
+  - Be explainable
+  - Never silently fail
+  - Have component-level error handling
 
 ---
 
@@ -128,10 +190,15 @@ Before coding, document:
 - Follow existing design language strictly
 - Accessibility is mandatory
 - Every screen defines:
-- Loading
-- Success
-- Failure
-- Empty
+  - Loading
+  - Success
+  - Failure (graceful fallback, not error state)
+  - Empty
+- **Error State Handling:**
+  - Never show technical error messages
+  - Use graceful fallbacks (empty states, default content, retry buttons)
+  - Components should degrade gracefully (show partial data, use defaults)
+  - Error boundaries are last resort only - components handle their own errors
 - No UI change without validating **user impact**
 
 ---
@@ -251,7 +318,94 @@ Always validate as the end user:
 
 ---
 
-## 11. Documentation as a System Contract
+## 11. Component-Level Error Handling (CRITICAL)
+
+### Error Handling Architecture
+
+**Component-Level (Primary):**
+- Every component must wrap its logic in try-catch blocks
+- Handle errors within the component's scope
+- Log errors to Vercel using `logger.error()` or `logger.warn()`
+- Display graceful UI fallbacks instead of error states
+
+**Page-Level (Secondary):**
+- Error boundaries should only catch unexpected errors
+- Not a replacement for component-level handling
+- Use as a last resort safety net
+
+### Error Handling Checklist
+
+For every component:
+
+- [ ] All async operations wrapped in try-catch
+- [ ] All event handlers have error handling
+- [ ] All useEffect hooks handle errors gracefully
+- [ ] Errors logged to Vercel with context
+- [ ] User-friendly error messages (no technical details)
+- [ ] Graceful fallback UI provided
+- [ ] Recovery actions available (retry, skip, use defaults)
+- [ ] No unhandled promise rejections
+- [ ] No thrown errors that escape component
+
+### Error Logging Pattern
+
+```tsx
+import { logger } from '@/utils/logger';
+
+// In component
+try {
+  await operation();
+} catch (err) {
+  // Log with context
+  logger.error('Operation failed in ComponentName', err, {
+    component: 'ComponentName',
+    action: 'operationName',
+    userId: userContextManager.getUserId(),
+    context: { /* relevant context */ }
+  });
+  
+  // Set user-friendly state
+  setError('Unable to complete action. Please try again.');
+  
+  // Continue with fallback behavior
+  // Never throw or crash
+}
+```
+
+### Graceful Degradation Patterns
+
+1. **Data Loading Failures:**
+   - Show cached/previous data if available
+   - Display empty state with retry option
+   - Use default values
+
+2. **Action Failures:**
+   - Show user-friendly error message
+   - Provide retry button
+   - Allow user to skip or cancel
+
+3. **Validation Failures:**
+   - Show inline validation errors
+   - Prevent submission
+   - Provide clear guidance
+
+4. **Network Failures:**
+   - Queue operations for retry
+   - Show offline indicator
+   - Allow offline mode continuation
+
+### Avoid These Patterns
+
+- ❌ Throwing errors from components
+- ❌ Relying solely on error boundaries
+- ❌ Showing technical error messages to users
+- ❌ Silent failures without logging
+- ❌ Page-level error handling only
+- ❌ Unhandled promise rejections
+
+---
+
+## 12. Documentation as a System Contract
 
 - Update:
 - README
@@ -265,7 +419,7 @@ Always validate as the end user:
 
 ---
 
-## 12. Technical Documentation Reference (CRITICAL)
+## 13. Technical Documentation Reference (CRITICAL)
 
 📄 `TECHNICAL_DOCUMENTATION.md` (root)
 
@@ -281,7 +435,7 @@ Update when any of the above changes.
 
 ---
 
-## 13. AI-Output Schema Contracts (CRITICAL)
+## 14. AI-Output Schema Contracts (CRITICAL)
 
 AI-generated outputs are treated as **untrusted external inputs**.
 
@@ -296,7 +450,7 @@ unless it **strictly conforms** to an approved schema contract.
 
 ---
 
-### 12.1 Canonical AI Response Envelope (MANDATORY)
+### 14.1 Canonical AI Response Envelope (MANDATORY)
 
 Every AI response must conform to the following envelope:
 

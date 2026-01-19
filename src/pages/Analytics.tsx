@@ -4,7 +4,7 @@ import { useWorkoutStore } from '@/store/workoutStore';
 import { useUserStore } from '@/store/userStore';
 import { analyticsService } from '@/services/analyticsService';
 import { calculateStreak } from '@/utils/calculations';
-import { DateRange, hasEnoughWorkoutsForAverages, filterWorkoutsByDateRange } from '@/utils/analyticsHelpers';
+import { DateRange, hasEnoughWorkoutsForAverages, filterWorkoutsByDateRange, getComparisonPeriodWithFallback } from '@/utils/analyticsHelpers';
 import { aiCallManager } from '@/services/aiCallManager';
 import { aiService } from '@/services/aiService';
 import { UnifiedDateSelector } from '@/components/analytics/UnifiedDateSelector';
@@ -91,21 +91,18 @@ export function Analytics() {
     return calculateStreak(workoutDates);
   }, [workouts]);
 
-  const previousMonthVolume = useMemo(() => {
-    const now = new Date();
-    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
-    const lastMonthWorkouts = (workouts ?? []).filter((w) => {
-      const workoutDate = new Date(w.date);
-      return workoutDate >= lastMonthStart && workoutDate <= lastMonthEnd;
-    });
-    return analyticsService.calculateTotalVolume(lastMonthWorkouts);
+  const comparisonPeriod = useMemo(() => {
+    return getComparisonPeriodWithFallback(workouts ?? []);
   }, [workouts]);
 
+  const previousPeriodVolume = useMemo(() => {
+    return analyticsService.calculateTotalVolume(comparisonPeriod.workouts);
+  }, [comparisonPeriod.workouts]);
+
   const trendPercentage = useMemo(() => {
-    if (!metrics || previousMonthVolume === 0) return 0;
-    return Math.round(((metrics.totalVolume - previousMonthVolume) / previousMonthVolume) * 100);
-  }, [metrics, previousMonthVolume]);
+    if (!metrics || previousPeriodVolume === 0) return 0;
+    return Math.round(((metrics.totalVolume - previousPeriodVolume) / previousPeriodVolume) * 100);
+  }, [metrics, previousPeriodVolume]);
 
   const topMuscle = useMemo(() => {
     const topMuscleNames = analyticsService.getMostActiveMuscleNames(workouts ?? [], 1);
@@ -151,7 +148,8 @@ export function Analytics() {
           metrics.workoutCount,
           trendPercentage,
           topMuscle,
-          profile?.preferredUnit || 'kg'
+          profile?.preferredUnit || 'kg',
+          comparisonPeriod.periodLabel
         ),
         0
       )
@@ -310,6 +308,7 @@ export function Analytics() {
                   totalVolume={metrics.totalVolume}
                   trendPercentage={hasEnoughWorkouts ? trendPercentage : 0}
                   unit={unit}
+                  comparisonPeriod={hasEnoughWorkouts ? comparisonPeriod.periodLabel : undefined}
                 />
                 <WorkoutStatsCards workoutCount={metrics.workoutCount} currentStreak={currentStreak} />
               </div>
