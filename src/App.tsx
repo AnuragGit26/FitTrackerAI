@@ -163,9 +163,37 @@ function App() {
               });
               
               // Register background sync for workout reminders
+              // Wait for service worker to be active before registering background sync
               if ('sync' in registration) {
                 try {
-                  await (registration as ServiceWorkerRegistration & { sync: { register: (tag: string) => Promise<void> } }).sync.register('workout-reminder-sync');
+                  // Ensure service worker is active before registering background sync
+                  if (registration.active) {
+                    await (registration as ServiceWorkerRegistration & { sync: { register: (tag: string) => Promise<void> } }).sync.register('workout-reminder-sync');
+                  } else if (registration.installing) {
+                    // Wait for installation to complete
+                    registration.installing.addEventListener('statechange', async () => {
+                      if (registration.active && 'sync' in registration) {
+                        try {
+                          await (registration as ServiceWorkerRegistration & { sync: { register: (tag: string) => Promise<void> } }).sync.register('workout-reminder-sync');
+                        } catch (error) {
+                          logger.warn('[SW] Background sync registration failed:', error);
+                        }
+                      }
+                    });
+                  } else if (registration.waiting) {
+                    // Service worker is waiting, activate it
+                    registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                    // Wait a bit for activation, then register
+                    setTimeout(async () => {
+                      if (registration.active && 'sync' in registration) {
+                        try {
+                          await (registration as ServiceWorkerRegistration & { sync: { register: (tag: string) => Promise<void> } }).sync.register('workout-reminder-sync');
+                        } catch (error) {
+                          logger.warn('[SW] Background sync registration failed:', error);
+                        }
+                      }
+                    }, 1000);
+                  }
                 } catch (error) {
                   logger.warn('[SW] Background sync registration failed:', error);
                 }
