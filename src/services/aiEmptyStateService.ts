@@ -123,15 +123,38 @@ class AIEmptyStateService {
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            const isTimeout = error instanceof Error && error.name === 'AbortError';
-            const isNetworkError = errorMessage.includes('network') || errorMessage.includes('fetch') || errorMessage.includes('Failed to fetch');
+            const errorString = String(error);
             
-            logger.warn('Failed to generate AI empty state message', error, {
-                screenName: context.screenName,
-                userName: context.userName,
-                timeOfDay: context.timeOfDay,
-                errorType: isTimeout ? 'timeout' : isNetworkError ? 'network' : 'api',
-            });
+            // Detect specific error types
+            const isTimeout = error instanceof Error && error.name === 'AbortError';
+            const isApiKeyError = 
+                errorMessage.includes('API_KEY_INVALID') ||
+                errorMessage.includes('API key expired') ||
+                errorMessage.includes('API key invalid') ||
+                errorString.includes('API_KEY_INVALID') ||
+                errorString.includes('API key expired') ||
+                errorString.includes('API key invalid') ||
+                (errorMessage.includes('400') && errorMessage.includes('API'));
+            const isNetworkError = 
+                !isApiKeyError && (
+                    errorMessage.includes('network') || 
+                    errorMessage.includes('fetch') || 
+                    errorMessage.includes('Failed to fetch') ||
+                    errorMessage.includes('ECONNREFUSED') ||
+                    errorMessage.includes('ETIMEDOUT')
+                );
+            
+            // Don't log API key errors - they're configuration issues, not runtime errors
+            // The fallback message will be used silently
+            if (!isApiKeyError) {
+                logger.warn('Failed to generate AI empty state message', error, {
+                    screenName: context.screenName,
+                    userName: context.userName,
+                    timeOfDay: context.timeOfDay,
+                    errorType: isTimeout ? 'timeout' : isNetworkError ? 'network' : 'api',
+                });
+            }
+            
             return this.getFallbackMessage(context);
         }
     }
