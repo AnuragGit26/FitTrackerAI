@@ -213,7 +213,8 @@ class NotificationService {
       await dbHelpers.setSetting(`notification_${notificationId}`, notificationData);
 
       // Register periodic sync for recovery checks
-      if (this.swRegistration && 'periodicSync' in this.swRegistration) {
+      // Only register if service worker is active
+      if (this.swRegistration && 'periodicSync' in this.swRegistration && this.swRegistration.active) {
         try {
           const registration = this.swRegistration as ServiceWorkerRegistration & {
             periodicSync?: { register: (tag: string, options: { minInterval: number }) => Promise<void> };
@@ -224,7 +225,7 @@ class NotificationService {
             });
           }
         } catch (error) {
-          logger.warn('[NotificationService] Periodic sync not supported:', error);
+          logger.warn('[NotificationService] Periodic sync registration failed:', error);
         }
       }
     } catch (error) {

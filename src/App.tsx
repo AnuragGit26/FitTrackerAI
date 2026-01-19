@@ -8,7 +8,6 @@ import { Layout } from '@/components/layout/Layout';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useUserStore } from '@/store/userStore';
 import { useSettingsStore } from '@/store/settingsStore';
-import { useUserStore as getUserStore } from '@/store/userStore';
 import { exerciseLibrary } from '@/services/exerciseLibrary';
 import { dataSync } from '@/services/dataSync';
 import { initializeDefaultTemplates } from '@/services/templateLibrary';
@@ -117,7 +116,7 @@ function App() {
 
         // USER-DEPENDENT INITIALIZATION: These require user to be loaded
         // User might not be available yet (loaded in AppRoutes), so we check
-        const user = getUserStore.getState().profile;
+        const user = useUserStore.getState().profile;
         if (user?.id) {
           // Initialize workout event tracker (notifications pulled after Firebase auth in AppRoutes)
           await workoutEventTracker.initialize(user.id).catch((error) => {
@@ -173,11 +172,43 @@ function App() {
               }
               
               // Register periodic sync for recovery checks (if supported)
+              // Wait for service worker to be active before registering periodic sync
               if ('periodicSync' in registration) {
                 try {
-                  await (registration as ServiceWorkerRegistration & { periodicSync: { register: (tag: string, options: { minInterval: number }) => Promise<void> } }).periodicSync.register('recovery-check', {
-                    minInterval: 60 * 60 * 1000, // 1 hour
-                  });
+                  // Ensure service worker is active before registering periodic sync
+                  if (registration.active) {
+                    await (registration as ServiceWorkerRegistration & { periodicSync: { register: (tag: string, options: { minInterval: number }) => Promise<void> } }).periodicSync.register('recovery-check', {
+                      minInterval: 60 * 60 * 1000, // 1 hour
+                    });
+                  } else if (registration.installing) {
+                    // Wait for installation to complete
+                    registration.installing.addEventListener('statechange', async () => {
+                      if (registration.active && 'periodicSync' in registration) {
+                        try {
+                          await (registration as ServiceWorkerRegistration & { periodicSync: { register: (tag: string, options: { minInterval: number }) => Promise<void> } }).periodicSync.register('recovery-check', {
+                            minInterval: 60 * 60 * 1000, // 1 hour
+                          });
+                        } catch (error) {
+                          logger.warn('[SW] Periodic sync registration failed:', error);
+                        }
+                      }
+                    });
+                  } else if (registration.waiting) {
+                    // Service worker is waiting, activate it
+                    registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                    // Wait a bit for activation, then register
+                    setTimeout(async () => {
+                      if (registration.active && 'periodicSync' in registration) {
+                        try {
+                          await (registration as ServiceWorkerRegistration & { periodicSync: { register: (tag: string, options: { minInterval: number }) => Promise<void> } }).periodicSync.register('recovery-check', {
+                            minInterval: 60 * 60 * 1000, // 1 hour
+                          });
+                        } catch (error) {
+                          logger.warn('[SW] Periodic sync registration failed:', error);
+                        }
+                      }
+                    }, 1000);
+                  }
                 } catch (error) {
                   logger.warn('[SW] Periodic sync registration failed:', error);
                 }
@@ -249,7 +280,7 @@ function App() {
         // Expose seed function in development for testing
         if (import.meta.env.DEV) {
           (window as Window & { seedWorkoutLogs?: (userId?: string) => Promise<void> }).seedWorkoutLogs = async (userId?: string) => {
-            const user = getUserStore.getState().profile;
+            const user = useUserStore.getState().profile;
             const targetUserId = userId || user?.id || 'user-1';
             await seedWorkoutLogs(targetUserId);
           };
