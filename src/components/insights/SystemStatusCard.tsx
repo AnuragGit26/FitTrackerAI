@@ -10,7 +10,7 @@ export function SystemStatusCard({ alerts }: SystemStatusCardProps) {
       case 'optimal':
         return 'text-primary';
       case 'good':
-        return 'text-green-500';
+        return 'text-blue-500';
       case 'moderate':
         return 'text-yellow-500';
       case 'low':
@@ -40,7 +40,7 @@ export function SystemStatusCard({ alerts }: SystemStatusCardProps) {
       <div className="flex flex-col gap-3">
         <div className="flex items-end justify-between">
           <div className="flex flex-col">
-            <p className="text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            <p className="text-sm font-medium uppercase tracking-wider text-slate-500 dark:text-gray-400">
               System Status
             </p>
             <h1 className="text-4xl font-bold tracking-tighter text-black dark:text-white mt-1">
@@ -52,7 +52,7 @@ export function SystemStatusCard({ alerts }: SystemStatusCardProps) {
             <span className="text-4xl font-bold text-primary">{alerts.readinessScore}%</span>
           </div>
         </div>
-        <div className="relative w-full h-4 bg-gray-200 dark:bg-[#1c3a2f] rounded-full overflow-hidden">
+        <div className="relative w-full h-4 bg-white dark:bg-[#1c3a2f] rounded-full overflow-hidden">
           <div
             className="absolute top-0 left-0 h-full bg-primary rounded-full transition-all duration-700 ease-out"
             style={{ width: `${alerts.readinessScore}%` }}
@@ -60,7 +60,7 @@ export function SystemStatusCard({ alerts }: SystemStatusCardProps) {
             <div className="absolute inset-0 bg-white/20 animate-pulse" />
           </div>
         </div>
-        <p className="text-sm text-gray-600 dark:text-[#90cba8]">{alerts.readinessMessage}</p>
+        <p className="text-sm text-slate-500 dark:text-[#FF9933]">{alerts.readinessMessage}</p>
       </div>
     </div>
   );

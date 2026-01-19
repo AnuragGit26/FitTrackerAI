@@ -18,9 +18,9 @@ export function ConsistencyHeatmap({ workouts }: ConsistencyHeatmapProps) {
   const dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'Su'];
 
   return (
-    <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-5 border border-gray-100 dark:border-gray-800/50 shadow-sm">
+    <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-5 border border-gray-100 dark:border-border-dark/50 shadow-sm">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-bold text-base text-gray-900 dark:text-white">Consistency</h3>
+        <h3 className="font-bold text-base text-slate-900 dark:text-white">Consistency</h3>
         <div className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded">
           {consistencyScore}%
         </div>
@@ -28,7 +28,7 @@ export function ConsistencyHeatmap({ workouts }: ConsistencyHeatmapProps) {
       <div className="flex flex-col gap-1">
         <div className="flex justify-between mb-1 px-1">
           {dayLabels.map((day, i) => (
-            <span key={i} className="text-[10px] w-6 text-center text-gray-500">
+            <span key={i} className="text-[10px] w-6 text-center text-slate-500 dark:text-gray-400">
               {day}
             </span>
           ))}
@@ -42,8 +42,8 @@ export function ConsistencyHeatmap({ workouts }: ConsistencyHeatmapProps) {
                   key={dayIndex}
                   className={`w-6 h-6 rounded ${
                     hasWorkout
-                      ? 'bg-primary shadow-[0_0_8px_rgba(13,242,105,0.6)]'
-                      : 'bg-gray-200 dark:bg-white/5'
+                      ? 'bg-primary shadow-[0_0_8px_rgba(255,153,51,0.6)]'
+                      : 'bg-white dark:bg-white/5'
                   }`}
                   initial={{ scale: 0, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
@@ -53,7 +53,7 @@ export function ConsistencyHeatmap({ workouts }: ConsistencyHeatmapProps) {
                   }}
                   whileHover={hasWorkout && !shouldReduceMotion ? { 
                     scale: 1.2,
-                    boxShadow: '0 0 12px rgba(13,242,105,0.8)'
+                    boxShadow: '0 0 12px rgba(255,153,51,0.8)'
                   } : {}}
                 />
               );

@@ -546,8 +546,8 @@ export function RestTimer({
                 style={{ willChange: 'transform' }}
               >
                 {/* Main Checkmark Circle */}
-                <div className="size-36 rounded-full bg-gradient-to-br from-background-dark/90 to-background-dark/95 flex items-center justify-center border-[5px] border-primary shadow-[0_0_60px_rgba(13,242,105,0.9),0_0_100px_rgba(13,242,105,0.5)] ring-[6px] ring-primary/30">
-                  <Check className="w-20 h-20 text-primary stroke-[4.5] drop-shadow-[0_0_20px_rgba(13,242,105,1)]" />
+                <div className="size-36 rounded-full bg-gradient-to-br from-background-dark/90 to-background-dark/95 flex items-center justify-center border-[5px] border-primary shadow-[0_0_60px_rgba(255,153,51,0.9),0_0_100px_rgba(255,153,51,0.5)] ring-[6px] ring-primary/30">
+                  <Check className="w-20 h-20 text-primary stroke-[4.5] drop-shadow-[0_0_20px_rgba(255,153,51,1)]" />
                 </div>
 
                 {/* Persistent Background Glow */}
@@ -605,7 +605,7 @@ export function RestTimer({
                 className="relative z-10"
                 style={{ willChange: 'transform, opacity' }}
               >
-                <div className="relative bg-gradient-to-br from-background-dark/85 to-background-dark/90 dark:from-background-dark/90 dark:to-background-dark/95 rounded-2xl px-8 py-4 border-2 border-primary/30 shadow-[0_0_30px_rgba(13,242,105,0.4)] backdrop-blur-sm">
+                <div className="relative bg-gradient-to-br from-background-dark/85 to-background-dark/90 dark:from-background-dark/90 dark:to-background-dark/95 rounded-2xl px-8 py-4 border-2 border-primary/30 shadow-[0_0_30px_rgba(255,153,51,0.4)] backdrop-blur-sm">
                   {/* Glow effect behind text */}
                   <div className="absolute inset-0 rounded-2xl bg-primary/10 blur-xl -z-10" />
 
@@ -623,7 +623,7 @@ export function RestTimer({
                       damping: 15,
                     }}
                     style={{
-                      textShadow: '0 0 30px rgba(13, 242, 105, 1), 0 0 60px rgba(13, 242, 105, 0.8), 0 0 90px rgba(13, 242, 105, 0.6), 3px 3px 6px rgba(0, 0, 0, 0.7)',
+                      textShadow: '0 0 30px rgba(255, 153, 51, 1), 0 0 60px rgba(255, 153, 51, 0.8), 0 0 90px rgba(255, 153, 51, 0.6), 3px 3px 6px rgba(0, 0, 0, 0.7)',
                       willChange: 'transform',
                       letterSpacing: '0.05em'
                     }}
@@ -637,7 +637,7 @@ export function RestTimer({
               {[...Array(6)].map((_, i) => (
                 <motion.div
                   key={`particle-${i}`}
-                  className="absolute size-2 rounded-full bg-primary/80 shadow-[0_0_10px_rgba(13,242,105,0.8)]"
+                  className="absolute size-2 rounded-full bg-primary/80 shadow-[0_0_10px_rgba(255,153,51,0.8)]"
                   initial={{
                     opacity: 0,
                     x: 0,
@@ -672,11 +672,11 @@ export function RestTimer({
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className="absolute bottom-6 left-4 right-4 z-40"
           >
-          <div className="bg-surface-dark dark:bg-[#152e22] rounded-2xl p-4 shadow-[0_8px_32px_rgba(0,0,0,0.3)] border border-gray-700 dark:border-[#316847] overflow-hidden relative ring-1 ring-white/10">
+          <div className="bg-surface-dark dark:bg-surface-dark rounded-2xl p-4 shadow-[0_8px_32px_rgba(0,0,0,0.3)] border border-transparent dark:border-border-dark overflow-hidden relative ring-1 ring-white/10">
             {/* Progress Bar */}
-            <div className="absolute top-0 left-0 w-full h-1 bg-gray-800/50">
+            <div className="absolute top-0 left-0 w-full h-1 bg-surface-dark/50">
               <motion.div
-                className="h-full bg-primary rounded-r-full shadow-[0_0_10px_rgba(13,242,105,0.5)]"
+                className="h-full bg-primary rounded-r-full shadow-[0_0_10px_rgba(255,153,51,0.5)]"
                 initial={{ width: '100%' }}
                 animate={{ width: `${progressPercentage}%` }}
                 transition={{ duration: 0.3 }}
@@ -722,7 +722,7 @@ export function RestTimer({
               <div className="flex items-center gap-3">
                 <button
                   onClick={handlePause}
-                  className="size-11 rounded-full bg-white/5 flex items-center justify-center text-gray-300 hover:bg-white/10 hover:text-white transition-colors border border-white/5 focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="size-11 rounded-full bg-white/5 flex items-center justify-center text-slate-300 hover:bg-white/10 hover:text-white transition-colors border border-white/5 focus:outline-none focus:ring-2 focus:ring-primary"
                   aria-label={isPaused ? 'Resume timer' : 'Pause timer'}
                 >
                   <span className="material-symbols-outlined text-xl">

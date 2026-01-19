@@ -202,6 +202,7 @@ class ErrorRecovery {
    */
   private defaultRetryableError(error: Error): boolean {
     const message = error.message.toLowerCase();
+    const errorString = String(error).toLowerCase();
 
     // Retry on network errors, timeouts, and temporary failures
     const retryablePatterns = [
@@ -213,6 +214,10 @@ class ErrorRecovery {
       'enotfound',
       'econnrefused',
       'etimedout',
+      'connection reset',
+      'err_connection_reset',
+      'failed to fetch',
+      'connection closed',
     ];
 
     // Don't retry on client errors (4xx) except 429 (rate limit)
@@ -235,9 +240,13 @@ class ErrorRecovery {
       return false;
     }
 
-    return retryablePatterns.some(pattern => message.includes(pattern)) ||
-           error.name === 'NetworkError' ||
-           error.name === 'TimeoutError';
+    // Check both message and string representation for connection reset errors
+    const isRetryable = 
+      retryablePatterns.some(pattern => message.includes(pattern) || errorString.includes(pattern)) ||
+      error.name === 'NetworkError' ||
+      error.name === 'TimeoutError';
+
+    return isRetryable;
   }
 
   /**

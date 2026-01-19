@@ -15,9 +15,11 @@ export function formatWorkoutDate(date: Date): string {
  * Format weight × reps string
  */
 export function formatWeightReps(weight?: number, reps?: number): string {
-  if (weight === undefined && reps === undefined) return '-';
-  if (weight === undefined) return `${reps} reps`;
-  if (reps === undefined) return `${weight}kg`;
+  if (weight === undefined && reps === undefined) {
+    return '-';
+  }
+  if (weight === undefined) {return `${reps} reps`;}
+  if (reps === undefined) {return `${weight}kg`;}
   return `${weight}kg × ${reps}`;
 }
 
@@ -33,10 +35,12 @@ export function calculateWeightChangeBadge(
   display: string;
   color: 'primary' | 'gray';
 } | null {
-  if (previousWeight === undefined) return null;
+  if (previousWeight === undefined) {
+    return null;
+  }
 
   const change = currentWeight - previousWeight;
-  if (Math.abs(change) < threshold) return null;
+  if (Math.abs(change) < threshold) {return null;}
 
   return {
     value: change,
@@ -54,16 +58,22 @@ export function matchSetByNumber(
 ): WorkoutSet | null {
   // First try exact match
   const exactMatch = sets.find((s) => s.setNumber === setNumber);
-  if (exactMatch) return exactMatch;
+  if (exactMatch) {
+    return exactMatch;
+  }
 
   // If no exact match, find closest
-  if (sets.length === 0) return null;
+  if (sets.length === 0) {
+    return null;
+  }
 
   // Sort by set number and find closest
   const sorted = [...sets].sort((a, b) => a.setNumber - b.setNumber);
   
   // If requested set is before first, return first
-  if (setNumber < sorted[0].setNumber) return sorted[0];
+  if (setNumber < sorted[0].setNumber) {
+    return sorted[0];
+  }
   
   // If requested set is after last, return last
   if (setNumber > sorted[sorted.length - 1].setNumber) {
@@ -114,7 +124,9 @@ export function getContextualMessage(
   previousSet: { weight?: number; reps?: number } | null,
   _currentSetNumber: number
 ): string | null {
-  if (!previousSet) return null;
+  if (!previousSet) {
+    return null;
+  }
 
   const set = previousSet;
   if (set.weight && set.reps) {

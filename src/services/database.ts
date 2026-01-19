@@ -51,6 +51,24 @@ export interface PendingSyncItem {
   userId?: string; // optional user context
 }
 
+export interface ExerciseFavorite {
+  id: string; // "userId-exerciseId"
+  userId: string;
+  exerciseId: string;
+  favoritedAt: number; // timestamp
+}
+
+export interface ExerciseUsageHistory {
+  id: string; // "userId-exerciseId"
+  userId: string;
+  exerciseId: string;
+  exerciseName: string;
+  lastUsedAt: number; // timestamp
+  useCount: number;
+  createdAt: number; // timestamp
+  updatedAt: number; // timestamp
+}
+
 class FitTrackAIDB extends Dexie {
   workouts!: Table<Workout, string>;
   exercises!: Table<Exercise, string>;
@@ -67,6 +85,8 @@ class FitTrackAIDB extends Dexie {
   notifications!: Table<Notification, string>;
   errorLogs!: Table<ErrorLog, number>;
   pendingSyncQueue!: Table<PendingSyncItem, number>;
+  exerciseFavorites!: Table<ExerciseFavorite, string>;
+  exerciseUsageHistory!: Table<ExerciseUsageHistory, string>;
 
   constructor() {
     super('FitTrackAIDB');
@@ -316,7 +336,7 @@ class FitTrackAIDB extends Dexie {
           // Update exercises: delete old and create new
           for (const [oldId, newId] of idMapping) {
             const exercise = exercisesToMigrate.find(ex => ex.id === oldId);
-            if (!exercise) continue;
+            if (!exercise) {continue;}
             
             // Delete old exercise
             await exercisesTable.delete(oldId);
@@ -485,7 +505,7 @@ class FitTrackAIDB extends Dexie {
           // Migrate workouts: delete old and create new
           for (const [oldId, newId] of idMapping) {
             const workout = workoutsToMigrate.find(w => typeof w.id === 'number' && w.id === oldId);
-            if (!workout) continue;
+            if (!workout) {continue;}
             
             // Delete old workout
             await workoutsTable.delete(oldId);
@@ -616,6 +636,27 @@ class FitTrackAIDB extends Dexie {
       notifications: 'id, userId, isRead, createdAt, [userId+isRead], [userId+createdAt], type',
       errorLogs: '++id, userId, errorType, severity, resolved, [userId+resolved], [userId+createdAt], tableName',
       pendingSyncQueue: '++id, tableName, queuedAt, userId',
+    });
+
+    // Version 17: Add exercise favorites and usage history
+    this.version(17).stores({
+      workouts: 'id, userId, date, deletedAt, version, [userId+date], [userId+deletedAt], [userId+updatedAt], *musclesTargeted',
+      exercises: 'id, name, category, userId, version, [name+category], [userId+isCustom], [userId+updatedAt], *primaryMuscles, *secondaryMuscles, *equipment',
+      muscleStatuses: '++id, muscle, userId, version, [userId+muscle], [userId+updatedAt], lastWorked',
+      settings: 'key, userId, version, [userId+key]',
+      workoutTemplates: 'id, userId, category, name, version, [userId+category], [name+userId], [userId+updatedAt], *musclesTargeted',
+      aiCacheMetadata: '++id, insightType, userId, [insightType+userId], lastFetchTimestamp',
+      plannedWorkouts: 'id, userId, scheduledDate, isCompleted, version, [userId+scheduledDate], [userId+isCompleted], [userId+updatedAt]',
+      exerciseDetailsCache: '++id, exerciseSlug, cachedAt',
+      muscleImageCache: '++id, muscle, cachedAt',
+      syncMetadata: '++id, tableName, userId, [userId+tableName], syncStatus, lastSyncAt',
+      sleepLogs: '++id, userId, date, version, [userId+date], [userId+updatedAt]',
+      recoveryLogs: '++id, userId, date, version, [userId+date], [userId+updatedAt]',
+      notifications: 'id, userId, isRead, createdAt, [userId+isRead], [userId+createdAt], type',
+      errorLogs: '++id, userId, errorType, severity, resolved, [userId+resolved], [userId+createdAt], tableName',
+      pendingSyncQueue: '++id, tableName, queuedAt, userId',
+      exerciseFavorites: 'id, userId, exerciseId, [userId+exerciseId], favoritedAt',
+      exerciseUsageHistory: 'id, userId, exerciseId, [userId+exerciseId], [userId+lastUsedAt], lastUsedAt, useCount',
     });
   }
 }
@@ -1140,7 +1181,7 @@ export const dbHelpers = {
       .equals(exerciseSlug)
       .first();
 
-    if (!cached) return null;
+    if (!cached) {return null;}
 
     return {
       details: cached.details,
@@ -1678,6 +1719,87 @@ export const dbHelpers = {
         logger.error(`[database] Unknown table name for upsertRecord: ${tableName}`);
         throw new Error(`Cannot upsert record for unknown table: ${tableName}`);
     }
+  },
+
+  // Exercise favorites operations
+  async getUserFavorites(userId: string): Promise<ExerciseFavorite[]> {
+    return await db.exerciseFavorites
+      .where('[userId+exerciseId]')
+      .between([userId, Dexie.minKey], [userId, Dexie.maxKey])
+      .toArray();
+  },
+
+  async addFavorite(userId: string, exerciseId: string): Promise<void> {
+    const id = `${userId}-${exerciseId}`;
+    const favorite: ExerciseFavorite = {
+      id,
+      userId,
+      exerciseId,
+      favoritedAt: Date.now(),
+    };
+    await db.exerciseFavorites.put(favorite);
+  },
+
+  async removeFavorite(userId: string, exerciseId: string): Promise<void> {
+    const id = `${userId}-${exerciseId}`;
+    await db.exerciseFavorites.delete(id);
+  },
+
+  async isFavorite(userId: string, exerciseId: string): Promise<boolean> {
+    const id = `${userId}-${exerciseId}`;
+    const favorite = await db.exerciseFavorites.get(id);
+    return !!favorite;
+  },
+
+  // Exercise usage history operations
+  async getExerciseUsageHistory(userId: string, limit: number = 10): Promise<ExerciseUsageHistory[]> {
+    return await db.exerciseUsageHistory
+      .where('[userId+lastUsedAt]')
+      .between([userId, Dexie.minKey], [userId, Dexie.maxKey])
+      .reverse()
+      .limit(limit)
+      .toArray();
+  },
+
+  async recordExerciseUsage(userId: string, exerciseId: string, exerciseName: string): Promise<void> {
+    const id = `${userId}-${exerciseId}`;
+    const now = Date.now();
+
+    const existing = await db.exerciseUsageHistory.get(id);
+
+    if (existing) {
+      // Update existing record
+      await db.exerciseUsageHistory.update(id, {
+        lastUsedAt: now,
+        useCount: existing.useCount + 1,
+        updatedAt: now,
+      });
+    } else {
+      // Create new record
+      const history: ExerciseUsageHistory = {
+        id,
+        userId,
+        exerciseId,
+        exerciseName,
+        lastUsedAt: now,
+        useCount: 1,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await db.exerciseUsageHistory.put(history);
+    }
+  },
+
+  async getMostUsedExercises(userId: string, limit: number = 10): Promise<ExerciseUsageHistory[]> {
+    const allHistory = await db.exerciseUsageHistory
+      .where('userId')
+      .equals(userId)
+      .toArray();
+
+    // Sort by useCount descending
+    return allHistory
+      .sort((a, b) => b.useCount - a.useCount)
+      .slice(0, limit);
   },
 };
 

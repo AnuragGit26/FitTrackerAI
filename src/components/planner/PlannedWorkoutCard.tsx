@@ -17,7 +17,7 @@ const categoryColors: Record<TemplateCategory, string> = {
   hypertrophy: 'border-primary',
   cardio: 'border-blue-400',
   home: 'border-purple-400',
-  flexibility: 'border-green-400',
+  flexibility: 'border-purple-400',
 };
 
 const categoryBadgeColors: Record<TemplateCategory, string> = {
@@ -25,7 +25,7 @@ const categoryBadgeColors: Record<TemplateCategory, string> = {
   hypertrophy: 'bg-primary/20 text-primary',
   cardio: 'bg-blue-500/20 text-blue-400',
   home: 'bg-purple-500/20 text-purple-400',
-  flexibility: 'bg-green-500/20 text-green-400',
+  flexibility: 'bg-purple-500/20 text-purple-400',
 };
 
 export function PlannedWorkoutCard({

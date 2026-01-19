@@ -61,7 +61,9 @@ export function saveFailedWorkout(workout: Workout, error: Error | string): stri
 export function getFailedWorkouts(): FailedWorkout[] {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return [];
+    if (!stored) {
+    return [];
+  }
     
     const parsed = JSON.parse(stored) as FailedWorkout[];
     const now = new Date();

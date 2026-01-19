@@ -14,7 +14,7 @@ export function AttentionNeededSection({ plateaus, formChecks }: AttentionNeeded
     <section>
       <h2 className="text-slate-800 dark:text-white text-lg font-bold mb-3 px-1">Attention Needed</h2>
       {!hasAnyIssues ? (
-        <div className="bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-700/30 rounded-xl p-4 text-center">
+        <div className="bg-gray-50 dark:bg-background-dark/20 border border-gray-100 dark:border-border-dark/30 rounded-xl p-4 text-center">
           <p className="text-slate-600 dark:text-gray-400 text-sm">
             No issues detected. Keep up the great work! 💪
           </p>
@@ -41,7 +41,7 @@ export function AttentionNeededSection({ plateaus, formChecks }: AttentionNeeded
           )}
           {formChecks.length > 0 && (
             <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-700/30 rounded-xl p-4 flex gap-4 items-center">
-              <div className="w-16 h-16 shrink-0 bg-gray-200 dark:bg-gray-800 rounded-lg overflow-hidden relative">
+              <div className="w-16 h-16 shrink-0 bg-white dark:bg-surface-dark rounded-lg overflow-hidden relative">
                 <div
                   className="w-full h-full bg-cover bg-center opacity-80 mix-blend-overlay"
                   style={{

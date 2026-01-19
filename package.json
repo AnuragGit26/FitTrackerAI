@@ -30,6 +30,7 @@
     },
     "dependencies": {
         "@google/generative-ai": "^0.2.1",
+        "@hookform/resolvers": "^5.2.2",
         "@react-three/drei": "^9.122.0",
         "@react-three/fiber": "^8.15.11",
         "@vercel/analytics": "^1.6.1",
@@ -50,12 +51,14 @@
         "prisma": "^6.19.1",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
+        "react-hook-form": "^7.71.1",
         "react-router-dom": "^6.20.0",
         "react-window": "^1.8.10",
         "recharts": "^2.10.3",
         "tailwind-merge": "^2.6.0",
         "tailwindcss-animate": "^1.0.7",
         "three": "^0.165.0",
+        "zod": "^4.3.5",
         "zustand": "^4.4.7"
     },
     "devDependencies": {

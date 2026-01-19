@@ -167,7 +167,7 @@ export function EditWorkoutForm({ workout, onSave, onCancel, isSaving }: EditWor
       {/* Workout Details Section */}
       <section className="space-y-4">
         <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-slate-500 dark:text-[#90cba8] ml-1" htmlFor="workout-name">
+          <label className="text-sm font-medium text-slate-500 dark:text-[#FF9933] ml-1" htmlFor="workout-name">
             Workout Name
           </label>
           <div className="relative">
@@ -188,7 +188,7 @@ export function EditWorkoutForm({ workout, onSave, onCancel, isSaving }: EditWor
         {/* Date and Time Section */}
         <div className="grid grid-cols-1 gap-4">
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-slate-500 dark:text-[#90cba8] ml-1" htmlFor="workout-date">
+            <label className="text-sm font-medium text-slate-500 dark:text-[#FF9933] ml-1" htmlFor="workout-date">
               Workout Date
             </label>
             <input
@@ -200,7 +200,7 @@ export function EditWorkoutForm({ workout, onSave, onCancel, isSaving }: EditWor
             />
           </div>
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-slate-500 dark:text-[#90cba8] ml-1" htmlFor="workout-start-time">
+            <label className="text-sm font-medium text-slate-500 dark:text-[#FF9933] ml-1" htmlFor="workout-start-time">
               Start Time
             </label>
             <input
@@ -212,7 +212,7 @@ export function EditWorkoutForm({ workout, onSave, onCancel, isSaving }: EditWor
             />
           </div>
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-slate-500 dark:text-[#90cba8] ml-1" htmlFor="workout-end-time">
+            <label className="text-sm font-medium text-slate-500 dark:text-[#FF9933] ml-1" htmlFor="workout-end-time">
               End Time (Optional)
             </label>
             <input
@@ -225,7 +225,7 @@ export function EditWorkoutForm({ workout, onSave, onCancel, isSaving }: EditWor
           </div>
           {calculatedDuration > 0 && (
             <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-slate-500 dark:text-[#90cba8] ml-1">
+              <label className="text-sm font-medium text-slate-500 dark:text-[#FF9933] ml-1">
                 Duration
               </label>
               <div className="w-full bg-white dark:bg-[#224932] rounded-xl px-4 py-3 text-base font-normal text-slate-900 dark:text-white shadow-sm">
@@ -236,7 +236,7 @@ export function EditWorkoutForm({ workout, onSave, onCancel, isSaving }: EditWor
         </div>
 
         <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-slate-500 dark:text-[#90cba8] ml-1" htmlFor="workout-desc">
+          <label className="text-sm font-medium text-slate-500 dark:text-[#FF9933] ml-1" htmlFor="workout-desc">
             Description (Optional)
           </label>
           <textarea
@@ -254,7 +254,7 @@ export function EditWorkoutForm({ workout, onSave, onCancel, isSaving }: EditWor
       <section>
         <div className="flex items-center justify-between mb-4 px-1">
           <h2 className="text-xl font-bold">Exercises</h2>
-          <span className="text-sm text-slate-500 dark:text-[#90cba8]">
+          <span className="text-sm text-slate-500 dark:text-[#FF9933]">
             {exercises.length} {exercises.length === 1 ? 'Exercise' : 'Exercises'}
           </span>
         </div>
@@ -278,7 +278,7 @@ export function EditWorkoutForm({ workout, onSave, onCancel, isSaving }: EditWor
           <button
             type="submit"
             disabled={isSaving || exercises.length === 0}
-            className="w-full py-3.5 px-4 rounded-xl font-bold text-background-dark bg-primary hover:bg-[#0be060] transition-colors shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-3.5 px-4 rounded-xl font-bold text-background-dark bg-primary hover:bg-[#E67E22] transition-colors shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSaving ? 'Saving...' : 'Save Changes'}
           </button>

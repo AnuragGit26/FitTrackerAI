@@ -126,12 +126,24 @@ function getWorkoutTypeForMuscles(readyMuscles: MuscleGroup[]): string | null {
   }
 
   // Category-based suggestions (lowered threshold to 1+)
-  if (legCount >= 1) return 'legs';
-  if (pushCount >= 1 && pullCount >= 1) return 'upper';
-  if (pushCount >= 1) return 'push';
-  if (pullCount >= 1) return 'pull';
-  if (armCount >= 1) return 'arms';
-  if (coreCount >= 1) return 'core';
+  if (legCount >= 1) {
+    return 'legs';
+  }
+  if (pushCount >= 1 && pullCount >= 1) {
+    return 'upper';
+  }
+  if (pushCount >= 1) {
+    return 'push';
+  }
+  if (pullCount >= 1) {
+    return 'pull';
+  }
+  if (armCount >= 1) {
+    return 'arms';
+  }
+  if (coreCount >= 1) {
+    return 'core';
+  }
 
   // Individual muscle focus (fallback for single muscles)
   if (readyMuscles.some(m => [MuscleGroup.CHEST, MuscleGroup.UPPER_CHEST, MuscleGroup.LOWER_CHEST].includes(m))) {
@@ -152,21 +164,29 @@ export function SuggestedWorkoutCard() {
   const { muscleStatuses, isLoading } = useMuscleRecovery();
 
   const suggestion = useMemo(() => {
-    if (isLoading || muscleStatuses.length === 0) return null;
+    if (isLoading || muscleStatuses.length === 0) {
+    return null;
+  }
 
     // Get muscle groups that are ready (>= 75% recovery)
     const readyMuscles = muscleStatuses
       .filter(status => status.recoveryPercentage >= 75)
       .map(status => status.muscle);
 
-    if (readyMuscles.length === 0) return null;
+    if (readyMuscles.length === 0) {
+    return null;
+  }
 
     // Determine workout type based on ready muscles
     const workoutType = getWorkoutTypeForMuscles(readyMuscles);
-    if (!workoutType) return null;
+    if (!workoutType) {
+    return null;
+  }
 
     const workoutSuggestion = WORKOUT_SUGGESTIONS[workoutType];
-    if (!workoutSuggestion) return null;
+    if (!workoutSuggestion) {
+    return null;
+  }
 
     // Filter exercises to only show those that target ready muscles
     const relevantExercises = workoutSuggestion.exercises.filter(exercise => {
@@ -174,7 +194,9 @@ export function SuggestedWorkoutCard() {
       return exercise.primaryMuscles.some(muscle => readyMuscles.includes(muscle));
     });
 
-    if (relevantExercises.length === 0) return null;
+    if (relevantExercises.length === 0) {
+    return null;
+  }
 
     // Get top 3 most recovered muscles for the reason
     const topRecovered = muscleStatuses
@@ -209,7 +231,7 @@ export function SuggestedWorkoutCard() {
 
   return (
     <div className="mx-4 mb-6">
-      <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-2xl p-5 border border-primary/30 shadow-[0_0_15px_rgba(13,242,105,0.1)]">
+      <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-2xl p-5 border border-primary/30 shadow-[0_0_15px_rgba(255,153,51,0.1)]">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-2">
             <div className="p-2 bg-primary/20 rounded-lg">

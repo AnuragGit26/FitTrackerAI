@@ -187,7 +187,7 @@ export const workoutAnalysisService = {
       .filter(w => {
         const workoutDate = w.date instanceof Date ? w.date : new Date(w.date);
         // Check for invalid date
-        if (isNaN(workoutDate.getTime())) return false;
+        if (isNaN(workoutDate.getTime())) {return false;}
         return workoutDate >= thirtyDaysAgo;
       })
       .sort((a, b) => {
@@ -213,7 +213,7 @@ export const workoutAnalysisService = {
     while (consecutiveDays < 30) {
       const hasWorkoutOnDate = recentWorkouts.some(w => {
         const workoutDate = w.date instanceof Date ? w.date : new Date(w.date);
-        if (isNaN(workoutDate.getTime())) return false;
+        if (isNaN(workoutDate.getTime())) {return false;}
         return isSameDay(workoutDate, checkDate);
       });
 
@@ -236,7 +236,7 @@ export const workoutAnalysisService = {
     const workoutsPerWeek = weeks.map(([start, end]) => {
       return recentWorkouts.filter(w => {
         const workoutDate = w.date instanceof Date ? w.date : new Date(w.date);
-        if (isNaN(workoutDate.getTime())) return false;
+        if (isNaN(workoutDate.getTime())) {return false;}
         return workoutDate >= start && workoutDate <= end;
       }).length;
     });
@@ -250,13 +250,13 @@ export const workoutAnalysisService = {
 
     const workoutsLast7Days = recentWorkouts.filter(w => {
       const workoutDate = w.date instanceof Date ? w.date : new Date(w.date);
-      if (isNaN(workoutDate.getTime())) return false;
+      if (isNaN(workoutDate.getTime())) {return false;}
       return workoutDate >= last7Days;
     });
 
     const workoutsLast14Days = recentWorkouts.filter(w => {
       const workoutDate = w.date instanceof Date ? w.date : new Date(w.date);
-      if (isNaN(workoutDate.getTime())) return false;
+      if (isNaN(workoutDate.getTime())) {return false;}
       return workoutDate >= last14Days;
     });
 
@@ -341,7 +341,7 @@ export const workoutAnalysisService = {
     const restDaysPerWeek = weeks.map(([start, end]) => {
       const weekWorkouts = recentWorkouts.filter(w => {
         const workoutDate = w.date instanceof Date ? w.date : new Date(w.date);
-        if (isNaN(workoutDate.getTime())) return false;
+        if (isNaN(workoutDate.getTime())) {return false;}
         return workoutDate >= start && workoutDate <= end;
       });
       const weekWorkoutDates = new Set(

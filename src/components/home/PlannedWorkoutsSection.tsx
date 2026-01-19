@@ -19,7 +19,9 @@ export function PlannedWorkoutsSection() {
 
   // Load upcoming planned workouts (next 7 days)
   useEffect(() => {
-    if (!profile?.id) return;
+    if (!profile?.id) {
+    return;
+  }
 
     const today = startOfDay(new Date());
     const nextWeek = addDays(today, 7);
@@ -34,7 +36,7 @@ export function PlannedWorkoutsSection() {
     return (plannedWorkouts ?? [])
       .filter((pw) => {
         const dateObj = new Date(pw.scheduledDate);
-        if (isNaN(dateObj.getTime())) return false;
+        if (isNaN(dateObj.getTime())) {return false;}
         
         try {
           const scheduledDate = startOfDay(dateObj);
@@ -57,7 +59,9 @@ export function PlannedWorkoutsSection() {
   }, [plannedWorkouts]);
 
   const handleStartWorkout = async (plannedWorkout: PlannedWorkout) => {
-    if (!profile?.id) return;
+    if (!profile?.id) {
+    return;
+  }
 
     try {
       const { startWorkoutFromPlanned } = useWorkoutStore.getState();

@@ -40,7 +40,9 @@ export const rpeService = {
       });
     });
 
-    if (allSets.length === 0) return 0;
+    if (allSets.length === 0) {
+    return 0;
+  }
 
     const sum = allSets.reduce((acc, set) => acc + (set.rpe || 0), 0);
     return sum / allSets.length;
@@ -217,16 +219,20 @@ export const rpeService = {
    * Detect RPE trend (increasing/decreasing)
    */
   detectTrend(rpeData: RPETrendData[]): 'increasing' | 'decreasing' | 'stable' {
-    if (rpeData.length < 2) return 'stable';
+    if (rpeData.length < 2) {
+    return 'stable';
+  }
 
     const recent = rpeData.slice(-7); // Last 7 data points
-    if (recent.length < 2) return 'stable';
+    if (recent.length < 2) {
+    return 'stable';
+  }
 
     const first = recent[0].rpe;
     const last = recent[recent.length - 1].rpe;
     const diff = last - first;
 
-    if (Math.abs(diff) < 0.3) return 'stable';
+    if (Math.abs(diff) < 0.3) {return 'stable';}
     return diff > 0 ? 'increasing' : 'decreasing';
   },
 };

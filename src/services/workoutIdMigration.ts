@@ -121,7 +121,9 @@ class WorkoutIdMigration {
       // Update workouts - delete old and create new
       for (const [oldId, newId] of idMapping) {
         const workout = workouts.find(w => String(w.id) === String(oldId));
-        if (!workout) continue;
+        if (!workout) {
+    continue;
+  }
 
         // Create updated workout with new ID
         const updatedWorkout: Workout = {

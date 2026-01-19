@@ -95,3 +95,27 @@ export const DEFAULT_RECOVERY_SETTINGS: RecoverySettings = {
   overtrainingThreshold: 80,
 };
 
+export function isBilateralMuscle(muscle: MuscleGroup): boolean {
+  const bilateralMuscles = [
+    MuscleGroup.CHEST,
+    MuscleGroup.UPPER_CHEST,
+    MuscleGroup.LOWER_CHEST,
+    MuscleGroup.BACK,
+    MuscleGroup.LATS,
+    MuscleGroup.TRAPS,
+    MuscleGroup.SHOULDERS,
+    MuscleGroup.FRONT_DELTS,
+    MuscleGroup.SIDE_DELTS,
+    MuscleGroup.REAR_DELTS,
+    MuscleGroup.BICEPS,
+    MuscleGroup.TRICEPS,
+    MuscleGroup.FOREARMS,
+    MuscleGroup.QUADS,
+    MuscleGroup.HAMSTRINGS,
+    MuscleGroup.GLUTES,
+    MuscleGroup.CALVES,
+    MuscleGroup.OBLIQUES,
+    MuscleGroup.HIP_FLEXORS,
+  ];
+  return bilateralMuscles.includes(muscle);
+}

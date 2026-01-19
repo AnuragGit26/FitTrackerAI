@@ -1,4 +1,4 @@
-import { Sparkles, Clock, Dumbbell, Play } from 'lucide-react';
+import { Sparkles, Clock, Dumbbell, Play, TrendingUp, Battery, Zap } from 'lucide-react';
 import { WorkoutRecommendation } from '@/types/insights';
 import { useNavigate } from 'react-router-dom';
 import { cleanPlainTextResponse } from '@/utils/aiResponseCleaner';
@@ -9,18 +9,34 @@ import { WorkoutExercise, WorkoutSet } from '@/types/exercise';
 import { calculateVolume } from '@/utils/calculations';
 import { useToast } from '@/hooks/useToast';
 import { ToastContainer } from '@/components/common/Toast';
+import { getRecommendationImageUrl } from '@/utils/recommendationImageMapper';
+import { categorizeMuscleGroup } from '@/utils/analyticsHelpers';
+
+interface RecommendedWorkoutMetrics {
+  prProbability?: number;
+  fatigueAccumulation?: number;
+  supercompensationScore?: number;
+}
 
 interface RecommendedWorkoutCardProps {
   workout?: WorkoutRecommendation;
+  metrics?: RecommendedWorkoutMetrics;
 }
 
-export function RecommendedWorkoutCard({ workout }: RecommendedWorkoutCardProps) {
+export function RecommendedWorkoutCard({ workout, metrics }: RecommendedWorkoutCardProps) {
   const navigate = useNavigate();
   const { profile } = useUserStore();
   const { muscleStatuses } = useMuscleRecovery();
   const { toasts, removeToast, error: showError } = useToast();
 
-  if (!workout) return null;
+  if (!workout) {
+    return null;
+  }
+
+  // Determine image URL
+  const primaryMuscle = workout.muscleGroups?.[0];
+  const category = primaryMuscle ? categorizeMuscleGroup(primaryMuscle) : 'mixed';
+  const imageUrl = getRecommendationImageUrl(category, 'strength');
 
   const handleStartWorkout = async () => {
     try {
@@ -142,7 +158,7 @@ export function RecommendedWorkoutCard({ workout }: RecommendedWorkoutCardProps)
         <div
           className="h-40 w-full bg-cover bg-center relative"
           style={{
-            backgroundImage: workout.imageUrl || 'url("https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800")',
+            backgroundImage: `url("${imageUrl}")`,
           }}
         >
           <div className="absolute inset-0 bg-gradient-to-t from-card-dark via-card-dark/60 to-transparent" />
@@ -151,6 +167,28 @@ export function RecommendedWorkoutCard({ workout }: RecommendedWorkoutCardProps)
               <Sparkles className="w-3.5 h-3.5" />
               Recommended
             </span>
+          </div>
+          
+          {/* Advanced Metrics Badges */}
+          <div className="absolute top-3 left-3 flex flex-col gap-1">
+            {metrics?.prProbability !== undefined && metrics.prProbability > 60 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-purple-500/90 backdrop-blur-sm px-2 py-0.5 text-[10px] font-bold text-white shadow-sm border border-purple-400/20">
+                <TrendingUp className="w-3 h-3" />
+                {metrics.prProbability}% PR Chance
+              </span>
+            )}
+            {metrics?.supercompensationScore !== undefined && metrics.supercompensationScore > 5 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/90 backdrop-blur-sm px-2 py-0.5 text-[10px] font-bold text-white shadow-sm border border-blue-400/20">
+                <Zap className="w-3 h-3" />
+                Supercompensation
+              </span>
+            )}
+            {metrics?.fatigueAccumulation !== undefined && metrics.fatigueAccumulation > 20 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/90 backdrop-blur-sm px-2 py-0.5 text-[10px] font-bold text-white shadow-sm border border-amber-400/20">
+                <Battery className="w-3 h-3" />
+                High Fatigue
+              </span>
+            )}
           </div>
         </div>
         <div className="p-5 -mt-6 relative z-10">
@@ -178,4 +216,3 @@ export function RecommendedWorkoutCard({ workout }: RecommendedWorkoutCardProps)
     </div>
   );
 }
-

@@ -23,7 +23,9 @@ export interface RecoveryInsight {
  * Calculate overall recovery score as average of all muscle groups
  */
 export function calculateOverallRecoveryScore(muscleStatuses: MuscleStatus[]): number {
-  if (muscleStatuses.length === 0) return 100;
+  if (muscleStatuses.length === 0) {
+    return 100;
+  }
   
   const total = muscleStatuses.reduce((sum, status) => {
     const val = status.recoveryPercentage;
@@ -117,7 +119,7 @@ export function calculateRecoveryTrend(
     ? Math.round((change / previous) * 100) 
     : (current > 0 ? 100 : 0);
     
-  if (isNaN(changePercentage)) changePercentage = 0;
+  if (isNaN(changePercentage)) {changePercentage = 0;}
 
   return {
     current,
@@ -131,8 +133,12 @@ export function calculateRecoveryTrend(
  * Determine readiness status based on overall recovery score
  */
 export function getReadinessStatus(overallScore: number): ReadinessStatus {
-  if (overallScore >= 75) return 'ready';
-  if (overallScore >= 50) return 'recovering';
+  if (overallScore >= 75) {
+    return 'ready';
+  }
+  if (overallScore >= 50) {
+    return 'recovering';
+  }
   return 'needs_rest';
 }
 
@@ -144,7 +150,9 @@ export function getTopMusclesByStatus(
   count: number = 6,
   filterBy: 'ready' | 'needs_rest' | 'all' = 'all'
 ): MuscleStatus[] {
-  if (muscleStatuses.length === 0) return [];
+  if (muscleStatuses.length === 0) {
+    return [];
+  }
 
   let filtered = [...muscleStatuses];
 
@@ -156,8 +164,12 @@ export function getTopMusclesByStatus(
     filtered.sort((a, b) => a.recoveryPercentage - b.recoveryPercentage);
   } else {
     filtered.sort((a, b) => {
-      if (a.recoveryPercentage >= 75 && b.recoveryPercentage < 75) return -1;
-      if (a.recoveryPercentage < 75 && b.recoveryPercentage >= 75) return 1;
+      if (a.recoveryPercentage >= 75 && b.recoveryPercentage < 75) {
+    return -1;
+  }
+      if (a.recoveryPercentage < 75 && b.recoveryPercentage >= 75) {
+    return 1;
+  }
       return b.recoveryPercentage - a.recoveryPercentage;
     });
   }

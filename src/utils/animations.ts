@@ -10,16 +10,27 @@ export const prefersReducedMotion = () => {
 
 /**
  * Common animation variants for Framer Motion
+ * Using seamless spring animations and smooth easing curves
  */
 export const fadeIn: Variants = {
   hidden: { opacity: 0 },
   visible: { 
     opacity: 1,
-    transition: { duration: 0.4, ease: 'easeOut' }
+    transition: { 
+      type: 'spring',
+      stiffness: 300,
+      damping: 30,
+      mass: 0.8
+    }
   },
   exit: { 
     opacity: 0,
-    transition: { duration: 0.3, ease: 'easeIn' }
+    transition: { 
+      type: 'spring',
+      stiffness: 400,
+      damping: 35,
+      mass: 0.6
+    }
   }
 };
 
@@ -31,12 +42,22 @@ export const slideUp: Variants = {
   visible: { 
     opacity: 1,
     y: 0,
-    transition: { duration: 0.4, ease: 'easeOut' }
+    transition: { 
+      type: 'spring',
+      stiffness: 300,
+      damping: 30,
+      mass: 0.8
+    }
   },
   exit: { 
     opacity: 0,
     y: -20,
-    transition: { duration: 0.3, ease: 'easeIn' }
+    transition: { 
+      type: 'spring',
+      stiffness: 400,
+      damping: 35,
+      mass: 0.6
+    }
   }
 };
 
@@ -48,12 +69,22 @@ export const slideDown: Variants = {
   visible: { 
     opacity: 1,
     y: 0,
-    transition: { duration: 0.4, ease: 'easeOut' }
+    transition: { 
+      type: 'spring',
+      stiffness: 300,
+      damping: 30,
+      mass: 0.8
+    }
   },
   exit: { 
     opacity: 0,
     y: 20,
-    transition: { duration: 0.3, ease: 'easeIn' }
+    transition: { 
+      type: 'spring',
+      stiffness: 400,
+      damping: 35,
+      mass: 0.6
+    }
   }
 };
 
@@ -65,12 +96,22 @@ export const slideLeft: Variants = {
   visible: { 
     opacity: 1,
     x: 0,
-    transition: { duration: 0.4, ease: 'easeOut' }
+    transition: { 
+      type: 'spring',
+      stiffness: 300,
+      damping: 30,
+      mass: 0.8
+    }
   },
   exit: { 
     opacity: 0,
     x: -20,
-    transition: { duration: 0.3, ease: 'easeIn' }
+    transition: { 
+      type: 'spring',
+      stiffness: 400,
+      damping: 35,
+      mass: 0.6
+    }
   }
 };
 
@@ -82,12 +123,22 @@ export const slideRight: Variants = {
   visible: { 
     opacity: 1,
     x: 0,
-    transition: { duration: 0.4, ease: 'easeOut' }
+    transition: { 
+      type: 'spring',
+      stiffness: 300,
+      damping: 30,
+      mass: 0.8
+    }
   },
   exit: { 
     opacity: 0,
     x: 20,
-    transition: { duration: 0.3, ease: 'easeIn' }
+    transition: { 
+      type: 'spring',
+      stiffness: 400,
+      damping: 35,
+      mass: 0.6
+    }
   }
 };
 
@@ -99,12 +150,22 @@ export const scaleIn: Variants = {
   visible: { 
     opacity: 1,
     scale: 1,
-    transition: { duration: 0.3, ease: 'easeOut' }
+    transition: { 
+      type: 'spring',
+      stiffness: 300,
+      damping: 25,
+      mass: 0.7
+    }
   },
   exit: { 
     opacity: 0,
     scale: 0.9,
-    transition: { duration: 0.2, ease: 'easeIn' }
+    transition: { 
+      type: 'spring',
+      stiffness: 400,
+      damping: 30,
+      mass: 0.5
+    }
   }
 };
 
@@ -116,12 +177,22 @@ export const scaleUp: Variants = {
   visible: { 
     opacity: 1,
     scale: 1,
-    transition: { duration: 0.4, ease: [0.34, 1.56, 0.64, 1] }
+    transition: { 
+      type: 'spring',
+      stiffness: 200,
+      damping: 20,
+      mass: 0.8
+    }
   },
   exit: { 
     opacity: 0,
     scale: 0.8,
-    transition: { duration: 0.2, ease: 'easeIn' }
+    transition: { 
+      type: 'spring',
+      stiffness: 400,
+      damping: 30,
+      mass: 0.5
+    }
   }
 };
 
@@ -162,7 +233,7 @@ export const staggerContainerSlow: Variants = {
 };
 
 /**
- * Page transition variants
+ * Page transition variants - seamless spring animation
  */
 export const pageTransition: Variants = {
   initial: { 
@@ -172,28 +243,43 @@ export const pageTransition: Variants = {
   animate: { 
     opacity: 1,
     y: 0,
-    transition: { duration: 0.3, ease: 'easeOut' }
+    transition: { 
+      type: 'spring',
+      stiffness: 300,
+      damping: 30,
+      mass: 0.8
+    }
   },
   exit: { 
     opacity: 0,
     y: -10,
-    transition: { duration: 0.2, ease: 'easeIn' }
+    transition: { 
+      type: 'spring',
+      stiffness: 400,
+      damping: 35,
+      mass: 0.6
+    }
   }
 };
 
 /**
- * Button press animation
+ * Button press animation - seamless spring feedback
  */
 export const buttonPress: Variants = {
   rest: { scale: 1 },
   pressed: { 
     scale: 0.95,
-    transition: { duration: 0.1 }
+    transition: { 
+      type: 'spring',
+      stiffness: 500,
+      damping: 30,
+      mass: 0.3
+    }
   }
 };
 
 /**
- * Card hover animation
+ * Card hover animation - seamless spring lift
  */
 export const cardHover: Variants = {
   rest: { 
@@ -203,12 +289,17 @@ export const cardHover: Variants = {
   hover: { 
     scale: 1.02,
     y: -4,
-    transition: { duration: 0.2, ease: 'easeOut' }
+    transition: { 
+      type: 'spring',
+      stiffness: 400,
+      damping: 25,
+      mass: 0.5
+    }
   }
 };
 
 /**
- * Toast animation variants
+ * Toast animation variants - seamless spring entrance
  */
 export const toastSlideIn: Variants = {
   initial: { 
@@ -223,29 +314,45 @@ export const toastSlideIn: Variants = {
     transition: { 
       type: 'spring',
       stiffness: 500,
-      damping: 30
+      damping: 30,
+      mass: 0.6
     }
   },
   exit: { 
     opacity: 0,
     y: -10,
     scale: 0.95,
-    transition: { duration: 0.2 }
+    transition: { 
+      type: 'spring',
+      stiffness: 500,
+      damping: 35,
+      mass: 0.4
+    }
   }
 };
 
 /**
- * Modal animation variants
+ * Modal animation variants - seamless fade
  */
 export const modalBackdrop: Variants = {
   initial: { opacity: 0 },
   animate: { 
     opacity: 1,
-    transition: { duration: 0.2, ease: 'easeOut' }
+    transition: { 
+      type: 'spring',
+      stiffness: 300,
+      damping: 30,
+      mass: 0.5
+    }
   },
   exit: { 
     opacity: 0,
-    transition: { duration: 0.2, ease: 'easeIn' }
+    transition: { 
+      type: 'spring',
+      stiffness: 400,
+      damping: 35,
+      mass: 0.4
+    }
   }
 };
 
@@ -270,7 +377,12 @@ export const modalContent: Variants = {
     opacity: 0,
     scale: 0.95,
     y: 10,
-    transition: { duration: 0.2, ease: 'easeIn' }
+    transition: { 
+      type: 'spring',
+      stiffness: 400,
+      damping: 35,
+      mass: 0.6
+    }
   }
 };
 
@@ -289,7 +401,7 @@ export const modalStagger: Variants = {
 };
 
 /**
- * Success checkmark animation
+ * Success checkmark animation - seamless spring bounce
  */
 export const checkmarkAnimation: Variants = {
   initial: { 
@@ -300,25 +412,30 @@ export const checkmarkAnimation: Variants = {
     scale: [0, 1.2, 1],
     opacity: 1,
     transition: { 
-      duration: 0.5,
-      times: [0, 0.6, 1],
-      ease: 'easeOut'
+      type: 'spring',
+      stiffness: 300,
+      damping: 20,
+      mass: 0.5,
+      times: [0, 0.6, 1]
     }
   }
 };
 
 /**
- * Shake animation for errors
+ * Shake animation for errors - seamless transition shake
  */
 export const shake: Variants = {
   shake: {
     x: [0, -10, 10, -10, 10, 0],
-    transition: { duration: 0.5 }
+    transition: { 
+      duration: 0.5,
+      ease: 'easeInOut'
+    }
   }
 };
 
 /**
- * Pulse animation
+ * Pulse animation - seamless transition pulse
  */
 export const pulse: Variants = {
   pulse: {
@@ -346,7 +463,7 @@ export const getReducedMotionVariants = (): Variants => {
 };
 
 /**
- * Celebration particle explosion animation
+ * Celebration particle explosion animation - seamless transition
  */
 export const celebrationParticles: Variants = {
   hidden: {
@@ -365,7 +482,7 @@ export const celebrationParticles: Variants = {
 };
 
 /**
- * Success pulse animation
+ * Success pulse animation - seamless transition pulse
  */
 export const successPulse: Variants = {
   pulse: {
@@ -380,7 +497,7 @@ export const successPulse: Variants = {
 };
 
 /**
- * Ripple effect for button clicks
+ * Ripple effect for button clicks - seamless transition expansion
  */
 export const rippleEffect: Variants = {
   hidden: {
@@ -399,7 +516,7 @@ export const rippleEffect: Variants = {
 };
 
 /**
- * Full celebration animation sequence for set completion
+ * Full celebration animation sequence for set completion - seamless transition bounce
  */
 export const setCompleteCelebration: Variants = {
   initial: {
@@ -417,3 +534,93 @@ export const setCompleteCelebration: Variants = {
   },
 };
 
+/**
+ * Hero slide up animation with seamless spring bounce for workout start banner
+ */
+export const heroSlideUp: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 60,
+    scale: 0.95
+  },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      type: 'spring',
+      stiffness: 200,
+      damping: 20,
+      mass: 0.8
+    }
+  },
+  exit: {
+    opacity: 0,
+    y: -20,
+    scale: 0.95,
+    transition: { 
+      type: 'spring',
+      stiffness: 400,
+      damping: 35,
+      mass: 0.6
+    }
+  }
+};
+
+/**
+ * Energy pulse animation with expanding saffron glow for CTA button - seamless transition
+ */
+export const energyPulse: Variants = {
+  initial: { scale: 1 },
+  pulse: {
+    scale: [1, 1.05, 1],
+    boxShadow: [
+      '0 0 0 0 rgba(255, 153, 51, 0)',
+      '0 0 0 10px rgba(255, 153, 51, 0.3)',
+      '0 0 0 20px rgba(255, 153, 51, 0)'
+    ],
+    transition: {
+      duration: 1.5,
+      repeat: Infinity,
+      ease: 'easeInOut'
+    }
+  }
+};
+
+/**
+ * Saffron glow pulse animation for primary action buttons - seamless transition pulse
+ */
+export const saffronGlowPulse: Variants = {
+  initial: { boxShadow: '0 0 20px rgba(255, 153, 51, 0.4)' },
+  pulse: {
+    boxShadow: [
+      '0 0 20px rgba(255, 153, 51, 0.4)',
+      '0 0 30px rgba(255, 153, 51, 0.6)',
+      '0 0 20px rgba(255, 153, 51, 0.4)',
+    ],
+    transition: {
+      duration: 2,
+      repeat: Infinity,
+      ease: 'easeInOut'
+    }
+  }
+};
+
+/**
+ * Saffron glow animation for secondary elements - seamless transition pulse
+ */
+export const saffronGlow: Variants = {
+  initial: { boxShadow: '0 0 20px rgba(255, 153, 51, 0.4)' },
+  pulse: {
+    boxShadow: [
+      '0 0 20px rgba(255, 153, 51, 0.4)',
+      '0 0 30px rgba(255, 153, 51, 0.6)',
+      '0 0 20px rgba(255, 153, 51, 0.4)',
+    ],
+    transition: {
+      duration: 2,
+      repeat: Infinity,
+      ease: 'easeInOut'
+    }
+  }
+};

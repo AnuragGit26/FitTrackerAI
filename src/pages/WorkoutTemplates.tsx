@@ -55,7 +55,9 @@ export function WorkoutTemplates() {
     }, [profile, loadTemplates, loadFeaturedTemplates, loadTrendingTemplates]);
 
     useEffect(() => {
-        if (!profile) return;
+        if (!profile) {
+    return;
+  }
 
         const timeoutId = setTimeout(() => {
             if (searchQuery.trim()) {
@@ -87,7 +89,9 @@ export function WorkoutTemplates() {
     };
 
     const handleTemplateSelect = async (templateId: string) => {
-        if (!profile) return;
+        if (!profile) {
+    return;
+  }
 
         try {
             await startWorkoutFromTemplate(templateId);

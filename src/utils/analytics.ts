@@ -17,7 +17,9 @@ class Analytics {
    * Track an event
    */
   track(eventName: string, properties?: Record<string, unknown>): void {
-    if (!this.enabled) return;
+    if (!this.enabled) {
+    return;
+  }
 
     const event: AnalyticsEvent = {
       name: eventName,

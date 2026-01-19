@@ -47,7 +47,7 @@ export function RPESlider({
   return (
     <div className={cn('w-full', className)}>
       <div className="flex justify-between items-end mb-2">
-        <span className="text-slate-500 dark:text-[#90cba8] text-xs font-medium uppercase tracking-wide">
+        <span className="text-slate-500 dark:text-[#FF9933] text-xs font-medium uppercase tracking-wide">
           RPE (Difficulty)
         </span>
         {showValue && (
@@ -71,7 +71,7 @@ export function RPESlider({
           disabled={disabled}
           className="w-full z-10 appearance-none bg-transparent cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
           style={{
-            background: `linear-gradient(to right, ${intensityColor} 0%, ${intensityColor} ${((localValue - min) / (max - min)) * 100}%, #316847 ${((localValue - min) / (max - min)) * 100}%, #316847 100%)`,
+            background: `linear-gradient(to right, ${intensityColor} 0%, ${intensityColor} ${((localValue - min) / (max - min)) * 100}%, #27272a ${((localValue - min) / (max - min)) * 100}%, #27272a 100%)`,
             height: '4px',
             borderRadius: '2px',
           }}

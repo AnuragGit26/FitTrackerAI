@@ -19,7 +19,7 @@ interface HIITSetCardProps {
 }
 
 const INTENSITY_LEVELS: Array<{ value: 'low' | 'moderate' | 'high' | 'max'; label: string; color: string }> = [
-  { value: 'low', label: 'Low', color: 'green' },
+  { value: 'low', label: 'Low', color: 'blue' },
   { value: 'moderate', label: 'Moderate', color: 'yellow' },
   { value: 'high', label: 'High', color: 'orange' },
   { value: 'max', label: 'Max', color: 'red' },
@@ -166,7 +166,9 @@ export function HIITSetCard({
   const canLogSet = workDurationNum > 0 && roundsNum > 0;
 
   const handleLogSetClick = () => {
-    if (!canLogSet || disabled) return;
+    if (!canLogSet || disabled) {
+    return;
+  }
     
     // Trigger celebration animations
     setIsLogging(true);
@@ -476,7 +478,7 @@ export function HIITSetCard({
             'flex w-full items-center justify-center gap-2 rounded-xl h-14 shadow-[0_0_20px_rgba(249,115,22,0.15)] transition-all relative z-10 overflow-hidden',
             canLogSet && !disabled
               ? 'bg-orange-500 hover:bg-orange-600 text-white active:scale-[0.98]'
-              : 'bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
+              : 'bg-white dark:bg-surface-dark-light text-slate-500 cursor-not-allowed'
           )}
           initial={false}
           animate={(showButtonAnimation || isLogging) && !shouldReduceMotion ? {
@@ -576,7 +578,7 @@ export function HIITSetCard({
               'flex w-full items-center justify-center gap-2 rounded-xl h-12 mt-3 border-2 transition-all relative overflow-hidden',
               !disabled
                 ? 'border-orange-500/30 bg-orange-500/5 hover:bg-orange-500/10 text-orange-600 dark:text-orange-400 active:scale-[0.98]'
-                : 'border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
+                : 'border-gray-100 dark:border-border-dark bg-gray-100 dark:bg-surface-dark text-gray-400 cursor-not-allowed'
             )}
             initial={false}
             animate={isNewSet && !shouldReduceMotion ? {

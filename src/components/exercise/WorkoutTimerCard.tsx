@@ -45,7 +45,7 @@ export function WorkoutTimerCard({
             transition={{ duration: 0.3 }}
             className="px-4 mb-4"
           >
-            <div className="bg-surface-light dark:bg-surface-dark p-4 rounded-2xl border border-gray-200 dark:border-[#316847] shadow-sm">
+            <div className="bg-surface-light dark:bg-surface-dark p-4 rounded-2xl border border-gray-100 dark:border-border-dark shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 flex-1">
                   <div className="flex items-center justify-center size-12 rounded-xl bg-primary/10">
@@ -54,10 +54,10 @@ export function WorkoutTimerCard({
                     </span>
                   </div>
                   <div className="flex-1">
-                    <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-0.5">
+                    <p className="text-xs font-bold text-slate-500 dark:text-gray-400 uppercase tracking-wider mb-0.5">
                       Workout Duration
                     </p>
-                    <p className="tabular-nums text-2xl font-display font-bold text-gray-900 dark:text-white tracking-tight">
+                    <p className="tabular-nums text-2xl font-display font-bold text-slate-900 dark:text-white tracking-tight">
                       {formattedTime}
                     </p>
                   </div>
@@ -66,7 +66,7 @@ export function WorkoutTimerCard({
                   {/* Pause/Resume Button */}
                   <button
                     onClick={isRunning ? onPause : onResume}
-                    className="flex items-center justify-center size-10 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+                    className="flex items-center justify-center size-10 rounded-lg bg-gray-100 dark:bg-surface-dark hover:bg-white dark:hover:bg-surface-dark-light text-slate-700 dark:text-gray-300 transition-colors"
                     aria-label={isRunning ? 'Pause timer' : 'Resume timer'}
                     title={isRunning ? 'Pause' : 'Resume'}
                   >
@@ -77,7 +77,7 @@ export function WorkoutTimerCard({
                   {/* Reset Button */}
                   <button
                     onClick={handleReset}
-                    className="flex items-center justify-center size-10 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-error/10 hover:text-error transition-colors text-gray-700 dark:text-gray-300"
+                    className="flex items-center justify-center size-10 rounded-lg bg-gray-100 dark:bg-surface-dark hover:bg-error/10 hover:text-error transition-colors text-slate-700 dark:text-gray-300"
                     aria-label="Reset timer"
                     title="Reset"
                   >
@@ -97,13 +97,13 @@ export function WorkoutTimerCard({
         title="Reset Timer"
       >
         <div className="space-y-4">
-          <p className="text-gray-700 dark:text-gray-300">
+          <p className="text-slate-700 dark:text-gray-300">
             Are you sure you want to reset the workout timer? This will clear all timer data and cannot be undone.
           </p>
           <div className="flex gap-3 pt-2">
             <button
               onClick={() => setShowResetConfirm(false)}
-              className="flex-1 h-12 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              className="flex-1 h-12 rounded-lg bg-white dark:bg-surface-dark-light text-slate-700 dark:text-gray-300 font-bold hover:bg-white dark:hover:bg-surface-dark transition-colors"
             >
               Cancel
             </button>

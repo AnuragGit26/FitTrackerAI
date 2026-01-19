@@ -19,7 +19,9 @@ export function ExportProgressModal({
     error,
     onClose,
 }: ExportProgressModalProps) {
-    if (!isOpen) return null;
+    if (!isOpen) {
+    return null;
+  }
 
     const isComplete = progress?.percentage === 100 && !error;
     const hasError = !!error;
@@ -29,7 +31,7 @@ export function ExportProgressModal({
             <div className="bg-white dark:bg-surface-dark rounded-2xl shadow-xl max-w-md w-full p-6 touch-pan-y">
                 <div className="flex items-center gap-4 mb-6">
                     {isComplete ? (
-                        <CheckCircle2 className="w-8 h-8 text-green-500" />
+                        <CheckCircle2 className="w-8 h-8 text-blue-500" />
                     ) : hasError ? (
                         <XCircle className="w-8 h-8 text-red-500" />
                     ) : (
@@ -55,7 +57,7 @@ export function ExportProgressModal({
                     <>
                         {/* Progress Bar */}
                         <div className="mb-4">
-                            <div className="w-full bg-gray-200 dark:bg-surface-border rounded-full h-3 overflow-hidden">
+                            <div className="w-full bg-white dark:bg-surface-border rounded-full h-3 overflow-hidden">
                                 <div
                                     className="bg-primary h-full rounded-full transition-all duration-300"
                                     style={{ width: `${progress.percentage}%` }}
@@ -99,7 +101,7 @@ export function ExportProgressModal({
                 {(isComplete || hasError) && (
                     <button
                         onClick={onClose}
-                        className="w-full mt-4 px-4 py-2 rounded-xl bg-primary hover:bg-[#0be060] text-black font-medium transition-colors touch-manipulation active:scale-[0.98] min-h-[44px]"
+                        className="w-full mt-4 px-4 py-2 rounded-xl bg-primary hover:bg-[#E67E22] text-black font-medium transition-colors touch-manipulation active:scale-[0.98] min-h-[44px]"
                     >
                         Close
                     </button>

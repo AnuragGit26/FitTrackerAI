@@ -18,12 +18,12 @@ export function CaloriesChart({ data }: CaloriesChartProps) {
 
   if (chartData.length === 0 || chartData.every(item => item.calories === 0)) {
     return (
-      <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-5 border border-gray-100 dark:border-gray-800/50 shadow-sm">
-        <h3 className="font-bold text-lg mb-1 text-gray-900 dark:text-white">
+      <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-5 border border-gray-100 dark:border-border-dark/50 shadow-sm">
+        <h3 className="font-bold text-lg mb-1 text-slate-900 dark:text-white">
           Calories Burned
         </h3>
-        <p className="text-xs text-gray-500 mb-4">Total calories burned over time</p>
-        <p className="text-gray-500 dark:text-gray-400 text-center py-8">
+        <p className="text-xs text-slate-500 mb-4">Total calories burned over time</p>
+        <p className="text-slate-500 dark:text-gray-400 text-center py-8">
           No calorie data available. Track calories when finishing workouts to see your progress here.
         </p>
       </div>
@@ -31,11 +31,11 @@ export function CaloriesChart({ data }: CaloriesChartProps) {
   }
 
   return (
-    <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-5 border border-gray-100 dark:border-gray-800/50 shadow-sm">
+    <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-5 border border-gray-100 dark:border-border-dark/50 shadow-sm">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h3 className="font-bold text-lg text-gray-900 dark:text-white">Calories Burned</h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+          <h3 className="font-bold text-lg text-slate-900 dark:text-white">Calories Burned</h3>
+          <p className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">
             Total calories burned over time
           </p>
         </div>

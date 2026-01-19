@@ -90,25 +90,25 @@ export function UnifiedDateSelector({
 
     return (
       <>
-        <div className="sticky top-0 z-40 flex items-center justify-between bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-sm p-4 border-b border-gray-200 dark:border-[#316847]">
+        <div className="sticky top-0 z-40 flex items-center justify-between bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-sm p-4 border-b border-gray-100 dark:border-border-dark">
           <h2 className="text-xl font-bold leading-tight tracking-tight flex-1">
             {title || 'Muscle Analytics'}
           </h2>
           <div className="flex items-center justify-end gap-3">
             <button
               onClick={() => onCustomRange?.()}
-              className="w-10 h-10 flex items-center justify-center bg-surface-light dark:bg-surface-dark rounded-full border border-gray-200 dark:border-gray-700 active:scale-95 transition-transform hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="w-10 h-10 flex items-center justify-center bg-surface-light dark:bg-surface-dark rounded-full border border-gray-100 dark:border-border-dark active:scale-95 transition-transform hover:bg-white dark:hover:bg-surface-dark"
               aria-label="Select custom date range"
             >
-              <Calendar className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+              <Calendar className="w-5 h-5 text-slate-500 dark:text-gray-400" />
             </button>
-            <button className="flex items-center justify-center rounded-full h-10 w-10 bg-gray-200 dark:bg-surface-dark text-slate-700 dark:text-white hover:bg-primary hover:text-black transition-colors">
+            <button className="flex items-center justify-center rounded-full h-10 w-10 bg-white dark:bg-surface-dark text-slate-700 dark:text-white hover:bg-primary hover:text-black transition-colors">
               <User className="w-5 h-5" />
             </button>
           </div>
         </div>
         <div className="px-4 py-4">
-          <div className="flex h-10 w-full items-center justify-center rounded-lg bg-gray-200 dark:bg-[#1c3a29] p-1">
+          <div className="flex h-10 w-full items-center justify-center rounded-lg bg-white dark:bg-surface-dark p-1">
             {periods.map((period) => (
               <label
                 key={period}
@@ -122,7 +122,7 @@ export function UnifiedDateSelector({
                   className={`text-sm font-medium ${
                     currentPeriod === period
                       ? 'text-primary'
-                      : 'text-slate-600 dark:text-[#90cba8]'
+                      : 'text-slate-600 dark:text-[#FF9933]'
                   }`}
                 >
                   {period}
@@ -153,18 +153,18 @@ export function UnifiedDateSelector({
   const currentRange = selectedRange || '30d';
 
   return (
-    <div className="sticky top-0 z-40 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-800/60">
+    <div className="sticky top-0 z-40 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md border-b border-gray-100 dark:border-border-dark/60">
       <div className="flex items-center justify-between px-4 py-3">
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
           {title || 'Progress'}
         </h1>
         <div className="flex items-center gap-3">
           <button
             onClick={() => onCustomRange?.()}
-            className="w-10 h-10 flex items-center justify-center bg-surface-light dark:bg-surface-dark rounded-full border border-gray-200 dark:border-gray-700 active:scale-95 transition-transform hover:bg-gray-100 dark:hover:bg-gray-800"
+            className="w-10 h-10 flex items-center justify-center bg-surface-light dark:bg-surface-dark rounded-full border border-gray-100 dark:border-border-dark active:scale-95 transition-transform hover:bg-white dark:hover:bg-surface-dark"
             aria-label="Select custom date range"
           >
-            <Calendar className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+            <Calendar className="w-5 h-5 text-slate-500 dark:text-gray-400" />
           </button>
           <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center border border-primary/30">
             <User className="w-6 h-6 text-primary" />
@@ -176,7 +176,7 @@ export function UnifiedDateSelector({
           <button
             ref={buttonRef}
             onClick={() => setShowRangeMenu(!showRangeMenu)}
-            className="flex shrink-0 items-center gap-2 bg-primary text-[#102217] pl-4 pr-3 py-1.5 rounded-full text-sm font-bold shadow-lg shadow-primary/20 active:scale-95 transition-all"
+            className="flex shrink-0 items-center gap-2 bg-primary text-[#050505] pl-4 pr-3 py-1.5 rounded-full text-sm font-bold shadow-lg shadow-primary/20 active:scale-95 transition-all"
           >
             <span>{rangeLabels[currentRange]}</span>
             <svg
@@ -201,7 +201,7 @@ export function UnifiedDateSelector({
               />
               {dropdownPosition && createPortal(
                 <div 
-                  className="fixed bg-surface-light dark:bg-surface-dark rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 py-2 z-[9999] min-w-[160px]"
+                  className="fixed bg-surface-light dark:bg-surface-dark rounded-xl shadow-2xl border border-gray-100 dark:border-border-dark py-2 z-[9999] min-w-[160px]"
                   style={{
                     top: `${dropdownPosition.top}px`,
                     left: `${dropdownPosition.left}px`,
@@ -214,7 +214,7 @@ export function UnifiedDateSelector({
                         setShowRangeMenu(false);
                       }}
                       className={cn(
-                        'w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors',
+                        'w-full text-left px-4 py-2 text-sm hover:bg-white dark:hover:bg-surface-dark transition-colors',
                         currentRange === range && 'text-primary font-bold'
                       )}
                     >

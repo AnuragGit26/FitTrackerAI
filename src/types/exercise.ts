@@ -71,6 +71,16 @@ export interface WorkoutSet {
   // For yoga/flexibility tracking
   focusAreas?: string[]; // Focus areas (e.g., Flexibility, Strength, Balance, Meditation)
   breathWorkType?: string; // Type of breath work (e.g., Breath holds, Pranayama)
+  // Side tracking for unilateral exercises
+  leftReps?: number;
+  rightReps?: number;
+  leftWeight?: number;
+  rightWeight?: number;
+  leftDistance?: number;
+  rightDistance?: number;
+  leftDuration?: number;
+  rightDuration?: number;
+  sides?: 'left' | 'right' | 'both';
 }
 
 export type ExerciseGroupType = 'single' | 'superset' | 'circuit';

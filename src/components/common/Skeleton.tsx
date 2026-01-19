@@ -19,7 +19,7 @@ export function Skeleton({
 }: SkeletonProps) {
   const shouldReduceMotion = prefersReducedMotion();
   
-  const baseStyles = 'bg-gray-200 dark:bg-gray-700 rounded';
+  const baseStyles = 'bg-white dark:bg-surface-dark-light rounded';
   
   const variantStyles = {
     text: 'h-4 rounded',

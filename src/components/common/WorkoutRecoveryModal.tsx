@@ -84,7 +84,9 @@ export function WorkoutRecoveryModal({
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return null;
+  }
 
   return (
     <Modal 
@@ -95,7 +97,7 @@ export function WorkoutRecoveryModal({
         <div className="flex flex-col sm:flex-row gap-3">
           <button
             onClick={handleResume}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-primary hover:bg-[#0be060] text-black rounded-xl font-medium transition-colors min-h-[44px] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-primary hover:bg-[#E67E22] text-black rounded-xl font-medium transition-colors min-h-[44px] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
           >
             <RotateCcw className="w-4 h-4" />
             Resume Workout
@@ -104,7 +106,7 @@ export function WorkoutRecoveryModal({
           <button
             onClick={handleSaveNow}
             disabled={isSaving || isDiscarding}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
           >
             {isSaving ? (
               <>
@@ -154,7 +156,7 @@ export function WorkoutRecoveryModal({
           </div>
         )}
 
-        <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 space-y-3">
+        <div className="bg-gray-50 dark:bg-surface-dark rounded-xl p-4 border border-gray-200 dark:border-border-dark space-y-3">
           <div className="flex items-center gap-2 text-sm">
             <Calendar className="w-4 h-4 text-gray-500 dark:text-gray-400" />
             <span className="text-gray-700 dark:text-gray-300">

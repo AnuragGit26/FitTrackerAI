@@ -25,6 +25,7 @@ import { AICoachInsightCard } from '@/components/analytics/AICoachInsightCard';
 import { FocusDistributionChart } from '@/components/analytics/FocusDistributionChart';
 import { VolumeByMuscleChart } from '@/components/analytics/VolumeByMuscleChart';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { EmptyStateAIMessage } from '@/components/common/EmptyStateAIMessage';
 import { CustomDateRangePicker } from '@/components/analytics/CustomDateRangePicker';
 import { AnalyticsMetrics } from '@/types/analytics';
 
@@ -240,7 +241,7 @@ export function Analytics() {
   return (
     <div className="min-h-screen bg-background-light dark:bg-background-dark pb-24">
       {/* View Toggle */}
-      <div className="sticky top-0 z-50 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-800/60">
+      <div className="sticky top-0 z-50 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md border-b border-gray-100 dark:border-border-dark/60">
         <div className="flex items-center justify-center gap-2 p-2 relative">
           <motion.div
             className="absolute left-2 right-2 h-[calc(100%-16px)] bg-primary rounded-lg"
@@ -254,8 +255,8 @@ export function Analytics() {
           <button
             onClick={() => setView('progress')}
             className={`relative z-10 flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${view === 'progress'
-                ? 'text-[#102217]'
-                : 'text-gray-600 dark:text-gray-300'
+                ? 'text-[#050505]'
+                : 'text-slate-500 dark:text-gray-300'
               }`}
           >
             Progress
@@ -263,8 +264,8 @@ export function Analytics() {
           <button
             onClick={() => setView('muscle')}
             className={`relative z-10 flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${view === 'muscle'
-                ? 'text-[#102217]'
-                : 'text-gray-600 dark:text-gray-300'
+                ? 'text-[#050505]'
+                : 'text-slate-500 dark:text-gray-300'
               }`}
           >
             Muscle Groups
@@ -292,7 +293,11 @@ export function Analytics() {
               transition={{ duration: 0.3 }}
             >
               <div className="p-4 space-y-5 max-w-2xl mx-auto">
-              {!hasEnoughWorkouts && (
+              {workouts.length === 0 ? (
+                <div className="mb-4">
+                  <EmptyStateAIMessage screenName="Analytics" />
+                </div>
+              ) : !hasEnoughWorkouts && (
                 <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
                   <p className="text-sm text-blue-800 dark:text-blue-200">
                     <strong>Building your data:</strong> You have {workouts.length} workout{workouts.length !== 1 ? 's' : ''} logged. 

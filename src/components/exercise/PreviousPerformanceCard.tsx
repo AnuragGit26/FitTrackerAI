@@ -32,7 +32,7 @@ export function PreviousPerformanceCard({
         </span>
       </div>
 
-      <div className="relative overflow-hidden rounded-xl border border-slate-200 dark:border-[#316847] bg-surface-light dark:bg-surface-dark shadow-sm">
+      <div className="relative overflow-hidden rounded-xl border border-slate-200 dark:border-border-dark bg-surface-light dark:bg-surface-dark shadow-sm">
         <div
           className={cn(
             'grid divide-x divide-slate-100 dark:divide-white/5',

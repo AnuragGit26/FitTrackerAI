@@ -24,9 +24,9 @@ export function RecoveryAnalyticsCard({ recoveryLogs, dateRange: _dateRange }: R
     <div className="space-y-6">
       {/* Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-200 dark:border-gray-800 shadow-sm">
+        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-100 dark:border-border-dark shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+            <span className="text-sm text-slate-500 dark:text-gray-400 font-medium">
               Avg Recovery
             </span>
             <Activity className="w-5 h-5 text-primary" />
@@ -39,9 +39,9 @@ export function RecoveryAnalyticsCard({ recoveryLogs, dateRange: _dateRange }: R
           </div>
         </div>
 
-        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-200 dark:border-gray-800 shadow-sm">
+        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-100 dark:border-border-dark shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+            <span className="text-sm text-slate-500 dark:text-gray-400 font-medium">
               Avg Stress
             </span>
           </div>
@@ -53,9 +53,9 @@ export function RecoveryAnalyticsCard({ recoveryLogs, dateRange: _dateRange }: R
           </div>
         </div>
 
-        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-200 dark:border-gray-800 shadow-sm">
+        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-100 dark:border-border-dark shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+            <span className="text-sm text-slate-500 dark:text-gray-400 font-medium">
               Avg Energy
             </span>
           </div>
@@ -67,9 +67,9 @@ export function RecoveryAnalyticsCard({ recoveryLogs, dateRange: _dateRange }: R
           </div>
         </div>
 
-        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-200 dark:border-gray-800 shadow-sm">
+        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-100 dark:border-border-dark shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+            <span className="text-sm text-slate-500 dark:text-gray-400 font-medium">
               Avg Soreness
             </span>
           </div>
@@ -84,8 +84,8 @@ export function RecoveryAnalyticsCard({ recoveryLogs, dateRange: _dateRange }: R
 
       {/* Recovery Trend */}
       {metrics.recoveryTrend.length > 0 && (
-        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-200 dark:border-gray-800 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-100 dark:border-border-dark shadow-sm">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">
             Recovery Trend
           </h3>
           <ResponsiveContainer width="100%" height={200}>
@@ -127,8 +127,8 @@ export function RecoveryAnalyticsCard({ recoveryLogs, dateRange: _dateRange }: R
 
       {/* Readiness Distribution */}
       {recoveryLogs.length > 0 && (
-        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-200 dark:border-gray-800 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-100 dark:border-border-dark shadow-sm">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">
             Readiness Distribution
           </h3>
           <ResponsiveContainer width="100%" height={200}>

@@ -30,9 +30,15 @@ export function getIntensityLabel(rpe: number): {
 }
 
 export function getRpeColor(rpe: number): string {
-  if (rpe >= 9) return '#ef4444'; // red
-  if (rpe >= 7) return '#0df269'; // primary green
-  if (rpe >= 5) return '#fbbf24'; // yellow
+  if (rpe >= 9) {
+    return '#ef4444';
+  } // red
+  if (rpe >= 7) {
+    return '#3b82f6';
+  } // blue
+  if (rpe >= 5) {
+    return '#fbbf24';
+  } // yellow
   return '#6b7280'; // gray
 }
 

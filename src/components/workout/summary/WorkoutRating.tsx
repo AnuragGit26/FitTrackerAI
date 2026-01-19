@@ -12,7 +12,7 @@ export function WorkoutRating({ rating }: WorkoutRatingProps) {
   return (
     <div className="px-4 pb-6">
       <h3 className="text-slate-900 dark:text-white text-lg font-bold mb-3 px-1">Workout Rating</h3>
-      <div className="relative w-full rounded-2xl bg-gradient-to-br from-[#162e21] to-black border border-[#316847] p-6 overflow-hidden">
+      <div className="relative w-full rounded-2xl bg-gradient-to-br from-[#18181b] to-black border border-[#27272a] p-6 overflow-hidden">
         {/* Background Decoration */}
         <div className="absolute -top-10 -right-10 w-40 h-40 bg-primary/20 rounded-full blur-3xl"></div>
         <div className="flex items-center justify-between relative z-10">
@@ -47,7 +47,7 @@ export function WorkoutRating({ rating }: WorkoutRatingProps) {
               />
               {/* Progress Circle */}
               <path
-                className="text-primary drop-shadow-[0_0_8px_rgba(13,242,105,0.6)]"
+                className="text-primary drop-shadow-[0_0_8px_rgba(255,153,51,0.6)]"
                 d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                 fill="none"
                 stroke="currentColor"

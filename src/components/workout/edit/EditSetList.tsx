@@ -60,7 +60,7 @@ export function EditSetList({ sets, onSetsChange }: EditSetListProps) {
     <div className="flex flex-col gap-3">
       {/* Header - only show for weight_reps */}
       {isWeightReps && (
-        <div className="grid grid-cols-[1fr_2fr_2fr_auto] gap-3 mb-2 text-xs font-bold text-slate-500 dark:text-[#90cba8] uppercase tracking-wider text-center">
+        <div className="grid grid-cols-[1fr_2fr_2fr_auto] gap-3 mb-2 text-xs font-bold text-slate-500 dark:text-[#FF9933] uppercase tracking-wider text-center">
           <span>Set</span>
           <span>kg</span>
           <span>Reps</span>

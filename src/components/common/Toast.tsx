@@ -39,7 +39,7 @@ export function Toast({ message, type = 'info', duration = 3000, onClose, action
     success: 'bg-success/10 text-success border-success/20',
     error: 'bg-error/10 text-error border-error/20',
     warning: 'bg-warning/10 text-warning border-warning/20',
-    info: 'bg-primary-50 text-primary-600 border-primary-200 dark:bg-primary-900/20 dark:text-primary-400 dark:border-primary-800',
+    info: 'bg-primary/10 text-primary border-primary/20 dark:bg-primary/20 dark:text-primary dark:border-primary/30',
   };
 
   const Icon = icons[type];

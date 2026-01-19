@@ -19,7 +19,9 @@ export function NutritionTimingTimeline({ events }: NutritionTimingTimelineProps
     }
   };
 
-  if (events.length === 0) return null;
+  if (events.length === 0) {
+    return null;
+  }
 
   return (
     <div className="flex flex-col gap-4 mt-4">
@@ -28,18 +30,18 @@ export function NutritionTimingTimeline({ events }: NutritionTimingTimelineProps
         <span className="text-xs font-normal text-primary bg-primary/10 px-2 py-1 rounded-md">Live Feed</span>
       </h2>
       <div className="px-4">
-        <div className="relative border-l-2 border-dashed border-gray-200 dark:border-[#1c3a2f] ml-3 space-y-8 py-2">
+        <div className="relative border-l-2 border-dashed border-gray-100 dark:border-[#1c3a2f] ml-3 space-y-8 py-2">
           {events.map((event, index) => (
             <div key={event.id} className={`relative pl-8 ${index > 0 ? 'opacity-60' : ''}`}>
               <div
                 className={`absolute -left-[9px] top-1 h-4 w-4 rounded-full border-2 border-primary ${
-                  index === 0 ? 'bg-background-light dark:bg-background-dark' : 'bg-gray-300 dark:bg-[#1c3a2f]'
+                  index === 0 ? 'bg-background-light dark:bg-background-dark' : 'bg-white dark:bg-[#1c3a2f]'
                 }`}
               />
               <div className="flex flex-col gap-1">
                 <span
                   className={`text-xs font-mono font-bold ${
-                    index === 0 ? 'text-primary' : 'text-gray-500 dark:text-gray-400'
+                    index === 0 ? 'text-primary' : 'text-slate-500 dark:text-gray-400'
                   }`}
                 >
                   {event.relativeTime}
@@ -51,7 +53,7 @@ export function NutritionTimingTimeline({ events }: NutritionTimingTimelineProps
                     </div>
                     <div>
                       <p className="text-sm font-bold text-black dark:text-white">{cleanPlainTextResponse(event.title)}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{cleanPlainTextResponse(event.description)}</p>
+                      <p className="text-xs text-slate-500 dark:text-gray-400">{cleanPlainTextResponse(event.description)}</p>
                     </div>
                   </div>
                 </div>

@@ -11,8 +11,12 @@ export function Layout({ children, showBottomNav = true }: LayoutProps) {
   const location = useLocation();
   const isHomePage = location.pathname === '/';
 
+  if (location.pathname === '/onboarding') {
+    return <>{children}</>;
+  }
+
   return (
-    <div className={`min-h-screen ${isHomePage ? 'bg-background-light dark:bg-background-dark' : 'bg-gray-50 dark:bg-gray-900'} pb-safe`}>
+    <div className={`min-h-screen ${isHomePage ? 'bg-background-light dark:bg-background-dark' : 'bg-background-light dark:bg-background-dark'} pb-safe`}>
       {/* Skip to main content link for accessibility */}
       <a
         href="#main-content"

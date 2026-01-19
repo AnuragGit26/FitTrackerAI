@@ -7,8 +7,9 @@ import {
   listAll,
   StorageReference,
 } from 'firebase/storage';
-import { getFirebaseApp } from './firebaseConfig';
+import { getFirebaseApp, getFirebaseAuth } from './firebaseConfig';
 import { logger } from '@/utils/logger';
+import { errorRecovery } from './errorRecovery';
 
 export interface UploadResult {
   url: string;
@@ -30,57 +31,124 @@ export class FirebaseStorageService {
    * @returns The download URL and storage path
    */
   async uploadProfilePicture(userId: string, file: File): Promise<UploadResult> {
-    try {
-      logger.log('[FirebaseStorage] Uploading profile picture for user:', userId);
-
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        throw new Error('File must be an image');
-      }
-
-      // Validate file size (max 5MB)
-      const maxSize = 5 * 1024 * 1024; // 5MB
-      if (file.size > maxSize) {
-        throw new Error('Image size must be less than 5MB');
-      }
-
-      // Create a unique filename with timestamp
-      const timestamp = Date.now();
-      const extension = file.name.split('.').pop() || 'jpg';
-      const filename = `${timestamp}.${extension}`;
-      const storagePath = `profile-pictures/${userId}/${filename}`;
-
-      // Create storage reference
-      const storageRef = ref(this.storage, storagePath);
-
-      // Set metadata
-      const metadata = {
-        contentType: file.type,
-        customMetadata: {
-          uploadedAt: new Date().toISOString(),
-          userId,
-        },
-      };
-
-      // Upload file
-      const snapshot = await uploadBytes(storageRef, file, metadata);
-      logger.log('[FirebaseStorage] Upload complete:', snapshot.metadata.fullPath);
-
-      // Get download URL
-      const url = await getDownloadURL(storageRef);
-      logger.log('[FirebaseStorage] Download URL obtained:', url);
-
-      // Delete old profile pictures (keep only the latest)
-      await this.deleteOldProfilePictures(userId, filename);
-
-      return {
-        url,
-        path: storagePath,
-      };
-    } catch (error) {
-      logger.error('[FirebaseStorage] Upload error:', error);
-      throw this.handleStorageError(error);
+    // Ensure user is authenticated with Firebase Auth
+    const auth = getFirebaseAuth();
+    const currentUser = auth.currentUser;
+    
+    if (!currentUser) {
+      throw new Error('You must be signed in to upload a profile picture. Please sign in and try again.');
     }
+
+    // Verify userId matches the authenticated user
+    if (currentUser.uid !== userId) {
+      logger.warn(
+        '[FirebaseStorage] User ID mismatch:',
+        { requestedUserId: userId, authUserId: currentUser.uid }
+      );
+      throw new Error('User ID mismatch. Please sign out and sign in again.');
+    }
+
+    // Ensure auth token is fresh (Firebase Storage requires valid auth token)
+    let authToken: string;
+    try {
+      authToken = await currentUser.getIdToken(true); // Force refresh
+      logger.log('[FirebaseStorage] Auth token refreshed for user:', userId);
+    } catch (tokenError) {
+      logger.error('[FirebaseStorage] Failed to refresh auth token:', tokenError);
+      throw new Error('Authentication expired. Please sign in again.');
+    }
+
+    // Verify token is valid (not null/undefined)
+    if (!authToken) {
+      throw new Error('Invalid authentication token. Please sign in again.');
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      throw new Error('File must be an image');
+    }
+
+    // Validate file size (max 5MB)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      throw new Error('Image size must be less than 5MB');
+    }
+
+    // Create a unique filename with timestamp
+    const timestamp = Date.now();
+    const extension = file.name.split('.').pop() || 'jpg';
+    const filename = `${timestamp}.${extension}`;
+    const storagePath = `profile-pictures/${userId}/${filename}`;
+
+    // Create storage reference
+    const storageRef = ref(this.storage, storagePath);
+
+    // Set metadata
+    const metadata = {
+      contentType: file.type,
+      customMetadata: {
+        uploadedAt: new Date().toISOString(),
+        userId,
+      },
+    };
+
+    // Upload with retry logic for network errors
+    return await errorRecovery.withRetry(
+      async () => {
+        logger.log('[FirebaseStorage] Uploading profile picture for user:', userId);
+
+        // Upload file
+        const snapshot = await uploadBytes(storageRef, file, metadata);
+        logger.log('[FirebaseStorage] Upload complete:', snapshot.metadata.fullPath);
+
+        // Get download URL
+        const url = await getDownloadURL(storageRef);
+        logger.log('[FirebaseStorage] Download URL obtained:', url);
+
+        // Delete old profile pictures (keep only the latest)
+        await this.deleteOldProfilePictures(userId, filename);
+
+        return {
+          url,
+          path: storagePath,
+        };
+      },
+      {
+        maxRetries: 3,
+        baseDelay: 1000,
+        maxDelay: 5000,
+        exponentialBackoff: true,
+        retryableErrors: (error) => {
+          // Check if it's a network/connection error
+          const message = error.message.toLowerCase();
+          const errorString = String(error).toLowerCase();
+          
+          // Retry on connection reset, network errors, and timeouts
+          const isNetworkError = 
+            message.includes('connection') ||
+            message.includes('network') ||
+            message.includes('timeout') ||
+            message.includes('econnreset') ||
+            message.includes('failed to fetch') ||
+            errorString.includes('err_connection_reset') ||
+            error.name === 'NetworkError' ||
+            error.name === 'TimeoutError';
+          
+          // Don't retry on auth/permission errors
+          const isNonRetryable = 
+            message.includes('unauthorized') ||
+            message.includes('permission') ||
+            message.includes('quota') ||
+            message.includes('invalid') ||
+            message.includes('forbidden');
+          
+          return isNetworkError && !isNonRetryable;
+        },
+      }
+    ).catch((error) => {
+      logger.error('[FirebaseStorage] Upload error after retries:', error);
+      throw this.handleStorageError(error);
+    });
   }
 
   /**
@@ -270,7 +338,11 @@ export class FirebaseStorageService {
 
       switch (storageError.code) {
         case 'storage/unauthorized':
-          return new Error('You do not have permission to access this file.');
+          return new Error(
+            'You do not have permission to access this file. ' +
+            'This usually means the Firebase Storage security rules have not been deployed. ' +
+            'Please run: firebase deploy --only storage'
+          );
         case 'storage/canceled':
           return new Error('Upload was cancelled.');
         case 'storage/unknown':
@@ -286,7 +358,7 @@ export class FirebaseStorageService {
         case 'storage/unauthenticated':
           return new Error('Please sign in to upload files.');
         case 'storage/retry-limit-exceeded':
-          return new Error('Upload failed after multiple attempts. Please try again later.');
+          return new Error('Upload failed after multiple attempts. Please check your internet connection and try again.');
         case 'storage/invalid-checksum':
           return new Error('File was corrupted during upload. Please try again.');
         case 'storage/invalid-event-name':
@@ -300,9 +372,26 @@ export class FirebaseStorageService {
         case 'storage/server-file-wrong-size':
           return new Error('Upload failed due to file size mismatch. Please try again.');
         default:
-          logger.error('[FirebaseStorage] Unhandled error:', storageError.code, storageError.message);
+          logger.error(
+            '[FirebaseStorage] Unhandled error:',
+            new Error(storageError.message),
+            { code: storageError.code }
+          );
           return new Error(`Storage error: ${storageError.message}`);
       }
+    }
+
+    // Handle network errors
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const lowerMessage = errorMessage.toLowerCase();
+    
+    if (
+      lowerMessage.includes('connection reset') ||
+      lowerMessage.includes('err_connection_reset') ||
+      lowerMessage.includes('network error') ||
+      lowerMessage.includes('failed to fetch')
+    ) {
+      return new Error('Network connection failed. Please check your internet connection and try again.');
     }
 
     return error instanceof Error ? error : new Error('Unknown storage error');

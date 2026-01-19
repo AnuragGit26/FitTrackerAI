@@ -17,7 +17,9 @@ function formatMuscleName(muscle: MuscleGroup): string {
 export function MuscleBalanceSection({ imbalances }: MuscleBalanceSectionProps) {
   const navigate = useNavigate();
 
-  if (imbalances.length === 0) return null;
+  if (imbalances.length === 0) {
+    return null;
+  }
 
   const imbalance = imbalances[0];
   const maxVolume = Math.max(imbalance.leftVolume, imbalance.rightVolume, 1);

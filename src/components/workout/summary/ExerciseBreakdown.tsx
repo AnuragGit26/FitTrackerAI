@@ -111,7 +111,7 @@ export function ExerciseBreakdown({ comparisons }: ExerciseBreakdownProps) {
           return (
             <details
               key={comparison.exerciseId}
-              className="flex flex-col rounded-xl border border-gray-200 dark:border-[#316847] bg-white dark:bg-[#162e21] group overflow-hidden"
+              className="flex flex-col rounded-xl border border-gray-200 dark:border-border-dark bg-white dark:bg-[#18181b] group overflow-hidden"
               open={isOpen}
             >
               <summary 
@@ -122,7 +122,7 @@ export function ExerciseBreakdown({ comparisons }: ExerciseBreakdownProps) {
                 }}
               >
                 <div className="flex items-center gap-3 flex-1">
-                  <div className="size-10 rounded-lg bg-gray-200 dark:bg-[#316847] flex items-center justify-center shrink-0">
+                  <div className="size-10 rounded-lg bg-gray-200 dark:bg-[#27272a] flex items-center justify-center shrink-0">
                     <span className="material-symbols-outlined text-gray-500 dark:text-gray-300">
                       fitness_center
                     </span>
@@ -148,7 +148,7 @@ export function ExerciseBreakdown({ comparisons }: ExerciseBreakdownProps) {
                   </div>
                 </div>
               </summary>
-              <div className="p-4 border-t border-gray-200 dark:border-[#316847] bg-white dark:bg-[#162e21]">
+              <div className="p-4 border-t border-gray-200 dark:border-border-dark bg-white dark:bg-[#18181b]">
                 {hasPreviousData ? (
                   <>
                     {/* Comparison Row Header */}
@@ -186,7 +186,7 @@ export function ExerciseBreakdown({ comparisons }: ExerciseBreakdownProps) {
                     No previous workout data available for comparison.
                   </p>
                 )}
-                <div className="mt-3 pt-3 border-t border-dashed border-gray-200 dark:border-[#316847] flex justify-between items-center">
+                <div className="mt-3 pt-3 border-t border-dashed border-gray-200 dark:border-border-dark flex justify-between items-center">
                   {comparison.estimated1RM && (
                     <span className="text-xs text-slate-500 dark:text-gray-400">
                       Est. 1RM:{' '}

@@ -108,7 +108,9 @@ export const supersetService = {
     const reordered = newOrder
       .map((exerciseId, index) => {
         const exercise = group.exercises.find((ex) => ex.id === exerciseId);
-        if (!exercise) return null;
+        if (!exercise) {
+    return null;
+  }
         return {
           ...exercise,
           groupOrder: index,
@@ -135,7 +137,9 @@ export const supersetService = {
    * Calculate average volume per exercise in group
    */
   calculateAverageVolume(group: SupersetGroup): number {
-    if (group.exercises.length === 0) return 0;
+    if (group.exercises.length === 0) {
+    return 0;
+  }
     return this.calculateGroupVolume(group) / group.exercises.length;
   },
 
@@ -250,7 +254,9 @@ export const supersetService = {
     exercise: WorkoutExercise,
     allExercises: WorkoutExercise[]
   ): string | null {
-    if (!exercise.groupId) return null;
+    if (!exercise.groupId) {
+    return null;
+  }
 
     const groupExercises = this.getGroupExercises(allExercises, exercise.groupId);
     const position = groupExercises.findIndex((ex) => ex.id === exercise.id) + 1;

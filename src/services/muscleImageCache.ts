@@ -18,11 +18,11 @@ function generateMuscleSVG(muscle: MuscleGroup): string {
         .split('_')
         .map(word => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ');
-    
+
     // Create a consistent gradient based on muscle group
     const gradientId = `grad-${muscle}`;
     const colors = getMuscleColors(muscle);
-    
+
     const svg = `<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="${gradientId}" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -33,7 +33,7 @@ function generateMuscleSVG(muscle: MuscleGroup): string {
   <rect width="512" height="512" fill="url(#${gradientId})" />
   <text x="256" y="256" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="#0df269" text-anchor="middle" dominant-baseline="middle" opacity="0.8">${muscleName}</text>
 </svg>`;
-    
+
     // URL encode the SVG instead of base64 for better compatibility
     return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
@@ -122,7 +122,7 @@ class MuscleImageCacheService {
      */
     async getCachedImageUrl(muscle: MuscleGroup): Promise<string> {
         const imageUrl = this.getImageUrl(muscle);
-        
+
         // Data URIs work directly, no need to cache them
         if (imageUrl.startsWith('data:')) {
             return imageUrl;

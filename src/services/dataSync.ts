@@ -9,7 +9,7 @@ class DataSyncService {
   private isInitializingUser = false;
 
   initialize() {
-    if (this.initialized) return;
+    if (this.initialized) {return;}
 
     const unsubscribeWorkout = dataService.on('workout', async () => {
       const userStore = useUserStore.getState();

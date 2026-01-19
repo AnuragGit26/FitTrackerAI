@@ -2,6 +2,8 @@ import { CheckCircle2 } from 'lucide-react';
 import { useMuscleRecovery } from '@/hooks/useMuscleRecovery';
 import { MuscleGroup, RecoveryStatus } from '@/types/muscle';
 import { cn } from '@/utils/cn';
+import { cardStyles } from '@/utils/styleHelpers';
+import { spacing, borderRadius, typography, transitions } from '@/styles/designSystem';
 import { MuscleGroupIcon } from '@/components/rest/MuscleGroupIcon';
 import { getTopMusclesByStatus } from '@/utils/recoveryHelpers';
 import { useMemo } from 'react';
@@ -56,9 +58,13 @@ function MuscleGroupCard({
   return (
     <div
       className={cn(
-        'snap-center min-w-[120px] flex flex-col gap-2 rounded-xl bg-white dark:bg-surface-dark-light p-3 border cursor-pointer transition-all hover:scale-105 relative',
+        'snap-center min-w-[120px] flex flex-col relative border cursor-pointer hover:scale-105',
+        cardStyles('compact'),
+        spacing.tight,
+        borderRadius.card,
+        transitions.base,
         isReady
-          ? 'border-primary/30 shadow-[0_0_10px_rgba(13,242,105,0.1)]'
+          ? 'border-primary/30 shadow-[0_0_10px_rgba(255,153,51,0.1)]'
           : borderColor
       )}
       onClick={onClick}
@@ -91,8 +97,8 @@ function MuscleGroupCard({
         <MuscleGroupIcon muscle={muscle} recoveryStatus={recoveryStatus} />
       </div>
       <div className="text-center">
-        <p className="font-bold text-slate-900 dark:text-white text-xs">{muscleName}</p>
-        <p className={cn('text-[10px] font-medium', statusColor)}>{statusText}</p>
+        <p className={cn(typography.cardTitle, 'text-xs')}>{muscleName}</p>
+        <p className={cn(typography.bodySmall, 'font-medium', statusColor)}>{statusText}</p>
       </div>
     </div>
   );
@@ -103,7 +109,9 @@ export function MuscleGroupCards() {
   const navigate = useNavigate();
 
   const displayStatuses = useMemo(() => {
-    if (isLoading || muscleStatuses.length === 0) return [];
+    if (isLoading || muscleStatuses.length === 0) {
+    return [];
+  }
 
     const uniqueStatuses = muscleStatuses.reduce((acc, status) => {
       const existing = acc.find(s => s.muscle === status.muscle);
@@ -136,10 +144,10 @@ export function MuscleGroupCards() {
 
   if (isLoading) {
     return (
-      <div className="flex overflow-x-auto gap-3 px-5 pb-4 [-ms-scrollbar-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory">
-        <div className="snap-center min-w-[120px] h-32 bg-white dark:bg-surface-dark-light rounded-xl animate-pulse" />
-        <div className="snap-center min-w-[120px] h-32 bg-white dark:bg-surface-dark-light rounded-xl animate-pulse" />
-        <div className="snap-center min-w-[120px] h-32 bg-white dark:bg-surface-dark-light rounded-xl animate-pulse" />
+      <div className={cn('flex overflow-x-auto px-5 pb-4 snap-x snap-mandatory scrollbar-hide', spacing.normal)}>
+        <div className={cn('snap-center min-w-[120px] h-32 animate-pulse', cardStyles('compact'), borderRadius.card)} />
+        <div className={cn('snap-center min-w-[120px] h-32 animate-pulse', cardStyles('compact'), borderRadius.card)} />
+        <div className={cn('snap-center min-w-[120px] h-32 animate-pulse', cardStyles('compact'), borderRadius.card)} />
       </div>
     );
   }
@@ -149,7 +157,7 @@ export function MuscleGroupCards() {
   }
 
   return (
-    <div className="flex overflow-x-auto gap-3 px-5 pb-4 scrollbar-hide snap-x snap-mandatory">
+    <div className={cn('flex overflow-x-auto px-5 pb-4 scrollbar-hide snap-x snap-mandatory', spacing.normal)}>
       {displayStatuses.map((status, index) => {
         const remainingHours = status.recommendedRestDays * 24;
         return (

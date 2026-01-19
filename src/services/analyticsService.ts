@@ -154,7 +154,7 @@ export const analyticsService = {
     });
 
     const total = distribution.legs + distribution.push + distribution.pull;
-    if (total === 0) return { legs: 0, push: 0, pull: 0 };
+    if (total === 0) {return { legs: 0, push: 0, pull: 0 };}
 
     // For new users with < 7 workouts, still show distribution but indicate it's preliminary
     const percentages = {
@@ -253,7 +253,9 @@ export const analyticsService = {
 
   calculateAverageCalories(workouts: Workout[]): number {
     const workoutsWithCalories = (workouts ?? []).filter(w => w.calories !== undefined && w.calories > 0);
-    if (workoutsWithCalories.length === 0) return 0;
+    if (workoutsWithCalories.length === 0) {
+    return 0;
+  }
     return Math.round(this.calculateTotalCalories(workoutsWithCalories) / workoutsWithCalories.length);
   },
 

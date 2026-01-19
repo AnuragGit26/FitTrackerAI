@@ -16,7 +16,7 @@ export function ReadinessScoreHeader({ recommendations }: ReadinessScoreHeaderPr
           <span>{recommendations?.readinessScore ?? 'N/A'}%</span>
         </div>
       </div>
-      <div className="w-full h-3 bg-gray-200 dark:bg-card-dark rounded-full overflow-hidden">
+      <div className="w-full h-3 bg-white dark:bg-card-dark rounded-full overflow-hidden">
         <div
           className="h-full bg-primary rounded-full transition-all duration-700 ease-out"
           style={{ width: `${recommendations?.readinessScore ?? 0}%` }}

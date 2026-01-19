@@ -24,6 +24,11 @@ interface LocalErrorLog {
 }
 
 class ErrorLogService {
+    private isOfflineError(error: Error | string): boolean {
+        const message = (error instanceof Error ? error.message : String(error)).toLowerCase();
+        return message.includes('client is offline');
+    }
+
     /**
      * Send error log to Vercel API endpoint (non-blocking)
      */
@@ -37,9 +42,17 @@ class ErrorLogService {
             return;
         }
 
+        // Ensure we have a valid API URL (must be absolute in production)
+        const vercelApiUrl = import.meta.env.VITE_VERCEL_API_URL;
+        if (!vercelApiUrl) {
+            // In production, we need an API URL configured
+            if (isProduction) {
+                logger.warn('[ErrorLogService] VITE_VERCEL_API_URL not configured, skipping Vercel logging');
+            }
+            return;
+        }
+
         try {
-            const vercelApiUrl = import.meta.env.VITE_VERCEL_API_URL || '/api/logs/error';
-            
             await fetch(vercelApiUrl, {
                 method: 'POST',
                 headers: {
@@ -60,7 +73,10 @@ class ErrorLogService {
             });
         } catch (error) {
             // Silently fail - don't block error logging if Vercel endpoint is unavailable
-            logger.warn('Failed to send error log to Vercel:', error);
+            // Only log in production to avoid console spam in development
+            if (isProduction) {
+                logger.warn('[ErrorLogService] Failed to send error log to Vercel:', error);
+            }
         }
     }
 
@@ -136,6 +152,7 @@ class ErrorLogService {
         operation: 'create' | 'update' | 'delete' | 'read' = 'read',
         context?: Record<string, unknown>
     ): Promise<number> {
+        const severity: ErrorSeverity = this.isOfflineError(error) ? 'warning' : 'error';
         return this.logError({
             userId,
             errorType: 'sync_error',
@@ -144,7 +161,7 @@ class ErrorLogService {
             tableName,
             recordId,
             operation,
-            severity: 'error',
+            severity,
             context,
         });
     }
@@ -355,9 +372,15 @@ class ErrorLogService {
      * Convert a timestamp to a local Date object
      */
     private timestampToLocalDate(timestamp: number | Date | string | null | undefined): Date | null {
-        if (!timestamp) return null;
-        if (timestamp instanceof Date) return timestamp;
-        if (typeof timestamp === 'string') return new Date(timestamp);
+        if (!timestamp) {
+    return null;
+  }
+        if (timestamp instanceof Date) {
+    return timestamp;
+  }
+        if (typeof timestamp === 'string') {
+    return new Date(timestamp);
+  }
         return new Date(timestamp);
     }
 

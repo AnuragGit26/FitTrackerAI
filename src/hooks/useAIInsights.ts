@@ -33,7 +33,9 @@ export function useAIInsights() {
       return;
     }
 
-    if (isGeneratingRef.current) return;
+    if (isGeneratingRef.current) {
+    return;
+  }
     
     const recentWorkouts = workouts.slice(0, 10);
     

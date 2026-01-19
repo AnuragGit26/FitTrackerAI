@@ -104,10 +104,10 @@ export function RestTimerSettings() {
   return (
     <div className="relative flex h-full min-h-screen w-full max-w-md mx-auto flex-col overflow-hidden bg-background-light dark:bg-background-dark shadow-2xl">
       {/* Top App Bar */}
-      <div className="sticky top-0 z-50 flex items-center bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md p-4 pb-3 justify-between border-b border-gray-200 dark:border-gray-800">
+      <div className="sticky top-0 z-50 flex items-center bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md p-4 pb-3 justify-between border-b border-gray-100 dark:border-border-dark">
         <button
           onClick={() => navigate(-1)}
-          className="text-slate-900 dark:text-white flex size-10 shrink-0 items-center justify-center rounded-full active:bg-gray-200 dark:active:bg-gray-800 transition-colors cursor-pointer"
+          className="text-slate-900 dark:text-white flex size-10 shrink-0 items-center justify-center rounded-full active:bg-white dark:active:bg-surface-dark transition-colors cursor-pointer"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
@@ -125,7 +125,7 @@ export function RestTimerSettings() {
 
           {/* Time Picker Container */}
           <div className="px-4 py-2">
-            <div className="bg-white dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-800">
+            <div className="bg-white dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-gray-100 dark:border-border-dark">
               <div className="text-center mb-4">
                 <span className="text-sm text-slate-500 dark:text-gray-400 font-medium">
                   Standard Rest Duration
@@ -141,7 +141,7 @@ export function RestTimerSettings() {
 
           {/* Auto-start Toggle */}
           <div className="px-4 mt-2">
-            <div className="flex items-center bg-white dark:bg-surface-dark px-4 py-3.5 rounded-xl justify-between border border-gray-100 dark:border-gray-800 shadow-sm">
+            <div className="flex items-center bg-white dark:bg-surface-dark px-4 py-3.5 rounded-xl justify-between border border-gray-100 dark:border-border-dark shadow-sm">
               <div className="flex flex-col">
                 <p className="text-slate-900 dark:text-white text-base font-medium leading-normal flex-1 truncate">
                   Auto-start Timer
@@ -157,7 +157,7 @@ export function RestTimerSettings() {
                   onChange={(e) => handleToggle('autoStart', e.target.checked)}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-surface-dark-light peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-100 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
               </label>
             </div>
           </div>
@@ -180,7 +180,7 @@ export function RestTimerSettings() {
             {restTimerSettings.presets.map((preset) => (
               <div
                 key={preset.id}
-                className="flex items-center bg-white dark:bg-surface-dark px-4 py-3 rounded-xl justify-between border border-gray-100 dark:border-gray-800 shadow-sm active:scale-[0.99] transition-transform"
+                className="flex items-center bg-white dark:bg-surface-dark px-4 py-3 rounded-xl justify-between border border-gray-100 dark:border-border-dark shadow-sm active:scale-[0.99] transition-transform"
               >
                 <div className="flex items-center gap-3">
                   <div
@@ -214,7 +214,7 @@ export function RestTimerSettings() {
             ))}
 
             {/* Add New */}
-            <button className="w-full flex items-center justify-center gap-2 bg-transparent border border-dashed border-gray-300 dark:border-gray-700 p-3 rounded-xl text-slate-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-surface-dark transition-colors">
+            <button className="w-full flex items-center justify-center gap-2 bg-transparent border border-dashed border-gray-100 dark:border-border-dark p-3 rounded-xl text-slate-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-surface-dark transition-colors">
               <Plus className="w-4 h-4" />
               <span className="text-sm font-medium">Add Custom Preset</span>
             </button>
@@ -226,9 +226,9 @@ export function RestTimerSettings() {
           <h3 className="text-slate-500 dark:text-gray-400 text-xs font-semibold uppercase tracking-wider px-6 pb-2 pt-4">
             Feedback & Notifications
           </h3>
-          <div className="bg-white dark:bg-surface-dark rounded-xl mx-4 overflow-hidden border border-gray-100 dark:border-gray-800 shadow-sm">
+          <div className="bg-white dark:bg-surface-dark rounded-xl mx-4 overflow-hidden border border-gray-100 dark:border-border-dark shadow-sm">
             {/* Sound Toggle */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-700/50">
+            <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-border-dark/50">
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-slate-400 dark:text-gray-500">
                   volume_up
@@ -244,12 +244,12 @@ export function RestTimerSettings() {
                   onChange={(e) => handleToggle('soundEnabled', e.target.checked)}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-surface-dark-light peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-100 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
               </label>
             </div>
 
             {/* Vibration Toggle */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-700/50">
+            <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-border-dark/50">
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-slate-400 dark:text-gray-500">
                   vibration
@@ -265,14 +265,14 @@ export function RestTimerSettings() {
                   onChange={(e) => handleToggle('vibrationEnabled', e.target.checked)}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-surface-dark-light peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-100 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
               </label>
             </div>
 
             {/* Sound Selection */}
             <button
               onClick={handleNotificationSoundChange}
-              className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-700/50 cursor-pointer active:bg-gray-50 dark:active:bg-surface-darker transition-colors w-full"
+              className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-border-dark/50 cursor-pointer active:bg-gray-50 dark:active:bg-surface-darker transition-colors w-full"
             >
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-slate-400 dark:text-gray-500">
@@ -310,7 +310,7 @@ export function RestTimerSettings() {
                   onChange={(e) => handleToggle('lockScreenActivity', e.target.checked)}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-surface-dark-light peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-100 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
               </label>
             </div>
           </div>
@@ -321,7 +321,7 @@ export function RestTimerSettings() {
           <h3 className="text-slate-500 dark:text-gray-400 text-xs font-semibold uppercase tracking-wider px-6 pb-2 pt-4">
             Visuals
           </h3>
-          <div className="bg-white dark:bg-surface-dark rounded-xl mx-4 overflow-hidden border border-gray-100 dark:border-gray-800 shadow-sm">
+          <div className="bg-white dark:bg-surface-dark rounded-xl mx-4 overflow-hidden border border-gray-100 dark:border-border-dark shadow-sm">
             <div className="flex items-center justify-between p-4">
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-slate-400 dark:text-gray-500">
@@ -338,7 +338,7 @@ export function RestTimerSettings() {
                   onChange={(e) => handleToggle('countdownOverlay', e.target.checked)}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-surface-dark-light peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-100 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
               </label>
             </div>
           </div>
@@ -360,13 +360,13 @@ export function RestTimerSettings() {
         title="Reset Settings"
       >
         <div className="space-y-4">
-          <p className="text-gray-700 dark:text-gray-300">
+          <p className="text-slate-700 dark:text-gray-300">
             Are you sure you want to reset all rest timer settings to defaults? This action cannot be undone.
           </p>
           <div className="flex gap-3 pt-2">
             <button
               onClick={() => setShowResetConfirm(false)}
-              className="flex-1 h-12 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              className="flex-1 h-12 rounded-lg bg-white dark:bg-surface-dark-light text-slate-700 dark:text-gray-300 font-bold hover:bg-white dark:hover:bg-surface-dark transition-colors"
             >
               Cancel
             </button>

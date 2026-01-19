@@ -55,7 +55,9 @@ export function WorkoutSummary() {
   }, [workoutId, profile]);
 
   const handleSaveRecovery = async (recoveryData: RecoveryLogData) => {
-    if (!summaryData || !workoutId) return;
+    if (!summaryData || !workoutId) {
+    return;
+  }
 
     try {
       // Update workout with recovery data
@@ -92,7 +94,9 @@ export function WorkoutSummary() {
   };
 
   const handleSaveWorkoutName = async (newName: string) => {
-    if (!summaryData || !workoutId) return;
+    if (!summaryData || !workoutId) {
+    return;
+  }
 
     await dataService.updateWorkout(workoutId, { workoutType: newName });
 
@@ -106,7 +110,9 @@ export function WorkoutSummary() {
   };
 
   const handleDeleteWorkout = async () => {
-    if (!workoutId) return;
+    if (!workoutId) {
+    return;
+  }
 
     // Capture value for undo closure to prevent stale references
     const deletedWorkoutId = workoutId;
@@ -186,7 +192,7 @@ export function WorkoutSummary() {
   return (
     <div className="relative flex min-h-screen w-full flex-col bg-background-light dark:bg-background-dark overflow-x-hidden pb-24">
       {/* Top App Bar */}
-      <header className="sticky top-0 z-50 flex items-center bg-background-light dark:bg-background-dark/95 backdrop-blur-sm p-4 border-b border-gray-200 dark:border-[#316847]">
+      <header className="sticky top-0 z-50 flex items-center bg-background-light dark:bg-background-dark/95 backdrop-blur-sm p-4 border-b border-gray-100 dark:border-border-dark">
         <button
           onClick={() => navigate(-1)}
           className="text-slate-900 dark:text-white flex size-12 shrink-0 items-center justify-start cursor-pointer"
@@ -207,7 +213,7 @@ export function WorkoutSummary() {
             <div className="relative">
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
-                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-black/20 text-gray-500 dark:text-gray-400 transition-colors"
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-black/20 text-slate-500 dark:text-gray-400 transition-colors"
               >
                 <span className="material-symbols-outlined">more_vert</span>
               </button>
@@ -218,13 +224,13 @@ export function WorkoutSummary() {
                     className="fixed inset-0 z-10"
                     onClick={() => setMenuOpen(false)}
                   />
-                  <div className="absolute right-0 top-10 bg-white dark:bg-surface-dark border border-gray-200 dark:border-white/10 rounded-lg shadow-lg z-20 min-w-[120px]">
+                  <div className="absolute right-0 top-10 bg-white dark:bg-surface-dark border border-gray-100 dark:border-white/10 rounded-lg shadow-lg z-20 min-w-[120px]">
                     <button
                       onClick={() => {
                         navigate(`/edit-workout/${summaryData.workout.id}`);
                         setMenuOpen(false);
                       }}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors flex items-center gap-2"
+                      className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors flex items-center gap-2"
                     >
                       <span className="material-symbols-outlined text-base">edit</span>
                       Edit

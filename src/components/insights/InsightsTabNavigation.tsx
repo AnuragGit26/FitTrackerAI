@@ -53,7 +53,7 @@ export function InsightsTabNavigation({ currentView, onViewChange }: InsightsTab
   }, [currentView, tabs]);
 
   return (
-    <div className="sticky top-[63px] z-40 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md border-b border-gray-200 dark:border-[#316847]">
+    <div className="sticky top-[63px] z-40 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md border-b border-gray-100 dark:border-border-dark">
       <div ref={containerRef} className="flex items-center justify-center gap-2 p-2 relative">
         <motion.div
           className="absolute h-[calc(100%-16px)] bg-primary rounded-lg top-2"
@@ -79,7 +79,7 @@ export function InsightsTabNavigation({ currentView, onViewChange }: InsightsTab
               'relative z-10 flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
               currentView === tab.id
                 ? 'text-background-dark'
-                : 'text-gray-600 dark:text-gray-300'
+                : 'text-slate-500 dark:text-gray-300'
             )}
             style={{
               border: 'none',

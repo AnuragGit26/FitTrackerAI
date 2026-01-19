@@ -7,7 +7,7 @@ interface SymmetryScoreCardProps {
 export function SymmetryScoreCard({ score }: SymmetryScoreCardProps) {
   return (
     <div className="flex gap-4">
-      <div className="flex flex-1 flex-col justify-between rounded-xl bg-white dark:bg-surface-dark p-5 shadow-sm border border-gray-100 dark:border-[#316847]">
+      <div className="flex flex-1 flex-col justify-between rounded-xl bg-white dark:bg-surface-dark p-5 shadow-sm border border-gray-100 dark:border-border-dark">
         <div className="flex items-start justify-between">
           <p className="text-slate-500 dark:text-gray-400 text-sm font-medium leading-normal">
             Symmetry Score

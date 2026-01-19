@@ -15,6 +15,8 @@ import { initializeDefaultTemplates } from '@/services/templateLibrary';
 import { workoutEventTracker } from '@/services/workoutEventTracker';
 import { muscleImageCache } from '@/services/muscleImageCache';
 import { notificationService } from '@/services/notificationService';
+import { dataService } from '@/services/dataService';
+import { getFirestoreDiagnostics, forceFirestoreOnline } from '@/services/firebaseConfig';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { AnimatedPage } from '@/components/common/AnimatedPage';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
@@ -44,6 +46,7 @@ const SleepRecovery = lazy(() => import('@/pages/SleepRecovery').then(m => ({ de
 const WorkoutSummary = lazy(() => import('@/pages/WorkoutSummary'));
 const WorkoutHistory = lazy(() => import('@/pages/WorkoutHistory'));
 const EditWorkout = lazy(() => import('@/pages/EditWorkout'));
+const Onboarding = lazy(() => import('@/pages/Onboarding'));
 const Login = lazy(() => import('@/pages/Login').then(m => ({ default: m.Login })));
 const SignUp = lazy(() => import('@/pages/SignUp').then(m => ({ default: m.SignUp })));
 
@@ -278,8 +281,8 @@ function App() {
 
   if (isInitializing) {
     return (
-      <motion.div 
-        className="flex items-center justify-center h-screen bg-gray-50 dark:bg-gray-900"
+      <motion.div
+        className="flex items-center justify-center h-screen bg-gray-50 dark:bg-background-dark"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -328,6 +331,19 @@ function AppRoutes() {
   const { currentUser, loading } = useAuth();
   const initializeUser = useUserStore((state) => state.initializeUser);
 
+  // Helper function to wait for Firestore to be ready
+  async function waitForFirestoreReady(maxWaitMs: number = 5000): Promise<boolean> {
+    const startTime = Date.now();
+    while (Date.now() - startTime < maxWaitMs) {
+      const diagnostics = getFirestoreDiagnostics();
+      if (diagnostics.isInitialized && diagnostics.networkEnabled) {
+        return true;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    return false;
+  }
+
   // Sync user store with Firebase user when authenticated
   useEffect(() => {
     if (!loading && currentUser) {
@@ -344,15 +360,67 @@ function AppRoutes() {
       }).then(async () => {
         logger.info('[App.tsx] User initialized with Firebase UID:', userId);
 
+        dataService.enableSync(true);
+
         // Initialize workout event tracker for this user
         workoutEventTracker.initialize(userId).catch((error) => {
           logger.error('Failed to initialize workout event tracker', error);
         });
 
         // Initialize default templates after user is loaded
-        initializeDefaultTemplates(userId).catch((error) => {
+        try {
+          await initializeDefaultTemplates(userId);
+        } catch (error) {
           logger.error('Failed to initialize templates', error);
-        });
+        }
+
+        // Wait for Firestore to be ready before attempting sync
+        const firestoreReady = await waitForFirestoreReady(5000);
+        if (!firestoreReady) {
+          logger.warn('Firestore not ready after 5s, will attempt sync anyway...');
+        }
+
+        const isOnline = typeof navigator === 'undefined' || navigator.onLine;
+        if (isOnline) {
+          try {
+            // Explicitly force online before bootstrap
+            await forceFirestoreOnline();
+            logger.info('[App] Firestore forced online before bootstrap');
+          } catch (error) {
+            logger.warn('Failed to force Firestore online before bootstrap:', error);
+          }
+
+          try {
+            const { syncMetadataService } = await import('@/services/syncMetadataService');
+            const metadata = await syncMetadataService.getLocalMetadata('workouts', userId);
+            const shouldBootstrap = !metadata?.lastPushAt;
+
+            if (shouldBootstrap) {
+              logger.info('[App] Starting bootstrap sync...');
+              const { firestoreSyncService } = await import('@/services/firestoreSyncService');
+              await firestoreSyncService.sync(userId, {
+                direction: 'push',
+                forceFullSync: true,
+                tables: [
+                  'workouts',
+                  'exercises',
+                  'workout_templates',
+                  'planned_workouts',
+                  'muscle_statuses',
+                  'user_profiles',
+                  'settings',
+                  'sleep_logs',
+                  'recovery_logs',
+                  'error_logs',
+                ],
+              });
+              logger.info('[App] Bootstrap sync completed successfully');
+            }
+          } catch (error) {
+            logger.warn('Failed to bootstrap Firestore sync on login:', error);
+            // Don't block login on sync failure
+          }
+        }
 
         // Pull notifications (Note: MongoDB/Supabase will be removed in Phase 6)
         // This is temporary until we fully migrate to Firestore
@@ -413,6 +481,20 @@ function AppRoutes() {
       <ErrorBoundary>
         <AnimatePresence mode="wait" initial={false}>
           <Routes location={location} key={location.pathname}>
+            <Route
+              path="/onboarding"
+              element={
+                <ProtectedRoute>
+                  <AnimatedPage>
+                    <ErrorBoundary>
+                      <Suspense fallback={<RouteLoader />}>
+                        <Onboarding />
+                      </Suspense>
+                    </ErrorBoundary>
+                  </AnimatedPage>
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/"
               element={

@@ -76,7 +76,9 @@ export async function seedWorkoutLogs(userId: string = 'user-1'): Promise<void> 
   // Helper to calculate total volume for an exercise
   const calculateVolume = (exercise: WorkoutExercise): number => {
     return exercise.sets.reduce((sum, set) => {
-      if (!set.completed) return sum;
+      if (!set.completed) {
+    return sum;
+  }
       if (set.weight !== undefined && set.reps !== undefined) {
         return sum + (set.reps * set.weight);
       }

@@ -114,7 +114,9 @@ class ExerciseIdMigration {
       let exercisesUpdated = 0;
       for (const [oldId, newId] of idMapping) {
         const exercise = exercisesToMigrate.find(ex => ex.id === oldId);
-        if (!exercise) continue;
+        if (!exercise) {
+    continue;
+  }
 
         // Delete old exercise
         await dbHelpers.deleteExercise(oldId);

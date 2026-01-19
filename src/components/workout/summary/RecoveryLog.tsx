@@ -26,7 +26,7 @@ export function RecoveryLog({ workoutId: _workoutId, initialData, onSave }: Reco
 
   return (
     <div className="px-4 pb-8">
-      <div className="bg-white dark:bg-[#162e21] border border-gray-200 dark:border-[#316847] rounded-xl p-5">
+      <div className="bg-white dark:bg-[#18181b] border border-gray-200 dark:border-border-dark rounded-xl p-5">
         <h3 className="text-slate-900 dark:text-white text-sm font-bold mb-4">
           How do you feel post-workout?
         </h3>
@@ -141,7 +141,7 @@ export function RecoveryLog({ workoutId: _workoutId, initialData, onSave }: Reco
         <button
           onClick={handleSave}
           disabled={isSaving || !mood}
-          className="w-full mt-6 bg-primary hover:bg-[#0bb850] text-black font-bold py-3 rounded-lg text-sm transition-colors shadow-[0_4px_12px_rgba(13,242,105,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full mt-6 bg-primary hover:bg-[#E67E22] text-black font-bold py-3 rounded-lg text-sm transition-colors shadow-[0_4px_12px_rgba(255,153,51,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isSaving ? 'Saving...' : 'Save & Finish Workout'}
         </button>

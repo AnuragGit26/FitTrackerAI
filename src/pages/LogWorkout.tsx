@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { X, Plus, Check, Edit, Trash2, Loader2, BookOpen, Save, CheckCircle2 } from 'lucide-react';
+import { X, Plus, Check, Edit, Trash2, Loader2, BookOpen, Save, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWorkoutStore, useWorkoutStore as getWorkoutStore } from '@/store/workoutStore';
 import { useUserStore } from '@/store/userStore';
@@ -13,7 +13,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { exerciseLibrary } from '@/services/exerciseLibrary';
 import { cn } from '@/utils/cn';
 import { useToast } from '@/hooks/useToast';
-import { staggerContainer, slideUp, prefersReducedMotion } from '@/utils/animations';
+import { staggerContainerFast, slideUp, prefersReducedMotion } from '@/utils/animations';
 import { templateService } from '@/services/templateService';
 import { TemplateCategory } from '@/types/workout';
 import { Workout } from '@/types/workout';
@@ -29,6 +29,8 @@ import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { normalizeWorkoutStartTime } from '@/utils/validators';
 import { debounce } from '@/utils/debounce';
 import { logger } from '@/utils/logger';
+import { WorkoutStartBanner } from '@/components/workout/WorkoutStartBanner';
+import { useAIInsights } from '@/hooks/useAIInsights';
 
 // Helper function to format date for datetime-local input (local time, not UTC)
 function formatDateTimeLocal(date: Date): string {
@@ -74,6 +76,7 @@ export function LogWorkout() {
   const [selectedCategory, setSelectedCategory] = useState<ExerciseCategory | null>(null);
   const [selectedMuscleGroups, setSelectedMuscleGroups] = useState<MuscleGroupCategory[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [isRestTimerActive, setIsRestTimerActive] = useState(false);
   const repeatWorkoutProcessedRef = useRef<string | null>(null);
   const shouldReduceMotion = prefersReducedMotion();
   const workoutChannelRef = useRef<BroadcastChannel | null>(null);
@@ -83,6 +86,14 @@ export function LogWorkout() {
 
   // Workout duration tracking - timer state is managed internally and persisted to sessionStorage
   const { formattedTime: workoutDuration, elapsedTime: workoutElapsedSeconds, isRunning: workoutTimerRunning, pause: pauseWorkoutTimer, resume: resumeWorkoutTimer, reset: resetWorkoutTimer, start: startWorkoutTimer } = useWorkoutDuration(false);
+
+  // Workout start banner state
+  const [isNewWorkout, setIsNewWorkout] = useState(true);
+  const [showStartBanner, setShowStartBanner] = useState(true);
+  const [hasShownStartBanner, setHasShownStartBanner] = useState(false);
+
+  // AI insights hook
+  const { insights, isLoading: isLoadingInsight, generateInsights } = useAIInsights();
 
   useEffect(() => {
     if (!currentWorkout && profile) {
@@ -103,8 +114,14 @@ export function LogWorkout() {
                             persistedWorkoutState.currentWorkout.exercises.length > 0;
         
         if (hasExercises) {
+          // Refresh start time to current time for recovered workout
+          const refreshedWorkout = {
+            ...persistedWorkoutState.currentWorkout,
+            startTime: new Date(), // REFRESH to current time
+            date: new Date(),      // REFRESH date to today
+          };
           // Show recovery modal for unsaved workout
-          setRecoveredWorkout(persistedWorkoutState.currentWorkout);
+          setRecoveredWorkout(refreshedWorkout);
           setShowRecoveryModal(true);
         } else {
           // Empty workout, just start a new one
@@ -258,6 +275,18 @@ export function LogWorkout() {
 
   // Timer will start when "Add Exercise" is clicked, not automatically
 
+  // Workout start detection - show banner only for new workouts
+  useEffect(() => {
+    if (currentWorkout && currentWorkout.exercises.length === 0 && !hasShownStartBanner) {
+      setIsNewWorkout(true);
+      setShowStartBanner(true);
+      generateInsights(); // Fetch AI insight in background
+    } else {
+      setIsNewWorkout(false);
+      setShowStartBanner(false);
+    }
+  }, [currentWorkout, hasShownStartBanner, generateInsights]);
+
   // Handle repeat workout from navigation state
   useEffect(() => {
     const locationState = location.state as { repeatWorkout?: Workout; recommendedWorkoutExercises?: WorkoutExercise[] };
@@ -306,9 +335,8 @@ export function LogWorkout() {
       const isRepeatWorkout = repeatWorkout.exercises.length > 0;
 
       // Create a unique identifier for this repeat workout to prevent duplicate processing
-      const startTime = repeatWorkout.startTime instanceof Date
-        ? repeatWorkout.startTime.getTime()
-        : new Date(repeatWorkout.startTime).getTime();
+      // Use current time for repeated workout, not old workout's time
+      const startTime = new Date().getTime();
       const repeatWorkoutId = repeatWorkout.id
         ? `repeat-${repeatWorkout.id}-${startTime}`
         : `repeat-${startTime}`;
@@ -475,11 +503,15 @@ export function LogWorkout() {
   const handleCloseExerciseModal = () => {
     setShowExerciseModal(false);
     setEditingExerciseId(null);
+    // Ensure we're on the LogWorkout page when modal closes
+    if (location.pathname !== '/log-workout') {
+      navigate('/log-workout', { replace: true });
+    }
   };
 
   const handleExerciseSaved = () => {
-    // Exercise was saved, modal will close automatically
-    // This callback can be used for any post-save actions if needed
+    // Exercise was saved, use same logic as back button to close modal
+    handleCloseExerciseModal();
   };
 
   const handleDeleteExercise = (exerciseId: string) => {
@@ -750,12 +782,7 @@ export function LogWorkout() {
       // PRIORITY: Use manual duration for template workouts, otherwise use timer
       // This ensures workout is saved with accurate duration
       const finalDurationSeconds = durationSeconds !== undefined ? durationSeconds : workoutElapsedSeconds;
-      await finishWorkout(calories, finalDurationSeconds > 0 ? finalDurationSeconds : undefined);
-      
-      // Get the saved workout ID from the store
-      const savedWorkouts = getWorkoutStore.getState().workouts;
-      const savedWorkout = savedWorkouts[0]; // Most recent workout
-      const workoutId = savedWorkout?.id;
+      const workoutId = await finishWorkout(calories, finalDurationSeconds > 0 ? finalDurationSeconds : undefined);
       
       // Broadcast workout saved to other tabs
       if (workoutChannelRef.current && workoutId) {
@@ -851,8 +878,28 @@ export function LogWorkout() {
     <div className="relative flex min-h-screen w-full flex-col mx-auto max-w-md bg-background-light dark:bg-background-dark overflow-hidden">
       <ToastContainer toasts={toasts} onRemove={removeToast} />
 
+      {/* Workout Start Banner */}
+      <AnimatePresence>
+        {showStartBanner && isNewWorkout && (
+          <WorkoutStartBanner
+            isNewWorkout={isNewWorkout}
+            aiInsight={insights}
+            isLoadingInsight={isLoadingInsight}
+            onDismiss={() => {
+              setShowStartBanner(false);
+              setHasShownStartBanner(true);
+            }}
+            onStartWorkout={() => {
+              setShowStartBanner(false);
+              setHasShownStartBanner(true);
+              startWorkoutTimer();
+            }}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Header */}
-      <header className="sticky top-0 z-10 flex items-center bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md p-4 pb-2 justify-between border-b border-gray-200 dark:border-[#316847]">
+      <header className="sticky top-0 z-10 flex items-center bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md p-4 pb-2 justify-between border-b border-gray-100 dark:border-border-dark">
         <button
           onClick={handleCancelLogWorkout}
           className="flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
@@ -861,7 +908,7 @@ export function LogWorkout() {
           <X className="w-5 h-5 text-gray-800 dark:text-white" />
         </button>
         <div className="flex-1 text-center">
-          <h2 className="text-gray-900 dark:text-white text-lg font-bold leading-tight tracking-[-0.015em]">
+          <h2 className="text-slate-900 dark:text-white text-lg font-bold leading-tight tracking-[-0.015em]">
             Log Workout
           </h2>
           {currentTemplateName && (
@@ -905,13 +952,13 @@ export function LogWorkout() {
       <main className="flex-1 overflow-y-auto pb-24">
         {/* Existing Exercises List */}
         {existingExercises.length > 0 && (
-          <div className="px-4 py-4 border-b border-gray-200 dark:border-[#316847]">
-            <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+          <div className="px-4 py-4 border-b border-gray-100 dark:border-border-dark">
+            <h3 className="text-sm font-bold text-slate-500 dark:text-gray-400 uppercase tracking-wider mb-3">
               Exercises in Workout ({existingExercises.length})
             </h3>
             <motion.div
               className="space-y-2"
-              variants={shouldReduceMotion ? {} : staggerContainer}
+              variants={shouldReduceMotion ? {} : staggerContainerFast}
               initial="hidden"
               animate="visible"
             >
@@ -931,7 +978,7 @@ export function LogWorkout() {
                     <motion.div
                       key={exercise.id}
                       className={cn(
-                        "flex flex-col rounded-xl bg-surface-light dark:bg-surface-dark border border-gray-200 dark:border-[#316847] overflow-hidden",
+                        "flex flex-col rounded-xl bg-surface-light dark:bg-surface-dark border border-gray-100 dark:border-border-dark overflow-hidden",
                         isGrouped && "mb-2"
                       )}
                       variants={shouldReduceMotion ? {} : slideUp}
@@ -954,10 +1001,10 @@ export function LogWorkout() {
                               {groupExercises.map((groupEx) => (
                                 <div key={groupEx.id} className="flex items-center justify-between">
                                   <div className="flex-1">
-                                    <p className="font-bold text-gray-900 dark:text-white">
+                                    <p className="font-bold text-slate-900 dark:text-white">
                                       {groupEx.exerciseName}
                                     </p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                    <p className="text-xs text-slate-500 dark:text-gray-400 mt-1">
                                       {groupEx.sets.length} set{groupEx.sets.length !== 1 ? 's' : ''} •{' '}
                                       {groupEx.sets.filter((s) => s.completed).length} completed
                                     </p>
@@ -987,10 +1034,10 @@ export function LogWorkout() {
                             </div>
                           ) : (
                             <>
-                              <p className="font-bold text-gray-900 dark:text-white">
+                              <p className="font-bold text-slate-900 dark:text-white">
                                 {exercise.exerciseName}
                               </p>
-                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              <p className="text-xs text-slate-500 dark:text-gray-400 mt-1">
                                 {exercise.sets.length} set{exercise.sets.length !== 1 ? 's' : ''} •{' '}
                                 {exercise.sets.filter((s) => s.completed).length} completed
                               </p>
@@ -1110,6 +1157,7 @@ export function LogWorkout() {
               setShowExerciseModal(true);
             }, 100);
           }}
+          onRestTimerStateChange={setIsRestTimerActive}
         />
       </ErrorBoundary>
 
@@ -1120,12 +1168,12 @@ export function LogWorkout() {
         title="Clear Workout"
       >
         <div className="space-y-4">
-          <p className="text-gray-700 dark:text-gray-300">
+          <p className="text-slate-700 dark:text-gray-300">
             Are you sure you want to clear this workout? This will remove all exercises and cannot be undone.
           </p>
           {existingExercises.length > 0 && (
-            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+            <div className="bg-gray-50 dark:bg-surface-dark-light/50 rounded-lg p-3">
+              <p className="text-sm text-slate-500 dark:text-gray-400">
                 You have <span className="font-bold">{existingExercises.length}</span> exercise{existingExercises.length !== 1 ? 's' : ''} in this workout.
               </p>
             </div>
@@ -1133,7 +1181,7 @@ export function LogWorkout() {
           <div className="flex gap-3 pt-2">
             <button
               onClick={() => setShowClearWorkoutModal(false)}
-              className="flex-1 h-12 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              className="flex-1 h-12 rounded-lg bg-white dark:bg-surface-dark-light text-slate-700 dark:text-gray-300 font-bold hover:bg-white dark:hover:bg-surface-dark transition-colors"
             >
               Cancel
             </button>
@@ -1152,38 +1200,83 @@ export function LogWorkout() {
       <Modal
         isOpen={showCancelWorkoutModal}
         onClose={() => setShowCancelWorkoutModal(false)}
-        title="Cancel Log Workout"
+        title="Cancel Workout?"
       >
-        <div className="space-y-4">
-          <p className="text-gray-700 dark:text-gray-300">
-            Are you sure you want to cancel this workout? This will clear all selected exercises, reset all timers, and discard any unsaved changes.
-          </p>
-          {existingExercises.length > 0 && (
-            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 space-y-2">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                <span className="font-bold">{existingExercises.length}</span> exercise{existingExercises.length !== 1 ? 's' : ''} will be removed.
+        <div className="space-y-5">
+          {/* Warning Message */}
+          <div className="flex items-start gap-3 p-4 bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20 border border-red-200 dark:border-red-800/30 rounded-xl">
+            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+            </div>
+            <div className="flex-1">
+              <h4 className="text-sm font-bold text-red-900 dark:text-red-200 mb-1">
+                Warning: This action cannot be undone
+              </h4>
+              <p className="text-sm text-red-700 dark:text-red-300 leading-relaxed">
+                All selected exercises, timers, and unsaved changes will be permanently discarded.
               </p>
-              {(workoutTimerRunning || getTimerStartTime() !== null) && (
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  All timers will be reset.
-                </p>
-              )}
+            </div>
+          </div>
+
+          {/* Impact Summary */}
+          {existingExercises.length > 0 && (
+            <div className="space-y-3">
+              <h4 className="text-sm font-semibold text-slate-900 dark:text-white">
+                What will be lost:
+              </h4>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-surface-dark/50 rounded-lg border border-gray-100 dark:border-border-dark">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Trash2 className="w-4 h-4 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                      {existingExercises.length} Exercise{existingExercises.length !== 1 ? 's' : ''}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-gray-400">
+                      All exercise data will be removed
+                    </p>
+                  </div>
+                </div>
+                {(workoutTimerRunning || getTimerStartTime() !== null) && (
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-surface-dark/50 rounded-lg border border-gray-100 dark:border-border-dark">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                      <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                        Active Timers
+                      </p>
+                      <p className="text-xs text-slate-500 dark:text-gray-400">
+                        All workout timers will be reset
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
+
+          {/* Action Buttons */}
           <div className="flex gap-3 pt-2">
-            <button
+            <motion.button
               onClick={() => setShowCancelWorkoutModal(false)}
-              className="flex-1 h-12 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="flex-1 h-12 rounded-xl bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 text-gray-800 dark:text-gray-200 font-bold hover:from-gray-200 hover:to-gray-300 dark:hover:from-gray-600 dark:hover:to-gray-500 transition-all duration-200 shadow-sm hover:shadow-md flex items-center justify-center gap-2 text-sm whitespace-nowrap px-3"
             >
-              Keep Working Out
-            </button>
-            <button
+              <Check className="w-4 h-4 flex-shrink-0" />
+              <span className="truncate">Keep Working Out</span>
+            </motion.button>
+            <motion.button
               onClick={handleConfirmCancelWorkout}
-              className="flex-1 h-12 rounded-lg bg-error text-white font-bold hover:bg-error/90 transition-colors flex items-center justify-center gap-2"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="flex-1 h-12 rounded-xl bg-gradient-to-r from-red-500 to-red-600 text-white font-bold hover:from-red-600 hover:to-red-700 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-2 text-sm whitespace-nowrap px-3"
             >
-              <X className="w-4 h-4" />
-              Cancel Workout
-            </button>
+              <X className="w-4 h-4 flex-shrink-0" />
+              <span className="truncate">Cancel Workout</span>
+            </motion.button>
           </div>
         </div>
       </Modal>
@@ -1196,7 +1289,7 @@ export function LogWorkout() {
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-sm font-bold text-slate-700 dark:text-gray-300 mb-2">
               Template Name *
             </label>
             <input
@@ -1204,18 +1297,18 @@ export function LogWorkout() {
               value={templateName}
               onChange={(e) => setTemplateName(e.target.value)}
               placeholder="e.g., Upper/Lower Split"
-              className="w-full rounded-lg bg-white dark:bg-surface-dark border border-gray-200 dark:border-[#316847] text-gray-900 dark:text-white focus:border-primary focus:ring-primary h-12 px-4"
+              className="w-full rounded-lg bg-white dark:bg-surface-dark border border-gray-100 dark:border-border-dark text-slate-900 dark:text-white focus:border-primary focus:ring-primary h-12 px-4"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-sm font-bold text-slate-700 dark:text-gray-300 mb-2">
               Category *
             </label>
             <select
               value={templateCategory}
               onChange={(e) => setTemplateCategory(e.target.value as TemplateCategory)}
-              className="w-full rounded-lg bg-white dark:bg-surface-dark border border-gray-200 dark:border-[#316847] text-gray-900 dark:text-white focus:border-primary focus:ring-primary h-12 px-4"
+              className="w-full rounded-lg bg-white dark:bg-surface-dark border border-gray-100 dark:border-border-dark text-slate-900 dark:text-white focus:border-primary focus:ring-primary h-12 px-4"
             >
               <option value="strength">Strength</option>
               <option value="hypertrophy">Hypertrophy</option>
@@ -1226,7 +1319,7 @@ export function LogWorkout() {
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-sm font-bold text-slate-700 dark:text-gray-300 mb-2">
               Description
             </label>
             <textarea
@@ -1234,14 +1327,14 @@ export function LogWorkout() {
               onChange={(e) => setTemplateDescription(e.target.value)}
               placeholder="Describe this workout template..."
               rows={3}
-              className="w-full rounded-lg bg-white dark:bg-surface-dark border border-gray-200 dark:border-[#316847] text-gray-900 dark:text-white focus:border-primary focus:ring-primary resize-none p-3"
+              className="w-full rounded-lg bg-white dark:bg-surface-dark border border-gray-100 dark:border-border-dark text-slate-900 dark:text-white focus:border-primary focus:ring-primary resize-none p-3"
             />
           </div>
 
           <div className="flex gap-3 pt-2">
             <button
               onClick={() => setShowSaveTemplateModal(false)}
-              className="flex-1 h-12 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              className="flex-1 h-12 rounded-lg bg-white dark:bg-surface-dark-light text-slate-700 dark:text-gray-300 font-bold hover:bg-white dark:hover:bg-surface-dark transition-colors"
             >
               Cancel
             </button>
@@ -1283,7 +1376,7 @@ export function LogWorkout() {
             <button
               onClick={handleConfirmFinishWorkout}
               disabled={isSaving || (!!templateId && (!manualStartTime || !manualEndTime))}
-              className="flex w-full flex-1 items-center justify-center rounded-xl bg-primary hover:bg-[#0be060] px-4 py-3 text-sm font-bold text-black shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
+              className="flex w-full flex-1 items-center justify-center rounded-xl bg-primary hover:bg-[#E67E22] px-4 py-3 text-sm font-bold text-black shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
             >
               {isSaving ? (
                 <>
@@ -1303,7 +1396,7 @@ export function LogWorkout() {
                 setManualDurationMinutes('');
               }}
               disabled={isSaving}
-              className="flex w-full flex-1 items-center justify-center rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-transparent px-4 py-3 text-sm font-bold text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
+              className="flex w-full flex-1 items-center justify-center rounded-xl border border-gray-100 dark:border-gray-600 bg-white dark:bg-transparent px-4 py-3 text-sm font-bold text-slate-700 dark:text-white hover:bg-gray-50 dark:hover:bg-surface-dark transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
             >
               Cancel
             </button>
@@ -1314,15 +1407,15 @@ export function LogWorkout() {
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/20">
             <CheckCircle2 className="w-6 h-6 text-primary" />
           </div>
-          <p className="text-sm text-gray-600 dark:text-gray-400 font-normal leading-relaxed">
+          <p className="text-sm text-slate-500 dark:text-gray-400 font-normal leading-relaxed">
             Are you sure you want to mark this workout as finished?
           </p>
           {/* Manual Timer Inputs for Template Workouts */}
           {templateId && (
             <div className="space-y-4 text-left">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Start Time <span className="text-gray-500 dark:text-gray-400">(required)</span>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-2">
+                        Start Time <span className="text-slate-500 dark:text-gray-400">(required)</span>
                       </label>
                       <input
                         type="datetime-local"
@@ -1338,13 +1431,13 @@ export function LogWorkout() {
                             setManualDurationMinutes(durationMinutes > 0 ? durationMinutes : '');
                           }
                         }}
-                        className="w-full rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 h-10 px-3 text-sm"
+                        className="w-full rounded-xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-gray-600 text-slate-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 h-10 px-3 text-sm"
                         required
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        End Time <span className="text-gray-500 dark:text-gray-400">(required)</span>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-2">
+                        End Time <span className="text-slate-500 dark:text-gray-400">(required)</span>
                       </label>
                       <input
                         type="datetime-local"
@@ -1360,13 +1453,13 @@ export function LogWorkout() {
                             setManualDurationMinutes(durationMinutes > 0 ? durationMinutes : '');
                           }
                         }}
-                        className="w-full rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 h-10 px-3 text-sm"
+                        className="w-full rounded-xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-gray-600 text-slate-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 h-10 px-3 text-sm"
                         required
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Total Duration <span className="text-gray-500 dark:text-gray-400">(minutes, optional - auto-calculated)</span>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-2">
+                        Total Duration <span className="text-slate-500 dark:text-gray-400">(minutes, optional - auto-calculated)</span>
                       </label>
                       <input
                         type="number"
@@ -1384,14 +1477,14 @@ export function LogWorkout() {
                           }
                         }}
                         placeholder="Auto-calculated from start/end times"
-                        className="w-full rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 h-10 px-3 text-sm"
+                        className="w-full rounded-xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-gray-600 text-slate-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 h-10 px-3 text-sm"
                       />
               </div>
             </div>
           )}
           <div className="text-left">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Calories <span className="text-gray-500 dark:text-gray-400">(optional)</span>
+            <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-2">
+              Calories <span className="text-slate-500 dark:text-gray-400">(optional)</span>
             </label>
             <input
               type="number"
@@ -1399,7 +1492,7 @@ export function LogWorkout() {
               value={workoutCalories}
               onChange={(e) => setWorkoutCalories(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
               placeholder="Enter Calories"
-              className="w-full rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 h-10 px-3 text-sm"
+              className="w-full rounded-xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-gray-600 text-slate-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 h-10 px-3 text-sm"
             />
           </div>
         </div>
@@ -1476,18 +1569,18 @@ export function LogWorkout() {
           <div className="max-w-md mx-auto">
             <motion.button
               onClick={handleFinishWorkoutClick}
-              disabled={isSaving}
+              disabled={isSaving || isRestTimerActive}
               className={cn(
                 'w-full rounded-xl bg-primary hover:bg-primary/90 text-background-dark font-bold text-lg py-4 shadow-lg shadow-primary/25 transition-all flex items-center justify-center gap-2 relative overflow-hidden',
-                isSaving && 'opacity-50 cursor-not-allowed'
+                (isSaving || isRestTimerActive) && 'opacity-50 cursor-not-allowed'
               )}
-              whileHover={!isSaving && !shouldReduceMotion ? { scale: 1.02, boxShadow: '0 0 30px rgba(13,242,105,0.5)' } : {}}
-              whileTap={!isSaving && !shouldReduceMotion ? { scale: 0.98 } : {}}
-              animate={!isSaving && !shouldReduceMotion ? {
+              whileHover={!isSaving && !isRestTimerActive && !shouldReduceMotion ? { scale: 1.02, boxShadow: '0 0 30px rgba(255,153,51,0.5)' } : {}}
+              whileTap={!isSaving && !isRestTimerActive && !shouldReduceMotion ? { scale: 0.98 } : {}}
+              animate={!isSaving && !isRestTimerActive && !shouldReduceMotion ? {
                 boxShadow: [
-                  '0 0 20px rgba(13,242,105,0.25)',
-                  '0 0 30px rgba(13,242,105,0.4)',
-                  '0 0 20px rgba(13,242,105,0.25)',
+                  '0 0 20px rgba(255,153,51,0.25)',
+                  '0 0 30px rgba(255,153,51,0.4)',
+                  '0 0 20px rgba(255,153,51,0.25)',
                 ],
               } : {}}
               transition={{

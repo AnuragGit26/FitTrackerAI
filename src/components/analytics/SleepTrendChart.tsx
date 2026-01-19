@@ -20,8 +20,8 @@ export function SleepTrendChart({ data }: SleepTrendChartProps) {
 
   if (data.length === 0) {
     return (
-      <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-5 border border-gray-100 dark:border-gray-800/50 shadow-sm">
-        <p className="text-gray-500 dark:text-gray-400 text-center py-8">
+      <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-5 border border-gray-100 dark:border-border-dark/50 shadow-sm">
+        <p className="text-slate-500 dark:text-gray-400 text-center py-8">
           No sleep data available
         </p>
       </div>
@@ -29,11 +29,11 @@ export function SleepTrendChart({ data }: SleepTrendChartProps) {
   }
 
   return (
-    <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-5 border border-gray-100 dark:border-gray-800/50 shadow-sm">
+    <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-5 border border-gray-100 dark:border-border-dark/50 shadow-sm">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h3 className="font-bold text-lg text-gray-900 dark:text-white">Sleep Trend</h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+          <h3 className="font-bold text-lg text-slate-900 dark:text-white">Sleep Trend</h3>
+          <p className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">
             Duration (hrs) and Quality (1-10)
           </p>
         </div>

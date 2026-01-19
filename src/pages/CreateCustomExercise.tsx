@@ -80,7 +80,7 @@ export function CreateCustomExercise() {
   return (
     <div className="relative flex h-full min-h-screen w-full flex-col max-w-md mx-auto shadow-2xl bg-background-light dark:bg-background-dark">
       {/* Header */}
-      <header className="sticky top-0 z-40 flex items-center justify-between px-4 py-3 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-md border-b border-black/5 dark:border-[#316847]/30">
+      <header className="sticky top-0 z-40 flex items-center justify-between px-4 py-3 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-md border-b border-black/5 dark:border-border-dark/30">
         <button
           onClick={() => navigate(-1)}
           className="flex items-center justify-center size-10 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors group"
@@ -147,7 +147,7 @@ export function CreateCustomExercise() {
               value={exerciseName}
               onChange={(e) => setExerciseName(e.target.value)}
               placeholder="e.g., Barbell Squat"
-              className="w-full h-14 pl-4 pr-10 rounded-xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-[#316847] focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-gray-500 text-base text-slate-900 dark:text-white"
+              className="w-full h-14 pl-4 pr-10 rounded-xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-border-dark focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-gray-500 text-base text-slate-900 dark:text-white"
             />
             <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-0 group-focus-within:opacity-100 transition-opacity">
               <Sparkles className="w-5 h-5 text-primary" />
@@ -177,7 +177,7 @@ export function CreateCustomExercise() {
                     'flex h-10 shrink-0 items-center justify-center gap-2 rounded-full pl-5 pr-5 transition-transform active:scale-95',
                     isSelected
                       ? 'bg-primary shadow-lg shadow-primary/20'
-                      : 'bg-white dark:bg-surface-dark border border-slate-200 dark:border-[#316847] hover:border-primary/50'
+                      : 'bg-white dark:bg-surface-dark border border-slate-200 dark:border-border-dark hover:border-primary/50'
                   )}
                 >
                   <Icon
@@ -213,7 +213,7 @@ export function CreateCustomExercise() {
             <select
               value={primaryMuscle}
               onChange={(e) => setPrimaryMuscle(e.target.value)}
-              className="w-full h-14 pl-4 pr-10 appearance-none rounded-xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-[#316847] focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-slate-900 dark:text-white text-base"
+              className="w-full h-14 pl-4 pr-10 appearance-none rounded-xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-border-dark focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-slate-900 dark:text-white text-base"
             >
               <option disabled value="">
                 Select a muscle group
@@ -231,7 +231,7 @@ export function CreateCustomExercise() {
           </div>
         </div>
 
-        <div className="h-px bg-slate-200 dark:bg-[#316847] my-2"></div>
+        <div className="h-px bg-slate-200 dark:bg-[#27272a] my-2"></div>
 
         {/* Default Targets */}
         <div className="flex flex-col gap-4">
@@ -255,11 +255,11 @@ export function CreateCustomExercise() {
                 className={cn(
                   'w-11 h-6 rounded-full peer-focus:outline-none transition-colors relative',
                   'after:content-[""] after:absolute after:top-[2px] after:start-[2px]',
-                  'after:bg-white after:border after:border-gray-300 dark:after:border-[#316847] after:rounded-full after:h-5 after:w-5',
+                  'after:bg-white after:border after:border-gray-100 dark:after:border-[#27272a] after:rounded-full after:h-5 after:w-5',
                   'after:transition-all',
                   defaultTargetsEnabled
                     ? 'bg-primary after:translate-x-full rtl:after:-translate-x-full after:border-white'
-                    : 'bg-slate-200 dark:bg-gray-700'
+                    : 'bg-slate-200 dark:bg-surface-dark-light'
                 )}
               />
             </label>
@@ -276,7 +276,7 @@ export function CreateCustomExercise() {
                     type="number"
                     value={defaultSets}
                     onChange={(e) => setDefaultSets(parseInt(e.target.value) || 0)}
-                    className="w-full h-12 rounded-lg bg-white dark:bg-surface-dark border border-slate-200 dark:border-[#316847] text-center focus:border-primary focus:ring-0 outline-none text-lg font-bold font-display placeholder:text-gray-600 text-slate-900 dark:text-white"
+                    className="w-full h-12 rounded-lg bg-white dark:bg-surface-dark border border-slate-200 dark:border-border-dark text-center focus:border-primary focus:ring-0 outline-none text-lg font-bold font-display placeholder:text-gray-600 text-slate-900 dark:text-white"
                   />
                 </div>
               </label>
@@ -289,7 +289,7 @@ export function CreateCustomExercise() {
                     type="number"
                     value={defaultReps}
                     onChange={(e) => setDefaultReps(parseInt(e.target.value) || 0)}
-                    className="w-full h-12 rounded-lg bg-white dark:bg-surface-dark border border-slate-200 dark:border-[#316847] text-center focus:border-primary focus:ring-0 outline-none text-lg font-bold font-display placeholder:text-gray-600 text-slate-900 dark:text-white"
+                    className="w-full h-12 rounded-lg bg-white dark:bg-surface-dark border border-slate-200 dark:border-border-dark text-center focus:border-primary focus:ring-0 outline-none text-lg font-bold font-display placeholder:text-gray-600 text-slate-900 dark:text-white"
                   />
                 </div>
               </label>
@@ -303,7 +303,7 @@ export function CreateCustomExercise() {
                     value={defaultWeight}
                     onChange={(e) => setDefaultWeight(e.target.value)}
                     placeholder={profile?.preferredUnit || 'kg'}
-                    className="w-full h-12 rounded-lg bg-white dark:bg-surface-dark border border-slate-200 dark:border-[#316847] text-center focus:border-primary focus:ring-0 outline-none text-lg font-bold font-display placeholder:text-slate-400 dark:placeholder:text-gray-600 text-slate-900 dark:text-white"
+                    className="w-full h-12 rounded-lg bg-white dark:bg-surface-dark border border-slate-200 dark:border-border-dark text-center focus:border-primary focus:ring-0 outline-none text-lg font-bold font-display placeholder:text-slate-400 dark:placeholder:text-gray-600 text-slate-900 dark:text-white"
                   />
                 </div>
               </label>

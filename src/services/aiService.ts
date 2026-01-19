@@ -19,6 +19,11 @@ import { addDays, format, differenceInHours } from 'date-fns';
 import { categorizeMuscleGroup, calculateMuscleImbalances } from '@/utils/analyticsHelpers';
 import { WorkoutPatternAnalysis, WorkoutRecommendation as PatternRecommendation } from './workoutAnalysisService';
 import { logger } from '@/utils/logger';
+import { 
+  calculateFatigueAccumulation, 
+  calculateSupercompensation, 
+  calculatePRProbability 
+} from './advancedRecoveryModeling';
 
 interface AIAnalysisContext {
   recentWorkouts: Workout[];
@@ -619,7 +624,7 @@ CRITICAL OUTPUT REQUIREMENTS:
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     // Calculate recovery predictions (always use calculated ones for accuracy)
-    const calculatedPredictions = calculateRecoveryPredictions(muscleStatuses, userLevel, baseRestInterval);
+    const calculatedPredictions = calculateRecoveryPredictions(muscleStatuses, userLevel, baseRestInterval, workouts);
     
     // Calculate muscle imbalances from actual workout data (data-driven)
     const calculatedImbalances = calculateMuscleImbalances(workouts);
@@ -649,6 +654,10 @@ CRITICAL OUTPUT REQUIREMENTS:
         return `${new Date(w.date).toLocaleDateString()}: ${exercises.substring(0, 50)}...`;
       }).join('\n');
 
+      const predictionContext = calculatedPredictions.map(p => 
+        `${p.dayLabel}: Recovery ${p.recoveryPercentage}%, Fatigue ${p.fatigueAccumulation || 0}, PR Prob ${p.prProbability || 0}%`
+      ).join('\n');
+
       const prompt = `Generate workout recommendations with comprehensive context in JSON format:
 {
   "readinessStatus": "Go Heavy|Moderate|Rest",
@@ -660,6 +669,21 @@ CRITICAL OUTPUT REQUIREMENTS:
     "muscleGroups": ["muscle1", "muscle2"],
     "reason": "explanation with specific recovery percentages and readiness score"
   },
+  "progressionPlan": {
+    "id": "plan-1",
+    "duration": 7,
+    "periodization": "linear|undulating|block",
+    "phases": [
+      {
+        "day": 1,
+        "workoutType": "push|pull|legs|cardio|rest",
+        "intensity": "low|medium|high",
+        "volumeTarget": 1000,
+        "exercises": ["ex1", "ex2"],
+        "recoveryTarget": 90
+      }
+    ]
+  },
   "imbalances": [{"muscle": "muscle", "leftVolume": number, "rightVolume": number, "imbalancePercent": number}],
   "correctiveExercises": [{"name": "exercise", "description": "why with data context", "targetMuscle": "muscle", "category": "imbalance|posture|weakness"}],
   "recoveryPredictions": [{"dayLabel": "Mon", "workoutType": "push|pull|legs|rest", "recoveryPercentage": number, "prPotential": ["exercise"], "fatigueWarnings": ["warning"]}]
@@ -670,6 +694,9 @@ Recovery & Readiness:
 - Ready Muscle Groups: ${readyMusclesList}
 - User Level: ${userLevel}
 - Base Rest Interval: ${baseRestInterval} hours
+
+Advanced Recovery Modeling (Calculated):
+${predictionContext}
 
 Balance Metrics:
 - Symmetry Score: ${symmetryScore}%
@@ -684,6 +711,7 @@ ${recentWorkoutTypes || 'No recent workouts'}
 CRITICAL OUTPUT REQUIREMENTS:
 - Output ONLY valid JSON, no markdown formatting, no code blocks, no explanatory text before or after
 - Include specific recovery percentages and readiness data in recommendations
+- Provide a detailed 7-day progression plan based on the calculated recovery modeling
 - Reference ready muscle groups with their recovery percentages
 - All text fields must be clean, professional, and polished - no gibberish, typos, or unpolished content
 - Ensure all strings are properly formatted and grammatically correct
@@ -702,6 +730,8 @@ CRITICAL OUTPUT REQUIREMENTS:
       if (parsed) {
         const cleaned = sanitizeAIResponse(parsed) as Record<string, unknown>;
         const recommendedWorkout = cleaned.recommendedWorkout as Record<string, unknown> | undefined;
+        const progressionPlan = cleaned.progressionPlan as Record<string, unknown> | undefined;
+        
         // Always use calculated predictions for accurate day labels and recovery percentages
         // But merge AI-generated workoutType if available
         const finalRecoveryPredictions = calculatedPredictions.map((calcPred, i) => {
@@ -717,6 +747,7 @@ CRITICAL OUTPUT REQUIREMENTS:
           }
           return calcPred;
         });
+        
         return {
           readinessScore,
           readinessStatus: String(cleaned.readinessStatus || 'Moderate'),
@@ -729,24 +760,30 @@ CRITICAL OUTPUT REQUIREMENTS:
             muscleGroups: (Array.isArray(recommendedWorkout.muscleGroups) ? recommendedWorkout.muscleGroups : []).map((m: unknown) => cleanPlainTextResponse(String(m)) as MuscleGroup),
             reason: cleanPlainTextResponse(String(recommendedWorkout.reason || '')),
           } : undefined,
+          progressionPlan: progressionPlan ? {
+            id: 'plan-1',
+            duration: typeof progressionPlan.duration === 'number' ? progressionPlan.duration : 7,
+            periodization: String(progressionPlan.periodization || 'linear') as 'linear' | 'undulating' | 'block',
+            phases: (Array.isArray(progressionPlan.phases) ? progressionPlan.phases : []).map((p: unknown) => {
+              const phase = p as Record<string, unknown>;
+              return {
+                day: typeof phase.day === 'number' ? phase.day : 1,
+                workoutType: String(phase.workoutType || 'rest') as 'push' | 'pull' | 'legs' | 'cardio' | 'rest',
+                intensity: String(phase.intensity || 'medium') as 'low' | 'medium' | 'high',
+                volumeTarget: typeof phase.volumeTarget === 'number' ? phase.volumeTarget : 0,
+                exercises: (Array.isArray(phase.exercises) ? phase.exercises : []).map((e: unknown) => cleanPlainTextResponse(String(e))),
+                recoveryTarget: typeof phase.recoveryTarget === 'number' ? phase.recoveryTarget : 0,
+              };
+            }),
+          } : undefined,
           muscleBalance: {
             // Use calculated imbalances (data-driven) instead of AI-generated ones
-            imbalances: calculatedImbalances.length > 0 
-              ? calculatedImbalances 
-              : (Array.isArray(cleaned.imbalances) ? cleaned.imbalances : []).map((im: unknown) => {
-                  const imbalance = im as Record<string, unknown>;
-                  const imbalancePercent = typeof imbalance.imbalancePercent === 'number' ? imbalance.imbalancePercent : 0;
-                  return {
-                    muscle: cleanPlainTextResponse(String(imbalance.muscle || '')) as MuscleGroup,
-                    leftVolume: typeof imbalance.leftVolume === 'number' ? imbalance.leftVolume : 0,
-                    rightVolume: typeof imbalance.rightVolume === 'number' ? imbalance.rightVolume : 0,
-                    imbalancePercent,
-                    status: (imbalancePercent > 10 ? 'imbalanced' : 'balanced') as 'balanced' | 'imbalanced',
-                  };
-                }),
+            // We trust our calculation (which requires 7+ workouts) over AI hallucination
+            imbalances: calculatedImbalances,
             overallScore: symmetryScore,
           },
-          correctiveExercises: (Array.isArray(cleaned.correctiveExercises) ? cleaned.correctiveExercises : []).map((ex: unknown, i: number) => {
+          correctiveExercises: workouts.length >= 7 
+            ? (Array.isArray(cleaned.correctiveExercises) ? cleaned.correctiveExercises : []).map((ex: unknown, i: number) => {
             const exercise = ex as Record<string, unknown>;
             return {
               id: `exercise-${i}`,
@@ -756,7 +793,7 @@ CRITICAL OUTPUT REQUIREMENTS:
               category: String(exercise.category || '') as 'imbalance' | 'posture' | 'weakness' | 'mobility',
               reason: cleanPlainTextResponse(String(exercise.reason || exercise.description || '')),
             };
-          }),
+          }) : [],
           recoveryPredictions: finalRecoveryPredictions,
         };
       }
@@ -888,7 +925,8 @@ function generateMockSmartAlerts(
 function calculateRecoveryPredictions(
   muscleStatuses: MuscleStatus[],
   userLevel: 'beginner' | 'intermediate' | 'advanced',
-  baseRestInterval: number
+  baseRestInterval: number,
+  recentWorkouts?: Workout[]
 ): RecoveryPrediction[] {
   const predictions: RecoveryPrediction[] = [];
   const today = new Date();
@@ -900,6 +938,9 @@ function calculateRecoveryPredictions(
     // Calculate average recovery for all muscles on this day
     let totalRecovery = 0;
     let count = 0;
+    let maxFatigue = 0;
+    let maxSupercompensation = 0;
+    
     const readyMusclesByCategory: { legs: MuscleGroup[]; push: MuscleGroup[]; pull: MuscleGroup[] } = {
       legs: [],
       push: [],
@@ -907,65 +948,68 @@ function calculateRecoveryPredictions(
     };
 
     muscleStatuses.forEach((status) => {
-      if (!status.lastWorked) {
+      let projectedRecovery = 100;
+      let fatigue = 0;
+      let supercomp = 0;
+      
+      const lastWorked = status.lastWorked instanceof Date 
+        ? status.lastWorked 
+        : status.lastWorked ? new Date(status.lastWorked) : null;
+
+      if (!lastWorked) {
+        // Never worked (or fully recovered)
         totalRecovery += 100;
         count++;
         const category = categorizeMuscleGroup(status.muscle);
         readyMusclesByCategory[category].push(status.muscle);
-        return;
-      }
+      } else {
+        // Calculate hours between target date and last workout
+        const hoursSinceWorkout = differenceInHours(targetDate, lastWorked);
 
-      const lastWorked = status.lastWorked instanceof Date 
-        ? status.lastWorked 
-        : new Date(status.lastWorked);
+        // Advanced metrics calculation
+        fatigue = calculateFatigueAccumulation(status, hoursSinceWorkout);
+        supercomp = calculateSupercompensation(status, hoursSinceWorkout);
+        maxFatigue = Math.max(maxFatigue, fatigue);
+        maxSupercompensation = Math.max(maxSupercompensation, supercomp);
 
-      // Calculate hours between target date and last workout
-      const hoursSinceWorkout = differenceInHours(targetDate, lastWorked);
+        if (hoursSinceWorkout < 0) {
+          // Target date is before last workout (shouldn't happen for future predictions)
+          projectedRecovery = status.recoveryPercentage;
+        } else {
+          // Calculate projected recovery
+          const recoverySettings = DEFAULT_RECOVERY_SETTINGS;
+          let baseRecoveryHours = 48;
 
-      if (hoursSinceWorkout < 0) {
-        // Target date is before last workout, use current recovery
-        totalRecovery += status.recoveryPercentage;
+          if (userLevel === 'beginner') {
+            baseRecoveryHours = (recoverySettings.beginnerRestDays[status.muscle] || 2) * 24;
+          } else if (userLevel === 'intermediate') {
+            baseRecoveryHours = (recoverySettings.intermediateRestDays[status.muscle] || 2) * 24;
+          } else {
+            baseRecoveryHours = (recoverySettings.advancedRestDays[status.muscle] || 1) * 24;
+          }
+
+          if (baseRestInterval !== undefined) {
+            const defaultBase = 48;
+            const ratio = baseRestInterval / defaultBase;
+            baseRecoveryHours = baseRecoveryHours * ratio;
+          }
+
+          const workloadMultiplier = 1 + (status.workloadScore / 100);
+          const adjustedRecoveryHours = baseRecoveryHours * workloadMultiplier;
+
+          projectedRecovery = Math.min(
+            100,
+            Math.max(0, (hoursSinceWorkout / adjustedRecoveryHours) * 100)
+          );
+        }
+
+        totalRecovery += projectedRecovery;
         count++;
-        if (status.recoveryPercentage >= 75) {
+
+        if (projectedRecovery >= 75) {
           const category = categorizeMuscleGroup(status.muscle);
           readyMusclesByCategory[category].push(status.muscle);
         }
-        return;
-      }
-
-      // Calculate projected recovery for this date
-      const recoverySettings = DEFAULT_RECOVERY_SETTINGS;
-      let baseRecoveryHours = 48;
-
-      if (userLevel === 'beginner') {
-        baseRecoveryHours = (recoverySettings.beginnerRestDays[status.muscle] || 2) * 24;
-      } else if (userLevel === 'intermediate') {
-        baseRecoveryHours = (recoverySettings.intermediateRestDays[status.muscle] || 2) * 24;
-      } else {
-        baseRecoveryHours = (recoverySettings.advancedRestDays[status.muscle] || 1) * 24;
-      }
-
-      // Apply BaseRestInterval setting
-      if (baseRestInterval !== undefined) {
-        const defaultBase = 48;
-        const ratio = baseRestInterval / defaultBase;
-        baseRecoveryHours = baseRecoveryHours * ratio;
-      }
-
-      const workloadMultiplier = 1 + (status.workloadScore / 100);
-      const adjustedRecoveryHours = baseRecoveryHours * workloadMultiplier;
-
-      const projectedRecovery = Math.min(
-        100,
-        Math.max(0, (hoursSinceWorkout / adjustedRecoveryHours) * 100)
-      );
-
-      totalRecovery += projectedRecovery;
-      count++;
-
-      if (projectedRecovery >= 75) {
-        const category = categorizeMuscleGroup(status.muscle);
-        readyMusclesByCategory[category].push(status.muscle);
       }
     });
 
@@ -980,17 +1024,34 @@ function calculateRecoveryPredictions(
     } else if (readyMusclesByCategory.pull.length >= 2) {
       workoutType = 'pull';
     } else if (avgRecovery >= 75) {
-      // If overall recovery is good but no specific category is ready, suggest rest or light work
       workoutType = 'rest';
     }
+    
+    // Calculate PR Probability if recent workouts are available
+    let prProb = 0;
+    if (recentWorkouts && recentWorkouts.length > 0 && muscleStatuses.length > 0) {
+      // Use the muscle with highest readiness to estimate PR chance for the day
+      const bestMuscle = muscleStatuses.reduce((prev, curr) => 
+        (curr.recoveryPercentage > prev.recoveryPercentage) ? curr : prev
+      );
+      // Rough estimation of hours since workout for best muscle
+      const lastWorked = bestMuscle.lastWorked ? new Date(bestMuscle.lastWorked) : null;
+      const hours = lastWorked ? differenceInHours(targetDate, lastWorked) : 100;
+      
+      prProb = calculatePRProbability(bestMuscle, recentWorkouts, hours);
+    }
 
-    const prediction = {
+    const prediction: RecoveryPrediction = {
       date: targetDate.toISOString().split('T')[0],
       dayLabel,
       workoutType,
-      recoveryPercentage: Math.max(1, avgRecovery), // Ensure minimum 1% so bar is always visible
+      recoveryPercentage: Math.max(1, avgRecovery),
       prPotential: avgRecovery >= 90 ? ['Optimal recovery for PR attempts'] : [],
       fatigueWarnings: avgRecovery < 50 ? ['High fatigue - consider rest'] : [],
+      fatigueAccumulation: maxFatigue,
+      supercompensationScore: maxSupercompensation,
+      prProbability: prProb,
+      volumePrediction: 0, // Placeholder
     };
     predictions.push(prediction);
   }
@@ -1015,6 +1076,7 @@ function generateMockWorkoutRecommendations(
       readinessScore: 0,
       readinessStatus: 'Rest',
       recommendedWorkout: undefined,
+      progressionPlan: undefined,
       muscleBalance: {
         imbalances: [],
         overallScore: 0,
@@ -1041,12 +1103,12 @@ function generateMockWorkoutRecommendations(
     readinessScore,
     readinessStatus: readinessScore >= 80 ? 'Go Heavy' : readinessScore >= 60 ? 'Moderate' : 'Rest',
     recommendedWorkout,
+    progressionPlan: undefined,
     muscleBalance: {
       imbalances: calculatedImbalances,
       overallScore: symmetryScore,
     },
     correctiveExercises: [],
-    recoveryPredictions: calculateRecoveryPredictions(muscleStatuses, userLevel, baseRestInterval),
+    recoveryPredictions: calculateRecoveryPredictions(muscleStatuses, userLevel, baseRestInterval, workouts),
   };
 }
-

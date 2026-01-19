@@ -22,8 +22,8 @@ export function VolumeTrendChart({ data }: VolumeTrendChartProps) {
 
   if (chartData.length === 0) {
     return (
-      <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-5 border border-gray-100 dark:border-gray-800/50 shadow-sm">
-        <p className="text-gray-500 dark:text-gray-400 text-center py-8">
+      <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-5 border border-gray-100 dark:border-border-dark/50 shadow-sm">
+        <p className="text-slate-500 dark:text-gray-400 text-center py-8">
           No volume data available
         </p>
       </div>
@@ -31,15 +31,15 @@ export function VolumeTrendChart({ data }: VolumeTrendChartProps) {
   }
 
   return (
-    <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-5 border border-gray-100 dark:border-gray-800/50 shadow-sm">
+    <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-5 border border-gray-100 dark:border-border-dark/50 shadow-sm">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h3 className="font-bold text-lg text-gray-900 dark:text-white">Volume Trend</h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+          <h3 className="font-bold text-lg text-slate-900 dark:text-white">Volume Trend</h3>
+          <p className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">
             Total weight lifted over time
           </p>
         </div>
-        <div className="flex gap-2 text-sm text-gray-500">
+        <div className="flex gap-2 text-sm text-slate-500">
           <span className="text-primary font-bold">1M</span>
           <span>3M</span>
           <span>6M</span>
@@ -50,8 +50,8 @@ export function VolumeTrendChart({ data }: VolumeTrendChartProps) {
           <AreaChart data={chartData}>
             <defs>
               <linearGradient id="volumeGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#0df269" stopOpacity={0.3} />
-                <stop offset="100%" stopColor="#0df269" stopOpacity={0} />
+                <stop offset="0%" stopColor="#FF9933" stopOpacity={0.3} />
+                <stop offset="100%" stopColor="#FF9933" stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="4 4" stroke="#333" opacity={0.3} />
@@ -81,7 +81,7 @@ export function VolumeTrendChart({ data }: VolumeTrendChartProps) {
             <Area
               type="monotone"
               dataKey="volume"
-              stroke="#0df269"
+              stroke="#FF9933"
               strokeWidth={3}
               fill="url(#volumeGradient)"
             />
@@ -89,7 +89,7 @@ export function VolumeTrendChart({ data }: VolumeTrendChartProps) {
         </ResponsiveContainer>
       </div>
       {chartData.length <= 14 && (
-        <div className={`flex mt-4 text-xs text-gray-400 font-medium px-1 ${
+        <div className={`flex mt-4 text-xs text-slate-400 dark:text-gray-400 font-medium px-1 ${
           chartData.length <= 7 ? 'justify-between' : 'gap-2 overflow-x-auto scrollbar-hide'
         }`}>
           {chartData.map((item, index) => (

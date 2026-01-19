@@ -40,9 +40,9 @@ export function DeleteConfirmationModal({
             Cancel
           </Button>
           <Button
-            variant="error"
+            variant="danger"
             onClick={onConfirm}
-            loading={isDeleting}
+            isLoading={isDeleting}
           >
             Delete
           </Button>

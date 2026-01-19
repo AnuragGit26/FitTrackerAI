@@ -8,7 +8,7 @@ interface UnitSwitcherProps {
 
 export function UnitSwitcher({ unit, onUnitChange }: UnitSwitcherProps) {
   return (
-    <div className="flex items-center rounded-lg bg-gray-200 dark:bg-surface-dark p-1">
+    <div className="flex items-center rounded-lg bg-white dark:bg-surface-dark p-1">
       <button
         onClick={() => onUnitChange('metric')}
         className={cn(

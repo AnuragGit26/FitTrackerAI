@@ -270,7 +270,9 @@ export const sleepRecoveryService = {
    * Returns null if insufficient data, otherwise returns correlation coefficient (-1 to 1)
    */
   calculateSleepRecoveryCorrelation(sleepLogs: SleepLog[], recoveryLogs: RecoveryLog[]): number | null {
-    if (sleepLogs.length < 3 || recoveryLogs.length < 3) return null;
+    if (sleepLogs.length < 3 || recoveryLogs.length < 3) {
+    return null;
+  }
 
     // Match logs by date
     const pairs: { sleepQuality: number; recoveryScore: number }[] = [];
@@ -318,7 +320,9 @@ export const sleepRecoveryService = {
       }
     });
 
-    if (pairs.length < 3) return null;
+    if (pairs.length < 3) {
+    return null;
+  }
 
     // Pearson correlation
     const n = pairs.length;
@@ -331,7 +335,9 @@ export const sleepRecoveryService = {
     const numerator = (n * sumXY) - (sumX * sumY);
     const denominator = Math.sqrt(((n * sumX2) - (sumX * sumX)) * ((n * sumY2) - (sumY * sumY)));
 
-    if (denominator === 0) return null;
+    if (denominator === 0) {
+    return null;
+  }
     
     return Math.round((numerator / denominator) * 100) / 100;
   },

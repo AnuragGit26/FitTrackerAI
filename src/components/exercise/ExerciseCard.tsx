@@ -18,7 +18,7 @@ export const ExerciseCard = memo(function ExerciseCard({ exercise, unit, onEdit,
 
   return (
     <motion.div 
-      className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4"
+      className="bg-white dark:bg-surface-dark rounded-lg border border-gray-100 dark:border-border-dark p-4"
       variants={shouldReduceMotion ? {} : cardHover}
       initial="rest"
       whileHover="hover"
@@ -26,10 +26,10 @@ export const ExerciseCard = memo(function ExerciseCard({ exercise, unit, onEdit,
     >
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
-          <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+          <h3 className="font-semibold text-slate-900 dark:text-gray-100">
             {exercise.exerciseName}
           </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          <p className="text-sm text-slate-500 dark:text-gray-400 mt-1">
             Total Volume: {formatWeight(exercise.totalVolume, unit)}
           </p>
         </div>
@@ -37,7 +37,7 @@ export const ExerciseCard = memo(function ExerciseCard({ exercise, unit, onEdit,
           {onEdit && (
             <motion.button
               onClick={onEdit}
-              className="p-2 rounded-lg text-gray-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
+              className="p-2 rounded-lg text-gray-400 hover:text-primary hover:bg-primary/10 dark:hover:bg-primary/20 transition-colors"
               aria-label="Edit exercise"
               whileHover={shouldReduceMotion ? {} : { scale: 1.1 }}
               whileTap={shouldReduceMotion ? {} : { scale: 0.9 }}
@@ -66,17 +66,17 @@ export const ExerciseCard = memo(function ExerciseCard({ exercise, unit, onEdit,
             className={cn(
               'flex items-center justify-between px-3 py-2 rounded text-sm',
               set.completed
-                ? 'bg-primary-50 dark:bg-primary-900/20'
-                : 'bg-gray-50 dark:bg-gray-700/50'
+                ? 'bg-primary/10 dark:bg-primary/20'
+                : 'bg-gray-50 dark:bg-surface-dark-light/50'
             )}
           >
-            <span className="font-medium text-gray-600 dark:text-gray-400">
+            <span className="font-medium text-slate-500 dark:text-gray-400">
               Set {set.setNumber}
             </span>
-            <span className="text-gray-900 dark:text-gray-100">
+            <span className="text-slate-900 dark:text-gray-100">
               {set.reps} × {set.weight !== undefined ? formatWeight(set.weight, unit) : 'N/A'}
               {set.completed && (
-                <span className="ml-2 text-primary-600 dark:text-primary-400">✓</span>
+                <span className="ml-2 text-primary">✓</span>
               )}
             </span>
           </div>

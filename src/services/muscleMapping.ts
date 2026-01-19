@@ -110,7 +110,9 @@ export function getMuscleMapping(exerciseName: string): ExerciseMuscleMapping | 
 
 export function getAllMusclesForExercise(exerciseName: string): MuscleGroup[] {
   const mapping = getMuscleMapping(exerciseName);
-  if (!mapping) return [];
+  if (!mapping) {
+    return [];
+  }
   return [...mapping.primary, ...mapping.secondary];
 }
 

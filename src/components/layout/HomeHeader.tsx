@@ -18,7 +18,9 @@ export function HomeHeader() {
   const shouldReduceMotion = prefersReducedMotion();
 
   const loadUnreadCount = useCallback(async () => {
-    if (!profile?.id) return;
+    if (!profile?.id) {
+    return;
+  }
     try {
       const count = await notificationService.getUnreadCount(profile.id);
       setUnreadCount(count);

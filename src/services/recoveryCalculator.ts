@@ -154,8 +154,9 @@ export function calculateAdjustedRecoveryHours(
 export function getRecoveryColor(status: RecoveryStatus): string {
   switch (status) {
     case 'ready':
+      return '#3b82f6'; // blue
     case 'fresh':
-      return '#10b981'; // green
+      return '#8b5cf6'; // purple
     case 'recovering':
       return '#f59e0b'; // yellow
     case 'sore':

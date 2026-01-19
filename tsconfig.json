@@ -28,7 +28,7 @@
     }
   },
   "include": ["src"],
-  "exclude": ["supabase/functions/**"],
+  "exclude": ["supabase/functions/**", "**/*.cy.tsx", "cypress/**"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
 

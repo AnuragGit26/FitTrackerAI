@@ -6,10 +6,10 @@ interface AIInsightCardProps {
 
 export function AIInsightCard({ insight }: AIInsightCardProps) {
   return (
-    <div className="bg-gradient-to-br from-[#1E293B] to-[#111827] dark:from-[#1F3528] dark:to-[#102217] rounded-xl p-5 border border-primary/20 relative overflow-hidden shadow-lg">
+    <div className="bg-gradient-to-br from-[#1E293B] to-[#111827] dark:from-surface-dark dark:to-background-dark rounded-xl p-5 border border-primary/20 relative overflow-hidden shadow-lg">
       <div className="absolute -top-10 -right-10 w-40 h-40 bg-primary/20 rounded-full blur-[60px]"></div>
       <div className="relative z-10 flex items-start gap-4">
-        <div className="bg-primary text-[#102217] p-2 rounded-lg shrink-0 shadow-[0_0_15px_rgba(13,242,105,0.4)]">
+        <div className="bg-primary text-background-dark p-2 rounded-lg shrink-0 shadow-[0_0_15px_rgba(255,153,51,0.4)]">
           <Sparkles className="w-5 h-5" />
         </div>
         <div className="flex-1">

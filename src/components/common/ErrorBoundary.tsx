@@ -80,7 +80,9 @@ export class ErrorBoundary extends Component<Props, State> {
     };
 
     isDatabaseError = (error: Error | null): boolean => {
-        if (!error) return false;
+        if (!error) {
+    return false;
+  }
         const errorStr = error.toString().toLowerCase();
         const messageStr = error.message?.toLowerCase() || '';
         return (
@@ -143,7 +145,7 @@ export class ErrorBoundary extends Component<Props, State> {
                             <div className="flex gap-3 w-full mt-6">
                                 <button
                                     onClick={this.handleGoHome}
-                                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-200 dark:bg-surface-dark-light text-gray-900 dark:text-gray-100 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-surface-dark transition-colors"
                                 >
                                     <Home className="w-4 h-4" />
                                     Go Home

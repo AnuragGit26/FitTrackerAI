@@ -30,12 +30,39 @@ export const workoutSummaryService = {
 
     // Get all workouts for comparisons and trends
     const allWorkouts = await dataService.getAllWorkouts(userId);
-    const previousWorkout = this.findPreviousWorkout(workout, allWorkouts);
+
+    // Calculate focus area early to enable focus-aware comparison
+    const currentMuscleDistribution = this.calculateMuscleDistribution(workout);
+    const focusArea = this.calculateFocusArea(currentMuscleDistribution);
+
+    // Find previous workout: prefer same focus area, fallback to any previous workout
+    let previousWorkout: Workout | undefined;
+    let comparisonContext = 'last workout';
+
+    if (focusArea.type !== 'balanced') {
+      const focusSpecificWorkout = this.findPreviousWorkoutForFocusArea(
+        workout,
+        allWorkouts,
+        focusArea.type
+      );
+
+      if (focusSpecificWorkout) {
+        previousWorkout = focusSpecificWorkout;
+        comparisonContext = `last ${focusArea.type} workout`;
+      } else {
+        previousWorkout = this.findPreviousWorkout(workout, allWorkouts);
+      }
+    } else {
+      previousWorkout = this.findPreviousWorkout(workout, allWorkouts);
+    }
 
     // Calculate all summary components
-    const sessionComparison = this.calculateSessionComparison(workout, previousWorkout);
+    const sessionComparison = this.calculateSessionComparison(
+      workout,
+      previousWorkout,
+      comparisonContext
+    );
     const muscleDistribution = this.calculateMuscleDistribution(workout, previousWorkout);
-    const focusArea = this.calculateFocusArea(muscleDistribution);
     const exerciseComparisons = await this.calculateExerciseComparisons(workout, userId);
     const exerciseTrends = this.calculateExerciseTrends(workout, allWorkouts);
     const personalRecords = this.calculatePersonalRecords(workout, allWorkouts);
@@ -82,11 +109,42 @@ export const workoutSummaryService = {
   },
 
   /**
+   * Find the most recent previous workout that targeted the same focus area (push/pull/legs)
+   */
+  findPreviousWorkoutForFocusArea(
+    currentWorkout: Workout,
+    allWorkouts: Workout[],
+    focusType: 'push' | 'pull' | 'legs' | 'balanced'
+  ): Workout | undefined {
+    // Filter workouts before current date
+    const currentDate = new Date(currentWorkout.date);
+    const previousWorkouts = (allWorkouts ?? [])
+      .filter((w) => {
+        const wDate = new Date(w.date);
+        return wDate < currentDate && w.id !== currentWorkout.id;
+      })
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    // Find most recent workout with matching focus area
+    for (const workout of previousWorkouts) {
+      const distribution = this.calculateMuscleDistribution(workout);
+      const workoutFocus = this.calculateFocusArea(distribution);
+
+      if (workoutFocus.type === focusType) {
+        return workout;
+      }
+    }
+
+    return undefined;
+  },
+
+  /**
    * Calculate session comparison metrics
    */
   calculateSessionComparison(
     current: Workout,
-    previous?: Workout
+    previous?: Workout,
+    comparisonContext: string = 'last workout'
   ): SessionComparison {
     const currentRPE = rpeService.calculateAverageRPE([current]);
     const previousRPE = previous ? rpeService.calculateAverageRPE([previous]) : undefined;
@@ -124,6 +182,7 @@ export const workoutSummaryService = {
         previous: previousIntensity,
         change: previousIntensity ? currentIntensity - previousIntensity : undefined,
       },
+      comparisonContext,
     };
   },
 
@@ -191,9 +250,9 @@ export const workoutSummaryService = {
     let legsVolume = 0;
 
     distribution.forEach(({ muscle, volume }) => {
-      if (pushMuscles.includes(muscle)) pushVolume += volume;
-      else if (pullMuscles.includes(muscle)) pullVolume += volume;
-      else if (legMuscles.includes(muscle)) legsVolume += volume;
+      if (pushMuscles.includes(muscle)) {pushVolume += volume;}
+      else if (pullMuscles.includes(muscle)) {pullVolume += volume;}
+      else if (legMuscles.includes(muscle)) {legsVolume += volume;}
     });
 
     const total = pushVolume + pullVolume + legsVolume;
@@ -210,9 +269,13 @@ export const workoutSummaryService = {
     let type: 'push' | 'pull' | 'legs' | 'balanced' = 'balanced';
 
     if (maxPercent >= 40) {
-      if (pushPercent === maxPercent) type = 'push';
-      else if (pullPercent === maxPercent) type = 'pull';
-      else if (legsPercent === maxPercent) type = 'legs';
+      if (pushPercent === maxPercent) {type = 'push';}
+      else if (pullPercent === maxPercent) {
+    type = 'pull';
+  }
+      else if (legsPercent === maxPercent) {
+    type = 'legs';
+  }
     }
 
     return {
@@ -346,7 +409,9 @@ export const workoutSummaryService = {
 
       const dataPoints = exerciseWorkouts.map((w) => {
         const ex = (w.exercises ?? []).find((e) => e.exerciseId === exercise.exerciseId);
-        if (!ex) return null;
+        if (!ex) {
+    return null;
+  }
         const completedSets = (ex.sets ?? []).filter((s) => s.completed);
         const maxWeight = completedSets.length > 0 ? Math.max(
           ...completedSets.map((s) => s.weight ?? 0),
@@ -397,8 +462,12 @@ export const workoutSummaryService = {
         firstVolume > 0 ? ((lastVolume - firstVolume) / firstVolume) * 100 : 0;
 
       let trend: 'increasing' | 'decreasing' | 'stable' = 'stable';
-      if (changePercent > 5) trend = 'increasing';
-      else if (changePercent < -5) trend = 'decreasing';
+      if (changePercent > 5) {
+    trend = 'increasing';
+  }
+      else if (changePercent < -5) {
+    trend = 'decreasing';
+  }
 
       trends.push({
         exerciseId: exercise.exerciseId,
@@ -443,7 +512,7 @@ export const workoutSummaryService = {
                 .filter((s) => s.completed && s.weight && s.reps)
                 .forEach((s) => {
                   const prev1RM = calculateEstimatedOneRepMax(s.weight!, s.reps!);
-                  if (prev1RM > previousMax1RM) previousMax1RM = prev1RM;
+                  if (prev1RM > previousMax1RM) {previousMax1RM = prev1RM;}
                 });
             }
           });
@@ -553,11 +622,19 @@ export const workoutSummaryService = {
 
     // Determine tier
     let tier: 'S-Tier' | 'A-Tier' | 'B-Tier' | 'C-Tier' | 'D-Tier' = 'C-Tier';
-    if (overallScore >= 9) tier = 'S-Tier';
-    else if (overallScore >= 8) tier = 'A-Tier';
-    else if (overallScore >= 6.5) tier = 'B-Tier';
-    else if (overallScore >= 5) tier = 'C-Tier';
-    else tier = 'D-Tier';
+    if (overallScore >= 9) {
+    tier = 'S-Tier';
+  }
+    else if (overallScore >= 8) {
+    tier = 'A-Tier';
+  }
+    else if (overallScore >= 6.5) {
+    tier = 'B-Tier';
+  }
+    else if (overallScore >= 5) {
+    tier = 'C-Tier';
+  }
+    else {tier = 'D-Tier';}
 
     // Generate summary
     const volumeChange = previous && previous.totalVolume && previous.totalVolume > 0

@@ -49,20 +49,32 @@ export function RecoveryScoreCard() {
   const trendChange = trend.changePercentage;
 
   const getStatusColor = () => {
-    if (readinessStatus === 'ready') return 'text-primary';
-    if (readinessStatus === 'recovering') return 'text-caution';
+    if (readinessStatus === 'ready') {
+    return 'text-primary';
+  }
+    if (readinessStatus === 'recovering') {
+    return 'text-caution';
+  }
     return 'text-warning';
   };
 
   const getStatusBgColor = () => {
-    if (readinessStatus === 'ready') return 'bg-primary/10';
-    if (readinessStatus === 'recovering') return 'bg-caution/10';
+    if (readinessStatus === 'ready') {
+    return 'bg-primary/10';
+  }
+    if (readinessStatus === 'recovering') {
+    return 'bg-caution/10';
+  }
     return 'bg-warning/10';
   };
 
   const getStatusIcon = () => {
-    if (readinessStatus === 'ready') return CheckCircle2;
-    if (readinessStatus === 'recovering') return Activity;
+    if (readinessStatus === 'ready') {
+    return CheckCircle2;
+  }
+    if (readinessStatus === 'recovering') {
+    return Activity;
+  }
     return AlertCircle;
   };
 

@@ -7,7 +7,9 @@ interface CriticalAlertsCardProps {
 }
 
 export function CriticalAlertsCard({ alerts }: CriticalAlertsCardProps) {
-  if (alerts.length === 0) return null;
+  if (alerts.length === 0) {
+    return null;
+  }
 
   const criticalAlert = alerts.find((a) => a.type === 'critical') || alerts[0];
 
@@ -37,11 +39,11 @@ export function CriticalAlertsCard({ alerts }: CriticalAlertsCardProps) {
               <h3 className="text-lg font-bold text-black dark:text-white leading-tight mb-1">
                 {cleanPlainTextResponse(criticalAlert.title)}
               </h3>
-              <p className="text-sm text-gray-600 dark:text-[#90cba8] leading-relaxed">{cleanPlainTextResponse(criticalAlert.message)}</p>
+              <p className="text-sm text-slate-500 dark:text-[#FF9933] leading-relaxed">{cleanPlainTextResponse(criticalAlert.message)}</p>
             </div>
           </div>
           <div className="mt-2 flex items-center justify-between gap-3">
-            <span className="text-xs font-mono text-gray-500 dark:text-gray-400">Source: Workout Vol.</span>
+            <span className="text-xs font-mono text-slate-500 dark:text-gray-400">Source: Workout Vol.</span>
             {criticalAlert.actionLabel && (
               <button
                 onClick={criticalAlert.actionHandler}

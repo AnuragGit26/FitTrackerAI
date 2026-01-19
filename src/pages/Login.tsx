@@ -70,10 +70,10 @@ export function Login() {
 
       {/* Headline Area */}
       <div className="px-6 pt-2 pb-6">
-        <h1 className="text-gray-900 dark:text-white tracking-tight text-[32px] font-bold leading-tight text-left">
+        <h1 className="text-slate-900 dark:text-white tracking-tight text-[32px] font-bold leading-tight text-left">
           Welcome Back
         </h1>
-        <p className="text-gray-600 dark:text-secondary-text text-base font-normal leading-normal pt-2 text-left">
+        <p className="text-slate-500 dark:text-secondary-text text-base font-normal leading-normal pt-2 text-left">
           Log in to continue your streak and track your gains.
         </p>
       </div>
@@ -95,7 +95,7 @@ export function Login() {
           <div>
             <label
               htmlFor="email"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+              className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-2"
             >
               Email
             </label>
@@ -106,7 +106,7 @@ export function Login() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="your@email.com"
               disabled={isLoading}
-              className="w-full h-12 px-4 rounded-lg border border-gray-300 dark:border-border-dark bg-white dark:bg-surface-dark text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
+              className="w-full h-12 px-4 rounded-lg border border-gray-100 dark:border-border-dark bg-white dark:bg-surface-dark text-slate-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
               required
             />
           </div>
@@ -114,7 +114,7 @@ export function Login() {
           <div>
             <label
               htmlFor="password"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+              className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-2"
             >
               Password
             </label>
@@ -125,7 +125,7 @@ export function Login() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password"
               disabled={isLoading}
-              className="w-full h-12 px-4 rounded-lg border border-gray-300 dark:border-border-dark bg-white dark:bg-surface-dark text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
+              className="w-full h-12 px-4 rounded-lg border border-gray-100 dark:border-border-dark bg-white dark:bg-surface-dark text-slate-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
               required
             />
           </div>
@@ -133,7 +133,7 @@ export function Login() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-primary hover:bg-primary/90 disabled:bg-primary/50 text-background-dark font-bold text-lg h-14 rounded-full transition-all transform active:scale-[0.98] flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(13,242,105,0.2)] disabled:cursor-not-allowed"
+            className="w-full bg-primary hover:bg-primary/90 disabled:bg-primary/50 text-background-dark font-bold text-lg h-14 rounded-full transition-all transform active:scale-[0.98] flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,153,51,0.2)] disabled:cursor-not-allowed"
           >
             {isLoading ? (
               <>
@@ -151,11 +151,11 @@ export function Login() {
 
         {/* Social Login Divider */}
         <div className="relative py-4 flex items-center">
-          <div className="flex-grow border-t border-gray-300 dark:border-border-dark"></div>
-          <span className="flex-shrink-0 mx-4 text-gray-500 dark:text-secondary-text text-sm">
+          <div className="flex-grow border-t border-gray-100 dark:border-border-dark"></div>
+          <span className="flex-shrink-0 mx-4 text-slate-500 dark:text-secondary-text text-sm">
             Or continue with
           </span>
-          <div className="flex-grow border-t border-gray-300 dark:border-border-dark"></div>
+          <div className="flex-grow border-t border-gray-100 dark:border-border-dark"></div>
         </div>
 
         {/* Social Buttons */}
@@ -164,7 +164,7 @@ export function Login() {
             type="button"
             onClick={() => handleSocialLogin('google')}
             disabled={isLoading}
-            className="flex items-center justify-center gap-2 h-12 rounded-lg border border-gray-300 dark:border-border-dark bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-surface-dark/80 text-gray-900 dark:text-white transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center justify-center gap-2 h-12 rounded-lg border border-gray-100 dark:border-border-dark bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-surface-dark/80 text-slate-900 dark:text-white transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg
               className="w-5 h-5"
@@ -199,7 +199,7 @@ export function Login() {
             type="button"
             onClick={() => handleSocialLogin('apple')}
             disabled={isLoading}
-            className="flex items-center justify-center gap-2 h-12 rounded-lg border border-gray-300 dark:border-border-dark bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-surface-dark/80 text-gray-900 dark:text-white transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center justify-center gap-2 h-12 rounded-lg border border-gray-100 dark:border-border-dark bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-surface-dark/80 text-slate-900 dark:text-white transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <img
               src="https://i.pinimg.com/736x/65/22/5a/65225ab6d965e5804a632b643e317bf4.jpg"
@@ -213,7 +213,7 @@ export function Login() {
 
       {/* Footer / Sign Up Link */}
       <div className="mt-auto py-8 text-center">
-        <p className="text-gray-600 dark:text-secondary-text">
+        <p className="text-slate-500 dark:text-secondary-text">
           Don&apos;t have an account?{' '}
           <Link to="/signup" className="text-primary font-bold hover:underline ml-1">
             Sign Up

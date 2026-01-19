@@ -25,11 +25,13 @@ export function TrainingPatternsSection({ patterns }: TrainingPatternsSectionPro
       case 'caffeine':
         return 'text-orange-500 dark:text-orange-400';
       default:
-        return 'text-gray-500 dark:text-gray-400';
+        return 'text-slate-500 dark:text-gray-400';
     }
   };
 
-  if (patterns.length === 0) return null;
+  if (patterns.length === 0) {
+    return null;
+  }
 
   return (
     <section>
@@ -38,7 +40,7 @@ export function TrainingPatternsSection({ patterns }: TrainingPatternsSectionPro
         {patterns.map((pattern, index) => (
           <div
             key={pattern.id || `pattern-${index}`}
-            className="snap-center shrink-0 w-64 bg-white dark:bg-surface-card rounded-xl p-4 border border-gray-200 dark:border-[#316847]/50 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow"
+            className="snap-center shrink-0 w-64 bg-white dark:bg-surface-card rounded-xl p-4 border border-gray-100 dark:border-border-dark/50 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow"
           >
             <div>
               <div className={`flex items-center gap-2 mb-2 ${getColor(pattern.type)}`}>

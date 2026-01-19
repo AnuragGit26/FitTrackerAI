@@ -14,7 +14,9 @@ export function trapFocus(container: HTMLElement): () => void {
   const lastElement = focusableElements[focusableElements.length - 1];
 
   const handleTabKey = (e: KeyboardEvent) => {
-    if (e.key !== 'Tab') return;
+    if (e.key !== 'Tab') {
+    return;
+  }
 
     if (e.shiftKey) {
       // Shift + Tab
@@ -90,11 +92,13 @@ export function announceToScreenReader(message: string, priority: 'polite' | 'as
  * Checks if an element is visible and focusable
  */
 export function isFocusable(element: HTMLElement): boolean {
-  if (element.tabIndex < 0) return false;
-  if (element.hasAttribute('disabled')) return false;
-  if (element.hasAttribute('hidden')) return false;
-  if (window.getComputedStyle(element).visibility === 'hidden') return false;
-  if (window.getComputedStyle(element).display === 'none') return false;
+  if (element.tabIndex < 0) {
+    return false;
+  }
+  if (element.hasAttribute('disabled')) {return false;}
+  if (element.hasAttribute('hidden')) {return false;}
+  if (window.getComputedStyle(element).visibility === 'hidden') {return false;}
+  if (window.getComputedStyle(element).display === 'none') {return false;}
 
   return true;
 }

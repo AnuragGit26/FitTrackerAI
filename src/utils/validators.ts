@@ -1,166 +1,158 @@
 import { ExerciseTrackingType, WorkoutSet, DistanceUnit } from '@/types/exercise';
 import { logger } from '@/utils/logger';
+import {
+  createWeightSchema,
+  repsSchema,
+  createDistanceSchema,
+  durationSecondsSchema,
+  caloriesSchema,
+  stepsSchema,
+  rpeSchema,
+  nameSchema,
+  notesSchema,
+  validateWorkoutSet as zodValidateWorkoutSet,
+} from '@/utils/validationSchemas';
 
+/**
+ * Validates weight using Zod schema
+ * @deprecated Use Zod schemas directly from validationSchemas.ts for better type safety
+ */
 export function validateWeight(weight: number, unit: 'kg' | 'lbs'): { valid: boolean; error?: string } {
-  if (weight <= 0) {
-    return { valid: false, error: 'Weight must be greater than 0' };
+  const schema = createWeightSchema(unit);
+  const result = schema.safeParse(weight);
+
+  if (result.success) {
+    return { valid: true };
   }
-  if (unit === 'kg' && weight > 1000) {
-    return { valid: false, error: 'Weight cannot exceed 1000 kg' };
-  }
-  if (unit === 'lbs' && weight > 2200) {
-    return { valid: false, error: 'Weight cannot exceed 2200 lbs' };
-  }
-  return { valid: true };
+
+  const error = result.error.errors[0]?.message || 'Invalid weight';
+  return { valid: false, error };
 }
 
+/**
+ * Validates reps using Zod schema
+ * @deprecated Use Zod schemas directly from validationSchemas.ts for better type safety
+ */
 export function validateReps(reps: number): { valid: boolean; error?: string } {
-  if (reps < 0) {
-    return { valid: false, error: 'Reps cannot be negative' };
+  const result = repsSchema.safeParse(reps);
+
+  if (result.success) {
+    return { valid: true };
   }
-  if (reps === 0) {
-    return { valid: false, error: 'Reps must be greater than 0' };
-  }
-  if (reps > 50) {
-    return { valid: false, error: 'Reps cannot exceed 50' };
-  }
-  return { valid: true };
+
+  const error = result.error.errors[0]?.message || 'Invalid reps';
+  return { valid: false, error };
 }
 
+/**
+ * Validates distance using Zod schema
+ * @deprecated Use Zod schemas directly from validationSchemas.ts for better type safety
+ */
 export function validateDistance(distance: number, unit: DistanceUnit): { valid: boolean; error?: string } {
-  if (distance < 0) {
-    return { valid: false, error: 'Distance cannot be negative' };
+  const schema = createDistanceSchema(unit);
+  const result = schema.safeParse(distance);
+
+  if (result.success) {
+    return { valid: true };
   }
-  if (unit === 'km' && distance > 1000) {
-    return { valid: false, error: 'Distance cannot exceed 1000 km' };
-  }
-  if (unit === 'miles' && distance > 621) {
-    return { valid: false, error: 'Distance cannot exceed 621 miles' };
-  }
-  return { valid: true };
+
+  const error = result.error.errors[0]?.message || 'Invalid distance';
+  return { valid: false, error };
 }
 
+/**
+ * Validates duration using Zod schema
+ * @deprecated Use Zod schemas directly from validationSchemas.ts for better type safety
+ */
 export function validateDuration(duration: number): { valid: boolean; error?: string } {
-  if (duration < 0) {
-    return { valid: false, error: 'Duration cannot be negative' };
+  const result = durationSecondsSchema.safeParse(duration);
+
+  if (result.success) {
+    return { valid: true };
   }
-  if (duration > 86400) {
-    return { valid: false, error: 'Duration cannot exceed 24 hours' };
-  }
-  return { valid: true };
+
+  const error = result.error.errors[0]?.message || 'Invalid duration';
+  return { valid: false, error };
 }
 
+/**
+ * Validates calories using Zod schema
+ * @deprecated Use Zod schemas directly from validationSchemas.ts for better type safety
+ */
 export function validateCalories(calories?: number): { valid: boolean; error?: string } {
-  if (calories === undefined) return { valid: true }; // Optional field
-  if (calories < 0) {
-    return { valid: false, error: 'Calories cannot be negative' };
+  const result = caloriesSchema.safeParse(calories);
+
+  if (result.success) {
+    return { valid: true };
   }
-  if (calories > 10000) {
-    return { valid: false, error: 'Calories cannot exceed 10000' };
-  }
-  return { valid: true };
+
+  const error = result.error.errors[0]?.message || 'Invalid calories';
+  return { valid: false, error };
 }
 
+/**
+ * Validates steps using Zod schema
+ * @deprecated Use Zod schemas directly from validationSchemas.ts for better type safety
+ */
 export function validateSteps(steps?: number): { valid: boolean; error?: string } {
-  if (steps === undefined) return { valid: true }; // Optional field
-  if (steps < 0) {
-    return { valid: false, error: 'Steps cannot be negative' };
+  const result = stepsSchema.safeParse(steps);
+
+  if (result.success) {
+    return { valid: true };
   }
-  if (steps > 100000) {
-    return { valid: false, error: 'Steps cannot exceed 100000' };
-  }
-  return { valid: true };
+
+  const error = result.error.errors[0]?.message || 'Invalid steps';
+  return { valid: false, error };
 }
 
+/**
+ * Validates RPE using Zod schema
+ * @deprecated Use Zod schemas directly from validationSchemas.ts for better type safety
+ */
 export function validateRPE(rpe?: number): boolean {
-  if (rpe === undefined) return true;
-  return rpe >= 1 && rpe <= 10;
+  const result = rpeSchema.safeParse(rpe);
+  return result.success;
 }
 
+/**
+ * Validates workout name using Zod schema
+ * @deprecated Use Zod schemas directly from validationSchemas.ts for better type safety
+ */
 export function validateWorkoutName(name: string): boolean {
-  return name.trim().length > 0 && name.trim().length <= 100;
+  const result = nameSchema.safeParse(name);
+  return result.success;
 }
 
+/**
+ * Validates exercise name using Zod schema
+ * @deprecated Use Zod schemas directly from validationSchemas.ts for better type safety
+ */
 export function validateExerciseName(name: string): boolean {
-  return name.trim().length > 0 && name.trim().length <= 100;
+  const result = nameSchema.safeParse(name);
+  return result.success;
 }
 
+/**
+ * Validates notes using Zod schema
+ * @deprecated Use Zod schemas directly from validationSchemas.ts for better type safety
+ */
 export function validateNotes(notes: string): boolean {
-  return notes.length <= 1000;
+  const result = notesSchema.safeParse(notes);
+  return result.success;
 }
 
+/**
+ * Validates a workout set using Zod schema
+ * @deprecated Use Zod schemas directly from validationSchemas.ts for better type safety
+ */
 export function validateSet(set: WorkoutSet, trackingType: ExerciseTrackingType, unit: 'kg' | 'lbs' = 'kg', distanceUnit: DistanceUnit = 'km'): { valid: boolean; error?: string } {
-  if (!set.completed) return { valid: true };
-
-  switch (trackingType) {
-    case 'weight_reps': {
-      if (set.weight === undefined || set.reps === undefined) {
-        return { valid: false, error: 'Weight and reps are required for completed sets' };
-      }
-      const weightValidation = validateWeight(set.weight, unit);
-      if (!weightValidation.valid) return weightValidation;
-      const repsValidation = validateReps(set.reps);
-      if (!repsValidation.valid) return repsValidation;
-      return { valid: true };
-    }
-
-    case 'reps_only':
-      if (set.reps === undefined) {
-        return { valid: false, error: 'Reps are required for completed sets' };
-      }
-      return validateReps(set.reps);
-
-    case 'cardio': {
-      // Distance-based cardio: requires distance and time
-      if (set.distance !== undefined) {
-        const distanceValidation = validateDistance(set.distance, set.distanceUnit || distanceUnit);
-        if (!distanceValidation.valid) return distanceValidation;
-        // Time is required for distance-based cardio
-        if (set.time === undefined) {
-          return { valid: false, error: 'Time is required for distance-based cardio' };
-        }
-        const timeValidation = validateDuration(set.time);
-        if (!timeValidation.valid) return { valid: false, error: 'Time must be between 0 and 24 hours' };
-      } 
-      // Reps-based cardio: requires reps or duration (at least one)
-      else if (set.reps !== undefined || set.duration !== undefined) {
-        if (set.reps !== undefined) {
-          const repsValidation = validateReps(set.reps);
-          if (!repsValidation.valid) return repsValidation;
-        }
-        if (set.duration !== undefined) {
-          const durationValidation = validateDuration(set.duration);
-          if (!durationValidation.valid) return durationValidation;
-        }
-        // At least one must be provided
-        if (set.reps === undefined && set.duration === undefined) {
-          return { valid: false, error: 'Reps or duration is required for cardio exercises' };
-        }
-      } else {
-        return { valid: false, error: 'Distance or reps/duration is required for cardio exercises' };
-      }
-      // Validate optional fields
-      const caloriesValidation = validateCalories(set.calories);
-      if (!caloriesValidation.valid) return { valid: false, error: 'Calories must be between 0 and 10000' };
-      const stepsValidation = validateSteps(set.steps);
-      if (!stepsValidation.valid) return { valid: false, error: 'Steps must be between 0 and 100000' };
-      return { valid: true };
-    }
-
-    case 'duration': {
-      if (set.duration === undefined) {
-        return { valid: false, error: 'Duration is required' };
-      }
-      const durationValidation = validateDuration(set.duration);
-      if (!durationValidation.valid) {
-        return { valid: false, error: 'Duration must be between 0 and 24 hours' };
-      }
-      return { valid: true };
-    }
-
-    default:
-      return { valid: false, error: 'Invalid tracking type' };
-  }
+  // Use Zod validation underneath
+  const result = zodValidateWorkoutSet(set, trackingType, unit);
+  // Map 'success' to 'valid' for backward compatibility
+  return {
+    valid: result.success,
+    error: result.error
+  };
 }
 
 export function validateExerciseSets(
@@ -277,69 +269,75 @@ export function normalizeWorkoutStartTime(
   workoutDate: Date,
   startTime?: Date | string | null
 ): Date {
-  const now = new Date();
-  const toleranceMs = 5000; // 5 seconds tolerance for clock skew
-  
-  // Ensure workoutDate is valid
-  const validWorkoutDate = workoutDate instanceof Date && !isNaN(workoutDate.getTime())
-    ? workoutDate
-    : new Date();
-  
-  // Default to workoutDate if startTime is missing
-  if (!startTime) {
-    return validWorkoutDate;
+  try {
+    const now = new Date();
+    const toleranceMs = 5000; // 5 seconds tolerance for clock skew
+
+    // Ensure workoutDate is valid
+    const validWorkoutDate = workoutDate instanceof Date && !isNaN(workoutDate.getTime())
+      ? workoutDate
+      : new Date();
+
+    // Default to workoutDate if startTime is missing
+    if (!startTime) {
+      return validWorkoutDate;
+    }
+
+    // Convert startTime to Date if needed
+    let startTimeDate: Date;
+    if (startTime instanceof Date) {
+      startTimeDate = startTime;
+    } else if (typeof startTime === 'string') {
+      startTimeDate = new Date(startTime);
+    } else {
+      return validWorkoutDate;
+    }
+
+    // Check if startTime is valid
+    if (isNaN(startTimeDate.getTime())) {
+      logger.warn('Invalid startTime detected, using workout date');
+      return validWorkoutDate;
+    }
+
+    // Step 1: Ensure startTime is on the same day as workout date (preserve time)
+    // Use local date comparison instead of UTC to handle timezone correctly
+    const workoutDateLocal = new Date(
+      validWorkoutDate.getFullYear(),
+      validWorkoutDate.getMonth(),
+      validWorkoutDate.getDate()
+    );
+    const startTimeLocal = new Date(
+      startTimeDate.getFullYear(),
+      startTimeDate.getMonth(),
+      startTimeDate.getDate()
+    );
+
+    let normalized = startTimeDate;
+    if (workoutDateLocal.getTime() !== startTimeLocal.getTime()) {
+      normalized = adjustStartTimeToMatchDate(validWorkoutDate, startTimeDate);
+      logger.warn('Start time adjusted to match workout date', {
+        original: startTimeDate.toISOString(),
+        adjusted: normalized.toISOString(),
+      });
+    }
+
+    // Step 2: Cap startTime to current time (not in the future, with tolerance)
+    const maxAllowedTime = now.getTime() + toleranceMs;
+    if (normalized.getTime() > maxAllowedTime) {
+      const capped = new Date(Math.min(normalized.getTime(), maxAllowedTime));
+      logger.warn('Start time capped to current time (was in the future)', {
+        original: normalized.toISOString(),
+        capped: capped.toISOString(),
+      });
+      normalized = capped;
+    }
+
+    return normalized;
+  } catch (error) {
+    logger.error('[normalizeWorkoutStartTime] Error normalizing time:', error);
+    // Fallback to current time on any error
+    return new Date();
   }
-  
-  // Convert startTime to Date if needed
-  let startTimeDate: Date;
-  if (startTime instanceof Date) {
-    startTimeDate = startTime;
-  } else if (typeof startTime === 'string') {
-    startTimeDate = new Date(startTime);
-  } else {
-    return validWorkoutDate;
-  }
-  
-  // Check if startTime is valid
-  if (isNaN(startTimeDate.getTime())) {
-    logger.warn('Invalid startTime detected, using workout date');
-    return validWorkoutDate;
-  }
-  
-  // Step 1: Ensure startTime is on the same day as workout date (preserve time)
-  // Use local date comparison instead of UTC to handle timezone correctly
-  const workoutDateLocal = new Date(
-    validWorkoutDate.getFullYear(),
-    validWorkoutDate.getMonth(),
-    validWorkoutDate.getDate()
-  );
-  const startTimeLocal = new Date(
-    startTimeDate.getFullYear(),
-    startTimeDate.getMonth(),
-    startTimeDate.getDate()
-  );
-  
-  let normalized = startTimeDate;
-  if (workoutDateLocal.getTime() !== startTimeLocal.getTime()) {
-    normalized = adjustStartTimeToMatchDate(validWorkoutDate, startTimeDate);
-    logger.warn('Start time adjusted to match workout date', {
-      original: startTimeDate.toISOString(),
-      adjusted: normalized.toISOString(),
-    });
-  }
-  
-  // Step 2: Cap startTime to current time (not in the future, with tolerance)
-  const maxAllowedTime = now.getTime() + toleranceMs;
-  if (normalized.getTime() > maxAllowedTime) {
-    const capped = new Date(Math.min(normalized.getTime(), maxAllowedTime));
-    logger.warn('Start time capped to current time (was in the future)', {
-      original: normalized.toISOString(),
-      capped: capped.toISOString(),
-    });
-    normalized = capped;
-  }
-  
-  return normalized;
 }
 
 /**

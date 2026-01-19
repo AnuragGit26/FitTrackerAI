@@ -119,11 +119,19 @@ service cloud.firestore {
 
       /**
        * Notifications subcollection
-       * Read-only for users (created server-side)
+       * Users can read their own notifications
+       * Users can create notifications (for client-side generation)
+       * Users can update to mark as read or delete
        */
       match /notifications/{notificationId} {
         allow read: if isOwner(userId);
-        allow write: if false; // Server-created only
+        allow create: if isOwner(userId) && userIdMatches();
+        allow update: if isOwner(userId) &&
+                        resource.data.userId == request.auth.uid &&
+                        // Only allow updating isRead, readAt, and deletedAt fields
+                        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt', 'deletedAt', 'version']));
+        allow delete: if isOwner(userId) &&
+                         resource.data.userId == request.auth.uid;
       }
 
       /**

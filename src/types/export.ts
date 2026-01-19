@@ -105,3 +105,18 @@ export interface ProgressCallback {
     }): void;
 }
 
+export interface DeletionResult {
+  category: string;
+  attempted: number;
+  deleted: number;
+  failed: number;
+  errors: Array<{ recordId: string; error: string }>;
+}
+
+export interface ClearDataResult {
+  success: boolean;
+  deletions: DeletionResult[];
+  totalDeleted: number;
+  totalFailed: number;
+}
+

@@ -8,6 +8,7 @@ A comprehensive mobile-first Progressive Web App (PWA) for gym exercise tracking
 - **Muscle Recovery Tracking**: Track muscle recovery status and readiness
 - **Analytics Dashboard**: View progress charts, volume trends, and workout frequency heatmaps
 - **AI-Powered Insights**: Get personalized workout recommendations using Gemini AI
+- **Smart Onboarding**: Seamless first-time user experience with profile setup and feature tours
 - **Offline-First**: All data stored locally with IndexedDB for offline functionality
 - **PWA Support**: Install as a native app on mobile devices
 

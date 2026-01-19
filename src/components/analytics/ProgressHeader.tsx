@@ -25,18 +25,18 @@ export function ProgressHeader({ selectedRange, onRangeChange, onComparePrevious
   const availableRanges: DateRange[] = ['7d', '30d', '90d', '180d', '1y'];
 
   return (
-    <div className="sticky top-0 z-40 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-800/60">
+    <div className="sticky top-0 z-40 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md border-b border-gray-100 dark:border-border-dark/60">
       <div className="flex items-center justify-between px-4 py-3">
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
           Progress
         </h1>
         <div className="flex items-center gap-3">
           <button 
             onClick={() => onCustomRange?.()}
-            className="w-10 h-10 flex items-center justify-center bg-surface-light dark:bg-surface-dark rounded-full border border-gray-200 dark:border-gray-700 active:scale-95 transition-transform hover:bg-gray-100 dark:hover:bg-gray-800"
+            className="w-10 h-10 flex items-center justify-center bg-surface-light dark:bg-surface-dark rounded-full border border-gray-100 dark:border-border-dark active:scale-95 transition-transform hover:bg-white dark:hover:bg-surface-dark"
             aria-label="Select custom date range"
           >
-            <Calendar className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+            <Calendar className="w-5 h-5 text-slate-500 dark:text-gray-400" />
           </button>
           <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center border border-primary/30">
             <User className="w-6 h-6 text-primary" />
@@ -47,7 +47,7 @@ export function ProgressHeader({ selectedRange, onRangeChange, onComparePrevious
         <div className="relative">
           <button
             onClick={() => setShowRangeMenu(!showRangeMenu)}
-            className="flex shrink-0 items-center gap-2 bg-primary text-[#102217] pl-4 pr-3 py-1.5 rounded-full text-sm font-bold shadow-lg shadow-primary/20 active:scale-95 transition-all"
+            className="flex shrink-0 items-center gap-2 bg-primary text-[#050505] pl-4 pr-3 py-1.5 rounded-full text-sm font-bold shadow-lg shadow-primary/20 active:scale-95 transition-all"
           >
             <span>{rangeLabels[selectedRange]}</span>
             <svg
@@ -70,7 +70,7 @@ export function ProgressHeader({ selectedRange, onRangeChange, onComparePrevious
                 className="fixed inset-0 z-[9998]"
                 onClick={() => setShowRangeMenu(false)}
               />
-              <div className="absolute top-full mt-2 left-0 bg-surface-light dark:bg-surface-dark rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 py-2 z-[9999] min-w-[160px]">
+              <div className="absolute top-full mt-2 left-0 bg-surface-light dark:bg-surface-dark rounded-xl shadow-2xl border border-gray-100 dark:border-border-dark py-2 z-[9999] min-w-[160px]">
                 {availableRanges.map((range) => (
                   <button
                     key={range}
@@ -79,7 +79,7 @@ export function ProgressHeader({ selectedRange, onRangeChange, onComparePrevious
                       setShowRangeMenu(false);
                     }}
                     className={cn(
-                      'w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors',
+                      'w-full text-left px-4 py-2 text-sm hover:bg-white dark:hover:bg-surface-dark transition-colors',
                       selectedRange === range && 'text-primary font-bold'
                     )}
                   >
@@ -93,7 +93,7 @@ export function ProgressHeader({ selectedRange, onRangeChange, onComparePrevious
         {onComparePrevious && (
           <button
             onClick={onComparePrevious}
-            className="flex shrink-0 items-center gap-2 bg-surface-light dark:bg-surface-dark border border-gray-200 dark:border-gray-700 px-4 py-1.5 rounded-full text-sm font-medium text-gray-600 dark:text-gray-300 whitespace-nowrap active:bg-gray-100 dark:active:bg-gray-800 transition-colors"
+            className="flex shrink-0 items-center gap-2 bg-surface-light dark:bg-surface-dark border border-gray-100 dark:border-border-dark px-4 py-1.5 rounded-full text-sm font-medium text-slate-500 dark:text-gray-300 whitespace-nowrap active:bg-white dark:active:bg-surface-dark transition-colors"
           >
             Compare to previous
           </button>
@@ -101,7 +101,7 @@ export function ProgressHeader({ selectedRange, onRangeChange, onComparePrevious
         {onCustomRange && (
           <button
             onClick={onCustomRange}
-            className="flex shrink-0 items-center gap-2 bg-surface-light dark:bg-surface-dark border border-gray-200 dark:border-gray-700 px-4 py-1.5 rounded-full text-sm font-medium text-gray-600 dark:text-gray-300 whitespace-nowrap active:bg-gray-100 dark:active:bg-gray-800 transition-colors"
+            className="flex shrink-0 items-center gap-2 bg-surface-light dark:bg-surface-dark border border-gray-100 dark:border-border-dark px-4 py-1.5 rounded-full text-sm font-medium text-slate-500 dark:text-gray-300 whitespace-nowrap active:bg-white dark:active:bg-surface-dark transition-colors"
           >
             Custom Range
           </button>

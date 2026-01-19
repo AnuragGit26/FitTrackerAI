@@ -15,7 +15,7 @@ export function TotalVolumeCard({ totalVolume, trendPercentage, unit }: TotalVol
 
   return (
     <motion.div 
-      className="col-span-2 bg-surface-light dark:bg-surface-dark p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800/50 relative overflow-hidden group"
+      className="col-span-2 bg-surface-light dark:bg-surface-dark p-5 rounded-xl shadow-sm border border-gray-100 dark:border-border-dark/50 relative overflow-hidden group"
       variants={shouldReduceMotion ? {} : slideUp}
       initial="hidden"
       animate="visible"
@@ -33,7 +33,7 @@ export function TotalVolumeCard({ totalVolume, trendPercentage, unit }: TotalVol
         }}
       />
       <div className="relative z-10 flex justify-between items-start mb-2">
-        <span className="text-gray-500 dark:text-gray-400 text-sm font-medium tracking-wide">
+        <span className="text-slate-500 dark:text-gray-400 text-sm font-medium tracking-wide">
           TOTAL VOLUME
         </span>
         <motion.div
@@ -51,7 +51,7 @@ export function TotalVolumeCard({ totalVolume, trendPercentage, unit }: TotalVol
       </div>
       <div className="relative z-10 flex items-baseline gap-2">
         <span className="text-3xl font-bold tracking-tight">{volumeCount.formattedValue}</span>
-        <span className="text-sm font-medium text-gray-400">{unit}</span>
+        <span className="text-sm font-medium text-slate-400 dark:text-gray-400">{unit}</span>
       </div>
       {trendPercentage !== 0 && (
         <div className="relative z-10 flex items-center gap-1 mt-2 text-primary text-sm font-bold bg-primary/10 w-fit px-2 py-0.5 rounded-md">

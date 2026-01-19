@@ -78,7 +78,9 @@ export function SetCompletionCelebration({
   // Generate confetti particles - memoized to prevent regeneration on re-renders
   // Reduced count for better performance (60 instead of 90)
   const confettiParticles = useMemo(() => {
-    if (!isVisible) return [];
+    if (!isVisible) {
+    return [];
+  }
     return Array.from({ length: 60 }, (_, i) => {
       const angle = (i * 360) / 60;
       const distance = 80 + Math.random() * 40;
@@ -103,7 +105,9 @@ export function SetCompletionCelebration({
   // Generate sparkle particles - memoized to prevent regeneration on re-renders
   // Reduced count for better performance (20 instead of 25)
   const sparkleParticles = useMemo(() => {
-    if (!isVisible) return [];
+    if (!isVisible) {
+    return [];
+  }
     return Array.from({ length: 20 }, (_, i) => {
       const angle = (i * 360) / 20;
       const distance = 40 + Math.random() * 30;
@@ -190,7 +194,7 @@ export function SetCompletionCelebration({
                 height: particle.size,
                 willChange: 'transform, opacity',
                 transform: 'translate3d(0, 0, 0)',
-                boxShadow: `0 0 ${particle.size * 2}px rgba(13, 242, 105, 0.8)`,
+                boxShadow: `0 0 ${particle.size * 2}px rgba(255, 153, 51, 0.8)`,
               }}
               initial={{ 
                 scale: 0,
@@ -223,7 +227,7 @@ export function SetCompletionCelebration({
                 top: centerY,
                 width: 250,
                 height: 250,
-                background: 'radial-gradient(circle, rgba(13, 242, 105, 0.75) 0%, rgba(13, 242, 105, 0) 70%)',
+                background: 'radial-gradient(circle, rgba(255, 153, 51, 0.75) 0%, rgba(255, 153, 51, 0) 70%)',
                 transform: 'translate3d(-50%, -50%, 0)',
                 willChange: 'transform, opacity',
               }}
@@ -293,8 +297,8 @@ export function SetCompletionCelebration({
               className="relative"
               style={{ willChange: 'transform' }}
             >
-              <div className="size-36 rounded-full bg-background-dark/80 dark:bg-background-dark/90 flex items-center justify-center border-4 border-primary shadow-[0_0_50px_rgba(13,242,105,0.8)] ring-4 ring-primary/40">
-                <Check className="w-20 h-20 text-primary stroke-[4] drop-shadow-[0_0_15px_rgba(13,242,105,0.9)]" />
+              <div className="size-36 rounded-full bg-background-dark/80 dark:bg-background-dark/90 flex items-center justify-center border-4 border-primary shadow-[0_0_50px_rgba(255,153,51,0.8)] ring-4 ring-primary/40">
+                <Check className="w-20 h-20 text-primary stroke-[4] drop-shadow-[0_0_15px_rgba(255,153,51,0.9)]" />
               </div>
               
               {/* Shimmer Effect - Simplified for performance */}
@@ -314,7 +318,7 @@ export function SetCompletionCelebration({
                 <div 
                   className="absolute inset-0"
                   style={{
-                    background: 'conic-gradient(from 0deg, transparent 0%, rgba(13, 242, 105, 0.3) 40%, transparent 80%)',
+                    background: 'conic-gradient(from 0deg, transparent 0%, rgba(255, 153, 51, 0.3) 40%, transparent 80%)',
                   }}
                 />
               </motion.div>
@@ -359,9 +363,9 @@ export function SetCompletionCelebration({
             >
               <div className="absolute inset-0 bg-background-dark/70 dark:bg-background-dark/80 rounded-xl px-6 py-3 -mx-6 -my-3" />
               <p
-                className="relative text-4xl font-bold text-primary text-center drop-shadow-[0_0_20px_rgba(13,242,105,0.9)]"
+                className="relative text-4xl font-bold text-primary text-center drop-shadow-[0_0_20px_rgba(255,153,51,0.9)]"
                 style={{
-                  textShadow: '0 0 40px rgba(13, 242, 105, 0.8), 0 0 80px rgba(13, 242, 105, 0.6), 2px 2px 4px rgba(0, 0, 0, 0.5)',
+                  textShadow: '0 0 40px rgba(255, 153, 51, 0.8), 0 0 80px rgba(255, 153, 51, 0.6), 2px 2px 4px rgba(0, 0, 0, 0.5)',
                 }}
               >
                 {message}
@@ -405,7 +409,7 @@ export function SetCompletionCelebration({
               <div
                 className="w-full h-full rounded-full bg-primary"
                 style={{
-                  boxShadow: `0 0 ${particle.size * 3}px rgba(13, 242, 105, 0.9)`,
+                  boxShadow: `0 0 ${particle.size * 3}px rgba(255, 153, 51, 0.9)`,
                 }}
               />
             </motion.div>

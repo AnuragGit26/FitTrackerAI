@@ -265,7 +265,7 @@ async function scrapeStrengthLogDirectory(): Promise<StrengthLogExercise[]> {
           currentElement = currentElement.nextElementSibling;
         }
 
-        if (!listElement) return;
+        if (!listElement) {return;}
 
         // Extract exercises from the list
         const listItems = Array.from(listElement.querySelectorAll('li'));
@@ -273,12 +273,12 @@ async function scrapeStrengthLogDirectory(): Promise<StrengthLogExercise[]> {
         listItems.forEach((item) => {
           // Try to find a link
           const link = item.querySelector('a');
-          if (!link) return;
+          if (!link) {return;}
 
           const exerciseName = link.textContent?.trim() || '';
           const href = link.getAttribute('href') || '';
           
-          if (!exerciseName || !href) return;
+          if (!exerciseName || !href) {return;}
 
           // Build full URL
           const fullUrl = href.startsWith('http') 

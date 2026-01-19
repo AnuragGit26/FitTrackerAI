@@ -6,6 +6,7 @@ import { InsightsTabNavigation } from '@/components/insights/InsightsTabNavigati
 import { useInsightsData } from '@/hooks/useInsightsData';
 import { useUserStore } from '@/store/userStore';
 import { Skeleton } from '@/components/common/Skeleton';
+import { EmptyStateAIMessage } from '@/components/common/EmptyStateAIMessage';
 import { BreakthroughCard } from '@/components/insights/BreakthroughCard';
 import { PerformanceTrendsCards } from '@/components/insights/PerformanceTrendsCards';
 import { VolumeTrendChart } from '@/components/insights/VolumeTrendChart';
@@ -17,6 +18,7 @@ import { SuggestionsSection } from '@/components/insights/SuggestionsSection';
 import { NutritionTimingTimeline } from '@/components/insights/NutritionTimingTimeline';
 import { ReadinessScoreHeader } from '@/components/insights/ReadinessScoreHeader';
 import { RecommendedWorkoutCard } from '@/components/insights/RecommendedWorkoutCard';
+import { ProgressionPlanCard } from '@/components/insights/ProgressionPlanCard';
 import { MuscleBalanceSection } from '@/components/insights/MuscleBalanceSection';
 import { CorrectiveExercisesCarousel } from '@/components/insights/CorrectiveExercisesCarousel';
 import { PredictedRecoveryChart } from '@/components/insights/PredictedRecoveryChart';
@@ -62,7 +64,7 @@ export function Insights() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background-light dark:bg-background-dark pb-24">
-        <div className="sticky top-0 z-50 flex items-center bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md p-4 pb-3 justify-between border-b border-gray-200 dark:border-[#316847]">
+        <div className="sticky top-0 z-50 flex items-center bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md p-4 pb-3 justify-between border-b border-gray-100 dark:border-border-dark">
           <h2 className="text-xl font-bold leading-tight tracking-[-0.015em] flex-1">AI Insights</h2>
         </div>
         <InsightsTabNavigation currentView={view} onViewChange={setView} />
@@ -78,7 +80,7 @@ export function Insights() {
 
   return (
     <div className="min-h-screen bg-background-light dark:bg-background-dark pb-24">
-      <div className="sticky top-0 z-50 flex items-center bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md p-4 pb-3 justify-between border-b border-gray-200 dark:border-[#316847]">
+      <div className="sticky top-0 z-50 flex items-center bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md p-4 pb-3 justify-between border-b border-gray-100 dark:border-border-dark">
         <h2 className="text-xl font-bold leading-tight tracking-[-0.015em] flex-1">AI Insights</h2>
         <div className="flex items-center justify-end gap-1.5 bg-primary/10 px-3 py-1.5 rounded-full border border-primary/20">
           <Bot className="w-4 h-4 text-primary" />
@@ -137,6 +139,9 @@ export function Insights() {
       )}
 
       <div className="flex flex-col gap-6 p-4 max-w-md mx-auto w-full">
+        {progressAnalysis && progressAnalysis.workoutCount === 0 && (
+          <EmptyStateAIMessage screenName="Insights" />
+        )}
         <AnimatePresence mode="wait">
           {view === 'progress' && progressAnalysis && (
             <motion.div
@@ -192,7 +197,7 @@ export function Insights() {
                 <motion.div variants={prefersReducedMotion() ? {} : {}}>
                   <SystemStatusCard alerts={smartAlerts} />
                 </motion.div>
-                <div className="w-full h-px bg-gray-200 dark:bg-white/5 mx-4" />
+                <div className="w-full h-px bg-white dark:bg-white/5 mx-4" />
                 <motion.div variants={prefersReducedMotion() ? {} : {}}>
                   <CriticalAlertsCard alerts={smartAlerts.criticalAlerts} />
                 </motion.div>
@@ -219,8 +224,20 @@ export function Insights() {
                   <ReadinessScoreHeader recommendations={workoutRecommendations} />
                 </motion.div>
                 <motion.div variants={prefersReducedMotion() ? {} : {}}>
-                  <RecommendedWorkoutCard workout={workoutRecommendations.recommendedWorkout} />
+                  <RecommendedWorkoutCard 
+                    workout={workoutRecommendations.recommendedWorkout} 
+                    metrics={workoutRecommendations.recoveryPredictions?.[0] ? {
+                      prProbability: workoutRecommendations.recoveryPredictions[0].prProbability,
+                      fatigueAccumulation: workoutRecommendations.recoveryPredictions[0].fatigueAccumulation,
+                      supercompensationScore: workoutRecommendations.recoveryPredictions[0].supercompensationScore
+                    } : undefined}
+                  />
                 </motion.div>
+                {workoutRecommendations.progressionPlan && (
+                  <motion.div variants={prefersReducedMotion() ? {} : {}}>
+                    <ProgressionPlanCard plan={workoutRecommendations.progressionPlan} />
+                  </motion.div>
+                )}
                 <motion.div variants={prefersReducedMotion() ? {} : {}}>
                   <MuscleBalanceSection imbalances={workoutRecommendations.muscleBalance.imbalances} />
                 </motion.div>

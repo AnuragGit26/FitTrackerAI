@@ -24,9 +24,13 @@ export const EQUIPMENT_CATEGORY_MAP: Record<string, EquipmentCategory> = {
   'Hex Bar': EquipmentCategory.FREE_WEIGHTS,
   'Medicine Ball': EquipmentCategory.FREE_WEIGHTS,
   'Resistance Bands': EquipmentCategory.FREE_WEIGHTS,
+  // Support equipment for free weights (not machines)
+  'Bench': EquipmentCategory.FREE_WEIGHTS,
+  'Squat Rack': EquipmentCategory.FREE_WEIGHTS,
+  'Preacher Bench': EquipmentCategory.FREE_WEIGHTS,
+  'Weight Belt': EquipmentCategory.FREE_WEIGHTS,
 
   // Machines
-  'Bench': EquipmentCategory.MACHINES,
   'Leg Press Machine': EquipmentCategory.MACHINES,
   'Smith Machine': EquipmentCategory.MACHINES,
   'Hammer Strength Machine': EquipmentCategory.MACHINES,
@@ -37,6 +41,7 @@ export const EQUIPMENT_CATEGORY_MAP: Record<string, EquipmentCategory> = {
   'Leg Extension Machine': EquipmentCategory.MACHINES,
   'Leg Curl Machine': EquipmentCategory.MACHINES,
   'Calf Raise Machine': EquipmentCategory.MACHINES,
+  'Seated Calf Raise Machine': EquipmentCategory.MACHINES,
   'Hack Squat Machine': EquipmentCategory.MACHINES,
   'Preacher Curl Machine': EquipmentCategory.MACHINES,
   'Tricep Extension Machine': EquipmentCategory.MACHINES,
@@ -49,6 +54,7 @@ export const EQUIPMENT_CATEGORY_MAP: Record<string, EquipmentCategory> = {
   'Assault Bike': EquipmentCategory.MACHINES,
   'Air Bike': EquipmentCategory.MACHINES,
   'Hyperextension Bench': EquipmentCategory.MACHINES,
+  'Assisted Pull-up Machine': EquipmentCategory.MACHINES,
 
   // Cables
   'Cable': EquipmentCategory.CABLES,
@@ -59,6 +65,7 @@ export const EQUIPMENT_CATEGORY_MAP: Record<string, EquipmentCategory> = {
   'Pull-up Bar': EquipmentCategory.BODYWEIGHT,
   'Dip Bar': EquipmentCategory.BODYWEIGHT,
   'Parallel Bars': EquipmentCategory.BODYWEIGHT,
+  'Wall': EquipmentCategory.BODYWEIGHT,
 
   // Functional
   'Battle Ropes': EquipmentCategory.FUNCTIONAL,
@@ -69,6 +76,8 @@ export const EQUIPMENT_CATEGORY_MAP: Record<string, EquipmentCategory> = {
   'Suspension Trainer': EquipmentCategory.FUNCTIONAL,
   'Ab Wheel': EquipmentCategory.FUNCTIONAL,
   'Prowler': EquipmentCategory.FUNCTIONAL,
+  'Jump Rope': EquipmentCategory.FUNCTIONAL,
+  'Box': EquipmentCategory.FUNCTIONAL,
 
   // Olympic
   'Olympic Barbell': EquipmentCategory.OLYMPIC,
@@ -76,7 +85,6 @@ export const EQUIPMENT_CATEGORY_MAP: Record<string, EquipmentCategory> = {
   'Platform': EquipmentCategory.OLYMPIC,
 
   // Assisted
-  'Assisted Pull-up Machine': EquipmentCategory.ASSISTED,
   'Resistance Band': EquipmentCategory.ASSISTED,
 };
 
@@ -308,7 +316,7 @@ const CORE_EXERCISES: Omit<Exercise, 'id' | 'isCustom'>[] = [
     category: 'strength',
     primaryMuscles: [MuscleGroup.TRICEPS],
     secondaryMuscles: [MuscleGroup.FRONT_DELTS],
-    equipment: ['Dip Bar', 'Bench'],
+    equipment: ['Dip Bar'],
     difficulty: 'intermediate',
     instructions: [
       'Support body on bars or bench',
@@ -623,7 +631,7 @@ const CORE_EXERCISES: Omit<Exercise, 'id' | 'isCustom'>[] = [
     category: 'strength',
     primaryMuscles: [MuscleGroup.LOWER_CHEST, MuscleGroup.CHEST],
     secondaryMuscles: [MuscleGroup.FRONT_DELTS, MuscleGroup.TRICEPS],
-    equipment: ['Bench'],
+    equipment: [],
     difficulty: 'beginner',
     instructions: [
       'Place hands on elevated surface',
@@ -631,8 +639,8 @@ const CORE_EXERCISES: Omit<Exercise, 'id' | 'isCustom'>[] = [
       'Lower chest to surface',
       'Push back up'
     ],
-  trackingType: 'reps_only',
-    },
+    trackingType: 'reps_only',
+  },
 
   // ========== BACK EXERCISES (20+) ==========
   {
@@ -2078,7 +2086,7 @@ const CORE_EXERCISES: Omit<Exercise, 'id' | 'isCustom'>[] = [
     category: 'strength',
     primaryMuscles: [MuscleGroup.ABS],
     secondaryMuscles: [MuscleGroup.HIP_FLEXORS],
-    equipment: ['Bench'],
+    equipment: [],
     difficulty: 'advanced',
     instructions: [
       'Hold bench behind head',
@@ -2436,6 +2444,149 @@ const CORE_EXERCISES: Omit<Exercise, 'id' | 'isCustom'>[] = [
   },
 ];
 
+/**
+ * Generate a simple hash of CORE_EXERCISES to detect changes
+ * This helps identify when exercise definitions have been updated
+ */
+function generateExerciseLibraryHash(): string {
+  // Create a stable string representation of CORE_EXERCISES
+  const normalized = CORE_EXERCISES.map(ex => ({
+    name: ex.name.toLowerCase().trim(),
+    equipment: [...ex.equipment].sort(),
+    category: ex.category,
+    trackingType: ex.trackingType,
+    primaryMuscles: [...ex.primaryMuscles].sort(),
+    secondaryMuscles: [...ex.secondaryMuscles].sort(),
+    difficulty: ex.difficulty,
+    instructions: ex.instructions,
+  })).sort((a, b) => a.name.localeCompare(b.name));
+  
+  // Simple hash: convert to JSON and create a hash-like string
+  const json = JSON.stringify(normalized);
+  let hash = 0;
+  for (let i = 0; i < json.length; i++) {
+    const char = json.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return `v${Math.abs(hash).toString(36)}`;
+}
+
+/**
+ * Check if exercise definitions have changed by comparing library hash
+ */
+async function hasExerciseLibraryChanged(): Promise<boolean> {
+  try {
+    const { dbHelpers } = await import('./database');
+    const currentHash = generateExerciseLibraryHash();
+    const storedHash = await dbHelpers.getSetting('exercise_library_hash');
+    
+    if (!storedHash || storedHash !== currentHash) {
+      logger.info(`Exercise library changed: ${storedHash || 'none'} -> ${currentHash}`);
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    logger.error('Error checking exercise library hash:', error);
+    // If we can't check, assume it changed to be safe
+    return true;
+  }
+}
+
+/**
+ * Update stored exercise library hash
+ */
+async function updateExerciseLibraryHash(): Promise<void> {
+  try {
+    const { dbHelpers } = await import('./database');
+    const currentHash = generateExerciseLibraryHash();
+    await dbHelpers.setSetting('exercise_library_hash', currentHash);
+    logger.info(`Updated exercise library hash: ${currentHash}`);
+  } catch (error) {
+    logger.error('Error updating exercise library hash:', error);
+  }
+}
+
+/**
+ * Update existing exercises when their definitions in CORE_EXERCISES change
+ * Only updates non-custom exercises to preserve user-created exercises
+ */
+async function updateExistingExercises(): Promise<number> {
+  try {
+    const { dbHelpers } = await import('./database');
+    const existingExercises = await dbHelpers.getAllExercises();
+    
+    // Create a map of CORE_EXERCISES by normalized name for quick lookup
+    const coreExercisesMap = new Map<string, typeof CORE_EXERCISES[0]>();
+    for (const coreEx of CORE_EXERCISES) {
+      const normalizedName = coreEx.name.toLowerCase().trim();
+      coreExercisesMap.set(normalizedName, coreEx);
+    }
+    
+    let updatedCount = 0;
+    
+    for (const existingEx of existingExercises) {
+      // Skip custom exercises - only update pre-populated exercises
+      if (existingEx.isCustom) {
+        continue;
+      }
+      
+      const normalizedName = existingEx.name.toLowerCase().trim();
+      const coreDefinition = coreExercisesMap.get(normalizedName);
+      
+      // If exercise exists in CORE_EXERCISES, check if it needs updating
+      if (coreDefinition) {
+        // Compare key fields that might have changed
+        const equipmentChanged = JSON.stringify([...existingEx.equipment].sort()) !== 
+                                 JSON.stringify([...coreDefinition.equipment].sort());
+        const categoryChanged = existingEx.category !== coreDefinition.category;
+        const trackingTypeChanged = existingEx.trackingType !== coreDefinition.trackingType;
+        const primaryMusclesChanged = JSON.stringify([...existingEx.primaryMuscles].sort()) !== 
+                                      JSON.stringify([...coreDefinition.primaryMuscles].sort());
+        const secondaryMusclesChanged = JSON.stringify([...existingEx.secondaryMuscles].sort()) !== 
+                                        JSON.stringify([...coreDefinition.secondaryMuscles].sort());
+        const difficultyChanged = existingEx.difficulty !== coreDefinition.difficulty;
+        const instructionsChanged = JSON.stringify(existingEx.instructions) !== 
+                                    JSON.stringify(coreDefinition.instructions);
+        
+        if (equipmentChanged || categoryChanged || trackingTypeChanged || 
+            primaryMusclesChanged || secondaryMusclesChanged || difficultyChanged || instructionsChanged) {
+          // Update exercise with new definition while preserving user data
+          const updatedExercise: Exercise = {
+            ...existingEx,
+            equipment: [...coreDefinition.equipment],
+            category: coreDefinition.category,
+            trackingType: coreDefinition.trackingType,
+            primaryMuscles: [...coreDefinition.primaryMuscles],
+            secondaryMuscles: [...coreDefinition.secondaryMuscles],
+            difficulty: coreDefinition.difficulty,
+            instructions: [...coreDefinition.instructions],
+            version: (existingEx.version || 1) + 1, // Increment version
+          };
+          
+          try {
+            await dbHelpers.saveExercise(updatedExercise);
+            updatedCount++;
+            logger.info(`Updated exercise: ${existingEx.name} (equipment: ${equipmentChanged ? 'yes' : 'no'}, category: ${categoryChanged ? 'yes' : 'no'}, etc.)`);
+          } catch (error) {
+            logger.error(`Failed to update exercise ${existingEx.name}:`, error);
+          }
+        }
+      }
+    }
+    
+    if (updatedCount > 0) {
+      logger.info(`Updated ${updatedCount} existing exercises with new definitions`);
+    }
+    
+    return updatedCount;
+  } catch (error) {
+    logger.error('Error updating existing exercises:', error);
+    return 0;
+  }
+}
+
 export const exerciseLibrary = {
   async syncMissingExercises(): Promise<void> {
     try {
@@ -2493,6 +2644,15 @@ export const exerciseLibrary = {
         
         if (addedCount > 0) {
           logger.info(`Synced ${addedCount} new exercises to database`);
+        }
+      }
+      
+      // Check if exercise library has changed and update existing exercises
+      if (await hasExerciseLibraryChanged()) {
+        const updatedCount = await updateExistingExercises();
+        if (updatedCount > 0 || addedCount > 0) {
+          // Update hash after successful sync
+          await updateExerciseLibraryHash();
         }
       }
     } catch (error) {
@@ -2608,8 +2768,11 @@ export const exerciseLibrary = {
       for (const exercise of exercises) {
         await dbHelpers.saveExercise(exercise);
       }
+      
+      // Store initial hash after first initialization
+      await updateExerciseLibraryHash();
     } else {
-      // Database already has exercises, sync any missing ones
+      // Database already has exercises, sync any missing ones and check for updates
       // Run sync asynchronously after initialization to avoid blocking
       // This prevents database connection issues during app startup
       setTimeout(() => {
@@ -2787,6 +2950,35 @@ export const exerciseLibrary = {
       logger.error('Error cleaning up duplicate exercises:', error);
       throw error;
     }
+  },
+
+  /**
+   * Force update all existing exercises from CORE_EXERCISES
+   * Useful for manual updates or after library changes
+   */
+  async updateAllExercises(): Promise<{ updated: number; added: number }> {
+    try {
+      // First sync missing exercises
+      await this.syncMissingExercises();
+      
+      // Then update existing exercises
+      const updatedCount = await updateExistingExercises();
+      
+      // Update hash after successful update
+      await updateExerciseLibraryHash();
+      
+      return { updated: updatedCount, added: 0 }; // added count is logged in syncMissingExercises
+    } catch (error) {
+      logger.error('Error updating all exercises:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Check if exercise library needs updating
+   */
+  async needsUpdate(): Promise<boolean> {
+    return await hasExerciseLibraryChanged();
   },
 };
 

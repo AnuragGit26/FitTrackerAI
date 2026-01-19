@@ -50,7 +50,9 @@ class SWCommunication {
    * Setup message listener for service worker messages
    */
   private setupMessageListener(): void {
-    if (this.isListening) return;
+    if (this.isListening) {
+    return;
+  }
     
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.addEventListener('message', (event: MessageEvent) => {

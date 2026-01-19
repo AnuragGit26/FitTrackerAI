@@ -22,7 +22,9 @@ class MuscleRecoveryService {
     const isPrimary = mapping.primary.includes(muscle);
     const isSecondary = mapping.secondary.includes(muscle);
 
-    if (!isPrimary && !isSecondary) return 0;
+    if (!isPrimary && !isSecondary) {
+    return 0;
+  }
 
     // Calculate volume contribution for this muscle
     const totalMuscles = mapping.primary.length + mapping.secondary.length;
@@ -52,17 +54,23 @@ class MuscleRecoveryService {
     workouts.forEach((workout) => {
       const workoutDate = new Date(workout.date);
       // Skip invalid dates
-      if (isNaN(workoutDate.getTime())) return;
+      if (isNaN(workoutDate.getTime())) {return;}
       
-      if (workoutDate < sevenDaysAgo) return;
+      if (workoutDate < sevenDaysAgo) {
+    return;
+  }
 
       workout.exercises.forEach((exercise) => {
         const mapping = getMuscleMapping(exercise.exerciseName);
-        if (!mapping) return;
+        if (!mapping) {
+    return;
+  }
 
         const isPrimary = mapping.primary.includes(muscle);
         const isSecondary = mapping.secondary.includes(muscle);
-        if (!isPrimary && !isSecondary) return;
+        if (!isPrimary && !isSecondary) {
+    return;
+  }
 
         const totalMuscles = mapping.primary.length + mapping.secondary.length;
         const muscleVolume = exercise.totalVolume / totalMuscles;
@@ -84,13 +92,17 @@ class MuscleRecoveryService {
     workouts.forEach((workout) => {
       const workoutDate = new Date(workout.date);
       // Skip invalid dates
-      if (isNaN(workoutDate.getTime())) return;
+      if (isNaN(workoutDate.getTime())) {return;}
 
-      if (workoutDate < thirtyDaysAgo) return;
+      if (workoutDate < thirtyDaysAgo) {
+    return;
+  }
 
       workout.exercises.forEach((exercise) => {
         const mapping = getMuscleMapping(exercise.exerciseName);
-        if (!mapping) return;
+        if (!mapping) {
+    return;
+  }
 
         if (mapping.primary.includes(muscle) || mapping.secondary.includes(muscle)) {
           const dateKey = workoutDate.toDateString();
@@ -202,7 +214,9 @@ class MuscleRecoveryService {
    * Initialize muscle statuses from workout history
    */
   async initializeMuscleStatusesFromHistory(workouts: Workout[], _userId: string): Promise<void> {
-    if (workouts.length === 0) return;
+    if (workouts.length === 0) {
+    return;
+  }
 
     // Get all unique muscles from all workouts
     const allMuscles = new Set<MuscleGroup>();
@@ -228,11 +242,15 @@ class MuscleRecoveryService {
         }
       });
 
-      if (!mostRecentWorkout || !mostRecentDate) continue;
+      if (!mostRecentWorkout || !mostRecentDate) {
+    continue;
+  }
 
       // Check if status already exists
       const existingStatus = await dataService.getMuscleStatus(muscle);
-      if (existingStatus) continue; // Skip if already exists
+      if (existingStatus) {
+    continue;
+  } // Skip if already exists
 
       // Calculate metrics
       const volumeLast7Days = this.calculateVolumeLast7Days(muscle, workouts);
@@ -284,7 +302,9 @@ class MuscleRecoveryService {
       // Recalculate status for each muscle
       for (const muscle of allMuscles) {
         const existingStatus = allStatuses.find((s: MuscleStatus) => s.muscle === muscle);
-        if (!existingStatus) continue;
+        if (!existingStatus) {
+    continue;
+  }
 
         const volumeLast7Days = this.calculateVolumeLast7Days(muscle, allWorkouts);
         const trainingFrequency = this.calculateTrainingFrequency(muscle, allWorkouts);
@@ -298,7 +318,7 @@ class MuscleRecoveryService {
           if (muscles.has(muscle)) {
             const workoutDate = new Date(workout.date);
             // Skip invalid dates
-            if (isNaN(workoutDate.getTime())) return;
+            if (isNaN(workoutDate.getTime())) {return;}
 
             if (!mostRecentDate || workoutDate > mostRecentDate) {
               mostRecentDate = workoutDate;
@@ -307,7 +327,9 @@ class MuscleRecoveryService {
           }
         });
 
-        if (!mostRecentWorkout || !mostRecentDate) continue;
+        if (!mostRecentWorkout || !mostRecentDate) {
+    continue;
+  }
 
         // Calculate workload from most recent workout
         // TypeScript needs explicit type assertion after the null check

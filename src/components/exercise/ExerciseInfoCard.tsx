@@ -52,10 +52,10 @@ export function ExerciseInfoCard({ exercise, className }: ExerciseInfoCardProps)
   if (!exercise) {
     return (
       <div
-        className={`rounded-2xl bg-surface-light dark:bg-surface-dark border border-gray-200 dark:border-[#316847] shadow-sm min-h-[140px] ${className || ''}`}
+        className={`rounded-2xl bg-surface-light dark:bg-surface-dark border border-gray-100 dark:border-border-dark shadow-sm min-h-[140px] ${className || ''}`}
       >
         <div className="flex items-center justify-center h-full p-4">
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+          <p className="text-sm text-slate-500 dark:text-gray-400">
             Select an exercise to view details
           </p>
         </div>
@@ -69,7 +69,7 @@ export function ExerciseInfoCard({ exercise, className }: ExerciseInfoCardProps)
 
   return (
     <div
-      className={`overflow-hidden rounded-2xl bg-surface-light dark:bg-surface-dark border border-gray-200 dark:border-[#316847] shadow-sm ${className || ''}`}
+      className={`overflow-hidden rounded-2xl bg-surface-light dark:bg-surface-dark border border-gray-100 dark:border-border-dark shadow-sm ${className || ''}`}
     >
       <div className="flex flex-row">
         {/* Left side - Muscle diagram with dark background */}
@@ -89,23 +89,23 @@ export function ExerciseInfoCard({ exercise, className }: ExerciseInfoCardProps)
           </span>
 
           {/* Exercise name */}
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white leading-tight mb-2">
+          <h3 className="text-xl font-bold text-slate-900 dark:text-white leading-tight mb-2">
             {exercise.name}
           </h3>
 
           {/* Target muscles */}
           <div className="flex flex-col gap-1">
             {primaryMuscles.length > 0 && (
-              <p className="text-sm text-gray-600 dark:text-gray-300 flex items-center gap-2">
+              <p className="text-sm text-slate-500 dark:text-gray-300 flex items-center gap-2">
                 <span className="size-2 rounded-full bg-primary"></span>
                 Primary:{' '}
-                <span className="font-medium text-gray-900 dark:text-white">
+                <span className="font-medium text-slate-900 dark:text-white">
                   {primaryMuscles.map(getMuscleGroupLabel).join(', ')}
                 </span>
               </p>
             )}
             {secondaryMuscles.length > 0 && (
-              <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
+              <p className="text-sm text-slate-500 dark:text-gray-400 flex items-center gap-2">
                 <span className="size-2 rounded-full bg-gray-500"></span>
                 Secondary: {secondaryMuscles.map(getMuscleGroupLabel).join(', ')}
               </p>

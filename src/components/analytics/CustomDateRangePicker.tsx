@@ -95,25 +95,25 @@ export function CustomDateRangePicker({
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => handleQuickSelect(7)}
-            className="px-3 py-1.5 text-sm rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+            className="px-3 py-1.5 text-sm rounded-lg bg-white dark:bg-surface-dark hover:bg-white dark:hover:bg-surface-dark-light text-slate-700 dark:text-gray-300 transition-colors"
           >
             Last 7 Days
           </button>
           <button
             onClick={() => handleQuickSelect(30)}
-            className="px-3 py-1.5 text-sm rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+            className="px-3 py-1.5 text-sm rounded-lg bg-white dark:bg-surface-dark hover:bg-white dark:hover:bg-surface-dark-light text-slate-700 dark:text-gray-300 transition-colors"
           >
             Last 30 Days
           </button>
           <button
             onClick={() => handleQuickSelect(90)}
-            className="px-3 py-1.5 text-sm rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+            className="px-3 py-1.5 text-sm rounded-lg bg-white dark:bg-surface-dark hover:bg-white dark:hover:bg-surface-dark-light text-slate-700 dark:text-gray-300 transition-colors"
           >
             Last 90 Days
           </button>
           <button
             onClick={() => handleQuickSelect(180)}
-            className="px-3 py-1.5 text-sm rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+            className="px-3 py-1.5 text-sm rounded-lg bg-white dark:bg-surface-dark hover:bg-white dark:hover:bg-surface-dark-light text-slate-700 dark:text-gray-300 transition-colors"
           >
             Last 180 Days
           </button>
@@ -122,7 +122,7 @@ export function CustomDateRangePicker({
         {/* Date Inputs */}
         <div className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+            <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1.5">
               Start Date
             </label>
             <div className="relative">
@@ -134,14 +134,14 @@ export function CustomDateRangePicker({
                   setError('');
                 }}
                 max={formatDateForInput(today)}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full px-3 py-2 rounded-lg border border-gray-100 dark:border-gray-600 bg-white dark:bg-surface-dark text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
               />
               <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+            <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1.5">
               End Date
             </label>
             <div className="relative">
@@ -154,7 +154,7 @@ export function CustomDateRangePicker({
                 }}
                 max={formatDateForInput(today)}
                 min={startDate}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full px-3 py-2 rounded-lg border border-gray-100 dark:border-gray-600 bg-white dark:bg-surface-dark text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
               />
               <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             </div>
@@ -172,13 +172,13 @@ export function CustomDateRangePicker({
         <div className="flex gap-3 pt-2">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            className="flex-1 px-4 py-2.5 rounded-lg border border-gray-100 dark:border-gray-600 bg-white dark:bg-surface-dark text-slate-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-surface-dark-light transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleApply}
-            className="flex-1 px-4 py-2.5 rounded-lg bg-primary text-background-dark font-medium hover:bg-[#0be060] transition-colors"
+            className="flex-1 px-4 py-2.5 rounded-lg bg-primary text-background-dark font-medium hover:bg-primary-dark transition-colors"
           >
             Apply
           </button>

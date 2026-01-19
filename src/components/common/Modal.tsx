@@ -130,7 +130,7 @@ export function Modal({
             aria-labelledby={title ? 'modal-title' : undefined}
             tabIndex={-1}
             className={cn(
-              'bg-white dark:bg-[#1c2e24] rounded-2xl shadow-2xl border border-gray-200 dark:border-[#316847]/50 w-full focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
+              'bg-white dark:bg-surface-dark rounded-2xl shadow-2xl border border-gray-100 dark:border-transparent w-full focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
               sizes[size],
               'max-h-[90vh] overflow-hidden flex flex-col'
             )}
@@ -141,20 +141,20 @@ export function Modal({
             exit="exit"
           >
             {(title || showCloseButton || header) && (
-              <div className="relative flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+              <div className="relative flex items-center justify-between p-4 sm:p-6 border-b border-gray-100 dark:border-border-dark flex-shrink-0">
                 {header ? (
                   header
                 ) : (
                   <>
                     {title && (
-                      <h2 id="modal-title" className="text-xl font-bold text-gray-900 dark:text-white pr-8">
+                      <h2 id="modal-title" className="text-xl font-bold text-slate-900 dark:text-white pr-8">
                         {title}
                       </h2>
                     )}
                     {showCloseButton && (
                       <button
                         onClick={onClose}
-                        className="absolute top-4 right-4 sm:top-6 sm:right-6 p-2 rounded-full text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center touch-manipulation focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                        className="absolute top-4 right-4 sm:top-6 sm:right-6 p-2 rounded-full text-slate-400 hover:text-slate-600 dark:text-gray-400 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-surface-dark transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center touch-manipulation focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
                         aria-label="Close modal"
                       >
                         <X className="w-5 h-5" />
@@ -168,7 +168,7 @@ export function Modal({
               {children}
             </div>
             {footer && (
-              <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 p-4 sm:p-6">
+              <div className="flex-shrink-0 border-t border-gray-100 dark:border-border-dark p-4 sm:p-6">
                 {footer}
               </div>
             )}

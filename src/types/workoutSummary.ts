@@ -25,6 +25,7 @@ export interface SessionComparison {
     previous?: number;
     change?: number;
   };
+  comparisonContext?: string; // e.g., "last workout", "last push workout", "last legs workout"
 }
 
 export interface MuscleDistribution {

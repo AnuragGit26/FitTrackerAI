@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import { MuscleGroup, RecoveryStatus } from '@/types/muscle';
 import { getRecoveryColor } from '@/services/recoveryCalculator';
 import { muscleImageCache } from '@/services/muscleImageCache';
@@ -10,7 +10,7 @@ interface MuscleGroupIconProps {
   className?: string;
 }
 
-export function MuscleGroupIcon({ muscle, recoveryStatus, className }: MuscleGroupIconProps) {
+export const MuscleGroupIcon = memo(function MuscleGroupIcon({ muscle, recoveryStatus, className }: MuscleGroupIconProps) {
   const [imageUrl, setImageUrl] = useState<string>(muscleImageCache.getImageUrl(muscle));
   const [imageError, setImageError] = useState(false);
   const blobUrlRef = useRef<string | null>(null);
@@ -114,5 +114,10 @@ export function MuscleGroupIcon({ muscle, recoveryStatus, className }: MuscleGro
       />
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  // Only re-render if muscle or recoveryStatus changed
+  return prevProps.muscle === nextProps.muscle &&
+         prevProps.recoveryStatus === nextProps.recoveryStatus &&
+         prevProps.className === nextProps.className;
+});
 

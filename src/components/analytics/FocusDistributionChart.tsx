@@ -17,8 +17,8 @@ export function FocusDistributionChart({ legs, push, pull }: FocusDistributionCh
 
   if (totalSets === 0) {
     return (
-      <div className="bg-white dark:bg-surface-dark rounded-xl p-6 border border-gray-100 dark:border-[#316847]">
-        <p className="text-gray-500 dark:text-gray-400 text-center py-8">
+      <div className="bg-white dark:bg-surface-dark rounded-xl p-6 border border-gray-100 dark:border-border-dark">
+        <p className="text-slate-500 dark:text-gray-400 text-center py-8">
           No workout data available
         </p>
       </div>
@@ -26,7 +26,7 @@ export function FocusDistributionChart({ legs, push, pull }: FocusDistributionCh
   }
 
   return (
-    <div className="bg-white dark:bg-surface-dark rounded-xl p-6 border border-gray-100 dark:border-[#316847]">
+    <div className="bg-white dark:bg-surface-dark rounded-xl p-6 border border-gray-100 dark:border-border-dark">
       <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 px-1">
         Focus Distribution
       </h3>
@@ -52,7 +52,7 @@ export function FocusDistributionChart({ legs, push, pull }: FocusDistributionCh
           </ResponsiveContainer>
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="h-28 w-28 rounded-full bg-white dark:bg-surface-dark flex items-center justify-center flex-col">
-              <span className="text-xs text-gray-500 font-medium uppercase">Total Sets</span>
+              <span className="text-xs text-slate-500 font-medium uppercase">Total Sets</span>
               <span className="text-2xl font-bold text-slate-900 dark:text-white">
                 {Math.round((legs + push + pull) / 10)}
               </span>

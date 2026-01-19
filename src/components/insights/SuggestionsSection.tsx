@@ -30,7 +30,9 @@ export function SuggestionsSection({ suggestions, onDismiss }: SuggestionsSectio
     }
   };
 
-  if (suggestions.length === 0) return null;
+  if (suggestions.length === 0) {
+    return null;
+  }
 
   return (
     <div className="flex flex-col gap-4 mt-2">
@@ -47,7 +49,7 @@ export function SuggestionsSection({ suggestions, onDismiss }: SuggestionsSectio
             <div className="flex flex-col flex-1 gap-2">
               <div>
                 <h4 className="font-bold text-base text-black dark:text-white">{cleanPlainTextResponse(suggestion.title)}</h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{cleanPlainTextResponse(suggestion.description)}</p>
+                <p className="text-sm text-slate-500 dark:text-gray-400 mt-1">{cleanPlainTextResponse(suggestion.description)}</p>
               </div>
               {suggestion.actionLabel && (
                 <div className="flex gap-2 mt-1">
@@ -59,7 +61,7 @@ export function SuggestionsSection({ suggestions, onDismiss }: SuggestionsSectio
                   {suggestion.dismissable && (
                     <button
                       onClick={() => onDismiss?.(suggestion.id)}
-                      className="text-xs font-medium text-gray-500 dark:text-gray-400 px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
+                      className="text-xs font-medium text-slate-500 dark:text-gray-400 px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
                     >
                       Dismiss
                     </button>

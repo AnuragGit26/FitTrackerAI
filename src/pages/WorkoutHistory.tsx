@@ -4,6 +4,7 @@ import { useUserStore } from '@/store/userStore';
 import { dataService } from '@/services/dataService';
 import { Workout } from '@/types/workout';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { EmptyStateAIMessage } from '@/components/common/EmptyStateAIMessage';
 import { EditableWorkoutNameInline } from '@/components/common/EditableWorkoutNameInline';
 import { DeleteConfirmationModal } from '@/components/common/DeleteConfirmationModal';
 import { ToastContainer } from '@/components/common/Toast';
@@ -102,7 +103,9 @@ export function WorkoutHistory() {
   };
 
   const handleDeleteWorkout = async () => {
-    if (!workoutToDelete?.id || !profile?.id) return;
+    if (!workoutToDelete?.id || !profile?.id) {
+    return;
+  }
 
     // Capture values for undo closure to prevent stale references
     const deletedWorkoutId = workoutToDelete.id;
@@ -167,7 +170,7 @@ export function WorkoutHistory() {
   return (
     <div className="relative flex min-h-screen w-full flex-col bg-background-light dark:bg-background-dark overflow-x-hidden pb-24">
       {/* Header */}
-      <header className="sticky top-0 z-50 flex items-center bg-background-light dark:bg-background-dark/95 backdrop-blur-sm p-4 border-b border-gray-200 dark:border-[#316847]">
+      <header className="sticky top-0 z-50 flex items-center bg-background-light dark:bg-background-dark/95 backdrop-blur-sm p-4 border-b border-gray-100 dark:border-border-dark">
         <button
           onClick={() => navigate(-1)}
           className="text-slate-900 dark:text-white flex size-12 shrink-0 items-center justify-start cursor-pointer"
@@ -188,13 +191,11 @@ export function WorkoutHistory() {
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto px-4 py-6">
         {workouts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16">
-            <span className="material-symbols-outlined text-6xl text-gray-400 dark:text-gray-600 mb-4">
+          <div className="flex flex-col items-center justify-center py-16 px-4">
+            <EmptyStateAIMessage screenName="History" className="w-full max-w-sm mb-8" />
+            <span className="material-symbols-outlined text-6xl text-slate-400 dark:text-gray-600 mb-4">
               fitness_center
             </span>
-            <p className="text-gray-500 dark:text-gray-400 text-center mb-4">
-              No workouts yet. Start logging your workouts to see them here!
-            </p>
             <button
               onClick={() => navigate('/log-workout')}
               className="px-6 py-3 bg-primary text-background-dark rounded-xl font-bold hover:bg-primary/90 transition-colors"
@@ -216,7 +217,7 @@ export function WorkoutHistory() {
                     handleWorkoutClick(workout.id);
                   }
                 }}
-                className="bg-white dark:bg-[#162e21] border border-gray-200 dark:border-[#316847] rounded-xl p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-[#1a2e23] transition-colors"
+                className="bg-white dark:bg-surface-dark border border-gray-100 dark:border-border-dark rounded-xl p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-surface-dark-light transition-colors"
               >
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1">
@@ -243,7 +244,7 @@ export function WorkoutHistory() {
                             e.stopPropagation();
                             setMenuOpenId(menuOpenId === workout.id ? null : workout.id!);
                           }}
-                          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-black/20 text-gray-500 dark:text-gray-400 transition-colors"
+                          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-black/20 text-slate-500 dark:text-gray-400 transition-colors"
                         >
                           <span className="material-symbols-outlined text-lg">more_vert</span>
                         </button>
@@ -254,14 +255,14 @@ export function WorkoutHistory() {
                               className="fixed inset-0 z-10"
                               onClick={() => setMenuOpenId(null)}
                             />
-                            <div className="absolute right-0 top-10 bg-white dark:bg-surface-dark border border-gray-200 dark:border-white/10 rounded-lg shadow-lg z-20 min-w-[120px]">
+                            <div className="absolute right-0 top-10 bg-white dark:bg-surface-dark border border-gray-100 dark:border-white/10 rounded-lg shadow-lg z-20 min-w-[120px]">
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   navigate(`/edit-workout/${workout.id}`);
                                   setMenuOpenId(null);
                                 }}
-                                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors flex items-center gap-2"
+                                className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors flex items-center gap-2"
                               >
                                 <span className="material-symbols-outlined text-base">edit</span>
                                 Edit
@@ -283,14 +284,14 @@ export function WorkoutHistory() {
                         )}
                       </div>
                     )}
-                    <span className="material-symbols-outlined text-gray-400 dark:text-gray-500">
+                    <span className="material-symbols-outlined text-slate-400 dark:text-gray-500">
                       chevron_right
                     </span>
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-3 mt-3">
                   <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-1 text-gray-500 dark:text-[#90cba8]">
+                    <div className="flex items-center gap-1 text-slate-500 dark:text-[#FF9933]">
                       <span className="material-symbols-outlined text-[14px]">schedule</span>
                       <p className="text-xs font-semibold uppercase tracking-wider">Time</p>
                     </div>
@@ -299,7 +300,7 @@ export function WorkoutHistory() {
                     </p>
                   </div>
                   <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-1 text-gray-500 dark:text-[#90cba8]">
+                    <div className="flex items-center gap-1 text-slate-500 dark:text-[#FF9933]">
                       <span className="material-symbols-outlined text-[14px]">fitness_center</span>
                       <p className="text-xs font-semibold uppercase tracking-wider">Vol</p>
                     </div>
@@ -308,7 +309,7 @@ export function WorkoutHistory() {
                     </p>
                   </div>
                   <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-1 text-gray-500 dark:text-[#90cba8]">
+                    <div className="flex items-center gap-1 text-slate-500 dark:text-[#FF9933]">
                       <span className="material-symbols-outlined text-[14px]">format_list_numbered</span>
                       <p className="text-xs font-semibold uppercase tracking-wider">Ex</p>
                     </div>

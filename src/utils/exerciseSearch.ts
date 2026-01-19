@@ -33,13 +33,15 @@ const MUSCLE_GROUP_NAMES: Record<MuscleGroup, string[]> = {
  * Simple fuzzy matching - checks if query characters appear in order in the text
  */
 export function fuzzyMatch(text: string, query: string): boolean {
-  if (!query) return true;
+  if (!query) {
+    return true;
+  }
   
   const textLower = text.toLowerCase();
   const queryLower = query.toLowerCase();
   
   // Exact match
-  if (textLower.includes(queryLower)) return true;
+  if (textLower.includes(queryLower)) {return true;}
   
   // Fuzzy match: check if all query characters appear in order
   let queryIndex = 0;
@@ -60,8 +62,8 @@ function levenshteinDistance(str1: string, str2: string): number {
   const n = str2.length;
   const dp: number[][] = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
   
-  for (let i = 0; i <= m; i++) dp[i][0] = i;
-  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 0; i <= m; i++) {dp[i][0] = i;}
+  for (let j = 0; j <= n; j++) {dp[0][j] = j;}
   
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
@@ -84,20 +86,22 @@ function levenshteinDistance(str1: string, str2: string): number {
  * Check if text matches query with fuzzy matching (allows 2-3 character difference)
  */
 function fuzzyMatchAdvanced(text: string, query: string): boolean {
-  if (!query) return true;
+  if (!query) {
+    return true;
+  }
   
   const textLower = text.toLowerCase();
   const queryLower = query.toLowerCase();
   
   // Exact or substring match
-  if (textLower.includes(queryLower)) return true;
+  if (textLower.includes(queryLower)) {return true;}
   
   // Check if query is similar to any word in text (max 2-3 char difference)
   const words = textLower.split(/\s+/);
   for (const word of words) {
     if (word.length >= queryLower.length - 3 && word.length <= queryLower.length + 3) {
       const distance = levenshteinDistance(word, queryLower);
-      if (distance <= 2) return true;
+      if (distance <= 2) {return true;}
     }
   }
   
@@ -127,7 +131,7 @@ function searchMuscleGroups(exercise: Exercise, query: string): boolean {
  * Calculate relevance score for an exercise based on search query
  */
 export function calculateRelevanceScore(exercise: Exercise, query: string): number {
-  if (!query.trim()) return 0;
+  if (!query.trim()) {return 0;}
   
   const queryLower = query.toLowerCase().trim();
   const exerciseNameLower = exercise.name.toLowerCase();
@@ -231,7 +235,7 @@ export function searchExercises(
  * Find all matching positions in text for highlighting
  */
 export function findMatches(text: string, query: string): Array<{ start: number; end: number }> {
-  if (!query.trim()) return [];
+  if (!query.trim()) {return [];}
   
   const textLower = text.toLowerCase();
   const queryLower = query.toLowerCase();
@@ -242,7 +246,9 @@ export function findMatches(text: string, query: string): Array<{ start: number;
   // eslint-disable-next-line no-constant-condition
   while (true) {
     const index = textLower.indexOf(queryLower, startIndex);
-    if (index === -1) break;
+    if (index === -1) {
+    break;
+  }
     matches.push({ start: index, end: index + queryLower.length });
     startIndex = index + 1;
   }

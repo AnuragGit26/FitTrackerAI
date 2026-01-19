@@ -1,7 +1,10 @@
+import { memo } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import { useMuscleRecovery } from '@/hooks/useMuscleRecovery';
 import { MuscleGroup, RecoveryStatus } from '@/types/muscle';
 import { cn } from '@/utils/cn';
+import { cardStyles } from '@/utils/styleHelpers';
+import { spacing, shadows, borderRadius, typography } from '@/styles/designSystem';
 import { MuscleGroupIcon } from './MuscleGroupIcon';
 
 interface MuscleGroupStatusCardProps {
@@ -11,7 +14,7 @@ interface MuscleGroupStatusCardProps {
   remainingHours?: number;
 }
 
-function MuscleGroupStatusCard({
+const MuscleGroupStatusCard = memo(function MuscleGroupStatusCard({
   muscle,
   recoveryPercentage,
   recoveryStatus,
@@ -49,10 +52,15 @@ function MuscleGroupStatusCard({
   return (
     <div
       className={cn(
-        'snap-center min-w-[140px] flex flex-col gap-3 rounded-2xl bg-slate-100 dark:bg-white/5 p-4 border relative',
+        'snap-center min-w-[140px] flex flex-col',
+        spacing.normal,
+        borderRadius.cardLarge,
+        cardStyles('compact'),
+        'border relative',
         isReady
-          ? 'border-primary/30 shadow-[0_0_15px_rgba(13,242,105,0.1)]'
-          : borderColor
+          ? 'border-primary/30'
+          : borderColor,
+        isReady && shadows.glow
       )}
     >
       {isReady && (
@@ -86,12 +94,18 @@ function MuscleGroupStatusCard({
         <MuscleGroupIcon muscle={muscle} recoveryStatus={recoveryStatus} />
       </div>
       <div className="text-center">
-        <p className="font-bold text-slate-900 dark:text-white">{muscleName}</p>
+        <p className={cn(typography.cardTitle, 'text-sm')}>{muscleName}</p>
         <p className={cn('text-xs font-medium', statusColor)}>{statusText}</p>
       </div>
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  // Only re-render if recovery data changed
+  return prevProps.muscle === nextProps.muscle &&
+         prevProps.recoveryPercentage === nextProps.recoveryPercentage &&
+         prevProps.recoveryStatus === nextProps.recoveryStatus &&
+         prevProps.remainingHours === nextProps.remainingHours;
+});
 
 export function MuscleGroupStatusCards() {
   const { muscleStatuses, isLoading } = useMuscleRecovery();

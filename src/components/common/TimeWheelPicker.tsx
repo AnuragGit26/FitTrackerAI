@@ -31,20 +31,28 @@ export function TimeWheelPicker({
   }, [minutes, seconds, onChange]);
 
   const handleMinutesScroll = (e: React.WheelEvent) => {
-    if (disabled) return;
+    if (disabled) {
+    return;
+  }
     e.preventDefault();
     const delta = e.deltaY > 0 ? 1 : -1;
     setMinutes((prev) => Math.max(0, Math.min(59, prev + delta)));
   };
 
   const handleSecondsScroll = (e: React.WheelEvent) => {
-    if (disabled) return;
+    if (disabled) {
+    return;
+  }
     e.preventDefault();
     const delta = e.deltaY > 0 ? 5 : -5;
     setSeconds((prev) => {
       const newValue = prev + delta;
-      if (newValue < 0) return 59;
-      if (newValue > 59) return 0;
+      if (newValue < 0) {
+    return 59;
+  }
+      if (newValue > 59) {
+    return 0;
+  }
       return newValue;
     });
   };

@@ -17,17 +17,17 @@ export function WorkoutStatsCards({ workoutCount, currentStreak }: WorkoutStatsC
   return (
     <>
       <motion.div 
-        className="bg-surface-light dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800/50 flex flex-col justify-between"
+        className="bg-surface-light dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-100 dark:border-border-dark/50 flex flex-col justify-between"
         variants={shouldReduceMotion ? {} : slideUp}
         initial="hidden"
         animate="visible"
         whileHover={shouldReduceMotion ? {} : { y: -2 }}
       >
-        <div className="text-gray-500 dark:text-gray-400 text-sm font-medium mb-1">
+        <div className="text-slate-500 dark:text-gray-400 text-sm font-medium mb-1">
           Workouts
         </div>
         <div className="text-2xl font-bold">{workoutCountValue.formattedValue}</div>
-        <div className="h-1 w-full bg-gray-200 dark:bg-gray-700 rounded-full mt-2 overflow-hidden">
+        <div className="h-1 w-full bg-white dark:bg-surface-dark-light rounded-full mt-2 overflow-hidden">
           <motion.div
             className="h-full bg-primary rounded-full"
             initial={{ width: 0 }}
@@ -37,13 +37,13 @@ export function WorkoutStatsCards({ workoutCount, currentStreak }: WorkoutStatsC
         </div>
       </motion.div>
       <motion.div 
-        className="bg-surface-light dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800/50 flex flex-col justify-between"
+        className="bg-surface-light dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-100 dark:border-border-dark/50 flex flex-col justify-between"
         variants={shouldReduceMotion ? {} : slideUp}
         initial="hidden"
         animate="visible"
         whileHover={shouldReduceMotion ? {} : { y: -2 }}
       >
-        <div className="text-gray-500 dark:text-gray-400 text-sm font-medium mb-1">
+        <div className="text-slate-500 dark:text-gray-400 text-sm font-medium mb-1">
           Streak
         </div>
         <div className="text-2xl font-bold text-white">

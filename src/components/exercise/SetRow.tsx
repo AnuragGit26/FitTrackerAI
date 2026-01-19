@@ -191,10 +191,10 @@ export function SetRow({ set, onUpdate, unit, trackingType, distanceUnit = 'km',
   };
 
   const inputClassName = (isCompleted: boolean) => cn(
-    'w-full bg-transparent text-center font-bold text-xl text-gray-900 dark:text-white border-0 border-b focus:ring-0 px-0 py-1 transition-colors',
+    'w-full bg-transparent text-center font-bold text-xl text-slate-900 dark:text-white border-0 border-b focus:ring-0 px-0 py-1 transition-colors',
     isCompleted
       ? 'border-primary/30 focus:border-primary'
-      : 'border-gray-200 dark:border-gray-700 focus:border-primary',
+      : 'border-gray-100 dark:border-border-dark focus:border-primary',
     isDisabled && 'text-gray-500 cursor-not-allowed'
   );
 
@@ -206,7 +206,7 @@ export function SetRow({ set, onUpdate, unit, trackingType, distanceUnit = 'km',
         isCompleted
           ? 'bg-primary/10 border-primary/30'
           : isActive
-            ? 'bg-surface-light dark:bg-surface-dark border-gray-200 dark:border-[#316847] shadow-sm'
+            ? 'bg-surface-light dark:bg-surface-dark border-gray-100 dark:border-border-dark shadow-sm'
             : 'bg-transparent opacity-60'
       )}
       animate={justCompleted && !shouldReduceMotion ? {
@@ -423,7 +423,7 @@ export function SetRow({ set, onUpdate, unit, trackingType, distanceUnit = 'km',
             'size-11 flex items-center justify-center rounded-lg shadow-sm hover:brightness-110 transition-all focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
             isCompleted
               ? 'bg-primary text-background-dark'
-              : 'bg-gray-200 dark:bg-[#316847]/50 text-gray-400 hover:bg-primary/20 hover:text-primary'
+              : 'bg-white dark:bg-[#27272a]/50 text-gray-400 hover:bg-primary/20 hover:text-primary'
           )}
           aria-label={isCompleted ? `Mark set ${set.setNumber} as incomplete` : `Mark set ${set.setNumber} as complete`}
           aria-pressed={isCompleted}

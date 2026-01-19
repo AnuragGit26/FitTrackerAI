@@ -20,7 +20,9 @@ export function VolumeTrendChart({
   }));
 
   const generatePath = (data: typeof normalizedData) => {
-    if (data.length === 0) return '';
+    if (data.length === 0) {
+    return '';
+  }
     const points = data.map((d, i) => {
       const x = (i / (data.length - 1 || 1)) * 100;
       const y = 100 - d.normalized;
@@ -30,14 +32,16 @@ export function VolumeTrendChart({
   };
 
   const generateAreaPath = (data: typeof normalizedData) => {
-    if (data.length === 0) return '';
+    if (data.length === 0) {
+    return '';
+  }
     const path = generatePath(data);
     const x = ((data.length - 1) / (data.length - 1 || 1)) * 100;
     return `${path} L${x},100 L0,100 Z`;
   };
 
   return (
-    <section className="rounded-xl border border-gray-200 dark:border-[#316847] bg-white dark:bg-surface-card p-5 shadow-sm">
+    <section className="rounded-xl border border-gray-100 dark:border-border-dark bg-white dark:bg-surface-card p-5 shadow-sm">
       <div className="flex justify-between items-start mb-4">
         <div>
           <p className="text-slate-500 dark:text-secondary-text text-sm font-medium">Volume vs Last Month</p>
@@ -48,13 +52,13 @@ export function VolumeTrendChart({
                 {changePercent.toFixed(0)}%
               </p>
             )}
-            <span className="flex items-center text-green-600 dark:text-primary text-sm font-bold">
+            <span className="flex items-center text-blue-600 dark:text-primary text-sm font-bold">
               <TrendingUp className="w-4 h-4" />
               {Math.round(currentVolume / 1000)}k lbs
             </span>
           </div>
         </div>
-        <button className="text-slate-400 hover:text-slate-600 dark:text-gray-400 dark:hover:text-white">
+        <button className="text-slate-400 hover:text-slate-600 dark:text-slate-400 dark:hover:text-white">
           <MoreHorizontal className="w-5 h-5" />
         </button>
       </div>
@@ -69,7 +73,7 @@ export function VolumeTrendChart({
           {[25, 50, 75].map((y) => (
             <line
               key={y}
-              className="text-gray-200 dark:text-white/10"
+              className="text-slate-200 dark:text-white/10"
               stroke="currentColor"
               strokeDasharray="2"
               strokeWidth="0.5"

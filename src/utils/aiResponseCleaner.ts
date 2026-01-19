@@ -7,7 +7,9 @@
  * Cleans text by removing markdown code blocks, extra whitespace, and formatting artifacts
  */
 export function cleanText(text: string | null | undefined): string {
-  if (!text) return '';
+  if (!text) {
+    return '';
+  }
   
   let cleaned = text.trim();
   
@@ -31,7 +33,9 @@ export function cleanText(text: string | null | undefined): string {
  * Handles cases where AI adds markdown, explanatory text, or other formatting
  */
 export function extractAndCleanJSON(text: string): string | null {
-  if (!text) return null;
+  if (!text) {
+    return null;
+  }
   
   const cleaned = cleanText(text);
   
@@ -147,7 +151,9 @@ export function sanitizeAIResponse<T>(data: unknown): T {
  * Cleans plain text AI responses (non-JSON)
  */
 export function cleanPlainTextResponse(text: string): string {
-  if (!text) return '';
+  if (!text) {
+    return '';
+  }
   
   let cleaned = cleanText(text);
   

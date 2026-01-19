@@ -269,7 +269,9 @@ export function CardioSetCard({
   const canLogSet = distanceNum > 0 && totalTimeSeconds > 0;
 
   const handleLogSetClick = () => {
-    if (!canLogSet || disabled) return;
+    if (!canLogSet || disabled) {
+    return;
+  }
     
     // Trigger celebration animations
     setIsLogging(true);
@@ -854,7 +856,7 @@ export function CardioSetCard({
             'flex w-full items-center justify-center gap-2 rounded-xl h-14 shadow-[0_0_20px_rgba(59,130,246,0.15)] transition-all relative z-10 overflow-hidden',
             canLogSet && !disabled
               ? 'bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white'
-              : 'bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
+              : 'bg-white dark:bg-surface-dark-light text-slate-500 cursor-not-allowed'
           )}
           initial={false}
           animate={(showButtonAnimation || isLogging) && !shouldReduceMotion ? {
@@ -966,7 +968,7 @@ export function CardioSetCard({
               'flex w-full items-center justify-center gap-2 rounded-xl h-12 mt-3 border-2 transition-all relative overflow-hidden',
               !disabled
                 ? 'border-blue-500/30 bg-blue-500/5 hover:bg-blue-500/10 text-blue-600 dark:text-blue-400'
-                : 'border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
+                : 'border-gray-100 dark:border-border-dark bg-gray-100 dark:bg-surface-dark text-gray-400 cursor-not-allowed'
             )}
             initial={false}
             animate={isNewSet && !shouldReduceMotion ? {

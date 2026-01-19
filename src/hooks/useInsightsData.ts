@@ -47,8 +47,8 @@ export function useInsightsData() {
 
       // Wait for muscle recovery to finish so we calculate the correct fingerprint
       if (isMuscleRecoveryLoading) {
-        return;
-      }
+    return;
+  }
 
       try {
         await loadWorkouts(profile.id);
@@ -297,14 +297,14 @@ export function useInsightsData() {
 
   const loadInsights = useCallback(async () => {
     if (!profile || isLoadingRef.current) {
-      if (!profile) setIsLoading(false);
+      if (!profile) {setIsLoading(false);}
       return;
     }
 
     // Wait for dependencies to be ready before proceeding
     if (isMuscleRecoveryLoading) {
-      return;
-    }
+    return;
+  }
 
     isLoadingRef.current = true;
     setIsLoading(true);
@@ -436,8 +436,12 @@ export function useInsightsData() {
 
   const getTimeSinceUpdate = useCallback((): string => {
     const minutes = Math.floor((new Date().getTime() - lastUpdated.getTime()) / 60000);
-    if (minutes < 1) return 'Just now';
-    if (minutes === 1) return '1m ago';
+    if (minutes < 1) {
+    return 'Just now';
+  }
+    if (minutes === 1) {
+    return '1m ago';
+  }
     return `${minutes}m ago`;
   }, [lastUpdated]);
 

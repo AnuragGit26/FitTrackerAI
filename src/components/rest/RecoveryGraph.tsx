@@ -29,7 +29,9 @@ export function RecoveryGraph() {
 
   // Calculate historical recovery data for the last 7 days using shared helper
   const chartData = useMemo(() => {
-    if (!profile) return [];
+    if (!profile) {
+    return [];
+  }
 
     const baseRestInterval = settings.baseRestInterval || 48;
 

@@ -11,6 +11,7 @@ import { calculateVolume, convertWeight } from '@/utils/calculations';
 import { userContextManager } from '@/services/userContextManager';
 import { normalizeWorkoutTimes } from '@/utils/validators';
 import { logger } from '@/utils/logger';
+import { notificationService } from '@/services/notificationService';
 
 interface RemoveExerciseResult {
   dissolved: boolean;
@@ -36,9 +37,10 @@ interface WorkoutState {
   addSet: (exerciseId: string, set: WorkoutSet) => void;
   updateSet: (exerciseId: string, setNumber: number, updates: Partial<WorkoutSet>) => void;
   cancelSet: (exerciseId: string, setNumber: number) => void;
-  finishWorkout: (calories?: number, currentDurationSeconds?: number) => Promise<void>;
+  finishWorkout: (calories?: number, currentDurationSeconds?: number) => Promise<string | undefined>;
   cancelWorkout: () => void;
   loadWorkouts: (userId: string) => Promise<void>;
+  refreshAllData: (userId: string) => Promise<void>;
   getWorkout: (id: string) => Promise<Workout | undefined>;
   setWorkoutTimerStartTime: (startTime: Date | null) => void;
 }
@@ -227,8 +229,8 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
   addExercise: (exercise: WorkoutExercise) => {
     const { currentWorkout } = get();
     if (!currentWorkout) {
-      return;
-    }
+    return;
+  }
 
     const updatedWorkout = {
       ...currentWorkout,
@@ -245,7 +247,9 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
 
   updateExercise: (exerciseId: string, updates: Partial<WorkoutExercise>) => {
     const { currentWorkout } = get();
-    if (!currentWorkout || !currentWorkout.exercises) return;
+    if (!currentWorkout || !currentWorkout.exercises) {
+    return;
+  }
 
     const exercises = (currentWorkout.exercises ?? []).map((ex) =>
       ex.id === exerciseId ? { ...ex, ...updates } : ex
@@ -265,7 +269,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
 
   removeExercise: (exerciseId: string) => {
     const { currentWorkout } = get();
-    if (!currentWorkout || !currentWorkout.exercises) return { dissolved: false };
+    if (!currentWorkout || !currentWorkout.exercises) {return { dissolved: false };}
 
     // FIX: Check if removing this exercise will dissolve a superset/circuit group
     const removedExercise = currentWorkout.exercises.find((ex) => ex.id === exerciseId);
@@ -338,7 +342,9 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
 
   addSet: (exerciseId: string, workoutSet: WorkoutSet) => {
     const { currentWorkout } = get();
-    if (!currentWorkout || !currentWorkout.exercises) return;
+    if (!currentWorkout || !currentWorkout.exercises) {
+    return;
+  }
 
     // FIX: Get user bodyweight for accurate bodyweight exercise volume calculation
     const userBodyweight = getUserBodyweightInKg();
@@ -373,7 +379,9 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
 
   updateSet: (exerciseId: string, setNumber: number, updates: Partial<WorkoutSet>) => {
     const { currentWorkout } = get();
-    if (!currentWorkout || !currentWorkout.exercises) return;
+    if (!currentWorkout || !currentWorkout.exercises) {
+    return;
+  }
 
     // FIX: Get user bodyweight for accurate bodyweight exercise volume calculation
     const userBodyweight = getUserBodyweightInKg();
@@ -410,7 +418,9 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
 
   cancelSet: (exerciseId: string, setNumber: number) => {
     const { currentWorkout } = get();
-    if (!currentWorkout || !currentWorkout.exercises) return;
+    if (!currentWorkout || !currentWorkout.exercises) {
+    return;
+  }
 
     // FIX: Get user bodyweight for accurate bodyweight exercise volume calculation
     const userBodyweight = getUserBodyweightInKg();
@@ -456,6 +466,13 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
   },
 
   finishWorkout: async (calories?: number, currentDurationSeconds?: number) => {
+    // RACE CONDITION FIX: Check if save is already in progress
+    const state = get();
+    if (state.isLoading) {
+      logger.warn('[finishWorkout] Save already in progress, ignoring duplicate call');
+      return;
+    }
+
     // FIX: Get fresh state to prevent race condition
     // Use get() to ensure we have the latest state including any recently added exercises
     const { currentWorkout } = get();
@@ -604,9 +621,20 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
 
       // Normalize both start and end times to handle stale dates from persisted state
       // This ensures they remain within the 1-day validation constraint
-      const workoutDate = currentWorkout.date instanceof Date 
-        ? currentWorkout.date 
+      const workoutDate = currentWorkout.date instanceof Date
+        ? currentWorkout.date
         : new Date(currentWorkout.date);
+
+      // Before normalizing, log any significant time discrepancies for debugging
+      const timeDiff = Math.abs(startTime.getTime() - new Date().getTime());
+      if (timeDiff > 24 * 60 * 60 * 1000) { // More than 24 hours old
+        logger.warn('[finishWorkout] Detected stale start time, normalizing:', {
+          staleTime: startTime.toISOString(),
+          workoutDate: workoutDate.toISOString(),
+          hoursDifference: timeDiff / (60 * 60 * 1000),
+        });
+      }
+
       const { startTime: normalizedStartTime, endTime: normalizedEndTime } = normalizeWorkoutTimes(
         workoutDate,
         startTime,
@@ -657,7 +685,23 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         } catch (syncError) {
           // Log sync failure but don't affect workout save
           logger.warn('Firestore sync failed for workout (will retry later):', syncError);
-          // Sync will be retried on next sync cycle
+
+          // Notify user about sync failure
+          try {
+            await notificationService.createNotification({
+              userId: currentUserId,
+              type: 'system',
+              title: 'Workout Saved Locally',
+              message: 'Your workout was saved on this device, but cloud sync failed. We\'ll automatically retry syncing when you\'re back online.',
+              data: {
+                actionLabel: 'Dismiss',
+                syncStatus: 'failed',
+                workoutId: savedWorkout.id,
+              },
+            });
+          } catch (notifError) {
+            logger.error('Failed to create sync failure notification:', notifError);
+          }
         }
       })();
 
@@ -683,6 +727,9 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
           // Continue even if marking as completed fails
         }
       }
+
+      // Return the workout ID so caller can navigate to summary
+      return workoutId;
     } catch (error) {
       // On error, keep workout in state so user can retry
       // Don't clear state - this allows recovery
@@ -745,6 +792,22 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to load workouts',
+        isLoading: false,
+      });
+    }
+  },
+
+  refreshAllData: async (userId: string) => {
+    set({ isLoading: true, error: null });
+
+    try {
+      const workouts = await dataService.getAllWorkouts(userId);
+      set({ workouts: workouts ?? [], isLoading: false });
+      logger.info('[workoutStore] Successfully refreshed workout data');
+    } catch (error) {
+      logger.error('[workoutStore] Failed to refresh workout data:', error);
+      set({
+        error: error instanceof Error ? error.message : 'Failed to refresh workouts',
         isLoading: false,
       });
     }

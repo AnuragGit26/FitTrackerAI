@@ -34,7 +34,9 @@ export function InstallPrompt() {
   }, []);
 
   const handleInstall = async () => {
-    if (!deferredPrompt) return;
+    if (!deferredPrompt) {
+    return;
+  }
 
     setIsInstalling(true);
     try {
@@ -108,7 +110,7 @@ export function InstallPrompt() {
                 onClick={handleInstall}
                 disabled={isInstalling}
                 className={cn(
-                  'flex-1 px-4 py-3 bg-primary hover:bg-[#0be060] active:bg-[#0be060]',
+                  'flex-1 px-4 py-3 bg-primary hover:bg-[#E67E22] active:bg-[#E67E22]',
                   'text-black font-semibold rounded-xl transition-colors',
                   'flex items-center justify-center gap-2 min-h-[44px]',
                   'disabled:opacity-50 disabled:cursor-not-allowed',

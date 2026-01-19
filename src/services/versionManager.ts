@@ -184,8 +184,12 @@ class VersionManager {
     const localVersion = local.version ?? 1;
     const remoteVersion = remote.version ?? 1;
 
-    if (localVersion > remoteVersion) return 1;
-    if (localVersion < remoteVersion) return -1;
+    if (localVersion > remoteVersion) {
+    return 1;
+  }
+    if (localVersion < remoteVersion) {
+    return -1;
+  }
     return 0;
   }
 

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, memo } from 'react';
 import { MuscleGroup } from '@/types/muscle';
 import { aggregateVolumeByMuscleGroup } from '@/utils/analyticsHelpers';
 import { Workout } from '@/types/workout';
@@ -8,7 +8,7 @@ interface VolumeByMuscleChartProps {
   workouts: Workout[];
 }
 
-export function VolumeByMuscleChart({ workouts }: VolumeByMuscleChartProps) {
+export const VolumeByMuscleChart = memo(function VolumeByMuscleChart({ workouts }: VolumeByMuscleChartProps) {
   const { profile } = useUserStore();
   const unit = profile?.preferredUnit || 'kg';
 
@@ -57,8 +57,8 @@ export function VolumeByMuscleChart({ workouts }: VolumeByMuscleChartProps) {
 
   if (muscleData.length === 0) {
     return (
-      <div className="flex flex-col gap-4 rounded-xl bg-white dark:bg-surface-dark p-5 border border-gray-100 dark:border-[#316847]">
-        <p className="text-gray-500 dark:text-gray-400 text-center py-4">
+      <div className="flex flex-col gap-4 rounded-xl bg-white dark:bg-surface-dark p-5 border border-gray-100 dark:border-border-dark">
+        <p className="text-slate-500 dark:text-gray-400 text-center py-4">
           No muscle volume data available
         </p>
       </div>
@@ -66,7 +66,7 @@ export function VolumeByMuscleChart({ workouts }: VolumeByMuscleChartProps) {
   }
 
   return (
-    <div className="flex flex-col gap-4 rounded-xl bg-white dark:bg-surface-dark p-5 border border-gray-100 dark:border-[#316847]">
+    <div className="flex flex-col gap-4 rounded-xl bg-white dark:bg-surface-dark p-5 border border-gray-100 dark:border-border-dark">
       {muscleData.map(({ muscle, volume, percentage }) => {
         const isLow = percentage < 30;
         return (
@@ -79,13 +79,13 @@ export function VolumeByMuscleChart({ workouts }: VolumeByMuscleChartProps) {
                 {volume.toLocaleString('en-US', { maximumFractionDigits: 0 })} {unit}
               </p>
             </div>
-            <div className="h-2 w-full rounded-full bg-gray-200 dark:bg-[#11261a]">
+            <div className="h-2 w-full rounded-full bg-white dark:bg-[#11261a]">
               <div
                 className={`h-2 rounded-full transition-all ${
                   isLow
                     ? 'bg-red-400'
                     : percentage > 70
-                    ? 'bg-primary shadow-[0_0_8px_rgba(13,242,105,0.4)]'
+                    ? 'bg-primary shadow-[0_0_8px_rgba(255,153,51,0.4)]'
                     : 'bg-primary/80'
                 }`}
                 style={{ width: `${percentage}%` }}
@@ -96,5 +96,5 @@ export function VolumeByMuscleChart({ workouts }: VolumeByMuscleChartProps) {
       })}
     </div>
   );
-}
+});
 

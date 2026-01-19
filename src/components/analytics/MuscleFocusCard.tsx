@@ -31,9 +31,9 @@ export function MuscleFocusCard({ workouts }: MuscleFocusCardProps) {
   };
 
   return (
-    <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-5 border border-gray-100 dark:border-gray-800/50 shadow-sm flex flex-col">
+    <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-5 border border-gray-100 dark:border-border-dark/50 shadow-sm flex flex-col">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="font-bold text-base text-gray-900 dark:text-white">Muscle Focus</h3>
+        <h3 className="font-bold text-base text-slate-900 dark:text-white">Muscle Focus</h3>
         <Link
           to="/anatomy"
           className="text-primary text-xs font-bold uppercase tracking-wide hover:underline"

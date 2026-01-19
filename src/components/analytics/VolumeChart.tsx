@@ -25,11 +25,11 @@ export const VolumeChart = memo(function VolumeChart() {
 
   if (chartData.length === 0) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+      <div className="bg-white dark:bg-surface-dark rounded-lg p-6 border border-gray-100 dark:border-border-dark">
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-gray-100 mb-4">
           Volume Progression
         </h3>
-        <p className="text-gray-500 dark:text-gray-400 text-center py-8">
+        <p className="text-slate-500 dark:text-gray-400 text-center py-8">
           No workout data available yet. Start logging workouts to see your progress!
         </p>
       </div>
@@ -37,8 +37,8 @@ export const VolumeChart = memo(function VolumeChart() {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+    <div className="bg-white dark:bg-surface-dark rounded-lg p-6 border border-gray-100 dark:border-border-dark">
+      <h3 className="text-lg font-semibold text-slate-900 dark:text-gray-100 mb-4">
         Volume Progression (Last 30 Days)
       </h3>
       <ResponsiveContainer width="100%" height={300}>

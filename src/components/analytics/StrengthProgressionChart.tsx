@@ -84,7 +84,7 @@ export function StrengthProgressionChart({ progressions }: StrengthProgressionCh
   const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-gray-900 dark:bg-gray-800 border border-gray-700 rounded-lg p-3 shadow-xl">
+        <div className="bg-gray-900 dark:bg-surface-dark border border-gray-700 rounded-lg p-3 shadow-xl">
           <p className="text-white font-semibold mb-2 text-sm">
             {label && format(new Date(label), 'MMM d, yyyy')}
           </p>
@@ -142,12 +142,12 @@ export function StrengthProgressionChart({ progressions }: StrengthProgressionCh
 
   if (chartData.length === 0) {
     return (
-      <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-5 border border-gray-100 dark:border-gray-800/50 shadow-sm">
-        <h3 className="font-bold text-lg mb-1 text-gray-900 dark:text-white">
+      <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-5 border border-gray-100 dark:border-border-dark/50 shadow-sm">
+        <h3 className="font-bold text-lg mb-1 text-slate-900 dark:text-white">
           Strength Progression (1RM)
         </h3>
-        <p className="text-xs text-gray-500 mb-4">Estimated One Rep Max over time</p>
-        <p className="text-gray-500 dark:text-gray-400 text-center py-8">
+        <p className="text-xs text-slate-500 mb-4">Estimated One Rep Max over time</p>
+        <p className="text-slate-500 dark:text-gray-400 text-center py-8">
           No strength progression data available
         </p>
       </div>
@@ -155,11 +155,11 @@ export function StrengthProgressionChart({ progressions }: StrengthProgressionCh
   }
 
   return (
-    <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-5 border border-gray-100 dark:border-gray-800/50 shadow-sm">
-      <h3 className="font-bold text-lg mb-1 text-gray-900 dark:text-white">
+    <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-5 border border-gray-100 dark:border-border-dark/50 shadow-sm">
+      <h3 className="font-bold text-lg mb-1 text-slate-900 dark:text-white">
         Strength Progression (1RM)
       </h3>
-      <p className="text-xs text-gray-500 mb-4">Estimated One Rep Max over time</p>
+      <p className="text-xs text-slate-500 mb-4">Estimated One Rep Max over time</p>
       <div className="flex gap-4 mb-4 flex-wrap">
         {progressions.map((prog) => {
           const isHidden = hiddenSeries.has(prog.exerciseName);
@@ -167,7 +167,7 @@ export function StrengthProgressionChart({ progressions }: StrengthProgressionCh
             <button
               key={prog.exerciseName}
               onClick={() => toggleSeries(prog.exerciseName)}
-              className={`flex items-center gap-2 px-2 py-1 bg-white/5 dark:bg-gray-800/50 rounded-md transition-opacity ${
+              className={`flex items-center gap-2 px-2 py-1 bg-white/5 dark:bg-surface-dark/50 rounded-md transition-opacity ${
                 isHidden ? 'opacity-40' : 'opacity-100'
               } hover:opacity-80 cursor-pointer`}
             >
@@ -178,7 +178,7 @@ export function StrengthProgressionChart({ progressions }: StrengthProgressionCh
                     colors[prog.exerciseName as keyof typeof colors] || '#0df269',
                 }}
               ></div>
-              <span className="text-xs font-bold text-gray-300">
+              <span className="text-xs font-bold text-slate-300">
                 {prog.exerciseName.replace('Barbell ', '')}
               </span>
             </button>
@@ -187,7 +187,7 @@ export function StrengthProgressionChart({ progressions }: StrengthProgressionCh
       </div>
       {selectedPoint && (
         <div className="mb-4 p-3 bg-primary/10 dark:bg-primary/20 rounded-lg border border-primary/30">
-          <p className="text-sm text-gray-700 dark:text-gray-300">
+          <p className="text-sm text-slate-700 dark:text-gray-300">
             <span className="font-semibold">Selected:</span> {selectedPoint.exercise.replace('Barbell ', '')} - {format(new Date(selectedPoint.date), 'MMM d, yyyy')} - {selectedPoint.value} lbs
           </p>
         </div>

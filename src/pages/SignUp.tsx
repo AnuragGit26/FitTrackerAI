@@ -83,7 +83,7 @@ export function SignUp() {
         {/* Hero Section */}
         <div className="flex flex-col items-center mb-8 mt-2">
           {/* Logo Placeholder / Icon */}
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-emerald-700 flex items-center justify-center mb-6 shadow-[0_0_15px_rgba(13,242,105,0.3)]">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center mb-6 shadow-[0_0_15px_rgba(255,153,51,0.3)]">
             <span
               className="material-symbols-outlined text-background-dark text-4xl leading-none"
               style={{ fontVariationSettings: "'FILL' 1, 'wght' 400" }}
@@ -127,7 +127,7 @@ export function SignUp() {
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="John Doe"
                 disabled={isLoading}
-                className="w-full h-12 px-4 rounded-lg border border-slate-200 dark:border-emerald-900/50 bg-white dark:bg-surface-dark text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
+                className="w-full h-12 px-4 rounded-lg border border-slate-200 dark:border-purple-900/50 bg-white dark:bg-surface-dark text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
                 required
               />
             </div>
@@ -146,7 +146,7 @@ export function SignUp() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your@email.com"
                 disabled={isLoading}
-                className="w-full h-12 px-4 rounded-lg border border-slate-200 dark:border-emerald-900/50 bg-white dark:bg-surface-dark text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
+                className="w-full h-12 px-4 rounded-lg border border-slate-200 dark:border-purple-900/50 bg-white dark:bg-surface-dark text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
                 required
               />
             </div>
@@ -165,7 +165,7 @@ export function SignUp() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="At least 6 characters"
                 disabled={isLoading}
-                className="w-full h-12 px-4 rounded-lg border border-slate-200 dark:border-emerald-900/50 bg-white dark:bg-surface-dark text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
+                className="w-full h-12 px-4 rounded-lg border border-slate-200 dark:border-purple-900/50 bg-white dark:bg-surface-dark text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
                 required
                 minLength={6}
               />
@@ -174,7 +174,7 @@ export function SignUp() {
             <button
               type="submit"
               disabled={isLoading}
-              className="mt-4 w-full bg-primary hover:bg-green-400 disabled:bg-primary/50 text-background-dark font-bold text-lg py-4 rounded-xl shadow-[0_4px_20px_rgba(13,242,105,0.25)] hover:shadow-[0_4px_25px_rgba(13,242,105,0.4)] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:cursor-not-allowed"
+              className="mt-4 w-full bg-primary hover:bg-primary-dark disabled:bg-primary/50 text-background-dark font-bold text-lg py-4 rounded-xl shadow-[0_4px_20px_rgba(255,153,51,0.25)] hover:shadow-[0_4px_25px_rgba(255,153,51,0.4)] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:cursor-not-allowed"
             >
               {isLoading ? (
                 <>
@@ -194,7 +194,7 @@ export function SignUp() {
         {/* Divider */}
         <div className="relative my-8">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-slate-200 dark:border-emerald-900/50"></div>
+            <div className="w-full border-t border-slate-200 dark:border-purple-900/50"></div>
           </div>
           <div className="relative flex justify-center text-sm">
             <span className="px-4 bg-background-light dark:bg-background-dark text-slate-500">
@@ -209,7 +209,7 @@ export function SignUp() {
             type="button"
             onClick={() => handleSocialSignUp('google')}
             disabled={isLoading}
-            className="flex items-center justify-center gap-2 bg-white dark:bg-surface-dark border border-slate-200 dark:border-emerald-900/50 hover:border-primary/50 dark:hover:border-primary/50 rounded-xl py-3 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center justify-center gap-2 bg-white dark:bg-surface-dark border border-slate-200 dark:border-purple-900/50 hover:border-primary/50 dark:hover:border-primary/50 rounded-xl py-3 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg
               className="w-5 h-5"
@@ -246,7 +246,7 @@ export function SignUp() {
             type="button"
             onClick={() => handleSocialSignUp('apple')}
             disabled={isLoading}
-            className="flex items-center justify-center gap-2 bg-white dark:bg-surface-dark border border-slate-200 dark:border-emerald-900/50 hover:border-primary/50 dark:hover:border-primary/50 rounded-xl py-3 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center justify-center gap-2 bg-white dark:bg-surface-dark border border-slate-200 dark:border-purple-900/50 hover:border-primary/50 dark:hover:border-primary/50 rounded-xl py-3 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <img
               src="https://i.pinimg.com/736x/65/22/5a/65225ab6d965e5804a632b643e317bf4.jpg"
@@ -276,7 +276,7 @@ export function SignUp() {
         <div className="fixed top-0 left-0 w-full h-full pointer-events-none -z-10 opacity-20 dark:opacity-10 overflow-hidden">
           {/* Abstract muscle pattern suggestion */}
           <div className="absolute top-[-10%] right-[-10%] w-[300px] h-[300px] bg-primary rounded-full blur-[120px]"></div>
-          <div className="absolute bottom-[-10%] left-[-10%] w-[200px] h-[200px] bg-emerald-800 rounded-full blur-[100px]"></div>
+          <div className="absolute bottom-[-10%] left-[-10%] w-[200px] h-[200px] bg-purple-800 rounded-full blur-[100px]"></div>
         </div>
       </main>
     </div>

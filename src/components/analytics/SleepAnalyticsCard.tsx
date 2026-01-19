@@ -21,27 +21,27 @@ export function SleepAnalyticsCard({ sleepLogs, dateRange: _dateRange }: SleepAn
     <div className="space-y-6">
       {/* Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-200 dark:border-gray-800 shadow-sm">
+        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-100 dark:border-border-dark shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+            <span className="text-sm text-slate-500 dark:text-gray-400 font-medium">
               Avg Sleep Duration
             </span>
             <Moon className="w-5 h-5 text-primary" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-gray-900 dark:text-white">
+            <span className="text-3xl font-bold text-slate-900 dark:text-white">
               {averageHours.toFixed(1)}
             </span>
             <span className="text-sm text-gray-400">hours</span>
           </div>
-          <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+          <div className="mt-2 text-xs text-slate-500 dark:text-gray-400">
             {optimalSleepCount} of {sleepLogs.length} nights optimal
           </div>
         </div>
 
-        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-200 dark:border-gray-800 shadow-sm">
+        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-100 dark:border-border-dark shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+            <span className="text-sm text-slate-500 dark:text-gray-400 font-medium">
               Sleep Quality
             </span>
           </div>
@@ -51,19 +51,19 @@ export function SleepAnalyticsCard({ sleepLogs, dateRange: _dateRange }: SleepAn
             </span>
             <span className="text-sm text-gray-400">/ 10</span>
           </div>
-          <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+          <div className="mt-2 text-xs text-slate-500 dark:text-gray-400">
             {metrics.optimalSleepPercentage.toFixed(0)}% optimal nights
           </div>
         </div>
 
-        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-200 dark:border-gray-800 shadow-sm">
+        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-100 dark:border-border-dark shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+            <span className="text-sm text-slate-500 dark:text-gray-400 font-medium">
               Consistency
             </span>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-gray-900 dark:text-white">
+            <span className="text-3xl font-bold text-slate-900 dark:text-white">
               {metrics.consistencyScore.toFixed(0)}
             </span>
             <span className="text-sm text-gray-400">/ 100</span>
@@ -71,8 +71,8 @@ export function SleepAnalyticsCard({ sleepLogs, dateRange: _dateRange }: SleepAn
           <div className="mt-2 flex items-center gap-1 text-xs">
             {metrics.consistencyScore >= 70 ? (
               <>
-                <TrendingUp className="w-3 h-3 text-green-500" />
-                <span className="text-green-500">Great consistency</span>
+                <TrendingUp className="w-3 h-3 text-blue-500" />
+                <span className="text-blue-500">Great consistency</span>
               </>
             ) : (
               <>
@@ -86,8 +86,8 @@ export function SleepAnalyticsCard({ sleepLogs, dateRange: _dateRange }: SleepAn
 
       {/* Sleep Duration Trend */}
       {metrics.sleepTrend.length > 0 && (
-        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-200 dark:border-gray-800 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-100 dark:border-border-dark shadow-sm">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">
             Sleep Duration Trend
           </h3>
           <ResponsiveContainer width="100%" height={200}>
@@ -128,8 +128,8 @@ export function SleepAnalyticsCard({ sleepLogs, dateRange: _dateRange }: SleepAn
 
       {/* Sleep Quality Trend */}
       {metrics.sleepTrend.length > 0 && (
-        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-200 dark:border-gray-800 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-100 dark:border-border-dark shadow-sm">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">
             Sleep Quality Trend
           </h3>
           <ResponsiveContainer width="100%" height={200}>

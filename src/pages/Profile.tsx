@@ -12,17 +12,18 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { dataExport } from '@/services/dataExport';
 import { useToast } from '@/hooks/useToast';
 import { cn } from '@/utils/cn';
-import { dataService } from '@/services/dataService';
 import { firestoreSyncService } from '@/services/firestoreSyncService';
 import { ImportStrategyModal } from '@/components/profile/ImportStrategyModal';
 import { ExportProgressModal } from '@/components/profile/ExportProgressModal';
 import { ImportProgressModal } from '@/components/profile/ImportProgressModal';
 import { ImportStrategy, ImportResult, ProgressCallback } from '@/types/export';
 import { logger } from '@/utils/logger';
+import { refreshAllAppData } from '@/utils/dataRefresh';
+import { ImportErrorBoundary } from '@/components/import/ImportErrorBoundary';
 
 export function Profile() {
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  useAuth();
   const { profile, updateProfile, isLoading, setPreferredUnit, setDefaultRestTime, setProfilePicture: updateProfilePictureInStore } = useUserStore();
   const { 
     settings, 
@@ -101,6 +102,11 @@ export function Profile() {
 
     if (!profile?.id || isSyncing) {
       logger.warn('[Profile.handleManualSync] Sync aborted - missing profile.id or already syncing');
+      return;
+    }
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      showError("You're offline — we'll sync when you're back online.");
       return;
     }
 
@@ -301,7 +307,7 @@ export function Profile() {
   return (
     <div className="min-h-screen bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-white flex flex-col relative overflow-x-hidden">
       {/* Sticky Header */}
-      <div className="sticky top-0 z-50 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md border-b border-gray-200 dark:border-surface-border">
+      <div className="sticky top-0 z-50 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md border-b border-gray-100 dark:border-surface-border">
         <div className="flex items-center p-4 justify-between max-w-lg mx-auto w-full">
           <button
             onClick={() => navigate(-1)}
@@ -318,8 +324,8 @@ export function Profile() {
         {isProfileIncomplete && (
           <div className="flex w-full items-center justify-center gap-2 pb-4">
             <div className="h-1.5 w-6 rounded-full bg-primary"></div>
-            <div className="h-1.5 w-6 rounded-full bg-gray-300 dark:bg-surface-border"></div>
-            <div className="h-1.5 w-6 rounded-full bg-gray-300 dark:bg-surface-border"></div>
+            <div className="h-1.5 w-6 rounded-full bg-white dark:bg-surface-border"></div>
+            <div className="h-1.5 w-6 rounded-full bg-white dark:bg-surface-border"></div>
           </div>
         )}
       </div>
@@ -357,7 +363,7 @@ export function Profile() {
               Full Name
             </span>
             <input
-              className="w-full rounded-xl border border-gray-300 dark:border-surface-border bg-white dark:bg-surface-dark px-4 py-3.5 text-base text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-[#90cba8] focus:border-primary focus:ring-1 focus:ring-primary transition-all outline-none"
+              className="w-full rounded-xl border border-gray-100 dark:border-surface-border bg-white dark:bg-surface-dark px-4 py-3.5 text-base text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-[#FF9933] focus:border-primary focus:ring-1 focus:ring-primary transition-all outline-none"
               placeholder="Enter your full name"
               type="text"
               value={name}
@@ -372,7 +378,7 @@ export function Profile() {
                 Age
               </span>
               <input
-                className="w-full rounded-xl border border-gray-300 dark:border-surface-border bg-white dark:bg-surface-dark px-4 py-3.5 text-center text-base text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-primary focus:ring-1 focus:ring-primary transition-all outline-none"
+                className="w-full rounded-xl border border-gray-100 dark:border-surface-border bg-white dark:bg-surface-dark px-4 py-3.5 text-center text-base text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-primary focus:ring-1 focus:ring-primary transition-all outline-none"
                 placeholder="25"
                 type="number"
                 min="1"
@@ -385,7 +391,7 @@ export function Profile() {
               <span className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-1.5 block ml-1">
                 Gender
               </span>
-              <div className="flex rounded-xl bg-gray-200 dark:bg-surface-dark p-1 h-[50px]">
+              <div className="flex rounded-xl bg-white dark:bg-surface-dark p-1 h-[50px]">
                 <button
                   onClick={() => setGender('male')}
                   className={cn(
@@ -439,7 +445,7 @@ export function Profile() {
               <div className="relative">
                 <Scale className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input
-                  className="w-full rounded-xl border border-gray-300 dark:border-surface-border bg-white dark:bg-surface-dark pl-11 pr-12 py-3.5 text-base text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-primary focus:ring-1 focus:ring-primary transition-all outline-none"
+                  className="w-full rounded-xl border border-gray-100 dark:border-surface-border bg-white dark:bg-surface-dark pl-11 pr-12 py-3.5 text-base text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-primary focus:ring-1 focus:ring-primary transition-all outline-none"
                   placeholder={unitSystem === 'metric' ? '75' : '165'}
                   type="number"
                   min="0"
@@ -462,7 +468,7 @@ export function Profile() {
                 <div className="relative">
                   <Ruler className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                   <input
-                    className="w-full rounded-xl border border-gray-300 dark:border-surface-border bg-white dark:bg-surface-dark pl-11 pr-12 py-3.5 text-base text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-primary focus:ring-1 focus:ring-primary transition-all outline-none"
+                    className="w-full rounded-xl border border-gray-100 dark:border-surface-border bg-white dark:bg-surface-dark pl-11 pr-12 py-3.5 text-base text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-primary focus:ring-1 focus:ring-primary transition-all outline-none"
                     placeholder="180"
                     type="number"
                     min="0"
@@ -478,7 +484,7 @@ export function Profile() {
                   <div className="relative flex-1">
                     <Ruler className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                     <input
-                      className="w-full rounded-xl border border-gray-300 dark:border-surface-border bg-white dark:bg-surface-dark pl-11 pr-12 py-3.5 text-base text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-primary focus:ring-1 focus:ring-primary transition-all outline-none"
+                      className="w-full rounded-xl border border-gray-100 dark:border-surface-border bg-white dark:bg-surface-dark pl-11 pr-12 py-3.5 text-base text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-primary focus:ring-1 focus:ring-primary transition-all outline-none"
                       placeholder="5"
                       type="number"
                       min="0"
@@ -492,7 +498,7 @@ export function Profile() {
                   </div>
                   <div className="relative flex-1">
                     <input
-                      className="w-full rounded-xl border border-gray-300 dark:border-surface-border bg-white dark:bg-surface-dark px-4 pr-12 py-3.5 text-base text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-primary focus:ring-1 focus:ring-primary transition-all outline-none"
+                      className="w-full rounded-xl border border-gray-100 dark:border-surface-border bg-white dark:bg-surface-dark px-4 pr-12 py-3.5 text-base text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-primary focus:ring-1 focus:ring-primary transition-all outline-none"
                       placeholder="10"
                       type="number"
                       min="0"
@@ -528,7 +534,7 @@ export function Profile() {
                 Default Rest Time (seconds)
               </span>
               <input
-                className="w-full rounded-xl border border-gray-300 dark:border-surface-border bg-white dark:bg-surface-dark px-4 py-3.5 text-base text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-primary focus:ring-1 focus:ring-primary transition-all outline-none"
+                className="w-full rounded-xl border border-gray-100 dark:border-surface-border bg-white dark:bg-surface-dark px-4 py-3.5 text-base text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-primary focus:ring-1 focus:ring-primary transition-all outline-none"
                 type="number"
                 min="0"
                 max="600"
@@ -547,7 +553,7 @@ export function Profile() {
               <span className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-1.5 block ml-1">
                 Theme
               </span>
-              <div className="flex rounded-xl bg-gray-200 dark:bg-surface-dark p-1 h-[50px]">
+              <div className="flex rounded-xl bg-white dark:bg-surface-dark p-1 h-[50px]">
                 <button
                   onClick={() => setTheme('light')}
                   className={cn(
@@ -594,13 +600,13 @@ export function Profile() {
           <h3 className="text-xl font-bold tracking-tight px-1">Cloud Sync</h3>
           <div className="space-y-3">
             {/* Sync Status Display */}
-            <div className="p-4 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border">
+            <div className="p-4 rounded-xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-surface-border">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   {isSyncing ? (
                     <RefreshCw className="w-5 h-5 text-blue-500 animate-spin" />
                   ) : (
-                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                    <CheckCircle2 className="w-5 h-5 text-blue-500" />
                   )}
                   <div>
                     <span className="text-sm font-medium text-slate-700 dark:text-slate-300 block">
@@ -614,8 +620,8 @@ export function Profile() {
               </div>
 
               {lastSyncMessage && (
-                <div className="mt-3 pt-3 border-t border-gray-200 dark:border-surface-border">
-                  <div className="flex items-center gap-2 text-xs text-green-600 dark:text-green-400">
+                <div className="mt-3 pt-3 border-t border-gray-100 dark:border-surface-border">
+                  <div className="flex items-center gap-2 text-xs text-blue-600 dark:text-blue-400">
                     <CheckCircle2 className="w-4 h-4" />
                     <span>{lastSyncMessage}</span>
                   </div>
@@ -628,7 +634,7 @@ export function Profile() {
               onClick={handleManualSync}
               disabled={isSyncing || !profile?.id || isLoading}
               className={cn(
-                'w-full flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border',
+                'w-full flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-surface-border',
                 'hover:bg-gray-50 dark:hover:bg-surface-dark-light transition-colors',
                 'disabled:opacity-50 disabled:cursor-not-allowed'
               )}
@@ -723,7 +729,7 @@ export function Profile() {
               }}
               disabled={isExporting || !profile?.id}
               className={cn(
-                'w-full flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border',
+                'w-full flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-surface-border',
                 'hover:bg-gray-50 dark:hover:bg-surface-dark-light transition-colors touch-manipulation active:scale-[0.98] min-h-[44px]',
                 'disabled:opacity-50 disabled:cursor-not-allowed'
               )}
@@ -742,7 +748,7 @@ export function Profile() {
               onClick={() => fileInputRef.current?.click()}
               disabled={isImporting || !profile?.id}
               className={cn(
-                'w-full flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border',
+                'w-full flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-surface-border',
                 'hover:bg-gray-50 dark:hover:bg-surface-dark-light transition-colors touch-manipulation active:scale-[0.98] min-h-[44px]',
                 'disabled:opacity-50 disabled:cursor-not-allowed'
               )}
@@ -760,7 +766,7 @@ export function Profile() {
             <button
               onClick={() => navigate('/trash')}
               className={cn(
-                'w-full flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border',
+                'w-full flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-surface-border',
                 'hover:bg-gray-50 dark:hover:bg-surface-dark-light transition-colors touch-manipulation active:scale-[0.98] min-h-[44px]'
               )}
             >
@@ -795,9 +801,17 @@ export function Profile() {
                 }
                 
                 try {
-                  // Validate and preview file
-                  await dataExport.validateExportFile(file);
-                  const preview = await dataExport.previewImport(file);
+                  // Parse and validate file once
+                  const parsedData = await dataExport.parseExportFile(file);
+
+                  // Validate structure
+                  const isValid = dataExport.validateExportFile(parsedData);
+                  if (!isValid) {
+                    throw new Error('Invalid export file structure');
+                  }
+
+                  // Get preview from parsed data (no re-parse)
+                  const preview = dataExport.previewImport(parsedData);
                   setImportPreview(preview);
                   setSelectedFile(file);
                   setShowImportStrategyModal(true);
@@ -834,10 +848,23 @@ export function Profile() {
         />
 
         {/* Import Strategy Modal */}
-        {showImportStrategyModal && importPreview && selectedFile && (
-          <ImportStrategyModal
-            preview={importPreview}
-            onSelect={async (strategy: ImportStrategy) => {
+        <ImportErrorBoundary
+          fallbackTitle="Import Configuration Error"
+          onReset={() => {
+            setShowImportStrategyModal(false);
+            setImportPreview(null);
+            setSelectedFile(null);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+          }}
+          onError={(error) => {
+            logger.error('[Profile] Import strategy modal error:', error);
+            showError('Import configuration failed. Please try again.');
+          }}
+        >
+          {showImportStrategyModal && importPreview && selectedFile && (
+            <ImportStrategyModal
+              preview={importPreview}
+              onSelect={async (strategy: ImportStrategy) => {
               setShowImportStrategyModal(false);
               if (!profile?.id || !selectedFile) return;
               
@@ -862,7 +889,7 @@ export function Profile() {
                   progressCallback
                 );
                 setImportResult(result);
-                
+
                 if (result.errors.length > 0) {
                   showError(
                     `Imported ${result.imported} items with ${result.errors.length} error(s)`
@@ -870,9 +897,27 @@ export function Profile() {
                 } else {
                   success(`Successfully imported ${result.imported} items`);
                 }
-                
-                // Refresh data
-                window.location.reload();
+
+                // Refresh data WITHOUT full page reload
+                setImportProgress({
+                  percentage: 100,
+                  currentOperation: 'Syncing to cloud...',
+                  completedItems: 9,
+                  totalItems: 10,
+                });
+
+                try {
+                  await refreshAllAppData(profile.id, {
+                    includeSync: true,
+                    syncTimeoutMs: 15000
+                  });
+                  success('Data synced successfully!');
+                } catch (refreshError) {
+                  logger.error('Failed to refresh after import:', refreshError);
+                  showError('Import completed but data refresh failed. Please refresh the page manually.');
+                }
+
+                // Keep modal open to show results
               } catch (error) {
                 showError(error instanceof Error ? error.message : 'Failed to import data');
                 setShowImportModal(false);
@@ -892,26 +937,41 @@ export function Profile() {
                 fileInputRef.current.value = '';
               }
             }}
-          />
-        )}
+            />
+          )}
+        </ImportErrorBoundary>
 
         {/* Import Progress Modal */}
-        <ImportProgressModal
-          isOpen={showImportModal}
-          progress={importProgress}
-          result={importResult}
-          onClose={() => {
+        <ImportErrorBoundary
+          fallbackTitle="Import Progress Error"
+          onReset={() => {
             setShowImportModal(false);
             setImportProgress(null);
             setImportResult(null);
+            setIsImporting(false);
           }}
-        />
+          onError={(error) => {
+            logger.error('[Profile] Import progress modal error:', error);
+            showError('Import display failed. Your data may have been imported - check your workout history.');
+          }}
+        >
+          <ImportProgressModal
+            isOpen={showImportModal}
+            progress={importProgress}
+            result={importResult}
+            onClose={() => {
+              setShowImportModal(false);
+              setImportProgress(null);
+              setImportResult(null);
+            }}
+          />
+        </ImportErrorBoundary>
 
         {/* Notification Settings */}
         <section className="space-y-4">
           <h3 className="text-xl font-bold tracking-tight px-1">Notifications</h3>
           <div className="space-y-3">
-            <label className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border">
+            <label className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-surface-border">
               <div className="flex items-center gap-3">
                 <Bell className="w-5 h-5 text-slate-400" />
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Auto-start Rest Timer</span>
@@ -923,7 +983,7 @@ export function Profile() {
                 className="w-5 h-5 rounded accent-primary"
               />
             </label>
-            <label className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border">
+            <label className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-surface-border">
               <div className="flex items-center gap-3">
                 <Volume2 className="w-5 h-5 text-slate-400" />
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Sound Alerts</span>
@@ -935,7 +995,7 @@ export function Profile() {
                 className="w-5 h-5 rounded accent-primary"
               />
             </label>
-            <label className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border">
+            <label className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-surface-border">
               <div className="flex items-center gap-3">
                 <Vibrate className="w-5 h-5 text-slate-400" />
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Vibration</span>
@@ -965,7 +1025,7 @@ export function Profile() {
                     showError('Notification permission denied. Please enable it in your browser settings.');
                   }
                 }}
-                className="w-full p-3 rounded-xl bg-primary hover:bg-[#0be060] text-black font-semibold transition-colors"
+                className="w-full p-3 rounded-xl bg-primary hover:bg-[#E67E22] text-black font-semibold transition-colors"
               >
                 Enable Notifications
               </button>
@@ -984,7 +1044,7 @@ export function Profile() {
 
             {settings.notificationPermission === 'granted' && (
               <>
-                <label className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border">
+                <label className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-surface-border">
                   <div className="flex items-center gap-3">
                     <Bell className="w-5 h-5 text-slate-400" />
                     <div>
@@ -1001,7 +1061,7 @@ export function Profile() {
                 </label>
 
                 {settings.workoutReminderEnabled && (
-                  <label className="block p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border">
+                  <label className="block p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-surface-border">
                     <div className="flex items-center gap-3 mb-2">
                       <Clock className="w-5 h-5 text-slate-400" />
                       <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Reminder Time</span>
@@ -1009,7 +1069,7 @@ export function Profile() {
                     <select
                       value={settings.workoutReminderMinutes ?? 30}
                       onChange={(e) => setWorkoutReminderMinutes(parseInt(e.target.value))}
-                      className="w-full rounded-lg border border-gray-300 dark:border-surface-border bg-white dark:bg-surface-dark px-3 py-2 text-sm text-slate-900 dark:text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                      className="w-full rounded-lg border border-gray-100 dark:border-surface-border bg-white dark:bg-surface-dark px-3 py-2 text-sm text-slate-900 dark:text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none"
                     >
                       <option value={15}>15 minutes before</option>
                       <option value={30}>30 minutes before</option>
@@ -1019,7 +1079,7 @@ export function Profile() {
                   </label>
                 )}
 
-                <label className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-surface-border">
+                <label className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-surface-border">
                   <div className="flex items-center gap-3">
                     <Bell className="w-5 h-5 text-slate-400" />
                     <div>
@@ -1047,8 +1107,8 @@ export function Profile() {
             onClick={handleSave}
             disabled={isSaving || isLoading}
             className={cn(
-              'w-full rounded-xl bg-primary hover:bg-[#0be060] text-black font-bold text-lg py-4',
-              'shadow-[0_4px_14px_0_rgba(13,242,105,0.39)] transition-all active:scale-[0.98]',
+              'w-full rounded-xl bg-primary hover:bg-[#E67E22] text-black font-bold text-lg py-4',
+              'shadow-[0_4px_14px_0_rgba(255,153,51,0.39)] transition-all active:scale-[0.98]',
               'flex items-center justify-center gap-2',
               (isSaving || isLoading) && 'opacity-50 cursor-not-allowed'
             )}

@@ -55,7 +55,9 @@ export function EditWorkout() {
   }, [workoutId, profile]);
 
   const handleSave = async (updatedWorkout: Workout) => {
-    if (!workout?.id || !profile) return;
+    if (!workout?.id || !profile) {
+    return;
+  }
 
     setIsSaving(true);
     try {
@@ -127,7 +129,7 @@ export function EditWorkout() {
             const form = document.querySelector('form');
             if (form) {
               const saveButton = form.querySelector('button[type="submit"]') as HTMLButtonElement;
-              if (saveButton) saveButton.click();
+              if (saveButton) {saveButton.click();}
             }
           }}
           disabled={isSaving}

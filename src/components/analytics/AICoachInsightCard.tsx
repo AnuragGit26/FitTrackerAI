@@ -7,7 +7,7 @@ interface AICoachInsightCardProps {
 export function AICoachInsightCard({ insight }: AICoachInsightCardProps) {
   return (
     <div className="px-4 py-2">
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-[#1a4430] to-[#102217] p-5 border border-primary/20 shadow-lg">
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-surface-dark to-background-dark p-5 border border-primary/20 shadow-lg">
         <div className="absolute -right-4 -top-4 text-primary/10">
           <Brain className="w-[100px] h-[100px]" />
         </div>

@@ -107,7 +107,9 @@ export function PlanWorkoutModal({ isOpen, onClose, selectedDate }: PlanWorkoutM
   };
 
   const handleAddExercise = () => {
-    if (!selectedExercise) return;
+    if (!selectedExercise) {
+    return;
+  }
 
     const newExercise: PlannedExercise = {
       exerciseId: selectedExercise.id,

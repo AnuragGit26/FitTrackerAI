@@ -41,7 +41,7 @@ const BREATH_WORK_TYPES = [
 ];
 
 const DIFFICULTY_LEVELS = [
-  { value: 'beginner', label: 'Beginner', color: 'green' },
+  { value: 'beginner', label: 'Beginner', color: 'blue' },
   { value: 'intermediate', label: 'Intermediate', color: 'yellow' },
   { value: 'advanced', label: 'Advanced', color: 'purple' },
 ];
@@ -172,7 +172,9 @@ export function YogaSetCard({
   const canLogSet = totalDurationSeconds > 0;
 
   const handleLogSetClick = () => {
-    if (!canLogSet || disabled) return;
+    if (!canLogSet || disabled) {
+    return;
+  }
     
     // Trigger celebration animations
     setIsLogging(true);
@@ -472,7 +474,7 @@ export function YogaSetCard({
             'flex w-full items-center justify-center gap-2 rounded-xl h-14 shadow-[0_0_20px_rgba(168,85,247,0.15)] transition-all relative z-10 overflow-hidden',
             canLogSet && !disabled
               ? 'bg-purple-500 hover:bg-purple-600 text-white active:scale-[0.98]'
-              : 'bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
+              : 'bg-white dark:bg-surface-dark-light text-slate-500 cursor-not-allowed'
           )}
           initial={false}
           animate={(showButtonAnimation || isLogging) && !shouldReduceMotion ? {
@@ -572,7 +574,7 @@ export function YogaSetCard({
               'flex w-full items-center justify-center gap-2 rounded-xl h-12 mt-3 border-2 transition-all relative overflow-hidden',
               !disabled
                 ? 'border-purple-500/30 bg-purple-500/5 hover:bg-purple-500/10 text-purple-600 dark:text-purple-400 active:scale-[0.98]'
-                : 'border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
+                : 'border-gray-100 dark:border-border-dark bg-gray-100 dark:bg-surface-dark text-gray-400 cursor-not-allowed'
             )}
             initial={false}
             animate={isNewSet && !shouldReduceMotion ? {

@@ -75,7 +75,9 @@ export function RecoveryInsightsCard() {
 
   const primaryInsight = insights[0];
 
-  if (!primaryInsight) return null;
+  if (!primaryInsight) {
+    return null;
+  }
 
   const Icon = getIcon(primaryInsight.type);
 

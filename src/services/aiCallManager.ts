@@ -36,7 +36,9 @@ class AICallManager {
    * Initialize IndexedDB cache store if needed
    */
   private async ensureIDBInitialized(): Promise<void> {
-    if (this.idbInitialized) return;
+    if (this.idbInitialized) {
+    return;
+  }
 
     try {
       // Check if store exists, if not we'll use Cache API as fallback
@@ -169,8 +171,8 @@ class AICallManager {
 
   private async processQueue(): Promise<void> {
     if (this.isProcessing || this.requestQueue.length === 0) {
-      return;
-    }
+    return;
+  }
 
     this.isProcessing = true;
 

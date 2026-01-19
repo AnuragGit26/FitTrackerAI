@@ -19,12 +19,29 @@ import {
   ImportError,
   ValidationResult,
   ProgressCallback,
+  DeletionResult,
+  ClearDataResult,
 } from '@/types/export';
 import { logger } from '@/utils/logger';
 import { AppError } from '@/utils/errorHandler';
 
 const EXPORT_VERSION = '2.0.0';
 const APP_VERSION = '1.0.0';
+
+// Critical errors that should block import
+const BLOCKING_VALIDATION_ERRORS = [
+  'Missing version field',
+  'Unsupported version',
+  'Invalid export file'
+];
+
+/**
+ * Check if an error should block the import
+ */
+function isBlockingError(error: ImportError): boolean {
+  return error.severity === 'error' &&
+         BLOCKING_VALIDATION_ERRORS.some(msg => error.message.includes(msg));
+}
 
 /**
  * Get user-friendly error message for import errors
@@ -451,17 +468,28 @@ export const dataExport = {
   },
 
   /**
-   * Validate export file before import
+   * Parse and validate JSON export file in one step
+   * Returns parsed data if valid, throws if invalid
    */
-  async validateExportFile(file: File): Promise<boolean> {
+  async parseExportFile(file: File): Promise<ExportData> {
     try {
       if (!file.name.endsWith('.json')) {
         throw new Error('File must be a JSON file');
       }
 
       const text = await file.text();
-      const data: ExportData = JSON.parse(text);
 
+      // Single JSON parse
+      let data: ExportData;
+      try {
+        data = JSON.parse(text);
+      } catch (parseError) {
+        throw new Error(
+          'Invalid JSON format. Please ensure you selected a valid FitTrackAI export file.'
+        );
+      }
+
+      // Basic structure validation (inline, no re-parse)
       if (!data.version) {
         throw new Error('Invalid export file: missing version');
       }
@@ -470,14 +498,12 @@ export const dataExport = {
         throw new Error('Invalid export file: missing export date');
       }
 
-      // Check if it's the new format (v2.0.0+) or old format
+      // Version check
       if (data.version.startsWith('2.')) {
-        // New format - should have all fields
         if (!Array.isArray(data.workouts)) {
           throw new Error('Invalid export file: workouts must be an array');
         }
       } else if (data.version.startsWith('1.')) {
-        // Old format - still valid but limited
         if (!Array.isArray(data.workouts)) {
           throw new Error('Invalid export file: workouts must be an array');
         }
@@ -485,117 +511,387 @@ export const dataExport = {
         throw new Error(`Unsupported export version: ${data.version}`);
       }
 
-      return true;
+      logger.info(`[parseExportFile] Successfully parsed file with version ${data.version}`);
+      return data;
     } catch (error) {
-      logger.error('Failed to validate export file', error);
+      logger.error('[parseExportFile] Failed to parse export file:', error);
       throw error;
     }
   },
 
   /**
-   * Preview import data before confirming
+   * Validate already-parsed export data
+   * Used after parseExportFile for additional validation if needed
    */
-  async previewImport(file: File): Promise<ImportPreview> {
-    try {
-      await this.validateExportFile(file);
+  validateExportFile(data: ExportData): boolean {
+    // Structure already validated in parseExportFile
+    // This can be extended for deeper semantic validation if needed
+    return true;
+  },
 
-      const text = await file.text();
-      const data: ExportData = JSON.parse(text);
-
-      return {
-        version: data.version,
-        exportDate: data.exportDate,
-        dataCounts: data.dataCounts || {
-          workouts: data.workouts?.length || 0,
-          templates: data.templates?.length || 0,
-          plannedWorkouts: data.plannedWorkouts?.length || 0,
-          customExercises: data.customExercises?.length || 0,
-          muscleStatuses: data.muscleStatuses?.length || 0,
-          sleepLogs: data.sleepLogs?.length || 0,
-          recoveryLogs: data.recoveryLogs?.length || 0,
-          settings: data.settings ? Object.keys(data.settings).length : 0,
-        },
-        userProfile: data.userProfile
-          ? {
-              name: data.userProfile.name,
-              id: data.userProfile.id,
-            }
-          : null,
-      };
-    } catch (error) {
-      logger.error('Failed to preview import', error);
-      throw new Error(
-        `Failed to preview import: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    }
+  /**
+   * Preview import data before confirming
+   * Accepts already-parsed data (no file reading or parsing)
+   */
+  previewImport(data: ExportData): ImportPreview {
+    return {
+      version: data.version,
+      exportDate: data.exportDate,
+      dataCounts: data.dataCounts || {
+        workouts: data.workouts?.length || 0,
+        templates: data.templates?.length || 0,
+        plannedWorkouts: data.plannedWorkouts?.length || 0,
+        customExercises: data.customExercises?.length || 0,
+        muscleStatuses: data.muscleStatuses?.length || 0,
+        sleepLogs: data.sleepLogs?.length || 0,
+        recoveryLogs: data.recoveryLogs?.length || 0,
+        settings: data.settings ? Object.keys(data.settings).length : 0,
+      },
+      userProfile: data.userProfile
+        ? {
+            name: data.userProfile.name,
+            id: data.userProfile.id,
+          }
+        : null,
+    };
   },
 
   /**
    * Clear all user data (for replace strategy)
+   * Returns detailed deletion results including partial failures
    */
-  async clearUserData(userId: string): Promise<void> {
+  async clearUserData(userId: string): Promise<ClearDataResult> {
+    const deletions: DeletionResult[] = [];
+    let totalDeleted = 0;
+    let totalFailed = 0;
+
+    logger.info(`[clearUserData] Starting deletion for user ${userId}`);
+
+    // 1. Delete workouts (per-record error handling)
     try {
-      // Delete all user-specific data
       const workouts = await dataService.getAllWorkouts(userId);
+      const result: DeletionResult = {
+        category: 'workouts',
+        attempted: workouts.length,
+        deleted: 0,
+        failed: 0,
+        errors: []
+      };
+
       for (const workout of workouts) {
         if (workout.id) {
-          await dataService.deleteWorkout(workout.id);
+          try {
+            await dataService.deleteWorkout(workout.id);
+            result.deleted++;
+          } catch (error) {
+            result.failed++;
+            result.errors.push({
+              recordId: workout.id,
+              error: error instanceof Error ? error.message : 'Unknown error'
+            });
+            logger.error(`Failed to delete workout ${workout.id}:`, error);
+          }
         }
       }
 
+      deletions.push(result);
+      totalDeleted += result.deleted;
+      totalFailed += result.failed;
+    } catch (error) {
+      logger.error('Failed to fetch workouts for deletion:', error);
+      deletions.push({
+        category: 'workouts',
+        attempted: 0,
+        deleted: 0,
+        failed: 1,
+        errors: [{ recordId: 'all', error: 'Failed to fetch workouts' }]
+      });
+      totalFailed++;
+    }
+
+    // 2. Delete templates (per-record error handling)
+    try {
       const templates = await templateService.getAllTemplates(userId);
+      const result: DeletionResult = {
+        category: 'templates',
+        attempted: templates.length,
+        deleted: 0,
+        failed: 0,
+        errors: []
+      };
+
       for (const template of templates) {
-        await templateService.deleteTemplate(template.id);
+        try {
+          await templateService.deleteTemplate(template.id);
+          result.deleted++;
+        } catch (error) {
+          result.failed++;
+          result.errors.push({
+            recordId: template.id,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+          logger.error(`Failed to delete template ${template.id}:`, error);
+        }
       }
 
-      const plannedWorkouts =
-        await plannedWorkoutService.getAllPlannedWorkouts(userId);
+      deletions.push(result);
+      totalDeleted += result.deleted;
+      totalFailed += result.failed;
+    } catch (error) {
+      logger.error('Failed to fetch templates for deletion:', error);
+      deletions.push({
+        category: 'templates',
+        attempted: 0,
+        deleted: 0,
+        failed: 1,
+        errors: [{ recordId: 'all', error: 'Failed to fetch templates' }]
+      });
+      totalFailed++;
+    }
+
+    // 3. Delete planned workouts (per-record error handling)
+    try {
+      const plannedWorkouts = await plannedWorkoutService.getAllPlannedWorkouts(userId);
+      const result: DeletionResult = {
+        category: 'plannedWorkouts',
+        attempted: plannedWorkouts.length,
+        deleted: 0,
+        failed: 0,
+        errors: []
+      };
+
       for (const plannedWorkout of plannedWorkouts) {
-        await plannedWorkoutService.deletePlannedWorkout(plannedWorkout.id);
+        try {
+          await plannedWorkoutService.deletePlannedWorkout(plannedWorkout.id);
+          result.deleted++;
+        } catch (error) {
+          result.failed++;
+          result.errors.push({
+            recordId: plannedWorkout.id,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+          logger.error(`Failed to delete planned workout ${plannedWorkout.id}:`, error);
+        }
       }
 
+      deletions.push(result);
+      totalDeleted += result.deleted;
+      totalFailed += result.failed;
+    } catch (error) {
+      logger.error('Failed to fetch planned workouts for deletion:', error);
+      deletions.push({
+        category: 'plannedWorkouts',
+        attempted: 0,
+        deleted: 0,
+        failed: 1,
+        errors: [{ recordId: 'all', error: 'Failed to fetch planned workouts' }]
+      });
+      totalFailed++;
+    }
+
+    // 4. Delete custom exercises (per-record error handling)
+    try {
       const allExercises = await dataService.getAllExercises();
       const customExercises = allExercises.filter(
         (ex) => ex.isCustom && ex.userId === userId
       );
+      const result: DeletionResult = {
+        category: 'customExercises',
+        attempted: customExercises.length,
+        deleted: 0,
+        failed: 0,
+        errors: []
+      };
+
       for (const exercise of customExercises) {
-        await dataService.deleteExercise(exercise.id);
+        try {
+          await dataService.deleteExercise(exercise.id);
+          result.deleted++;
+        } catch (error) {
+          result.failed++;
+          result.errors.push({
+            recordId: exercise.id,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+          logger.error(`Failed to delete exercise ${exercise.id}:`, error);
+        }
       }
 
+      deletions.push(result);
+      totalDeleted += result.deleted;
+      totalFailed += result.failed;
+    } catch (error) {
+      logger.error('Failed to fetch custom exercises for deletion:', error);
+      deletions.push({
+        category: 'customExercises',
+        attempted: 0,
+        deleted: 0,
+        failed: 1,
+        errors: [{ recordId: 'all', error: 'Failed to fetch custom exercises' }]
+      });
+      totalFailed++;
+    }
+
+    // 5. Delete muscle statuses (per-record error handling)
+    try {
       const allMuscleStatuses = await dataService.getAllMuscleStatuses();
       const muscleStatuses = allMuscleStatuses.filter(
         (ms) => ms.userId === userId
       );
+      const result: DeletionResult = {
+        category: 'muscleStatuses',
+        attempted: muscleStatuses.length,
+        deleted: 0,
+        failed: 0,
+        errors: []
+      };
+
       for (const status of muscleStatuses) {
         if (status.id) {
-          await db.muscleStatuses.delete(status.id);
+          try {
+            await db.muscleStatuses.delete(status.id);
+            result.deleted++;
+          } catch (error) {
+            result.failed++;
+            result.errors.push({
+              recordId: status.id.toString(),
+              error: error instanceof Error ? error.message : 'Unknown error'
+            });
+            logger.error(`Failed to delete muscle status ${status.id}:`, error);
+          }
         }
       }
 
+      deletions.push(result);
+      totalDeleted += result.deleted;
+      totalFailed += result.failed;
+    } catch (error) {
+      logger.error('Failed to fetch muscle statuses for deletion:', error);
+      deletions.push({
+        category: 'muscleStatuses',
+        attempted: 0,
+        deleted: 0,
+        failed: 1,
+        errors: [{ recordId: 'all', error: 'Failed to fetch muscle statuses' }]
+      });
+      totalFailed++;
+    }
+
+    // 6. Delete sleep logs (per-record error handling)
+    try {
       const sleepLogs = await sleepRecoveryService.getAllSleepLogs(userId);
+      const result: DeletionResult = {
+        category: 'sleepLogs',
+        attempted: sleepLogs.length,
+        deleted: 0,
+        failed: 0,
+        errors: []
+      };
+
       for (const log of sleepLogs) {
         if (log.id) {
-          await db.sleepLogs.delete(log.id);
+          try {
+            await db.sleepLogs.delete(log.id);
+            result.deleted++;
+          } catch (error) {
+            result.failed++;
+            result.errors.push({
+              recordId: log.id.toString(),
+              error: error instanceof Error ? error.message : 'Unknown error'
+            });
+            logger.error(`Failed to delete sleep log ${log.id}:`, error);
+          }
         }
       }
 
+      deletions.push(result);
+      totalDeleted += result.deleted;
+      totalFailed += result.failed;
+    } catch (error) {
+      logger.error('Failed to fetch sleep logs for deletion:', error);
+      deletions.push({
+        category: 'sleepLogs',
+        attempted: 0,
+        deleted: 0,
+        failed: 1,
+        errors: [{ recordId: 'all', error: 'Failed to fetch sleep logs' }]
+      });
+      totalFailed++;
+    }
+
+    // 7. Delete recovery logs (per-record error handling)
+    try {
       const recoveryLogs = await sleepRecoveryService.getAllRecoveryLogs(userId);
+      const result: DeletionResult = {
+        category: 'recoveryLogs',
+        attempted: recoveryLogs.length,
+        deleted: 0,
+        failed: 0,
+        errors: []
+      };
+
       for (const log of recoveryLogs) {
         if (log.id) {
-          await db.recoveryLogs.delete(log.id);
+          try {
+            await db.recoveryLogs.delete(log.id);
+            result.deleted++;
+          } catch (error) {
+            result.failed++;
+            result.errors.push({
+              recordId: log.id.toString(),
+              error: error instanceof Error ? error.message : 'Unknown error'
+            });
+            logger.error(`Failed to delete recovery log ${log.id}:`, error);
+          }
         }
       }
 
-      // Clear settings (but keep appSettings structure)
-      await dataService.updateSetting('appSettings', {});
-
-      logger.info(`Cleared all data for user ${userId}`);
+      deletions.push(result);
+      totalDeleted += result.deleted;
+      totalFailed += result.failed;
     } catch (error) {
-      logger.error('Failed to clear user data', error);
-      throw new Error(
-        `Failed to clear user data: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      logger.error('Failed to fetch recovery logs for deletion:', error);
+      deletions.push({
+        category: 'recoveryLogs',
+        attempted: 0,
+        deleted: 0,
+        failed: 1,
+        errors: [{ recordId: 'all', error: 'Failed to fetch recovery logs' }]
+      });
+      totalFailed++;
     }
+
+    // 8. Clear settings (special handling - don't fail if this errors)
+    try {
+      await dataService.updateSetting('appSettings', {});
+      deletions.push({
+        category: 'settings',
+        attempted: 1,
+        deleted: 1,
+        failed: 0,
+        errors: []
+      });
+      totalDeleted++;
+    } catch (error) {
+      logger.error('Failed to clear settings:', error);
+      deletions.push({
+        category: 'settings',
+        attempted: 1,
+        deleted: 0,
+        failed: 1,
+        errors: [{ recordId: 'appSettings', error: error instanceof Error ? error.message : 'Unknown' }]
+      });
+      totalFailed++;
+    }
+
+    logger.info(`[clearUserData] Completed: ${totalDeleted} deleted, ${totalFailed} failed`);
+
+    return {
+      success: totalFailed === 0,
+      deletions,
+      totalDeleted,
+      totalFailed
+    };
   },
 
   /**
@@ -787,16 +1083,16 @@ export const dataExport = {
   },
 
   /**
-   * Import all data from JSON with merge or replace strategy
+   * Import all data from parsed ExportData with merge or replace strategy
    */
   async importAllData(
     userId: string,
-    jsonData: string,
+    data: ExportData,
     strategy: ImportStrategy,
     onProgress?: ProgressCallback
   ): Promise<ImportResult> {
     try {
-      const data: ExportData = JSON.parse(jsonData);
+      // Data is already parsed - no JSON.parse needed!
       const result: ImportResult = {
         imported: 0,
         skipped: 0,
@@ -824,17 +1120,35 @@ export const dataExport = {
       });
       
       const validation = await this.validateImportData(data);
-      
-      // Add validation errors and warnings to result
-      result.errors.push(...validation.errors);
-      result.errors.push(...validation.warnings);
-      
-      // If there are critical validation errors, we can still proceed but log them
-      if (validation.errors.length > 0) {
-        logger.warn('Import validation found errors', {
-          errorCount: validation.errors.length,
-          warningCount: validation.warnings.length,
-        });
+
+      // Check for blocking errors
+      if (!validation.isValid) {
+        const blockingErrors = validation.errors.filter(isBlockingError);
+        if (blockingErrors.length > 0) {
+          logger.error('[importAllData] Import blocked by validation errors:', blockingErrors);
+
+          // Create result with only validation errors
+          result.errors.push(...validation.errors);
+          result.errors.push(...validation.warnings);
+
+          throw new Error(
+            `Import blocked: ${blockingErrors.length} critical validation error(s) found. ` +
+            `Please check the export file format and try again.`
+          );
+        }
+      }
+
+      // Add warnings to result but continue
+      if (validation.warnings.length > 0) {
+        logger.warn('[importAllData] Import has warnings:', validation.warnings);
+        result.errors.push(...validation.warnings);
+      }
+
+      // Add non-blocking errors as warnings
+      const nonBlockingErrors = validation.errors.filter(e => !isBlockingError(e));
+      if (nonBlockingErrors.length > 0) {
+        logger.warn('[importAllData] Import has non-blocking errors:', nonBlockingErrors);
+        result.errors.push(...nonBlockingErrors);
       }
 
       // If replace strategy, clear existing data first
@@ -845,7 +1159,31 @@ export const dataExport = {
           completedItems: 0,
           totalItems: totalSteps,
         });
-        await this.clearUserData(userId);
+
+        const clearResult = await this.clearUserData(userId);
+
+        // Add deletion issues to import result
+        if (!clearResult.success) {
+          logger.warn(`Data clearing had ${clearResult.totalFailed} failures`, clearResult);
+
+          for (const deletion of clearResult.deletions) {
+            if (deletion.failed > 0) {
+              for (const error of deletion.errors) {
+                result.errors.push({
+                  type: 'data',
+                  category: `delete_${deletion.category}`,
+                  message: `Failed to delete ${deletion.category}: ${error.error}`,
+                  technicalMessage: error.error,
+                  recordId: error.recordId,
+                  severity: 'warning', // Don't block import
+                  suggestion: 'Some old data may remain. Consider manually cleaning up or trying again.'
+                });
+              }
+            }
+          }
+        }
+
+        logger.info(`Cleared ${clearResult.totalDeleted} records before import`);
       }
 
       let currentStep = strategy === 'replace' ? 1 : 0;
@@ -1436,7 +1774,7 @@ export const dataExport = {
 
   /**
    * Import data from file
-   * Handles mobile devices and large files
+   * Parses file once and passes data through to importAllData
    */
   async importFromFile(
     userId: string,
@@ -1444,108 +1782,44 @@ export const dataExport = {
     strategy: ImportStrategy,
     onProgress?: ProgressCallback
   ): Promise<ImportResult> {
-    return new Promise((resolve, reject) => {
-      // Validate file size before reading
-      const maxSize = 50 * 1024 * 1024; // 50MB
-      if (file.size > maxSize) {
-        reject(new AppError(
-          `The file is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Maximum size is 50MB.`,
-          'FILE_TOO_LARGE',
-          undefined,
-          undefined,
-          { fileName: file.name, fileSize: file.size, maxSize }
-        ));
-        return;
-      }
+    // Validate file size before reading
+    const maxSize = 50 * 1024 * 1024; // 50MB
+    if (file.size > maxSize) {
+      throw new AppError(
+        `The file is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Maximum size is 50MB.`,
+        'FILE_TOO_LARGE',
+        undefined,
+        undefined,
+        { fileName: file.name, fileSize: file.size, maxSize }
+      );
+    }
 
-      const reader = new FileReader();
-      
-      reader.onload = async (e) => {
-        try {
-          const text = e.target?.result;
-          if (typeof text !== 'string') {
-            reject(new AppError(
-              'Unable to read the selected file. The file may be corrupted or in an unsupported format.',
-              'FILE_READ_ERROR',
-              undefined,
-              undefined,
-              { fileName: file.name }
-            ));
-            return;
-          }
-          
-          // Validate JSON before parsing (importAllData will do full validation)
-          try {
-            JSON.parse(text); // Just validate it's valid JSON
-          } catch (parseError) {
-            reject(new AppError(
-              'The file is not valid JSON. Please ensure you selected the correct export file from FitTrackAI.',
-              'INVALID_JSON',
-              undefined,
-              parseError instanceof Error ? parseError : new Error(String(parseError)),
-              { fileName: file.name }
-            ));
-            return;
-          }
-          
-          const result = await this.importAllData(
-            userId,
-            text,
-            strategy,
-            onProgress
-          );
-          resolve(result);
-        } catch (error) {
-          logger.error('Import failed', error);
-          if (error instanceof AppError) {
-            reject(error);
-          } else {
-            reject(new AppError(
-              'Failed to import data. Please check the file format and try again.',
-              'IMPORT_FAILED',
-              undefined,
-              error instanceof Error ? error : new Error(String(error)),
-              { fileName: file.name }
-            ));
-          }
-        }
-      };
-      
-      reader.onerror = (error) => {
-        logger.error('FileReader error', error);
-        reject(new AppError(
-          'Unable to read the selected file. The file may be corrupted or in an unsupported format.',
-          'FILE_READ_ERROR',
-          undefined,
-          error instanceof Error ? error : new Error(String(error)),
-          { fileName: file.name, fileSize: file.size }
-        ));
-      };
-      
-      reader.onabort = () => {
-        reject(new AppError(
-          'File reading was cancelled. Please try again.',
-          'FILE_READ_ABORTED',
-          undefined,
-          undefined,
-          { fileName: file.name }
-        ));
-      };
-      
-      // Use readAsText with UTF-8 encoding for proper JSON parsing
-      try {
-        reader.readAsText(file, 'UTF-8');
-      } catch (error) {
-        logger.error('Failed to start file read', error);
-        reject(new AppError(
-          'Failed to read file. Please ensure the file is accessible and try again.',
-          'FILE_READ_START_FAILED',
-          undefined,
-          error instanceof Error ? error : new Error(String(error)),
-          { fileName: file.name }
-        ));
+    try {
+      // SINGLE PARSE - parseExportFile does all JSON parsing and validation
+      const data = await this.parseExportFile(file);
+
+      // Pass parsed data directly - no more JSON.parse calls
+      const result = await this.importAllData(
+        userId,
+        data,
+        strategy,
+        onProgress
+      );
+
+      return result;
+    } catch (error) {
+      logger.error('[importFromFile] Import failed:', error);
+      if (error instanceof AppError) {
+        throw error;
       }
-    });
+      throw new AppError(
+        'Failed to import data. Please check the file format and try again.',
+        'IMPORT_FAILED',
+        undefined,
+        error instanceof Error ? error : new Error(String(error)),
+        { fileName: file.name }
+      );
+    }
   },
 
   /**

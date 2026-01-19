@@ -16,7 +16,7 @@ export function Header({ title, showBack = false, rightAction, className }: Head
   return (
     <header
       className={cn(
-        'sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800',
+        'sticky top-0 z-40 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-gray-100 dark:border-border-dark',
         className
       )}
     >
@@ -25,13 +25,13 @@ export function Header({ title, showBack = false, rightAction, className }: Head
           {showBack && (
             <button
               onClick={() => navigate(-1)}
-              className="p-2 -ml-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              className="p-2 -ml-2 rounded-lg hover:bg-gray-100 dark:hover:bg-surface-dark transition-colors"
               aria-label="Go back"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
           )}
-          <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate">
+          <h1 className="text-lg font-semibold text-slate-900 dark:text-white truncate">
             {title}
           </h1>
         </div>

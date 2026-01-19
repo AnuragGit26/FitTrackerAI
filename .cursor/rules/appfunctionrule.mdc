@@ -136,7 +136,51 @@ Before coding, document:
 
 ---
 
-## 7. Agentic Code Review & Quality Gate
+## 7. Build & Lint Validation (MANDATORY PREREQUISITE)
+
+**All code changes MUST pass build and lint validation before completion.**
+
+### Build Validation
+
+- Run `npm run build:prod` (or equivalent) to validate:
+  - TypeScript compilation (`tsc --noEmit`)
+  - Strict linting (`lint:strict` with 0 max warnings)
+  - Production build (`vite build`)
+- **Zero build errors allowed**
+- **Zero TypeScript errors allowed**
+- Build must complete successfully
+
+### Lint Validation
+
+- Run `npm run lint:strict` before completing any code change
+- **Zero lint errors allowed**
+- **Zero lint warnings allowed** (strict mode)
+- Auto-fix when possible: `npm run lint:fix`
+- Manual fixes required for non-auto-fixable issues
+
+### Validation Workflow
+
+1. **Before committing code:**
+   - Run `npm run lint:strict`
+   - Fix all lint errors/warnings
+   - Run `npm run build:prod`
+   - Verify zero build errors
+
+2. **After code changes:**
+   - Re-run validation if dependencies change
+   - Verify no new errors introduced
+   - Ensure existing functionality still builds
+
+3. **Integration with Code Review:**
+   - Build/lint validation is a **prerequisite** for code review
+   - No code review until build passes
+   - No merge until validation passes
+
+> **No exceptions.** Code with build or lint errors is incomplete and must not be merged.
+
+---
+
+## 8. Agentic Code Review & Quality Gate
 
 Every feature is reviewed as:
 
@@ -165,7 +209,8 @@ Every feature is reviewed as:
 - Efficient Prisma queries
 - Correct IndexedDB sync
 - Secure edge boundaries
-- No lint/build errors
+- **Build validation passed** (Section 7)
+- **Lint validation passed** (Section 7)
 - Tests updated
 - Rule relevance verified
 
@@ -173,7 +218,7 @@ Every feature is reviewed as:
 
 ---
 
-## 8. Testing Requirements (Agentic & E2E)
+## 9. Testing Requirements (Agentic & E2E)
 
 Testing must include:
 
@@ -195,7 +240,7 @@ Testing must include:
 
 ---
 
-## 9. End-User Perspective (Fitness + AI Coaching)
+## 10. End-User Perspective (Fitness + AI Coaching)
 
 Always validate as the end user:
 
@@ -206,7 +251,7 @@ Always validate as the end user:
 
 ---
 
-## 10. Documentation as a System Contract
+## 11. Documentation as a System Contract
 
 - Update:
 - README
@@ -220,7 +265,7 @@ Always validate as the end user:
 
 ---
 
-## 11. Technical Documentation Reference (CRITICAL)
+## 12. Technical Documentation Reference (CRITICAL)
 
 📄 `TECHNICAL_DOCUMENTATION.md` (root)
 
@@ -236,7 +281,7 @@ Update when any of the above changes.
 
 ---
 
-## 12. AI-Output Schema Contracts (CRITICAL)
+## 13. AI-Output Schema Contracts (CRITICAL)
 
 AI-generated outputs are treated as **untrusted external inputs**.
 

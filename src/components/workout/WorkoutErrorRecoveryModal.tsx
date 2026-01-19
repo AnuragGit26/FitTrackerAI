@@ -118,17 +118,19 @@ export function WorkoutErrorRecoveryModal({ isOpen, onClose, onWorkoutRecovered 
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return null;
+  }
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Recover Failed Workouts">
       <div className="space-y-6">
         {failedWorkouts.length === 0 ? (
           <div className="text-center py-8">
-            <div className="mx-auto w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/20 flex items-center justify-center mb-4">
-              <X className="w-8 h-8 text-green-600 dark:text-green-400" />
+            <div className="mx-auto w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center mb-4">
+              <X className="w-8 h-8 text-blue-600 dark:text-blue-400" />
             </div>
-            <p className="text-gray-600 dark:text-gray-400">No failed workouts to recover</p>
+            <p className="text-slate-500 dark:text-gray-400">No failed workouts to recover</p>
           </div>
         ) : (
           <>
@@ -154,7 +156,7 @@ export function WorkoutErrorRecoveryModal({ isOpen, onClose, onWorkoutRecovered 
                   className={`border rounded-xl p-4 transition-all cursor-pointer ${
                     selectedWorkout?.id === fw.id
                       ? 'border-primary bg-primary/10 dark:bg-primary/20'
-                      : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600'
+                      : 'border-gray-100 dark:border-border-dark bg-white dark:bg-surface-dark hover:border-gray-100 dark:hover:border-gray-600'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-4">
@@ -164,20 +166,20 @@ export function WorkoutErrorRecoveryModal({ isOpen, onClose, onWorkoutRecovered 
                     >
                       <div className="flex items-center gap-2 mb-2">
                         <Calendar className="w-4 h-4 text-gray-400" />
-                        <span className="font-bold text-gray-900 dark:text-white">
+                        <span className="font-bold text-slate-900 dark:text-white">
                           {formatWorkoutDate(fw.workout)}
                         </span>
                         {formatWorkoutTime(fw.workout) && (
                           <>
                             <span className="text-gray-400">•</span>
                             <Clock className="w-4 h-4 text-gray-400" />
-                            <span className="text-sm text-gray-600 dark:text-gray-400">
+                            <span className="text-sm text-slate-500 dark:text-gray-400">
                               {formatWorkoutTime(fw.workout)}
                             </span>
                           </>
                         )}
                       </div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                      <div className="text-sm text-slate-500 dark:text-gray-400 mb-2">
                         {fw.workout.exercises.length} exercise{fw.workout.exercises.length !== 1 ? 's' : ''} •{' '}
                         {fw.workout.totalDuration} min
                       </div>
@@ -185,7 +187,7 @@ export function WorkoutErrorRecoveryModal({ isOpen, onClose, onWorkoutRecovered 
                         Error: {fw.error}
                       </div>
                       {fw.retryCount > 0 && (
-                        <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                        <div className="text-xs text-slate-500 dark:text-gray-500 mt-1">
                           Retried {fw.retryCount} time{fw.retryCount !== 1 ? 's' : ''}
                         </div>
                       )}
@@ -194,7 +196,7 @@ export function WorkoutErrorRecoveryModal({ isOpen, onClose, onWorkoutRecovered 
                       <button
                         onClick={() => handleRetry(fw)}
                         disabled={isRetrying || isDeleting === fw.id}
-                        className="px-4 py-2 rounded-xl bg-primary hover:bg-[#0be060] text-black font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 min-h-[44px] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                        className="px-4 py-2 rounded-xl bg-primary hover:bg-[#E67E22] text-black font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 min-h-[44px] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
                       >
                         {isRetrying && selectedWorkout?.id === fw.id ? (
                           <>
@@ -225,15 +227,15 @@ export function WorkoutErrorRecoveryModal({ isOpen, onClose, onWorkoutRecovered 
 
                   {/* Expanded Details */}
                   {selectedWorkout?.id === fw.id && (
-                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-border-dark">
                       <div className="space-y-3">
                         <div>
-                          <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                          <h4 className="text-sm font-bold text-slate-700 dark:text-gray-300 mb-2">
                             Exercises:
                           </h4>
                           <div className="space-y-1">
                             {fw.workout.exercises.map((ex, idx) => (
-                              <div key={idx} className="text-sm text-gray-600 dark:text-gray-400">
+                              <div key={idx} className="text-sm text-slate-500 dark:text-gray-400">
                                 • {ex.exerciseName} ({ex.sets.length} set{ex.sets.length !== 1 ? 's' : ''})
                               </div>
                             ))}
@@ -241,10 +243,10 @@ export function WorkoutErrorRecoveryModal({ isOpen, onClose, onWorkoutRecovered 
                         </div>
                         {fw.errorDetails && (
                           <div>
-                            <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                            <h4 className="text-sm font-bold text-slate-700 dark:text-gray-300 mb-2">
                               Error Details:
                             </h4>
-                            <pre className="text-xs bg-gray-100 dark:bg-gray-800 p-3 rounded-xl overflow-auto max-h-32 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
+                            <pre className="text-xs bg-gray-100 dark:bg-surface-dark p-3 rounded-xl overflow-auto max-h-32 text-slate-700 dark:text-gray-300 border border-gray-100 dark:border-border-dark">
                               {fw.errorDetails}
                             </pre>
                           </div>

@@ -61,7 +61,7 @@ export function BottomNavigation() {
 
   return (
     <motion.nav 
-      className="fixed bottom-0 left-0 right-0 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-lg border-t border-gray-200 dark:border-surface-dark-light pb-6 pt-2 px-3 z-20 w-full max-w-md mx-auto"
+      className="fixed bottom-0 left-0 right-0 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-lg border-t border-gray-100 dark:border-surface-dark-light pb-6 pt-2 px-3 z-20 w-full max-w-md mx-auto"
       initial={{ y: 100, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ 
@@ -153,7 +153,7 @@ export function BottomNavigation() {
                     className={cn(
                       'w-6 h-6 transition-all duration-200',
                       isActive 
-                        ? 'text-primary drop-shadow-[0_0_8px_rgba(13,242,105,0.4)]' 
+                        ? 'text-primary drop-shadow-[0_0_8px_rgba(255,153,51,0.4)]' 
                         : ''
                     )} 
                   />

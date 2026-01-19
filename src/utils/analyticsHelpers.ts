@@ -1,7 +1,8 @@
 import { Workout } from '@/types/workout';
 import { PersonalRecord } from '@/types/analytics';
-import { MuscleGroup } from '@/types/muscle';
+import { MuscleGroup, isBilateralMuscle } from '@/types/muscle';
 import { exerciseMuscleMap } from '@/services/muscleMapping';
+import { calculateVolumeBySide } from '@/utils/calculations';
 
 export type DateRange = '7d' | '30d' | '90d' | '180d' | '1y' | 'all';
 
@@ -55,31 +56,62 @@ export function calculatePersonalRecords(workouts: Workout[]): PersonalRecord[] 
       const existingRecord = records.get(exerciseName);
 
       (exercise.sets ?? []).forEach((set) => {
-        if (!set.completed) return;
-        if (set.weight === undefined || set.reps === undefined) return;
+        if (!set.completed) {
+    return;
+  }
+        
+        // Handle unilateral sets for PRs?
+        // Usually PRs are tracked by max weight lifted.
+        // For unilateral, max weight is usually per side.
+        // If 'sides' is set, we check left/right weights.
+        
+        let weight = set.weight;
+        let reps = set.reps;
+        
+        // If unilateral tracking used, take the max of left/right if available
+        if (set.sides) {
+           const lWeight = set.leftWeight ?? 0;
+           const rWeight = set.rightWeight ?? 0;
+           const lReps = set.leftReps ?? 0;
+           const rReps = set.rightReps ?? 0;
+           
+           if (lWeight > rWeight) {
+             weight = lWeight;
+             reps = lReps;
+           } else if (rWeight > lWeight) {
+             weight = rWeight;
+             reps = rReps;
+           } else {
+             weight = lWeight; // Equal
+             reps = Math.max(lReps, rReps);
+           }
+        }
+
+        if (weight === undefined || reps === undefined) {
+    return;
+  }
 
         const currentMaxWeight = existingRecord?.maxWeight || 0;
         const currentMaxReps = existingRecord?.maxReps || 0;
         const currentVolume = currentMaxWeight * currentMaxReps;
-        const setVolume = set.weight * set.reps;
+        const setVolume = weight * reps;
 
         if (
-          set.weight > currentMaxWeight ||
-          (set.weight === currentMaxWeight && set.reps > currentMaxReps) ||
+          weight > currentMaxWeight ||
+          (weight === currentMaxWeight && reps > currentMaxReps) ||
           setVolume > currentVolume
         ) {
           // Store personal record with unique workout association
-          // workoutId ensures each record is linked to the specific workout where it was achieved
           if (!workout.id) {
             console.warn(`Workout missing ID for personal record: ${exerciseName}`, workout);
           }
           records.set(exerciseName, {
             exerciseId: exercise.exerciseId,
             exerciseName,
-            maxWeight: set.weight,
-            maxReps: set.reps,
+            maxWeight: weight,
+            maxReps: reps,
             date: workout.date,
-            workoutId: String(workout.id || 0), // Each record is uniquely associated with its workout
+            workoutId: String(workout.id || 0),
           });
         }
       });
@@ -118,9 +150,9 @@ export function categorizeMuscleGroup(muscle: MuscleGroup): 'legs' | 'push' | 'p
     MuscleGroup.REAR_DELTS,
   ];
 
-  if (legs.includes(muscle)) return 'legs';
-  if (push.includes(muscle)) return 'push';
-  if (pull.includes(muscle)) return 'pull';
+  if (legs.includes(muscle)) {return 'legs';}
+  if (push.includes(muscle)) {return 'push';}
+  if (pull.includes(muscle)) {return 'pull';}
   return 'legs';
 }
 
@@ -130,23 +162,18 @@ export function aggregateVolumeByMuscleGroup(workouts: Workout[]): Map<MuscleGro
   (workouts ?? []).forEach((workout) => {
     (workout.exercises ?? []).forEach((exercise) => {
       const mapping = exerciseMuscleMap[exercise.exerciseName];
-      const exerciseVolume = exercise.totalVolume;
+      const exerciseVolume = exercise.totalVolume; // Should already include both sides summed up
       
+      let muscles: MuscleGroup[] = [];
       if (mapping) {
-        // Use mapping if available
-        const totalMuscles = mapping.primary.length + mapping.secondary.length;
-        if (totalMuscles > 0) {
-          const volumePerMuscle = exerciseVolume / totalMuscles;
-          [...mapping.primary, ...mapping.secondary].forEach((muscle) => {
-            const current = volumeMap.get(muscle) || 0;
-            volumeMap.set(muscle, current + volumePerMuscle);
-          });
-        }
+        muscles = [...mapping.primary, ...mapping.secondary];
       } else if (exercise.musclesWorked && exercise.musclesWorked.length > 0) {
-        // Fallback to exercise.musclesWorked if mapping not found
-        const totalMuscles = exercise.musclesWorked.length;
-        const volumePerMuscle = exerciseVolume / totalMuscles;
-        exercise.musclesWorked.forEach((muscle) => {
+        muscles = exercise.musclesWorked;
+      }
+
+      if (muscles.length > 0) {
+        const volumePerMuscle = exerciseVolume / muscles.length;
+        muscles.forEach((muscle) => {
           const current = volumeMap.get(muscle) || 0;
           volumeMap.set(muscle, current + volumePerMuscle);
         });
@@ -174,14 +201,16 @@ function getMondayOfWeek(date: Date): Date {
  * Score = (consistent_weeks / total_weeks) * 100
  */
 export function calculateConsistencyScore(workouts: Workout[], _days: number = 30): number {
-  if ((workouts ?? []).length === 0) return 0;
+  if ((workouts ?? []).length === 0) {return 0;}
 
   // Use all available workout data (no date filtering)
   const sortedWorkouts = [...(workouts ?? [])].sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
   );
 
-  if (sortedWorkouts.length === 0) return 0;
+  if (sortedWorkouts.length === 0) {
+    return 0;
+  }
 
   // Group workouts by week (Monday to Sunday)
   const weekMap = new Map<string, { workouts: Workout[]; weekStart: Date; weekEnd: Date }>();
@@ -230,7 +259,9 @@ export function calculateConsistencyScore(workouts: Workout[], _days: number = 3
     }
   });
 
-  if (totalWeeks === 0) return 0;
+  if (totalWeeks === 0) {
+    return 0;
+  }
 
   return Math.min(100, Math.round((consistentWeeks / totalWeeks) * 100));
 }
@@ -240,7 +271,7 @@ export function calculateConsistencyScore(workouts: Workout[], _days: number = 3
  * Returns a 2D array where each inner array represents a week (Monday to Sunday).
  */
 export function getWeeklyWorkoutDays(workouts: Workout[]): boolean[][] {
-  if ((workouts ?? []).length === 0) return [];
+  if ((workouts ?? []).length === 0) {return [];}
 
   // Get date range from workouts
   const workoutDates = (workouts ?? []).map((w) => new Date(w.date));
@@ -295,9 +326,9 @@ export function hasEnoughWorkoutsForAverages(workouts: Workout[]): boolean {
 
 /**
  * Calculate muscle imbalances from actual workout data.
- * Since the system doesn't track left/right separately, this calculates
- * imbalances based on the symmetry score approach - comparing volume consistency
- * across workouts. Returns imbalances only when there's clear evidence of asymmetry.
+ * Uses side-specific tracking data (left/right volumes) to detect imbalances.
+ * For unilateral exercises tracked with sides, it calculates exact imbalance.
+ * For bilateral exercises or legacy data, it assumes balanced volume.
  */
 export function calculateMuscleImbalances(workouts: Workout[]): Array<{
   muscle: MuscleGroup;
@@ -306,9 +337,62 @@ export function calculateMuscleImbalances(workouts: Workout[]): Array<{
   imbalancePercent: number;
   status: 'balanced' | 'imbalanced';
 }> {
-  if ((workouts ?? []).length < 7) return []; // Need enough data for meaningful analysis
+  if ((workouts ?? []).length < 7) {return [];} // Need enough data for meaningful analysis
 
-  const muscleVolume = aggregateVolumeByMuscleGroup(workouts ?? []);
+  // Track aggregated left/right volumes per muscle
+  const leftVolumes = new Map<MuscleGroup, number>();
+  const rightVolumes = new Map<MuscleGroup, number>();
+
+  (workouts ?? []).forEach((workout) => {
+    (workout.exercises ?? []).forEach((exercise) => {
+      const mapping = exerciseMuscleMap[exercise.exerciseName];
+      let muscles: MuscleGroup[] = [];
+      
+      if (mapping) {
+        muscles = [...mapping.primary, ...mapping.secondary];
+      } else if (exercise.musclesWorked && exercise.musclesWorked.length > 0) {
+        muscles = exercise.musclesWorked;
+      } else {
+        return; // No muscle data
+      }
+
+      // Calculate volume by side for this exercise
+      // Using calculateVolumeBySide ensures we respect unilateral tracking
+      const sideVolumes = calculateVolumeBySide(exercise.sets, exercise.trackingType);
+      
+      // Distribute volume to muscles
+      // If unilateral tracking detected (volume split between sides differently)
+      // Otherwise split evenly
+      
+      const totalVolume = sideVolumes.left + sideVolumes.right;
+      if (totalVolume === 0) {
+    return;
+  }
+
+      const volumePerMuscle = totalVolume / muscles.length;
+      
+      muscles.forEach((muscle) => {
+        // If sideVolumes are distinct (unilateral tracking used)
+        const hasUnilateralData = exercise.sets.some(s => s.sides || s.leftWeight !== undefined || s.leftReps !== undefined);
+        
+        if (hasUnilateralData) {
+          // If explicitly tracked, use the tracking data
+          // Divide side volume by number of muscles to distribute load
+          const lVol = sideVolumes.left / muscles.length;
+          const rVol = sideVolumes.right / muscles.length;
+          
+          leftVolumes.set(muscle, (leftVolumes.get(muscle) || 0) + lVol);
+          rightVolumes.set(muscle, (rightVolumes.get(muscle) || 0) + rVol);
+        } else {
+          // Bilateral/Legacy: Assume 50/50 split
+          const splitVol = volumePerMuscle * 0.5;
+          leftVolumes.set(muscle, (leftVolumes.get(muscle) || 0) + splitVol);
+          rightVolumes.set(muscle, (rightVolumes.get(muscle) || 0) + splitVol);
+        }
+      });
+    });
+  });
+
   const imbalances: Array<{
     muscle: MuscleGroup;
     leftVolume: number;
@@ -317,66 +401,46 @@ export function calculateMuscleImbalances(workouts: Workout[]): Array<{
     status: 'balanced' | 'imbalanced';
   }> = [];
 
-  // Muscles that can have left/right imbalances
-  const bilateralMuscles: MuscleGroup[] = [
+  // Analyze bilateral muscles for imbalance
+  // We iterate over all muscles that have recorded volume
+  // but we can filter to isBilateralMuscle if desired.
+  // Using explicit list of checkable muscles:
+  const checkableMuscles: MuscleGroup[] = [
     MuscleGroup.QUADS,
     MuscleGroup.HAMSTRINGS,
     MuscleGroup.BICEPS,
     MuscleGroup.TRICEPS,
+    MuscleGroup.SHOULDERS,
+    MuscleGroup.LATS,
+    MuscleGroup.CALVES,
+    MuscleGroup.GLUTES,
+    MuscleGroup.FOREARMS,
+    MuscleGroup.CHEST, // Sometimes unilateral (DB press)
+    MuscleGroup.BACK, // Rows
   ];
 
-  bilateralMuscles.forEach((muscle) => {
-    const totalVolume = muscleVolume.get(muscle) || 0;
-    if (totalVolume === 0) return;
+  checkableMuscles.forEach((muscle) => {
+    const leftTotal = leftVolumes.get(muscle) || 0;
+    const rightTotal = rightVolumes.get(muscle) || 0;
+    
+    const maxVol = Math.max(leftTotal, rightTotal);
+    if (maxVol < 100) {
+    return;
+  } // Ignore negligible volume
 
-    // Calculate volume per workout to detect consistency
-    const volumesPerWorkout: number[] = [];
-    (workouts ?? []).forEach((w) => {
-      let workoutVolume = 0;
-      (w.exercises ?? []).forEach((ex) => {
-        const mapping = exerciseMuscleMap[ex.exerciseName];
-        if (mapping) {
-          const isPrimary = mapping.primary.includes(muscle);
-          const isSecondary = mapping.secondary.includes(muscle);
-          if (isPrimary || isSecondary) {
-            const totalMuscles = mapping.primary.length + mapping.secondary.length;
-            const muscleVol = ex.totalVolume / totalMuscles;
-            workoutVolume += isPrimary ? muscleVol : muscleVol * 0.5;
-          }
-        } else if (ex.musclesWorked?.includes(muscle)) {
-          const totalMuscles = ex.musclesWorked.length;
-          workoutVolume += ex.totalVolume / totalMuscles;
-        }
-      });
-      if (workoutVolume > 0) {
-        volumesPerWorkout.push(workoutVolume);
-      }
-    });
+    // Calculate imbalance percentage
+    // 0% = perfect balance
+    // 100% = only one side worked
+    const diff = Math.abs(leftTotal - rightTotal);
+    const imbalancePercent = (diff / maxVol) * 100;
 
-    if (volumesPerWorkout.length < 3) return; // Need at least 3 workouts with this muscle
-
-    // Calculate coefficient of variation (CV) to detect inconsistency
-    // High CV suggests potential imbalance
-    const avgVolume = volumesPerWorkout.reduce((sum, v) => sum + v, 0) / volumesPerWorkout.length;
-    const variance = volumesPerWorkout.reduce((sum, v) => sum + Math.pow(v - avgVolume, 2), 0) / volumesPerWorkout.length;
-    const stdDev = Math.sqrt(variance);
-    const coefficientOfVariation = avgVolume > 0 ? (stdDev / avgVolume) * 100 : 0;
-
-    // If CV is high (>20%), it suggests potential imbalance
-    // Use CV to estimate imbalance percentage (capped at 25%)
-    if (coefficientOfVariation > 15) {
-      const estimatedImbalancePercent = Math.min(25, Math.round(coefficientOfVariation * 0.8));
-      
-      // Split volume with imbalance: assume weaker side is (100 - imbalancePercent)%
-      const imbalanceRatio = estimatedImbalancePercent / 100;
-      const leftVolume = totalVolume * 0.5 * (1 - imbalanceRatio);
-      const rightVolume = totalVolume * 0.5 * (1 + imbalanceRatio);
-
+    // Threshold for reporting imbalance (e.g., > 10%)
+    if (imbalancePercent > 10) {
       imbalances.push({
         muscle,
-        leftVolume: Math.round(leftVolume),
-        rightVolume: Math.round(rightVolume),
-        imbalancePercent: estimatedImbalancePercent,
+        leftVolume: Math.round(leftTotal),
+        rightVolume: Math.round(rightTotal),
+        imbalancePercent: Math.round(imbalancePercent),
         status: 'imbalanced',
       });
     }
@@ -385,4 +449,3 @@ export function calculateMuscleImbalances(workouts: Workout[]): Array<{
   // Sort by imbalance percentage (highest first)
   return imbalances.sort((a, b) => b.imbalancePercent - a.imbalancePercent);
 }
-

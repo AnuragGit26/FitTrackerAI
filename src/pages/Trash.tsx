@@ -92,7 +92,7 @@ export function Trash() {
     <div className="min-h-screen bg-background-light dark:bg-background-dark pb-20">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background-light dark:bg-background-dark shadow-md">
-        <div className="flex items-center gap-4 p-4 border-b border-gray-200 dark:border-[#316847]">
+        <div className="flex items-center gap-4 p-4 border-b border-gray-100 dark:border-border-dark">
           <button
             onClick={() => navigate(-1)}
             className="text-slate-900 dark:text-white flex size-12 shrink-0 items-center justify-start cursor-pointer"
@@ -120,7 +120,7 @@ export function Trash() {
             {deletedWorkouts.map((workout) => (
               <div
                 key={workout.id}
-                className="bg-white dark:bg-[#162e21] p-4 rounded-lg border border-gray-200 dark:border-[#316847]"
+                className="bg-white dark:bg-[#18181b] p-4 rounded-lg border border-gray-100 dark:border-border-dark"
               >
                 <div className="flex justify-between items-start mb-2">
                   <div>

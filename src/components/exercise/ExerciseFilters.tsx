@@ -57,9 +57,9 @@ export function ExerciseFilters({
   return (
     <div className="px-4 mb-5 space-y-4">
       {/* Category Filter */}
-      <div className="bg-surface-light dark:bg-surface-dark p-3 rounded-2xl border border-gray-200 dark:border-[#316847] mt-4">
+      <div className="bg-surface-light dark:bg-surface-dark p-3 rounded-2xl border border-gray-100 dark:border-border-dark mt-4">
         <div className="flex items-center justify-between mb-3">
-          <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+          <label className="text-xs font-bold text-slate-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
             <span className="material-symbols-outlined text-sm">category</span>
             Category
           </label>
@@ -75,7 +75,7 @@ export function ExerciseFilters({
                   'shrink-0 px-4 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center gap-2',
                   isSelected
                     ? 'bg-primary text-background-dark hover:brightness-105'
-                    : 'bg-background-light dark:bg-background-dark border border-gray-200 dark:border-[#316847] text-gray-600 dark:text-gray-300 font-medium hover:border-primary hover:text-primary'
+                    : 'bg-background-light dark:bg-background-dark border border-gray-100 dark:border-border-dark text-slate-500 dark:text-gray-300 font-medium hover:border-primary hover:text-primary'
                 )}
               >
                 <span className="material-symbols-outlined text-[18px]">{category.icon}</span>
@@ -88,15 +88,15 @@ export function ExerciseFilters({
 
       {/* Muscle Group Filter */}
       <div className={cn(
-        "bg-surface-light dark:bg-surface-dark p-3 rounded-2xl border border-gray-200 dark:border-[#316847]",
+        "bg-surface-light dark:bg-surface-dark p-3 rounded-2xl border border-gray-100 dark:border-border-dark",
         !isMuscleGroupFilterEnabled && "opacity-50"
       )}>
         <div className="flex items-center justify-between mb-3">
           <label className={cn(
             "text-xs font-bold uppercase tracking-wider flex items-center gap-1.5",
             isMuscleGroupFilterEnabled 
-              ? "text-gray-500 dark:text-gray-400" 
-              : "text-gray-400 dark:text-gray-500"
+              ? "text-slate-500 dark:text-gray-400" 
+              : "text-slate-400 dark:text-gray-500"
           )}>
             <span className="material-symbols-outlined text-sm">accessibility_new</span>
             Muscle Group
@@ -127,8 +127,8 @@ export function ExerciseFilters({
                   isSelected && isMuscleGroupFilterEnabled
                     ? 'bg-primary/10 border border-primary text-primary font-bold'
                     : isMuscleGroupFilterEnabled
-                    ? 'bg-background-light dark:bg-background-dark border border-gray-200 dark:border-[#316847] text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#1a3b2b] hover:border-primary/50'
-                    : 'bg-background-light dark:bg-background-dark border border-gray-200 dark:border-[#316847] text-gray-400 dark:text-gray-600'
+                    ? 'bg-background-light dark:bg-background-dark border border-gray-100 dark:border-border-dark text-slate-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-surface-dark hover:border-primary/50'
+                    : 'bg-background-light dark:bg-background-dark border border-gray-100 dark:border-border-dark text-slate-400 dark:text-gray-600'
                 )}
               >
                 {isSelected && isMuscleGroupFilterEnabled && (

@@ -54,7 +54,9 @@ export function CreateTemplate() {
   const [isSaving, setIsSaving] = useState(false);
 
   const handleAddExercise = () => {
-    if (!selectedExercise) return;
+    if (!selectedExercise) {
+    return;
+  }
 
     const newExercise: TemplateExercise = {
       exerciseId: selectedExercise.id,
@@ -149,7 +151,7 @@ export function CreateTemplate() {
   return (
     <div className="relative flex h-full min-h-screen w-full flex-col max-w-md mx-auto bg-background-light dark:bg-background-dark">
       {/* Header */}
-      <header className="sticky top-0 z-40 flex items-center justify-between px-4 py-3 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-md border-b border-black/5 dark:border-[#316847]/30">
+      <header className="sticky top-0 z-40 flex items-center justify-between px-4 py-3 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-md border-b border-black/5 dark:border-border-dark/30">
         <button
           onClick={() => navigate(-1)}
           className="flex items-center justify-center size-10 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
@@ -196,7 +198,7 @@ export function CreateTemplate() {
       </header>
 
       {/* Progress Indicator */}
-      <div className="px-4 py-3 border-b border-gray-200 dark:border-[#316847]/30">
+      <div className="px-4 py-3 border-b border-gray-100 dark:border-border-dark/30">
         <div className="flex items-center gap-2">
           {[1, 2, 3].map((s) => (
             <div key={s} className="flex items-center gap-2 flex-1">
@@ -205,7 +207,7 @@ export function CreateTemplate() {
                   'size-8 rounded-full flex items-center justify-center font-bold text-sm transition-colors',
                   step >= s
                     ? 'bg-primary text-background-dark'
-                    : 'bg-gray-200 dark:bg-surface-dark text-gray-500 dark:text-gray-400'
+                    : 'bg-white dark:bg-surface-dark text-slate-500 dark:text-gray-400'
                 )}
               >
                 {s}
@@ -214,7 +216,7 @@ export function CreateTemplate() {
                 <div
                   className={cn(
                     'flex-1 h-1 rounded-full transition-colors',
-                    step > s ? 'bg-primary' : 'bg-gray-200 dark:bg-surface-dark'
+                    step > s ? 'bg-primary' : 'bg-white dark:bg-surface-dark'
                   )}
                 />
               )}
@@ -235,7 +237,7 @@ export function CreateTemplate() {
               className="px-4 py-6 space-y-6"
             >
               <div>
-                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-bold text-slate-700 dark:text-gray-300 mb-2">
                   Template Name *
                 </label>
                 <input
@@ -243,12 +245,12 @@ export function CreateTemplate() {
                   value={templateName}
                   onChange={(e) => setTemplateName(e.target.value)}
                   placeholder="e.g., Upper/Lower Split"
-                  className="w-full rounded-lg bg-white dark:bg-surface-dark border border-gray-200 dark:border-[#316847] text-gray-900 dark:text-white focus:border-primary focus:ring-primary h-12 px-4"
+                  className="w-full rounded-lg bg-white dark:bg-surface-dark border border-gray-100 dark:border-border-dark text-slate-900 dark:text-white focus:border-primary focus:ring-primary h-12 px-4"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-bold text-slate-700 dark:text-gray-300 mb-2">
                   Category *
                 </label>
                 <div className="grid grid-cols-2 gap-3">
@@ -260,7 +262,7 @@ export function CreateTemplate() {
                         'h-12 rounded-lg border-2 font-medium transition-colors',
                         category === cat.value
                           ? 'bg-primary border-primary text-background-dark'
-                          : 'bg-white dark:bg-surface-dark border-gray-200 dark:border-[#316847] text-gray-700 dark:text-gray-300 hover:border-primary/50'
+                          : 'bg-white dark:bg-surface-dark border-gray-100 dark:border-border-dark text-slate-700 dark:text-gray-300 hover:border-primary/50'
                       )}
                     >
                       {cat.label}
@@ -270,7 +272,7 @@ export function CreateTemplate() {
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-bold text-slate-700 dark:text-gray-300 mb-2">
                   Description
                 </label>
                 <textarea
@@ -278,19 +280,19 @@ export function CreateTemplate() {
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Describe this workout template..."
                   rows={4}
-                  className="w-full rounded-lg bg-white dark:bg-surface-dark border border-gray-200 dark:border-[#316847] text-gray-900 dark:text-white focus:border-primary focus:ring-primary resize-none p-3"
+                  className="w-full rounded-lg bg-white dark:bg-surface-dark border border-gray-100 dark:border-border-dark text-slate-900 dark:text-white focus:border-primary focus:ring-primary resize-none p-3"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-bold text-slate-700 dark:text-gray-300 mb-2">
                     Difficulty
                   </label>
                   <select
                     value={difficulty}
                     onChange={(e) => setDifficulty(e.target.value as TemplateDifficulty)}
-                    className="w-full rounded-lg bg-white dark:bg-surface-dark border border-gray-200 dark:border-[#316847] text-gray-900 dark:text-white focus:border-primary focus:ring-primary h-12 px-4"
+                    className="w-full rounded-lg bg-white dark:bg-surface-dark border border-gray-100 dark:border-border-dark text-slate-900 dark:text-white focus:border-primary focus:ring-primary h-12 px-4"
                   >
                     {DIFFICULTIES.map((diff) => (
                       <option key={diff.value} value={diff.value}>
@@ -301,7 +303,7 @@ export function CreateTemplate() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-bold text-slate-700 dark:text-gray-300 mb-2">
                     Days/Week
                   </label>
                   <input
@@ -310,13 +312,13 @@ export function CreateTemplate() {
                     max="7"
                     value={daysPerWeek}
                     onChange={(e) => setDaysPerWeek(parseInt(e.target.value) || 3)}
-                    className="w-full rounded-lg bg-white dark:bg-surface-dark border border-gray-200 dark:border-[#316847] text-gray-900 dark:text-white focus:border-primary focus:ring-primary h-12 px-4"
+                    className="w-full rounded-lg bg-white dark:bg-surface-dark border border-gray-100 dark:border-border-dark text-slate-900 dark:text-white focus:border-primary focus:ring-primary h-12 px-4"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-bold text-slate-700 dark:text-gray-300 mb-2">
                   Estimated Duration (minutes)
                 </label>
                 <input
@@ -325,7 +327,7 @@ export function CreateTemplate() {
                   max="300"
                   value={estimatedDuration}
                   onChange={(e) => setEstimatedDuration(parseInt(e.target.value) || 60)}
-                  className="w-full rounded-lg bg-white dark:bg-surface-dark border border-gray-200 dark:border-[#316847] text-gray-900 dark:text-white focus:border-primary focus:ring-primary h-12 px-4"
+                  className="w-full rounded-lg bg-white dark:bg-surface-dark border border-gray-100 dark:border-border-dark text-slate-900 dark:text-white focus:border-primary focus:ring-primary h-12 px-4"
                 />
               </div>
             </motion.div>
@@ -340,7 +342,7 @@ export function CreateTemplate() {
               className="px-4 py-6 space-y-6"
             >
               <div>
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">
                   Add Exercises
                 </h3>
 
@@ -366,10 +368,10 @@ export function CreateTemplate() {
                     {exercises.map((exercise, index) => (
                       <div
                         key={index}
-                        className="p-4 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-[#316847]"
+                        className="p-4 rounded-xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-border-dark"
                       >
                         <div className="flex items-start justify-between mb-3">
-                          <h4 className="font-bold text-gray-900 dark:text-white">
+                          <h4 className="font-bold text-slate-900 dark:text-white">
                             {exercise.exerciseName}
                           </h4>
                           <button
@@ -382,7 +384,7 @@ export function CreateTemplate() {
 
                         <div className="grid grid-cols-3 gap-3">
                           <div>
-                            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">
+                            <label className="block text-xs font-bold text-slate-500 dark:text-gray-400 mb-1">
                               Sets
                             </label>
                             <input
@@ -395,11 +397,11 @@ export function CreateTemplate() {
                                   sets: parseInt(e.target.value) || 1,
                                 })
                               }
-                              className="w-full rounded-lg bg-background-light dark:bg-background-dark border border-gray-200 dark:border-[#316847] text-gray-900 dark:text-white focus:border-primary focus:ring-primary h-10 px-3 text-sm"
+                              className="w-full rounded-lg bg-background-light dark:bg-background-dark border border-gray-100 dark:border-border-dark text-slate-900 dark:text-white focus:border-primary focus:ring-primary h-10 px-3 text-sm"
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">
+                            <label className="block text-xs font-bold text-slate-500 dark:text-gray-400 mb-1">
                               Reps
                             </label>
                             <input
@@ -412,11 +414,11 @@ export function CreateTemplate() {
                                   reps: parseInt(e.target.value) || 1,
                                 })
                               }
-                              className="w-full rounded-lg bg-background-light dark:bg-background-dark border border-gray-200 dark:border-[#316847] text-gray-900 dark:text-white focus:border-primary focus:ring-primary h-10 px-3 text-sm"
+                              className="w-full rounded-lg bg-background-light dark:bg-background-dark border border-gray-100 dark:border-border-dark text-slate-900 dark:text-white focus:border-primary focus:ring-primary h-10 px-3 text-sm"
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">
+                            <label className="block text-xs font-bold text-slate-500 dark:text-gray-400 mb-1">
                               Weight (kg)
                             </label>
                             <input
@@ -428,7 +430,7 @@ export function CreateTemplate() {
                                   weight: parseFloat(e.target.value) || 0,
                                 })
                               }
-                              className="w-full rounded-lg bg-background-light dark:bg-background-dark border border-gray-200 dark:border-[#316847] text-gray-900 dark:text-white focus:border-primary focus:ring-primary h-10 px-3 text-sm"
+                              className="w-full rounded-lg bg-background-light dark:bg-background-dark border border-gray-100 dark:border-border-dark text-slate-900 dark:text-white focus:border-primary focus:ring-primary h-10 px-3 text-sm"
                             />
                           </div>
                         </div>
@@ -449,29 +451,29 @@ export function CreateTemplate() {
               className="px-4 py-6 space-y-6"
             >
               <div>
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">
                   Review Template
                 </h3>
 
-                <div className="p-4 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-[#316847] space-y-4">
+                <div className="p-4 rounded-xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-border-dark space-y-4">
                   <div>
-                    <h4 className="font-bold text-gray-900 dark:text-white text-lg">
+                    <h4 className="font-bold text-slate-900 dark:text-white text-lg">
                       {templateName}
                     </h4>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-sm text-slate-500 dark:text-gray-400 mt-1">
                       {CATEGORIES.find((c) => c.value === category)?.label} •{' '}
                       {DIFFICULTIES.find((d) => d.value === difficulty)?.label} •{' '}
                       {daysPerWeek} Days/Week • {estimatedDuration} min
                     </p>
                     {description && (
-                      <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
+                      <p className="text-sm text-slate-500 dark:text-gray-300 mt-2">
                         {description}
                       </p>
                     )}
                   </div>
 
                   <div>
-                    <h5 className="font-bold text-gray-900 dark:text-white mb-2">
+                    <h5 className="font-bold text-slate-900 dark:text-white mb-2">
                       Exercises ({exercises.length})
                     </h5>
                     <div className="space-y-2">
@@ -480,10 +482,10 @@ export function CreateTemplate() {
                           key={index}
                           className="p-3 rounded-lg bg-background-light dark:bg-background-dark"
                         >
-                          <p className="font-medium text-gray-900 dark:text-white">
+                          <p className="font-medium text-slate-900 dark:text-white">
                             {exercise.exerciseName}
                           </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          <p className="text-xs text-slate-500 dark:text-gray-400 mt-1">
                             {exercise.sets} sets × {exercise.reps} reps
                             {exercise.weight && exercise.weight > 0 && ` @ ${exercise.weight}kg`}
                           </p>

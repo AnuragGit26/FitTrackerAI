@@ -12,13 +12,14 @@ import {
   DocumentReference,
   Firestore,
 } from 'firebase/firestore';
-import { getFirestoreDb, getFirebaseAuth } from './firebaseConfig';
+import { getFirestoreDb, getFirebaseAuth, forceFirestoreOnline } from './firebaseConfig';
 import { dbHelpers } from './database';
 import { requireUserId } from '@/utils/userIdValidation';
 import { syncMetadataService } from './syncMetadataService';
 import { errorRecovery } from './errorRecovery';
 import { userContextManager } from './userContextManager';
 import { errorLogService } from './errorLogService';
+import { firestoreDiagnostics } from './firestoreDiagnostics';
 import { logger } from '@/utils/logger';
 import {
   SyncOptions,
@@ -37,9 +38,15 @@ type ProgressCallback = (progress: SyncProgress) => void;
  * Convert a timestamp (number, Date, or Firestore Timestamp) to a local Date object
  */
 function timestampToLocalDate(timestamp: number | Date | Timestamp | string | null | undefined): Date | null {
-  if (!timestamp) return null;
-  if (timestamp instanceof Date) return timestamp;
-  if (timestamp instanceof Timestamp) return timestamp.toDate();
+  if (!timestamp) {
+    return null;
+  }
+  if (timestamp instanceof Date) {
+    return timestamp;
+  }
+  if (timestamp instanceof Timestamp) {
+    return timestamp.toDate();
+  }
 
   if (typeof timestamp === 'string') {
     const date = new Date(timestamp);
@@ -98,12 +105,120 @@ class FirestoreSyncService {
     this.progressCallback = callback;
   }
 
+  private isOnline(): boolean {
+    if (typeof navigator === 'undefined') {
+    return true;
+  }
+    return navigator.onLine;
+  }
+
   private updateProgress(progress: Partial<SyncProgress>): void {
     if (this.currentProgress) {
       this.currentProgress = { ...this.currentProgress, ...progress };
       if (this.progressCallback) {
         this.progressCallback(this.currentProgress);
       }
+    }
+  }
+
+  /**
+   * Check if error is a Firestore offline error
+   */
+  private isFirestoreOfflineError(error: unknown): boolean {
+    if (!error) return false;
+    
+    const message = error instanceof Error ? error.message : String(error);
+    const lowerMessage = message.toLowerCase();
+    const errorCode = error && typeof error === 'object' && 'code' in error 
+      ? String((error as { code: string }).code).toLowerCase() 
+      : '';
+    
+    return (
+      lowerMessage.includes('client is offline') ||
+      lowerMessage.includes('failed to get document') ||
+      lowerMessage.includes('the client is offline') ||
+      errorCode === 'unavailable' ||
+      errorCode === 'deadline-exceeded'
+    );
+  }
+
+  /**
+   * Categorize errors by recoverability
+   */
+  private categorizeError(error: unknown): {
+    type: 'offline' | 'permission' | 'network' | 'unknown';
+    isRecoverable: boolean;
+  } {
+    const message = error instanceof Error ? error.message : String(error);
+    const lowerMessage = message.toLowerCase();
+
+    if (lowerMessage.includes('client is offline')) {
+      return { type: 'offline', isRecoverable: true };
+    }
+    if (lowerMessage.includes('permission') || lowerMessage.includes('unauthorized')) {
+      return { type: 'permission', isRecoverable: false };
+    }
+    if (lowerMessage.includes('network') || lowerMessage.includes('timeout')) {
+      return { type: 'network', isRecoverable: true };
+    }
+    return { type: 'unknown', isRecoverable: false };
+  }
+
+  /**
+   * Get document with automatic offline recovery
+   */
+  private async getDocWithRetry(docRef: DocumentReference): Promise<any> {
+    try {
+      return await getDoc(docRef);
+    } catch (error) {
+      if (this.isFirestoreOfflineError(error)) {
+        logger.warn('[FirestoreSyncService] Detected offline error, forcing online...');
+        try {
+          await forceFirestoreOnline();
+          // Wait a bit longer for network to stabilize before retry
+          await new Promise(resolve => setTimeout(resolve, 500));
+          // Retry once after forcing online
+          return await getDoc(docRef);
+        } catch (retryError) {
+          // If still failing, check if device is actually online
+          if (!navigator.onLine) {
+            logger.error('[FirestoreSyncService] Device is offline, cannot sync');
+            throw new Error('Device is offline. Please check your internet connection.');
+          }
+          logger.error('[FirestoreSyncService] Retry after force online failed:', retryError);
+          throw retryError;
+        }
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Get documents with automatic offline recovery
+   */
+  private async getDocsWithRetry(q: any): Promise<any> {
+    try {
+      return await getDocs(q);
+    } catch (error) {
+      if (this.isFirestoreOfflineError(error)) {
+        logger.warn('[FirestoreSyncService] Detected offline error, forcing online...');
+        try {
+          await forceFirestoreOnline();
+          // Wait a bit longer for network to stabilize before retry
+          await new Promise(resolve => setTimeout(resolve, 500));
+          // Retry once after forcing online
+          return await getDocs(q);
+        } catch (retryError) {
+          // If still failing, check if device is actually online
+          if (!navigator.onLine) {
+            logger.error('[FirestoreSyncService] Device is offline, cannot sync');
+            throw new Error('Device is offline. Please check your internet connection.');
+          }
+          logger.error('[FirestoreSyncService] Retry after force online failed:', retryError);
+          throw retryError;
+        }
+      }
+      throw error;
     }
   }
 
@@ -132,6 +247,11 @@ class FirestoreSyncService {
    */
   async sync(userId: string, options: SyncOptions = {}): Promise<SyncResult[]> {
     logger.log('[FirestoreSyncService.sync] Starting sync for userId:', userId, 'options:', options);
+
+    if (!this.isOnline()) {
+      logger.info('[FirestoreSyncService.sync] Skipping sync - client is offline');
+      return [];
+    }
 
     this.syncQueue = this.syncQueue
       .then(async () => {
@@ -376,6 +496,11 @@ class FirestoreSyncService {
     } finally {
       this.isSyncing = false;
       this.currentProgress = null;
+
+      // Track sync attempts for diagnostics
+      const hasErrors = results.some((r) => r.status === 'error');
+      firestoreDiagnostics.recordSyncAttempt(!hasErrors);
+
       logger.log('[FirestoreSyncService.performSync] Sync completed, results count:', results.length);
     }
 
@@ -427,10 +552,19 @@ class FirestoreSyncService {
       {
         maxRetries: options.maxRetries ?? 3,
         retryableErrors: (error) => {
-          const message = error.message.toLowerCase();
-          return (
-            message.includes('network') || message.includes('timeout') || message.includes('temporary')
-          );
+          const category = this.categorizeError(error);
+          return category.isRecoverable;
+        },
+        onRetry: async (error, attempt) => {
+          const category = this.categorizeError(error);
+          if (category.type === 'offline') {
+            logger.warn(`[FirestoreSyncService] Retry ${attempt}: Forcing online...`);
+            try {
+              await forceFirestoreOnline();
+            } catch (forceError) {
+              logger.error('[FirestoreSyncService] Failed to force online during retry:', forceError);
+            }
+          }
         },
       }
     );
@@ -643,11 +777,15 @@ class FirestoreSyncService {
       const metadata = await syncMetadataService.getLocalMetadata(tableName, validatedUserId);
       const lastPushAt = metadata?.lastPushAt || (options.forceFullSync ? null : undefined);
 
-      const localRecords = await this.fetchLocalRecords(
+      let localRecords = await this.fetchLocalRecords(
         validatedUserId,
         tableName,
         lastPushAt ? new Date(lastPushAt) : undefined
       );
+
+      if (tableName === 'exercises') {
+        localRecords = localRecords.filter((record) => record.isCustom === true);
+      }
 
       this.updateProgress({
         currentOperation: `Pushing ${localRecords.length} records to ${tableName}...`,
@@ -671,7 +809,7 @@ class FirestoreSyncService {
             const docRef = this.getDocumentReference(db, tableName, validatedUserId, convertedRecord);
 
             // Check for conflicts before writing
-            const docSnap = await getDoc(docRef);
+            const docSnap = await this.getDocWithRetry(docRef);
             if (docSnap.exists()) {
               const remoteData = docSnap.data();
               const conflict = this.detectVersionConflict(localRecord, remoteData);
@@ -779,7 +917,7 @@ class FirestoreSyncService {
     // Special handling for user_profiles (single document)
     if (tableName === 'user_profiles') {
       const docRef = doc(db, 'users', validatedUserId);
-      const docSnap = await getDoc(docRef);
+      const docSnap = await this.getDocWithRetry(docRef);
       if (docSnap.exists()) {
         return [{ id: docSnap.id, ...docSnap.data() }];
       }
@@ -789,7 +927,7 @@ class FirestoreSyncService {
     // Special handling for settings (single document in subcollection)
     if (tableName === 'settings') {
       const docRef = doc(db, 'users', validatedUserId, 'settings', 'appSettings');
-      const docSnap = await getDoc(docRef);
+      const docSnap = await this.getDocWithRetry(docRef);
       if (docSnap.exists()) {
         return [{ key: 'appSettings', ...docSnap.data() }];
       }
@@ -803,8 +941,8 @@ class FirestoreSyncService {
       const customExercisesQuery = query(collection(db, 'users', validatedUserId, 'customExercises'));
 
       const [globalSnapshot, customSnapshot] = await Promise.all([
-        getDocs(globalExercisesQuery),
-        getDocs(customExercisesQuery),
+        this.getDocsWithRetry(globalExercisesQuery),
+        this.getDocsWithRetry(customExercisesQuery),
       ]);
 
       const records: unknown[] = [];
@@ -829,7 +967,7 @@ class FirestoreSyncService {
 
     const collectionRef = collection(db, 'users', validatedUserId, collectionName);
     const q = query(collectionRef, ...constraints);
-    const querySnapshot = await getDocs(q);
+    const querySnapshot = await this.getDocsWithRetry(q);
 
     const records: unknown[] = [];
     querySnapshot.forEach((doc) => {
@@ -864,13 +1002,25 @@ class FirestoreSyncService {
       since ? `since ${since.toISOString()}` : ''
     );
 
+    if (tableName === 'user_profiles') {
+      const { dataService } = await import('./dataService');
+      const profile = await dataService.getUserProfile(validatedUserId);
+      return profile ? [profile as Record<string, unknown>] : [];
+    }
+
+    if (tableName === 'settings') {
+      const { dataService } = await import('./dataService');
+      const settings = await dataService.getSetting('appSettings');
+      return settings ? [{ key: 'appSettings', value: settings }] : [];
+    }
+
     let records = await dbHelpers.getRecordsByUserId(tableName, validatedUserId);
 
     // Filter by updated date if since is provided
     if (since) {
       records = records.filter((record) => {
         const updatedAt = (record as Record<string, unknown>).updatedAt;
-        if (!updatedAt) return true; // Include records without updatedAt
+        if (!updatedAt) {return true;} // Include records without updatedAt
         const updatedDate = timestampToLocalDate(
           updatedAt as number | Date | Timestamp | string | null | undefined
         );
@@ -939,8 +1089,11 @@ class FirestoreSyncService {
       }
     });
 
-    // Add userId if not present (except for user_profiles)
-    if (tableName !== 'user_profiles' && !converted.userId) {
+    // Add userId if not present (except for user_profiles and global exercises)
+    const shouldAddUserId =
+      tableName !== 'user_profiles' &&
+      (tableName !== 'exercises' || converted.isCustom === true);
+    if (shouldAddUserId && !converted.userId) {
       const userId = userContextManager.getUserId();
       if (userId) {
         converted.userId = userId;

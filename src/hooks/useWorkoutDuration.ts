@@ -23,7 +23,9 @@ interface TimerState {
 function loadTimerState(): TimerState | null {
     try {
         const stored = sessionStorage.getItem(STORAGE_KEY);
-        if (!stored) return null;
+        if (!stored) {
+    return null;
+  }
         return JSON.parse(stored);
     } catch (error) {
         console.error('Failed to load timer state:', error);
@@ -53,6 +55,39 @@ export function getTimerStartTime(): Date | null {
         return new Date(state.startTime);
     }
     return null;
+}
+
+/**
+ * Sync timer with workout startTime
+ * Call this when workout startTime changes
+ */
+export function syncTimerWithWorkout(workoutStartTime: Date): void {
+    const state = loadTimerState();
+    if (state) {
+        state.startTime = workoutStartTime.toISOString();
+        saveTimerState(state);
+    }
+}
+
+/**
+ * Reset timer state - clears all persisted timer data
+ */
+export function resetTimer(): void {
+    clearTimerState();
+}
+
+/**
+ * Initialize timer with a specific start time
+ */
+export function initializeTimer(startTime?: Date): void {
+    const state: TimerState = {
+        startTime: (startTime || new Date()).toISOString(),
+        pausedTime: 0,
+        pauseStartTime: null,
+        isRunning: true,
+        lastUpdateTime: new Date().toISOString(),
+    };
+    saveTimerState(state);
 }
 
 export function useWorkoutDuration(shouldStart: boolean = false): UseWorkoutDurationReturn {

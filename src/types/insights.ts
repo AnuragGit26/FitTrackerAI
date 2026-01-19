@@ -48,6 +48,22 @@ export interface NutritionEvent {
   icon?: string;
 }
 
+export interface ProgressionPhase {
+  day: number;
+  workoutType: 'push' | 'pull' | 'legs' | 'cardio' | 'rest';
+  intensity: 'low' | 'medium' | 'high';
+  volumeTarget: number;
+  exercises: string[];
+  recoveryTarget: number;
+}
+
+export interface ProgressionPlan {
+  id: string;
+  duration: number; // days
+  phases: ProgressionPhase[];
+  periodization: 'linear' | 'undulating' | 'block';
+}
+
 export interface RecoveryPrediction {
   date: string;
   dayLabel: string;
@@ -55,6 +71,10 @@ export interface RecoveryPrediction {
   recoveryPercentage: number;
   prPotential?: string[];
   fatigueWarnings?: string[];
+  fatigueAccumulation?: number;
+  supercompensationScore?: number;
+  prProbability?: number; // 0-100
+  volumePrediction?: number;
 }
 
 export interface WorkoutRecommendation {
@@ -126,6 +146,7 @@ export interface WorkoutRecommendations {
   readinessScore: number;
   readinessStatus: string;
   recommendedWorkout?: WorkoutRecommendation;
+  progressionPlan?: ProgressionPlan;
   muscleBalance: {
     imbalances: MuscleImbalance[];
     overallScore: number;

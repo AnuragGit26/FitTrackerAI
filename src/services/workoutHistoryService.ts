@@ -112,10 +112,14 @@ export const workoutHistoryService = {
     reps?: number;
     rpe?: number;
   } | null {
-    if (!previousWorkout) return null;
+    if (!previousWorkout) {
+    return null;
+  }
 
     const set = previousWorkout.sets.find((s) => s.setNumber === setNumber);
-    if (!set || !set.completed) return null;
+    if (!set || !set.completed) {
+    return null;
+  }
 
     return {
       weight: set.weight,
@@ -131,7 +135,9 @@ export const workoutHistoryService = {
     currentWeight: number,
     previousWeight?: number
   ): number | null {
-    if (previousWeight === undefined) return null;
+    if (previousWeight === undefined) {
+    return null;
+  }
     return currentWeight - previousWeight;
   },
 
@@ -144,7 +150,9 @@ export const workoutHistoryService = {
     suggestedWeight: number;
     suggestedReps: number;
   } | null {
-    if (!previousSet || previousSet.weight === undefined) return null;
+    if (!previousSet || previousSet.weight === undefined) {
+    return null;
+  }
 
     // Suggest 2.5kg increase or same weight with +1 rep
     const suggestedWeight = previousSet.weight + 2.5;

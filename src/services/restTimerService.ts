@@ -57,7 +57,9 @@ class RestTimerService {
    * Play completion sound
    */
   playCompletionSound(): void {
-    if (!this.audioContext) return;
+    if (!this.audioContext) {
+    return;
+  }
 
     try {
       const oscillator = this.audioContext.createOscillator();

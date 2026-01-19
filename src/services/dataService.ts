@@ -22,6 +22,7 @@ type Gender = 'male' | 'female' | 'other';
 interface UserProfile {
   id: string;
   name: string;
+  email?: string;
   experienceLevel: ExperienceLevel;
   goals: Goal[];
   equipment: string[];
@@ -33,6 +34,7 @@ interface UserProfile {
   weight?: number;
   height?: number;
   profilePicture?: string;
+  hasCompletedOnboarding?: boolean;
   version?: number;
   deletedAt?: Date | null;
 }
@@ -103,7 +105,9 @@ class DataService {
   }
 
   private async queueSyncForEvent(event: EventType): Promise<void> {
-    if (!this.syncEnabled) return;
+    if (!this.syncEnabled) {
+    return;
+  }
 
     const tableMap: Record<EventType, SyncableTable> = {
       workout: 'workouts',
@@ -138,7 +142,9 @@ class DataService {
    * This ensures queued syncs aren't lost on page refresh
    */
   private async loadPendingSyncQueue(): Promise<void> {
-    if (this.syncQueueLoaded) return;
+    if (this.syncQueueLoaded) {
+    return;
+  }
 
     try {
       const pendingItems = await dbHelpers.getPendingSyncQueue();
@@ -178,7 +184,14 @@ class DataService {
   }
 
   private async processSyncQueue(): Promise<void> {
-    if (this.syncQueue.size === 0) return;
+    if (this.syncQueue.size === 0) {
+    return;
+  }
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      logger.info('[DataService] Skipping sync queue processing - client is offline');
+      return;
+    }
 
     const tables = Array.from(this.syncQueue);
     this.syncQueue.clear();
@@ -1003,7 +1016,9 @@ class DataService {
         }
       }
       
-      if (!profile) return null;
+      if (!profile) {
+    return null;
+  }
       
       // Double-check: ensure profile belongs to requested user
       if (profile.id !== userId) {

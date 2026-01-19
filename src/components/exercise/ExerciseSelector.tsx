@@ -70,10 +70,10 @@ export function ExerciseSelector({ onSelect, onClose }: ExerciseSelectorProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-white dark:bg-gray-900">
+    <div className="fixed inset-0 z-50 bg-white dark:bg-background-dark">
       <div className="flex flex-col h-full">
         {/* Search Header */}
-        <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+        <div className="sticky top-0 z-10 bg-white dark:bg-background-dark border-b border-gray-100 dark:border-border-dark">
           <div className="p-4">
             <div className="flex items-center gap-3">
               <div className="flex-1 relative">
@@ -83,13 +83,13 @@ export function ExerciseSelector({ onSelect, onClose }: ExerciseSelectorProps) {
                   placeholder="Search by name, muscle, or equipment..."
                   value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg border-0 focus:ring-2 focus:ring-primary-500"
+                  className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-surface-dark rounded-lg border-0 focus:ring-2 focus:ring-primary-500"
                   autoFocus
                 />
                 {searchQuery && (
                   <button
                     onClick={() => setSearchQuery('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-white dark:hover:bg-surface-dark-light"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -101,14 +101,14 @@ export function ExerciseSelector({ onSelect, onClose }: ExerciseSelectorProps) {
                   'px-3 py-2 rounded-lg transition-colors',
                   showFilters || selectedEquipmentCategories.length > 0
                     ? 'bg-primary-500 text-white'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+                    : 'bg-gray-100 dark:bg-surface-dark text-slate-700 dark:text-gray-300'
                 )}
               >
                 <Filter className="w-5 h-5" />
               </button>
               <button
                 onClick={onClose}
-                className="px-4 py-2 text-gray-700 dark:text-gray-300 font-medium"
+                className="px-4 py-2 text-slate-700 dark:text-gray-300 font-medium"
               >
                 Cancel
               </button>
@@ -117,9 +117,9 @@ export function ExerciseSelector({ onSelect, onClose }: ExerciseSelectorProps) {
 
           {/* Equipment Filter Section */}
           {showFilters && (
-            <div className="px-4 pb-4 border-t border-gray-200 dark:border-gray-800 pt-4">
+            <div className="px-4 pb-4 border-t border-gray-100 dark:border-border-dark pt-4">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <h3 className="text-sm font-medium text-slate-700 dark:text-gray-300">
                   Filter by Equipment
                 </h3>
                 {selectedEquipmentCategories.length > 0 && (
@@ -150,7 +150,7 @@ export function ExerciseSelector({ onSelect, onClose }: ExerciseSelectorProps) {
                         'px-3 py-1.5 text-xs font-medium rounded-lg transition-colors',
                         isSelected
                           ? 'bg-primary-500 text-white'
-                          : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                          : 'bg-gray-100 dark:bg-surface-dark text-slate-700 dark:text-gray-300 hover:bg-white dark:hover:bg-surface-dark-light'
                       )}
                     >
                       {category}
@@ -163,9 +163,9 @@ export function ExerciseSelector({ onSelect, onClose }: ExerciseSelectorProps) {
 
           {/* Active Filters Display */}
           {!showFilters && selectedEquipmentCategories.length > 0 && (
-            <div className="px-4 pb-3 border-t border-gray-200 dark:border-gray-800 pt-3">
+            <div className="px-4 pb-3 border-t border-gray-100 dark:border-border-dark pt-3">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs text-gray-500 dark:text-gray-400">Active filters:</span>
+                <span className="text-xs text-slate-500 dark:text-gray-400">Active filters:</span>
                 {selectedEquipmentCategories.map((category) => (
                   <span
                     key={category}
@@ -192,7 +192,7 @@ export function ExerciseSelector({ onSelect, onClose }: ExerciseSelectorProps) {
               <LoadingSpinner />
             </div>
           ) : filteredExercises.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+            <div className="flex flex-col items-center justify-center h-64 text-slate-500">
               <p className="text-lg font-medium">No exercises found</p>
               <p className="text-sm">
                 {searchQuery || selectedEquipmentCategories.length > 0
@@ -202,7 +202,7 @@ export function ExerciseSelector({ onSelect, onClose }: ExerciseSelectorProps) {
             </div>
           ) : (
             <>
-              <div className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-800">
+              <div className="px-4 py-2 text-xs text-slate-500 dark:text-gray-400 border-b border-gray-100 dark:border-border-dark">
                 Showing {filteredExercises.length} of {exercises.length} exercises
                 {(debouncedQuery !== searchQuery || deferredSearchQuery !== debouncedQuery) && (
                   <span className="ml-1 text-primary-500 animate-pulse">
@@ -226,19 +226,19 @@ export function ExerciseSelector({ onSelect, onClose }: ExerciseSelectorProps) {
                           onSelect(exercise);
                           onClose();
                         }}
-                        className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-inset"
+                        className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-surface-dark transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-inset"
                         aria-label={`Select exercise ${exercise.name}`}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
-                            <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate">
+                            <h3 className="font-semibold text-slate-900 dark:text-gray-100 truncate">
                               <SearchHighlight
                                 text={exercise.name}
                                 query={deferredSearchQuery}
                               />
                             </h3>
                             <div className="flex items-center gap-2 mt-1 flex-wrap">
-                              <span className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-gray-600 dark:text-gray-400">
+                              <span className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-surface-dark rounded text-slate-500 dark:text-gray-400">
                                 {exercise.category}
                               </span>
                               {getEquipmentCategories(exercise.equipment).map((category) => (
@@ -250,7 +250,7 @@ export function ExerciseSelector({ onSelect, onClose }: ExerciseSelectorProps) {
                                 </span>
                               ))}
                               {exercise.equipment.length > 0 && (
-                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                <span className="text-xs text-slate-500 dark:text-gray-400">
                                   {exercise.equipment.join(', ')}
                                 </span>
                               )}
@@ -259,7 +259,7 @@ export function ExerciseSelector({ onSelect, onClose }: ExerciseSelectorProps) {
                           <span
                             className={cn(
                               'text-xs px-2 py-1 rounded',
-                              exercise.difficulty === 'beginner' && 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+                              exercise.difficulty === 'beginner' && 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
                               exercise.difficulty === 'intermediate' && 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
                               exercise.difficulty === 'advanced' && 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
                             )}

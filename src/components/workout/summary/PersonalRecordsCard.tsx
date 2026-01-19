@@ -82,8 +82,8 @@ export function PersonalRecordsCard({ records }: PersonalRecordsCardProps) {
             key={index}
             className={`p-4 rounded-xl border flex flex-col gap-3 relative overflow-hidden group ${
               index === 0
-                ? 'bg-[#1c3a29] border-primary/20'
-                : 'bg-[#162e21] border-white/5'
+                ? 'bg-surface-dark border-primary/20'
+                : 'bg-surface-dark border-white/5'
             }`}
           >
             {index === 0 && (
@@ -92,7 +92,7 @@ export function PersonalRecordsCard({ records }: PersonalRecordsCardProps) {
             <div className="flex items-start justify-between">
               <span
                 className={`material-symbols-outlined text-2xl ${
-                  index === 0 ? 'text-primary' : 'text-[#90cba8]'
+                  index === 0 ? 'text-primary' : 'text-[#FF9933]'
                 }`}
                 style={{ fontSize: '24px' }}
               >
@@ -110,12 +110,12 @@ export function PersonalRecordsCard({ records }: PersonalRecordsCardProps) {
             </div>
             <div>
               {record.exerciseName && (
-                <p className="text-[#90cba8] text-xs uppercase font-bold tracking-wider mb-1">
+                <p className="text-[#FF9933] text-xs uppercase font-bold tracking-wider mb-1">
                   {record.exerciseName}
                 </p>
               )}
               {!record.exerciseName && (
-                <p className="text-[#90cba8] text-xs uppercase font-bold tracking-wider mb-1">
+                <p className="text-[#FF9933] text-xs uppercase font-bold tracking-wider mb-1">
                   {getRecordLabel(record.type)}
                 </p>
               )}

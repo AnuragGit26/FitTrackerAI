@@ -23,7 +23,7 @@ export function AIInsightsPanel() {
 
   if (isLoading) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-surface-dark rounded-lg p-6 border border-gray-100 dark:border-border-dark">
         <div className="flex items-center justify-center py-12">
           <LoadingSpinner />
         </div>
@@ -71,19 +71,19 @@ export function AIInsightsPanel() {
 
       {/* Additional Insights */}
       {insights && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+        <div className="bg-white dark:bg-surface-dark rounded-lg p-6 border border-gray-100 dark:border-border-dark">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-gray-100 mb-4">
             Additional Insights
           </h3>
           {insights.motivation && (
             <div className="mb-4 p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
-              <p className="text-sm text-gray-700 dark:text-gray-300">{cleanPlainTextResponse(insights.motivation)}</p>
+              <p className="text-sm text-slate-700 dark:text-gray-300">{cleanPlainTextResponse(insights.motivation)}</p>
             </div>
           )}
           {insights.tip && (
             <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-              <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">💡 Tip</p>
-              <p className="text-sm text-gray-700 dark:text-gray-300">{cleanPlainTextResponse(insights.tip)}</p>
+              <p className="text-sm font-medium text-slate-900 dark:text-gray-100 mb-1">💡 Tip</p>
+              <p className="text-sm text-slate-700 dark:text-gray-300">{cleanPlainTextResponse(insights.tip)}</p>
             </div>
           )}
         </div>

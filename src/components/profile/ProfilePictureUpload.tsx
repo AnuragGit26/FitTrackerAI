@@ -23,7 +23,9 @@ export function ProfilePictureUpload({ picture, onPictureChange }: ProfilePictur
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+    return;
+  }
 
     // Check if user is authenticated
     if (!currentUser) {
@@ -71,7 +73,20 @@ export function ProfilePictureUpload({ picture, onPictureChange }: ProfilePictur
     } catch (error) {
       console.error('Failed to upload profile photo:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to upload profile photo';
-      showError(errorMessage);
+      
+      // Provide more helpful error messages
+      let userMessage = errorMessage;
+      if (errorMessage.toLowerCase().includes('connection') || 
+          errorMessage.toLowerCase().includes('network')) {
+        userMessage = 'Network error. Please check your internet connection and try again.';
+      } else if (errorMessage.toLowerCase().includes('permission') || 
+                 errorMessage.toLowerCase().includes('unauthorized') ||
+                 errorMessage.toLowerCase().includes('deploy')) {
+        // Storage rules not deployed - provide helpful message
+        userMessage = 'Storage permissions not configured. Please contact support or try again later.';
+      }
+      
+      showError(userMessage);
       setPreviewUrl(null);
     } finally {
       setIsLoading(false);
@@ -84,7 +99,9 @@ export function ProfilePictureUpload({ picture, onPictureChange }: ProfilePictur
   };
 
   const handleRemovePhoto = async () => {
-    if (!picture) return;
+    if (!picture) {
+    return;
+  }
 
     // Check if user is authenticated
     if (!currentUser) {
@@ -126,7 +143,7 @@ export function ProfilePictureUpload({ picture, onPictureChange }: ProfilePictur
       <div className="relative group">
         <div
           className={cn(
-            'size-32 rounded-full overflow-hidden border-4 border-gray-200 dark:border-surface-border',
+            'size-32 rounded-full overflow-hidden border-4 border-gray-100 dark:border-surface-border',
             'group-hover:border-primary transition-colors duration-300',
             'bg-gray-100 dark:bg-surface-dark bg-center bg-cover',
             isLoading && 'opacity-50',
@@ -140,8 +157,8 @@ export function ProfilePictureUpload({ picture, onPictureChange }: ProfilePictur
           onClick={!isLoading ? handleClick : undefined}
         >
           {!displayUrl && (
-            <div className="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-surface-dark">
-              <Camera className="w-12 h-12 text-gray-400 dark:text-gray-500" />
+            <div className="w-full h-full flex items-center justify-center bg-white dark:bg-surface-dark">
+              <Camera className="w-12 h-12 text-slate-400 dark:text-gray-500" />
             </div>
           )}
           {isLoading && (
@@ -174,7 +191,7 @@ export function ProfilePictureUpload({ picture, onPictureChange }: ProfilePictur
         )}
         {!isLoading && (
           <div
-            className="absolute bottom-0 right-0 bg-primary text-black rounded-full p-2 border-4 border-background-light dark:border-background-dark flex items-center justify-center cursor-pointer hover:bg-[#0be060] transition-colors"
+            className="absolute bottom-0 right-0 bg-primary text-black rounded-full p-2 border-4 border-background-light dark:border-background-dark flex items-center justify-center cursor-pointer hover:bg-[#E67E22] transition-colors"
             onClick={handleClick}
           >
             <Camera className="w-5 h-5" />
@@ -185,7 +202,7 @@ export function ProfilePictureUpload({ picture, onPictureChange }: ProfilePictur
         <p className="text-lg font-bold">
           {displayUrl ? 'Change Photo' : 'Upload Photo'}
         </p>
-        <p className="text-sm text-slate-500 dark:text-[#90cba8]">
+        <p className="text-sm text-slate-500 dark:text-[#FF9933]">
           {displayUrl ? 'Tap to change your profile picture' : 'Add a profile picture'}
         </p>
       </div>

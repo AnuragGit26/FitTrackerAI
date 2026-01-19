@@ -14,7 +14,9 @@ export function SessionTrends({ trends }: SessionTrendsProps) {
   }
 
   const generateSparklinePath = (data: number[]): string => {
-    if (data.length === 0) return '';
+    if (data.length === 0) {
+    return '';
+  }
     const width = 100;
     const height = 40;
     const stepX = width / (data.length - 1 || 1);
@@ -44,7 +46,7 @@ export function SessionTrends({ trends }: SessionTrendsProps) {
       case 'decreasing':
         return 'text-red-500';
       default:
-        return 'text-[#90cba8]';
+        return 'text-[#FF9933]';
     }
   };
 
@@ -53,7 +55,7 @@ export function SessionTrends({ trends }: SessionTrendsProps) {
     <div className="px-4 pb-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-white text-xl font-bold">Session Trends</h2>
-        <span className="text-xs text-[#90cba8] bg-[#162e21] px-2 py-1 rounded-full">
+        <span className="text-xs text-primary bg-surface-dark px-2 py-1 rounded-full">
           Last 5 Sessions
         </span>
       </div>
@@ -66,11 +68,11 @@ export function SessionTrends({ trends }: SessionTrendsProps) {
           return (
             <div
               key={trend.exerciseId}
-              className="flex items-center justify-between rounded-xl bg-[#162e21] p-4 border border-white/5"
+              className="flex items-center justify-between rounded-xl bg-[#18181b] p-4 border border-white/5"
             >
               <div className="flex flex-col gap-1 min-w-[120px]">
                 <span className="text-white font-medium text-base">{trend.exerciseName}</span>
-                <span className="text-[#90cba8] text-sm">
+                <span className="text-[#FF9933] text-sm">
                   {sets} Sets • {maxWeight > 0 ? `${maxWeight}${unit}` : 'N/A'}
                 </span>
               </div>
@@ -92,7 +94,7 @@ export function SessionTrends({ trends }: SessionTrendsProps) {
                   <path
                     d={generateSparklinePath(trend.sparklineData)}
                     fill="none"
-                    stroke={trend.trend === 'increasing' ? '#0df269' : trend.trend === 'decreasing' ? '#ef4444' : '#90cba8'}
+                    stroke={trend.trend === 'increasing' ? '#0df269' : trend.trend === 'decreasing' ? '#ef4444' : '#FF9933'}
                     strokeLinecap="round"
                     strokeWidth="2"
                     vectorEffect="non-scaling-stroke"

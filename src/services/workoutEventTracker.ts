@@ -15,7 +15,9 @@ class WorkoutEventTracker {
    * Initialize the tracker by loading the last processed workout
    */
   async initialize(userId: string): Promise<void> {
-    if (this.isInitialized) return;
+    if (this.isInitialized) {
+    return;
+  }
 
     try {
       // Get the most recent workout to determine last processed ID
@@ -44,7 +46,9 @@ class WorkoutEventTracker {
     try {
       // Get the most recent workout
       const workouts = await dbHelpers.getAllWorkouts(userId);
-      if (workouts.length === 0) return;
+      if (workouts.length === 0) {
+    return;
+  }
 
       const mostRecent = workouts[0];
       const workoutId = mostRecent.id;
@@ -112,7 +116,9 @@ class WorkoutEventTracker {
 
       // Find workouts newer than last processed
       const newWorkouts = workouts.filter(workout => {
-        if (!workout.id) return false;
+        if (!workout.id) {
+    return false;
+  }
         return workout.id > this.lastProcessedWorkoutId!;
       });
 

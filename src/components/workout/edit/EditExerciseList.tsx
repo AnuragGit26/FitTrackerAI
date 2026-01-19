@@ -99,7 +99,9 @@ export function EditExerciseList({ exercises, onExercisesChange }: EditExerciseL
 
   const handleDuplicateExercise = (exerciseId: string) => {
     const exerciseToDuplicate = exercises.find(ex => ex.id === exerciseId);
-    if (!exerciseToDuplicate) return;
+    if (!exerciseToDuplicate) {
+    return;
+  }
 
     const duplicatedExercise: WorkoutExercise = {
       ...exerciseToDuplicate,
@@ -122,10 +124,14 @@ export function EditExerciseList({ exercises, onExercisesChange }: EditExerciseL
 
   const handleMoveExercise = (exerciseId: string, direction: 'up' | 'down') => {
     const exerciseIndex = exercises.findIndex(ex => ex.id === exerciseId);
-    if (exerciseIndex === -1) return;
+    if (exerciseIndex === -1) {
+    return;
+  }
 
     const newIndex = direction === 'up' ? exerciseIndex - 1 : exerciseIndex + 1;
-    if (newIndex < 0 || newIndex >= exercises.length) return;
+    if (newIndex < 0 || newIndex >= exercises.length) {
+    return;
+  }
 
     const newExercises = [...exercises];
     [newExercises[exerciseIndex], newExercises[newIndex]] = [

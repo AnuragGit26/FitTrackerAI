@@ -30,10 +30,10 @@ export function Button({
   const baseStyles = 'font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden';
 
   const variants = {
-    primary: 'bg-primary-600 text-white hover:bg-primary-700',
-    secondary: 'bg-gray-200 text-gray-900 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600',
-    outline: 'border-2 border-primary-600 text-primary-600 hover:bg-primary-50 dark:border-primary-400 dark:text-primary-400 dark:hover:bg-primary-900/20',
-    ghost: 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800',
+    primary: 'bg-primary text-background-dark hover:bg-primary-dark',
+    secondary: 'bg-white text-slate-900 hover:bg-gray-100 dark:bg-surface-dark-light dark:text-white dark:hover:bg-surface-dark',
+    outline: 'border-2 border-gray-100 dark:border-transparent text-slate-900 dark:text-white hover:bg-gray-50 dark:hover:bg-surface-dark-light',
+    ghost: 'text-slate-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-dark',
     danger: 'bg-error text-white hover:bg-red-600',
   };
 

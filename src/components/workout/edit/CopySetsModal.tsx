@@ -39,7 +39,9 @@ export function CopySetsModal({
     }, [isOpen, profile?.id, exerciseId]);
 
     const loadPreviousWorkout = async () => {
-        if (!profile?.id) return;
+        if (!profile?.id) {
+    return;
+  }
 
         setIsLoading(true);
         try {
@@ -73,7 +75,9 @@ export function CopySetsModal({
     };
 
     const handleCopy = () => {
-        if (!previousWorkout || selectedSets.size === 0) return;
+        if (!previousWorkout || selectedSets.size === 0) {
+    return;
+  }
 
         const setsToCopy = previousWorkout.sets
             .filter(s => selectedSets.has(s.setNumber) && s.completed)
@@ -101,14 +105,14 @@ export function CopySetsModal({
                 <div className="flex gap-3">
                     <button
                         onClick={onClose}
-                        className="flex-1 px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-transparent text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors min-h-[44px] focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                        className="flex-1 px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-transparent text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-surface-dark transition-colors min-h-[44px] focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
                     >
                         Cancel
                     </button>
                     <button
                         onClick={handleCopy}
                         disabled={selectedSets.size === 0}
-                        className="flex-1 px-4 py-3 rounded-xl bg-primary hover:bg-[#0be060] text-black font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                        className="flex-1 px-4 py-3 rounded-xl bg-primary hover:bg-[#E67E22] text-black font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
                     >
                         Copy {selectedSets.size} Set{selectedSets.size !== 1 ? 's' : ''}
                     </button>
@@ -126,7 +130,7 @@ export function CopySetsModal({
                     </div>
                 ) : (
                     <>
-                        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+                        <div className="bg-gray-50 dark:bg-surface-dark/50 rounded-xl p-4 border border-gray-200 dark:border-border-dark">
                             <p className="text-sm text-gray-600 dark:text-gray-400">
                                 <span className="font-semibold">Last workout:</span>{' '}
                                 {format(new Date(previousWorkout.date), 'MMM d, yyyy')}
@@ -144,7 +148,7 @@ export function CopySetsModal({
                                         key={set.setNumber}
                                         className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${isSelected
                                                 ? 'border-primary bg-primary/10 dark:bg-primary/20'
-                                                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                                                : 'border-gray-200 dark:border-border-dark hover:border-gray-300 dark:hover:border-gray-600'
                                             }`}
                                     >
                                         <input

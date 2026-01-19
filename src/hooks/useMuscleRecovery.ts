@@ -25,7 +25,9 @@ export function useMuscleRecovery() {
   // Initialize muscle statuses from workout history if database is empty
   useEffect(() => {
     async function initializeIfNeeded() {
-      if (initializedRef.current || !profile) return;
+      if (initializedRef.current || !profile) {
+    return;
+  }
       
       try {
         const savedStatuses = await dbHelpers.getAllMuscleStatuses();
@@ -78,7 +80,9 @@ export function useMuscleRecovery() {
   }, [settings.baseRestInterval]);
 
   async function calculateMuscleStatuses() {
-    if (isCalculatingRef.current) return;
+    if (isCalculatingRef.current) {
+    return;
+  }
     isCalculatingRef.current = true;
     setIsLoading(true);
     try {
@@ -157,7 +161,9 @@ export function useMuscleRecovery() {
       // Only update if content actually changed
       const prevStatuses = muscleStatuses;
       setMuscleStatuses(prev => {
-        if (prev.length !== statuses.length) return statuses;
+        if (prev.length !== statuses.length) {
+    return statuses;
+  }
         const hasChanged = prev.some((p, i) => {
           const s = statuses[i];
           return !s || p.muscle !== s.muscle || p.recoveryPercentage !== s.recoveryPercentage;

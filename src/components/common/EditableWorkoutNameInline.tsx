@@ -37,13 +37,13 @@ export function EditableWorkoutNameInline({
   };
 
   const handleCancel = (e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
+    if (e) {e.stopPropagation();}
     setIsEditing(false);
     setEditedName(name);
   };
 
   const handleSave = async (e?: React.MouseEvent | React.FocusEvent) => {
-    if (e) e.stopPropagation();
+    if (e) {e.stopPropagation();}
     
     const trimmedName = editedName.trim();
     if (!trimmedName) {

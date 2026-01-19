@@ -208,7 +208,9 @@ export function QuickCardioLog({ isOpen, onClose, onSaved }: QuickCardioLogProps
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return null;
+  }
 
   const estimatedCalories = steps ? estimateCaloriesFromSteps(parseInt(steps) || 0) : 0;
 
@@ -223,18 +225,18 @@ export function QuickCardioLog({ isOpen, onClose, onSaved }: QuickCardioLogProps
           onClick={onClose}
         >
           <motion.div
-            className="relative w-full max-w-md overflow-hidden rounded-xl bg-white dark:bg-[#1c2e24] shadow-2xl border border-gray-200 dark:border-[#316847]/50"
+            className="relative w-full max-w-md overflow-hidden rounded-xl bg-white dark:bg-[#1c2e24] shadow-2xl border border-gray-100 dark:border-border-dark/50"
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-[#316847]">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white">Quick Cardio Log</h2>
+            <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-border-dark">
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">Quick Cardio Log</h2>
               <button
                 onClick={onClose}
-                className="p-1 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                className="p-1 rounded-full text-gray-400 hover:text-slate-500 dark:hover:text-gray-300 transition-colors"
                 aria-label="Close"
               >
                 <X className="w-5 h-5" />
@@ -245,13 +247,13 @@ export function QuickCardioLog({ isOpen, onClose, onSaved }: QuickCardioLogProps
             <div className="p-6 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
               {/* Activity Type */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-2">
                   Activity Type *
                 </label>
                 <select
                   value={activityType}
                   onChange={(e) => setActivityType(e.target.value)}
-                  className="w-full rounded-lg bg-white dark:bg-[#224932] border border-gray-300 dark:border-[#316847] text-gray-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary h-10 px-3"
+                  className="w-full rounded-lg bg-white dark:bg-[#224932] border border-gray-100 dark:border-border-dark text-slate-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary h-10 px-3"
                 >
                   {CARDIO_ACTIVITIES.map((activity) => (
                     <option key={activity.name} value={activity.name}>
@@ -264,7 +266,7 @@ export function QuickCardioLog({ isOpen, onClose, onSaved }: QuickCardioLogProps
               {/* Custom Activity Name */}
               {activityType === 'Custom' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-2">
                     Activity Name *
                   </label>
                   <input
@@ -272,14 +274,14 @@ export function QuickCardioLog({ isOpen, onClose, onSaved }: QuickCardioLogProps
                     value={customActivityName}
                     onChange={(e) => setCustomActivityName(e.target.value)}
                     placeholder="e.g., Trail Running"
-                    className="w-full rounded-lg bg-white dark:bg-[#224932] border border-gray-300 dark:border-[#316847] text-gray-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary h-10 px-3"
+                    className="w-full rounded-lg bg-white dark:bg-[#224932] border border-gray-100 dark:border-border-dark text-slate-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary h-10 px-3"
                   />
                 </div>
               )}
 
               {/* Distance */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-2">
                   Distance *
                 </label>
                 <div className="flex gap-2">
@@ -289,12 +291,12 @@ export function QuickCardioLog({ isOpen, onClose, onSaved }: QuickCardioLogProps
                     value={distance}
                     onChange={(e) => setDistance(e.target.value)}
                     placeholder="0"
-                    className="flex-1 rounded-lg bg-white dark:bg-[#224932] border border-gray-300 dark:border-[#316847] text-gray-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary h-10 px-3"
+                    className="flex-1 rounded-lg bg-white dark:bg-[#224932] border border-gray-100 dark:border-border-dark text-slate-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary h-10 px-3"
                   />
                   <select
                     value={distanceUnit}
                     onChange={(e) => setDistanceUnit(e.target.value as DistanceUnit)}
-                    className="rounded-lg bg-white dark:bg-[#224932] border border-gray-300 dark:border-[#316847] text-gray-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary h-10 px-3"
+                    className="rounded-lg bg-white dark:bg-[#224932] border border-gray-100 dark:border-border-dark text-slate-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary h-10 px-3"
                   >
                     <option value="km">km</option>
                     <option value="miles">miles</option>
@@ -304,7 +306,7 @@ export function QuickCardioLog({ isOpen, onClose, onSaved }: QuickCardioLogProps
 
               {/* Time */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-2">
                   Time *
                 </label>
                 <div className="flex gap-2 items-center">
@@ -316,7 +318,7 @@ export function QuickCardioLog({ isOpen, onClose, onSaved }: QuickCardioLogProps
                     placeholder="MM"
                     min="0"
                     max="59"
-                    className="w-20 rounded-lg bg-white dark:bg-[#224932] border border-gray-300 dark:border-[#316847] text-gray-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary h-10 px-3 text-center"
+                    className="w-20 rounded-lg bg-white dark:bg-[#224932] border border-gray-100 dark:border-border-dark text-slate-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary h-10 px-3 text-center"
                   />
                   <span className="text-gray-500">:</span>
                   <input
@@ -327,15 +329,15 @@ export function QuickCardioLog({ isOpen, onClose, onSaved }: QuickCardioLogProps
                     placeholder="SS"
                     min="0"
                     max="59"
-                    className="w-20 rounded-lg bg-white dark:bg-[#224932] border border-gray-300 dark:border-[#316847] text-gray-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary h-10 px-3 text-center"
+                    className="w-20 rounded-lg bg-white dark:bg-[#224932] border border-gray-100 dark:border-border-dark text-slate-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary h-10 px-3 text-center"
                   />
-                  <span className="text-sm text-gray-500">(MM:SS)</span>
+                  <span className="text-sm text-slate-500">(MM:SS)</span>
                 </div>
               </div>
 
               {/* Steps (optional) */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-2">
                   Steps <span className="text-gray-500">(optional)</span>
                 </label>
                 <input
@@ -346,10 +348,10 @@ export function QuickCardioLog({ isOpen, onClose, onSaved }: QuickCardioLogProps
                   placeholder="0"
                   min="0"
                   max="100000"
-                  className="w-full rounded-lg bg-white dark:bg-[#224932] border border-gray-300 dark:border-[#316847] text-gray-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary h-10 px-3"
+                  className="w-full rounded-lg bg-white dark:bg-[#224932] border border-gray-100 dark:border-border-dark text-slate-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary h-10 px-3"
                 />
                 {steps && estimatedCalories > 0 && !calories && (
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-slate-500 mt-1">
                     Estimated calories: ~{estimatedCalories} (from steps)
                   </p>
                 )}
@@ -357,7 +359,7 @@ export function QuickCardioLog({ isOpen, onClose, onSaved }: QuickCardioLogProps
 
               {/* Calories (optional) */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-2">
                   Calories <span className="text-gray-500">(optional)</span>
                 </label>
                 <input
@@ -368,30 +370,30 @@ export function QuickCardioLog({ isOpen, onClose, onSaved }: QuickCardioLogProps
                   placeholder={steps && estimatedCalories > 0 ? `~${estimatedCalories} (estimated)` : '0'}
                   min="0"
                   max="10000"
-                  className="w-full rounded-lg bg-white dark:bg-[#224932] border border-gray-300 dark:border-[#316847] text-gray-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary h-10 px-3"
+                  className="w-full rounded-lg bg-white dark:bg-[#224932] border border-gray-100 dark:border-border-dark text-slate-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary h-10 px-3"
                 />
               </div>
 
               {/* Date */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-2">
                   Date & Time
                 </label>
                 <input
                   type="datetime-local"
                   value={workoutDate.toISOString().slice(0, 16)}
                   onChange={(e) => setWorkoutDate(new Date(e.target.value))}
-                  className="w-full rounded-lg bg-white dark:bg-[#224932] border border-gray-300 dark:border-[#316847] text-gray-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary h-10 px-3"
+                  className="w-full rounded-lg bg-white dark:bg-[#224932] border border-gray-100 dark:border-border-dark text-slate-900 dark:text-white focus:border-primary focus:ring-2 focus:ring-primary h-10 px-3"
                 />
               </div>
             </div>
 
             {/* Footer */}
-            <div className="flex gap-3 p-4 border-t border-gray-200 dark:border-[#316847]">
+            <div className="flex gap-3 p-4 border-t border-gray-100 dark:border-border-dark">
               <button
                 onClick={onClose}
                 disabled={isSaving}
-                className="flex-1 h-12 rounded-lg border border-gray-300 dark:border-[#316847] bg-white dark:bg-transparent text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-[#224932] transition-colors font-bold disabled:opacity-50"
+                className="flex-1 h-12 rounded-lg border border-gray-100 dark:border-border-dark bg-white dark:bg-transparent text-slate-700 dark:text-white hover:bg-gray-50 dark:hover:bg-[#224932] transition-colors font-bold disabled:opacity-50"
               >
                 Cancel
               </button>

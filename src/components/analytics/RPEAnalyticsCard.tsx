@@ -25,9 +25,9 @@ export function RPEAnalyticsCard({ workouts, dateRange }: RPEAnalyticsCardProps)
     <div className="space-y-6">
       {/* Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-200 dark:border-gray-800 shadow-sm">
+        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-100 dark:border-border-dark shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+            <span className="text-sm text-slate-500 dark:text-gray-400 font-medium">
               Average RPE
             </span>
             <Activity className="w-5 h-5 text-primary" />
@@ -50,32 +50,32 @@ export function RPEAnalyticsCard({ workouts, dateRange }: RPEAnalyticsCardProps)
                 </>
               ) : (
                 <>
-                  <TrendingDown className="w-4 h-4 text-green-500" />
-                  <span className="text-green-500">Decreasing intensity</span>
+                  <TrendingDown className="w-4 h-4 text-blue-500" />
+                  <span className="text-blue-500">Decreasing intensity</span>
                 </>
               )}
             </div>
           )}
         </div>
 
-        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-200 dark:border-gray-800 shadow-sm">
+        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-100 dark:border-border-dark shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+            <span className="text-sm text-slate-500 dark:text-gray-400 font-medium">
               Total Sets Tracked
             </span>
           </div>
-          <span className="text-3xl font-bold text-gray-900 dark:text-white">
+          <span className="text-3xl font-bold text-slate-900 dark:text-white">
             {metrics.exerciseBreakdown.reduce((sum, ex) => sum + ex.setCount, 0)}
           </span>
         </div>
 
-        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-200 dark:border-gray-800 shadow-sm">
+        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-100 dark:border-border-dark shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+            <span className="text-sm text-slate-500 dark:text-gray-400 font-medium">
               Exercises Tracked
             </span>
           </div>
-          <span className="text-3xl font-bold text-gray-900 dark:text-white">
+          <span className="text-3xl font-bold text-slate-900 dark:text-white">
             {metrics.exerciseBreakdown.length}
           </span>
         </div>
@@ -83,8 +83,8 @@ export function RPEAnalyticsCard({ workouts, dateRange }: RPEAnalyticsCardProps)
 
       {/* RPE Trend Chart */}
       {metrics.trend.length > 0 && (
-        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-200 dark:border-gray-800 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-100 dark:border-border-dark shadow-sm">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">
             RPE Trend Over Time
           </h3>
           <ResponsiveContainer width="100%" height={200}>
@@ -124,8 +124,8 @@ export function RPEAnalyticsCard({ workouts, dateRange }: RPEAnalyticsCardProps)
 
       {/* Exercise Breakdown */}
       {metrics.exerciseBreakdown.length > 0 && (
-        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-200 dark:border-gray-800 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-100 dark:border-border-dark shadow-sm">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">
             RPE by Exercise
           </h3>
           <div className="space-y-3">
@@ -135,10 +135,10 @@ export function RPEAnalyticsCard({ workouts, dateRange }: RPEAnalyticsCardProps)
                 className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-surface-darker"
               >
                 <div className="flex-1">
-                  <p className="font-medium text-gray-900 dark:text-white">
+                  <p className="font-medium text-slate-900 dark:text-white">
                     {exercise.exerciseName}
                   </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p className="text-xs text-slate-500 dark:text-gray-400">
                     {exercise.setCount} sets
                   </p>
                 </div>
@@ -150,7 +150,7 @@ export function RPEAnalyticsCard({ workouts, dateRange }: RPEAnalyticsCardProps)
                     >
                       {exercise.averageRPE.toFixed(1)}
                     </span>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">avg RPE</p>
+                    <p className="text-xs text-slate-500 dark:text-gray-400">avg RPE</p>
                   </div>
                 </div>
               </div>
@@ -161,8 +161,8 @@ export function RPEAnalyticsCard({ workouts, dateRange }: RPEAnalyticsCardProps)
 
       {/* Volume vs RPE Correlation */}
       {metrics.volumeCorrelation.length > 0 && (
-        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-200 dark:border-gray-800 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+        <div className="bg-white dark:bg-surface-dark rounded-xl p-4 border border-gray-100 dark:border-border-dark shadow-sm">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">
             Volume vs RPE Correlation
           </h3>
           <ResponsiveContainer width="100%" height={200}>

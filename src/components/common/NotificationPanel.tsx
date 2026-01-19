@@ -32,14 +32,14 @@ const NOTIFICATION_ICONS: Record<NotificationType, typeof Bell> = {
 
 const NOTIFICATION_COLORS: Record<NotificationType, string> = {
     workout_reminder: 'text-blue-500 bg-blue-50 dark:bg-blue-900/20',
-    muscle_recovery: 'text-green-500 bg-green-50 dark:bg-green-900/20',
+    muscle_recovery: 'text-blue-500 bg-blue-50 dark:bg-blue-900/20',
     ai_insight: 'text-purple-500 bg-purple-50 dark:bg-purple-900/20',
     system: 'text-orange-500 bg-orange-50 dark:bg-orange-900/20',
     achievement: 'text-yellow-500 bg-yellow-50 dark:bg-yellow-900/20',
 };
 
 function formatRelativeTime(timestamp: number): string {
-    if (!timestamp || isNaN(timestamp)) return '';
+    if (!timestamp || isNaN(timestamp)) {return '';}
 
     const now = Date.now();
     const diff = now - timestamp;
@@ -48,13 +48,15 @@ function formatRelativeTime(timestamp: number): string {
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
 
-    if (seconds < 60) return 'Just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    if (days < 7) return `${days}d ago`;
+    if (seconds < 60) {
+    return 'Just now';
+  }
+    if (minutes < 60) {return `${minutes}m ago`;}
+    if (hours < 24) {return `${hours}h ago`;}
+    if (days < 7) {return `${days}d ago`;}
 
     const date = new Date(timestamp);
-    if (isNaN(date.getTime())) return '';
+    if (isNaN(date.getTime())) {return '';}
 
     const nowDate = new Date();
     const diffDays = Math.floor((nowDate.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
@@ -88,7 +90,7 @@ function groupNotificationsByDate(notifications: Notification[]): {
 
     notifications.forEach((notification) => {
         const notificationDate = new Date(notification.createdAt);
-        if (isNaN(notificationDate.getTime())) return;
+        if (isNaN(notificationDate.getTime())) {return;}
 
         if (notificationDate >= today) {
             groups.today.push(notification);
@@ -136,7 +138,9 @@ export function NotificationPanel({ isOpen, onClose, userId }: NotificationPanel
 
     // Periodically refresh notifications when panel is open (every 5 minutes)
     useEffect(() => {
-        if (!isOpen || !userId) return;
+        if (!isOpen || !userId) {
+    return;
+  }
 
         const intervalId = setInterval(() => {
             loadNotifications();
@@ -187,7 +191,9 @@ export function NotificationPanel({ isOpen, onClose, userId }: NotificationPanel
     const groupedNotifications = groupNotificationsByDate(notifications);
     const hasUnread = unreadCount > 0;
 
-    if (!isOpen) return null;
+    if (!isOpen) {
+    return null;
+  }
 
     return (
         <AnimatePresence>
@@ -206,49 +212,55 @@ export function NotificationPanel({ isOpen, onClose, userId }: NotificationPanel
                     {/* Panel */}
                     <motion.div
                         ref={panelRef}
-                        className="fixed top-16 right-4 z-50 w-full max-w-sm bg-white dark:bg-surface-dark rounded-2xl shadow-2xl border border-gray-200 dark:border-surface-border overflow-hidden flex flex-col max-h-[80vh]"
+                        className="fixed top-16 right-4 z-50 w-full max-w-sm bg-gradient-to-b from-white to-gray-50 dark:from-surface-dark dark:to-surface-dark-light rounded-2xl shadow-2xl border border-gray-200 dark:border-primary/20 overflow-hidden flex flex-col max-h-[80vh]"
                         initial={{ opacity: 0, y: -20, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -20, scale: 0.95 }}
-                        transition={{ duration: 0.2, ease: 'easeOut' }}
+                        transition={{ duration: 0.3, ease: [0.34, 1.56, 0.64, 1] }}
                     >
-                        {/* Header */}
-                        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-surface-border">
-                            <div className="flex items-center gap-2">
-                                <Bell className="w-5 h-5 text-slate-700 dark:text-slate-300" />
-                                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                                    Notifications
-                                </h3>
-                                {hasUnread && (
-                                    <span className="px-2 py-0.5 bg-primary text-black text-xs font-bold rounded-full">
-                                        {unreadCount}
-                                    </span>
-                                )}
+                        {/* Header with gradient background */}
+                        <div className="relative flex items-center justify-between p-5 border-b border-gray-200 dark:border-primary/10 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5">
+                            <div className="flex items-center gap-3">
+                                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/20">
+                                    <Bell className="w-5 h-5 text-primary" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                                        Notifications
+                                    </h3>
+                                    {hasUnread && (
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                                            {unreadCount} unread
+                                        </p>
+                                    )}
+                                </div>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1">
                                 {hasUnread && (
                                     <button
                                         onClick={handleMarkAllAsRead}
                                         disabled={isMarkingAll}
                                         className={cn(
-                                            'p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-surface-dark-light transition-colors',
-                                            'disabled:opacity-50 disabled:cursor-not-allowed'
+                                            'p-2 rounded-xl hover:bg-primary/10 transition-all duration-200',
+                                            'disabled:opacity-50 disabled:cursor-not-allowed',
+                                            'hover:scale-105 active:scale-95'
                                         )}
                                         aria-label="Mark all as read"
+                                        title="Mark all as read"
                                     >
                                         {isMarkingAll ? (
-                                            <Clock className="w-4 h-4 text-slate-500 dark:text-slate-400 animate-spin" />
+                                            <Clock className="w-4 h-4 text-primary animate-spin" />
                                         ) : (
-                                            <CheckCheck className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                                            <CheckCheck className="w-4 h-4 text-primary" />
                                         )}
                                     </button>
                                 )}
                                 <button
                                     onClick={onClose}
-                                    className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-surface-dark-light transition-colors"
+                                    className="p-2 rounded-xl hover:bg-gray-200 dark:hover:bg-surface-border transition-all duration-200 hover:scale-105 active:scale-95"
                                     aria-label="Close notifications"
                                 >
-                                    <X className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                                    <X className="w-4 h-4 text-slate-600 dark:text-slate-400" />
                                 </button>
                             </div>
                         </div>
@@ -256,27 +268,36 @@ export function NotificationPanel({ isOpen, onClose, userId }: NotificationPanel
                         {/* Content */}
                         <div className="flex-1 overflow-y-auto">
                             {isLoading ? (
-                                <div className="p-4 space-y-3">
+                                <div className="p-4 space-y-4">
                                     {[1, 2, 3].map((i) => (
                                         <div
                                             key={i}
-                                            className="animate-pulse space-y-2"
+                                            className="flex items-start gap-3 animate-pulse"
                                         >
-                                            <div className="h-4 bg-gray-200 dark:bg-surface-border rounded w-3/4" />
-                                            <div className="h-3 bg-gray-200 dark:bg-surface-border rounded w-full" />
+                                            <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-surface-border" />
+                                            <div className="flex-1 space-y-2">
+                                                <div className="h-4 bg-gray-200 dark:bg-surface-border rounded w-3/4" />
+                                                <div className="h-3 bg-gray-200 dark:bg-surface-border rounded w-full" />
+                                                <div className="h-3 bg-gray-200 dark:bg-surface-border rounded w-1/4" />
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
                             ) : notifications.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center p-8 text-center">
-                                    <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-surface-dark-light flex items-center justify-center mb-4">
-                                        <Bell className="w-8 h-8 text-gray-400 dark:text-gray-500" />
-                                    </div>
-                                    <h4 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
-                                        No notifications
+                                <div className="flex flex-col items-center justify-center p-12 text-center">
+                                    <motion.div
+                                        initial={{ scale: 0 }}
+                                        animate={{ scale: 1 }}
+                                        transition={{ type: 'spring', duration: 0.5 }}
+                                        className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center mb-4"
+                                    >
+                                        <Bell className="w-10 h-10 text-primary" />
+                                    </motion.div>
+                                    <h4 className="text-lg font-bold text-slate-900 dark:text-white mb-2">
+                                        All caught up!
                                     </h4>
-                                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                                        You&apos;re all caught up!
+                                    <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xs">
+                                        You don&apos;t have any notifications right now. Check back later for updates!
                                     </p>
                                 </div>
                             ) : (
@@ -284,7 +305,7 @@ export function NotificationPanel({ isOpen, onClose, userId }: NotificationPanel
                                     {/* Today */}
                                     {groupedNotifications.today.length > 0 && (
                                         <div>
-                                            <div className="px-4 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider bg-gray-50 dark:bg-surface-dark-light">
+                                            <div className="sticky top-0 px-4 py-2.5 text-xs font-bold text-primary uppercase tracking-wider bg-white/80 dark:bg-surface-dark/80 backdrop-blur-sm border-b border-primary/10">
                                                 Today
                                             </div>
                                             {groupedNotifications.today.map((notification) => (
@@ -301,7 +322,7 @@ export function NotificationPanel({ isOpen, onClose, userId }: NotificationPanel
                                     {/* Yesterday */}
                                     {groupedNotifications.yesterday.length > 0 && (
                                         <div>
-                                            <div className="px-4 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider bg-gray-50 dark:bg-surface-dark-light">
+                                            <div className="sticky top-0 px-4 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider bg-white/80 dark:bg-surface-dark/80 backdrop-blur-sm border-b border-gray-200 dark:border-surface-border">
                                                 Yesterday
                                             </div>
                                             {groupedNotifications.yesterday.map((notification) => (
@@ -318,7 +339,7 @@ export function NotificationPanel({ isOpen, onClose, userId }: NotificationPanel
                                     {/* This Week */}
                                     {groupedNotifications.thisWeek.length > 0 && (
                                         <div>
-                                            <div className="px-4 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider bg-gray-50 dark:bg-surface-dark-light">
+                                            <div className="sticky top-0 px-4 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider bg-white/80 dark:bg-surface-dark/80 backdrop-blur-sm border-b border-gray-200 dark:border-surface-border">
                                                 This Week
                                             </div>
                                             {groupedNotifications.thisWeek.map((notification) => (
@@ -335,7 +356,7 @@ export function NotificationPanel({ isOpen, onClose, userId }: NotificationPanel
                                     {/* Older */}
                                     {groupedNotifications.older.length > 0 && (
                                         <div>
-                                            <div className="px-4 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider bg-gray-50 dark:bg-surface-dark-light">
+                                            <div className="sticky top-0 px-4 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider bg-white/80 dark:bg-surface-dark/80 backdrop-blur-sm border-b border-gray-200 dark:border-surface-border">
                                                 Older
                                             </div>
                                             {groupedNotifications.older.map((notification) => (
@@ -372,54 +393,69 @@ function NotificationItem({ notification, onClick, onMarkAsRead }: NotificationI
     return (
         <motion.div
             className={cn(
-                'flex items-start gap-3 p-4 cursor-pointer transition-colors',
-                'hover:bg-gray-50 dark:hover:bg-surface-dark-light',
-                !notification.isRead && 'bg-primary/5 dark:bg-primary/10'
+                'flex items-start gap-3 p-4 cursor-pointer transition-all duration-200 group relative',
+                'hover:bg-gray-100 dark:hover:bg-surface-dark-light',
+                !notification.isRead && 'bg-gradient-to-r from-primary/8 via-primary/5 to-transparent dark:from-primary/15 dark:via-primary/10 dark:to-transparent border-l-2 border-primary'
             )}
             onClick={onClick}
-            whileHover={shouldReduceMotion ? {} : { backgroundColor: 'rgba(0, 0, 0, 0.02)' }}
-            transition={{ duration: 0.15 }}
+            whileHover={shouldReduceMotion ? {} : { x: 4 }}
+            transition={{ duration: 0.2 }}
         >
-            {/* Icon */}
-            <div className={cn('flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center', colorClass)}>
+            {/* Icon with enhanced styling */}
+            <motion.div
+                className={cn('flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center shadow-sm', colorClass)}
+                whileHover={shouldReduceMotion ? {} : { scale: 1.1, rotate: 5 }}
+                transition={{ duration: 0.2 }}
+            >
                 <Icon className="w-5 h-5" />
-            </div>
+            </motion.div>
 
             {/* Content */}
             <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1">
-                        <h4 className={cn(
-                            'text-sm font-semibold text-slate-900 dark:text-white mb-1',
-                            !notification.isRead && 'font-bold'
-                        )}>
-                            {notification.title}
-                        </h4>
-                        <p className="text-sm text-slate-600 dark:text-slate-300 line-clamp-2">
-                            {notification.message}
-                        </p>
-                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-                            {formatRelativeTime(notification.createdAt)}
-                        </p>
-                    </div>
+                <div className="flex items-start justify-between gap-2 mb-1">
+                    <h4 className={cn(
+                        'text-sm font-semibold text-slate-900 dark:text-white',
+                        !notification.isRead && 'font-bold text-slate-900 dark:text-white'
+                    )}>
+                        {notification.title}
+                    </h4>
 
-                    {/* Unread indicator */}
+                    {/* Unread indicator badge */}
                     {!notification.isRead && (
-                        <div className="flex-shrink-0 w-2 h-2 bg-primary rounded-full mt-1.5" />
+                        <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            className="flex-shrink-0 w-2 h-2 bg-primary rounded-full mt-1.5 shadow-glow"
+                        />
                     )}
+                </div>
 
-                    {/* Mark as read button */}
+                <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2 leading-relaxed mb-2">
+                    {notification.message}
+                </p>
+
+                <div className="flex items-center justify-between">
+                    <p className="text-xs text-slate-500 dark:text-slate-500 font-medium">
+                        {formatRelativeTime(notification.createdAt)}
+                    </p>
+
+                    {/* Mark as read button - shows on hover for unread */}
                     {!notification.isRead && (
-                        <button
+                        <motion.button
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.95 }}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 onMarkAsRead();
                             }}
-                            className="flex-shrink-0 p-1 rounded-lg hover:bg-gray-200 dark:hover:bg-surface-border transition-colors"
+                            className="opacity-0 group-hover:opacity-100 flex-shrink-0 p-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 transition-all duration-200"
                             aria-label="Mark as read"
+                            title="Mark as read"
                         >
-                            <Check className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-                        </button>
+                            <Check className="w-3.5 h-3.5 text-primary" />
+                        </motion.button>
                     )}
                 </div>
             </div>

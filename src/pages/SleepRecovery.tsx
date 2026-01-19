@@ -106,7 +106,9 @@ export function SleepRecovery() {
 
   // Load existing data
   useEffect(() => {
-    if (!profile?.id) return;
+    if (!profile?.id) {
+    return;
+  }
 
     const loadData = async () => {
       try {
@@ -179,20 +181,32 @@ export function SleepRecovery() {
   };
 
   const getStressLabel = (value: number): string => {
-    if (value <= 3) return 'Low';
-    if (value <= 6) return 'Medium';
+    if (value <= 3) {
+    return 'Low';
+  }
+    if (value <= 6) {
+    return 'Medium';
+  }
     return 'High';
   };
 
   const getEnergyLabel = (value: number): string => {
-    if (value <= 3) return 'Low';
-    if (value <= 6) return 'Medium';
+    if (value <= 3) {
+    return 'Low';
+  }
+    if (value <= 6) {
+    return 'Medium';
+  }
     return 'High';
   };
 
   const getSorenessLabel = (value: number): string => {
-    if (value <= 3) return 'Low';
-    if (value <= 6) return 'Medium';
+    if (value <= 3) {
+    return 'Low';
+  }
+    if (value <= 6) {
+    return 'Medium';
+  }
     return 'High';
   };
 
@@ -298,7 +312,7 @@ export function SleepRecovery() {
   return (
     <div className="relative flex h-full min-h-screen w-full max-w-lg mx-auto flex-col overflow-hidden bg-background-light dark:bg-background-dark">
       {/* Top App Bar */}
-      <div className="sticky top-0 z-50 flex items-center bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md p-4 pb-2 justify-between border-b border-gray-200 dark:border-surface-border/30">
+      <div className="sticky top-0 z-50 flex items-center bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md p-4 pb-2 justify-between border-b border-gray-100 dark:border-surface-border/30">
         <button
           onClick={() => navigate(-1)}
           className="text-slate-900 dark:text-white flex size-12 shrink-0 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
@@ -397,7 +411,7 @@ export function SleepRecovery() {
                 <div className="relative size-12 flex items-center justify-center">
                   <svg className="size-full -rotate-90" viewBox="0 0 36 36">
                     <path
-                      className="text-gray-200 dark:text-surface-border"
+                      className="text-slate-200 dark:text-surface-border"
                       d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                       fill="none"
                       stroke="currentColor"
@@ -477,7 +491,7 @@ export function SleepRecovery() {
               </p>
               <div className="relative">
                 <input
-                  className="form-input w-full rounded-lg text-slate-900 dark:text-white border-gray-200 dark:border-surface-border bg-slate-50 dark:bg-black/20 focus:border-primary focus:ring-1 focus:ring-primary h-12 px-3 text-base font-medium"
+                  className="form-input w-full rounded-lg text-slate-900 dark:text-white border-gray-100 dark:border-surface-border bg-slate-50 dark:bg-black/20 focus:border-primary focus:ring-1 focus:ring-primary h-12 px-3 text-base font-medium"
                   type="time"
                   value={formatTime(bedtime)}
                   onChange={handleBedtimeChange}
@@ -493,7 +507,7 @@ export function SleepRecovery() {
               </p>
               <div className="relative">
                 <input
-                  className="form-input w-full rounded-lg text-slate-900 dark:text-white border-gray-200 dark:border-surface-border bg-slate-50 dark:bg-black/20 focus:border-primary focus:ring-1 focus:ring-primary h-12 px-3 text-base font-medium"
+                  className="form-input w-full rounded-lg text-slate-900 dark:text-white border-gray-100 dark:border-surface-border bg-slate-50 dark:bg-black/20 focus:border-primary focus:ring-1 focus:ring-primary h-12 px-3 text-base font-medium"
                   type="time"
                   value={formatTime(wakeTime)}
                   onChange={handleWakeTimeChange}
@@ -531,7 +545,7 @@ export function SleepRecovery() {
                 value={sleepQuality}
                 onChange={(e) => setSleepQuality(Number(e.target.value))}
               />
-              <div className="w-full h-1.5 bg-gray-200 dark:bg-surface-border rounded-full relative overflow-hidden">
+              <div className="w-full h-1.5 bg-white dark:bg-surface-border rounded-full relative overflow-hidden">
                 <div
                   className="h-full bg-primary absolute top-0 left-0 transition-all"
                   style={{ width: `${((sleepQuality - 1) / 9) * 100}%` }}
@@ -560,7 +574,7 @@ export function SleepRecovery() {
                     'whitespace-nowrap px-3 py-1.5 rounded-full border text-xs font-medium transition-all',
                     isSelected
                       ? 'bg-primary text-black border-primary font-bold'
-                      : 'border-gray-200 dark:border-surface-border text-slate-600 dark:text-gray-300 hover:bg-primary/10 hover:border-primary hover:text-primary'
+                      : 'border-gray-100 dark:border-surface-border text-slate-600 dark:text-gray-300 hover:bg-primary/10 hover:border-primary hover:text-primary'
                   )}
                 >
                   {hours} hrs
@@ -588,7 +602,7 @@ export function SleepRecovery() {
             <div className="relative size-12 flex items-center justify-center">
               <svg className="size-full -rotate-90" viewBox="0 0 36 36">
                 <path
-                  className="text-gray-200 dark:text-surface-border"
+                  className="text-slate-200 dark:text-surface-border"
                   d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                   fill="none"
                   stroke="currentColor"
@@ -616,7 +630,7 @@ export function SleepRecovery() {
               <span className="text-primary text-sm font-bold">{overallRecovery}%</span>
             </div>
             <input
-              className="w-full h-1.5 bg-gray-200 dark:bg-surface-border rounded-lg appearance-none cursor-pointer accent-primary"
+              className="w-full h-1.5 bg-white dark:bg-surface-border rounded-lg appearance-none cursor-pointer accent-primary"
               type="range"
               min="0"
               max="100"
@@ -642,7 +656,7 @@ export function SleepRecovery() {
                   value={stressLevel}
                   onChange={(e) => setStressLevel(Number(e.target.value))}
                 />
-                <div className="w-full h-1.5 bg-gray-200 dark:bg-surface-border rounded-full relative overflow-hidden">
+                <div className="w-full h-1.5 bg-white dark:bg-surface-border rounded-full relative overflow-hidden">
                   <div
                     className="h-full bg-sky-400 absolute top-0 left-0 transition-all"
                     style={{ width: `${((stressLevel - 1) / 9) * 100}%` }}
@@ -670,7 +684,7 @@ export function SleepRecovery() {
                   value={energyLevel}
                   onChange={(e) => setEnergyLevel(Number(e.target.value))}
                 />
-                <div className="w-full h-1.5 bg-gray-200 dark:bg-surface-border rounded-full relative overflow-hidden">
+                <div className="w-full h-1.5 bg-white dark:bg-surface-border rounded-full relative overflow-hidden">
                   <div
                     className="h-full bg-yellow-400 absolute top-0 left-0 transition-all"
                     style={{ width: `${((energyLevel - 1) / 9) * 100}%` }}
@@ -698,7 +712,7 @@ export function SleepRecovery() {
                   value={soreness}
                   onChange={(e) => setSoreness(Number(e.target.value))}
                 />
-                <div className="w-full h-1.5 bg-gray-200 dark:bg-surface-border rounded-full relative overflow-hidden">
+                <div className="w-full h-1.5 bg-white dark:bg-surface-border rounded-full relative overflow-hidden">
                   <div
                     className="h-full bg-rose-400 absolute top-0 left-0 transition-all"
                     style={{ width: `${((soreness - 1) / 9) * 100}%` }}
@@ -730,7 +744,7 @@ export function SleepRecovery() {
                       'flex flex-col items-center justify-center p-3 rounded-lg border transition-all h-20',
                       readinessToTrain === readiness
                         ? 'bg-primary/20 border-primary'
-                        : 'border-gray-200 dark:border-surface-border bg-slate-50 dark:bg-black/20'
+                        : 'border-gray-100 dark:border-surface-border bg-slate-50 dark:bg-black/20'
                     )}
                   >
                     <span
@@ -767,7 +781,7 @@ export function SleepRecovery() {
               <span className="text-slate-700 dark:text-white text-base font-medium">Daily Notes</span>
             </div>
             <textarea
-              className="form-textarea w-full rounded-lg text-slate-900 dark:text-white border border-gray-200 dark:border-surface-border bg-slate-50 dark:bg-black/20 focus:border-primary focus:ring-0 placeholder:text-slate-400 dark:placeholder:text-text-secondary/50 p-3 text-sm min-h-[80px]"
+              className="form-textarea w-full rounded-lg text-slate-900 dark:text-white border border-gray-100 dark:border-surface-border bg-slate-50 dark:bg-black/20 focus:border-primary focus:ring-0 placeholder:text-slate-400 dark:placeholder:text-text-secondary/50 p-3 text-sm min-h-[80px]"
               placeholder="How are you feeling today? Any specific aches or pains?"
               value={recoveryNotes}
               onChange={(e) => setRecoveryNotes(e.target.value)}
@@ -785,7 +799,7 @@ export function SleepRecovery() {
           <motion.button
             onClick={handleSave}
             disabled={isSaving}
-            className="flex items-center justify-center size-14 rounded-full bg-primary text-black shadow-[0_4px_12px_rgba(13,242,105,0.4)] hover:shadow-[0_6px_16px_rgba(13,242,105,0.6)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center justify-center size-14 rounded-full bg-primary text-black shadow-[0_4px_12px_rgba(255,153,51,0.4)] hover:shadow-[0_6px_16px_rgba(255,153,51,0.6)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             whileHover={!isSaving && !shouldReduceMotion ? { scale: 1.05 } : {}}
             whileTap={!isSaving && !shouldReduceMotion ? { scale: 0.95 } : {}}
           >

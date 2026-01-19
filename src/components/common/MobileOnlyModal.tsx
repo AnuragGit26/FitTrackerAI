@@ -88,7 +88,7 @@ export function MobileOnlyModal() {
       >
         <motion.div
           className={cn(
-            'bg-white dark:bg-surface-dark rounded-2xl shadow-2xl border border-gray-200 dark:border-[#316847]/50',
+            'bg-white dark:bg-surface-dark rounded-2xl shadow-2xl border border-gray-200 dark:border-border-dark/50',
             'w-full max-w-md p-6',
             'flex flex-col items-center text-center gap-4'
           )}
@@ -110,7 +110,7 @@ export function MobileOnlyModal() {
             </p>
           </div>
 
-          <div className="w-full pt-4 border-t border-gray-200 dark:border-gray-700 space-y-3">
+          <div className="w-full pt-4 border-t border-gray-200 dark:border-border-dark space-y-3">
             <div className="flex items-start gap-3 text-left">
               <div className="w-2 h-2 rounded-full bg-primary mt-2 flex-shrink-0" />
               <div>

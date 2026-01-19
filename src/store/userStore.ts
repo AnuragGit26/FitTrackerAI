@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { dataService } from '@/services/dataService';
 import { userContextManager } from '@/services/userContextManager';
 import { logger } from '@/utils/logger';
+import { notificationService } from '@/services/notificationService';
 
 export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
 export type Goal = 'build_muscle' | 'gain_strength' | 'lose_fat' | 'improve_endurance' | 'general_fitness';
@@ -11,6 +12,7 @@ export type UnitSystem = 'metric' | 'imperial';
 export interface UserProfile {
   id: string;
   name: string;
+  email?: string;
   experienceLevel: ExperienceLevel;
   goals: Goal[];
   equipment: string[];
@@ -22,6 +24,7 @@ export interface UserProfile {
   weight?: number; // stored in kg
   height?: number; // stored in cm
   profilePicture?: string; // Supabase Storage URL or base64 data URL (for backward compatibility)
+  hasCompletedOnboarding?: boolean; // Track if user has completed onboarding flow
   version?: number; // For optimistic locking
   deletedAt?: Date | null; // Soft delete timestamp
 }
@@ -46,6 +49,7 @@ interface UserState {
   setWeight: (weight: number) => Promise<void>;
   setHeight: (height: number) => Promise<void>;
   setProfilePicture: (picture: string) => Promise<void>;
+  setHasCompletedOnboarding: (completed: boolean) => Promise<void>;
 }
 
 // Unit conversion helpers
@@ -80,6 +84,7 @@ const DEFAULT_PROFILE: UserProfile = {
   workoutFrequency: 3,
   preferredUnit: 'kg',
   defaultRestTime: 90,
+  hasCompletedOnboarding: false,
 };
 
 export const useUserStore = create<UserState>((set, get) => ({
@@ -99,7 +104,8 @@ export const useUserStore = create<UserState>((set, get) => ({
       }
 
       const userId = firebaseUser.id;
-      const userName = firebaseUser.firstName ?? firebaseUser.username ?? firebaseUser.emailAddresses?.[0]?.emailAddress ?? 'User';
+      const userEmail = firebaseUser.emailAddresses?.[0]?.emailAddress ?? null;
+      const userName = firebaseUser.firstName ?? firebaseUser.username ?? userEmail ?? 'User';
 
       // Get profile for this specific user ID (strictly user-specific)
       let savedProfile = await dataService.getUserProfile(userId);
@@ -110,20 +116,32 @@ export const useUserStore = create<UserState>((set, get) => ({
           ...DEFAULT_PROFILE,
           id: userId,
           name: userName,
+          email: userEmail ?? undefined,
         };
         await dataService.updateUserProfile(savedProfile);
       } else {
         // Profile exists - ensure it's up to date with Firebase data if needed
         // Only update name if it's empty or default, preserve user-saved custom names
-        const shouldUpdateName = !savedProfile.name || savedProfile.name === 'User' || savedProfile.name === DEFAULT_PROFILE.name;
+        const shouldUpdateName =
+          !savedProfile.name || savedProfile.name === 'User' || savedProfile.name === DEFAULT_PROFILE.name;
         const shouldUpdateId = savedProfile.id !== userId;
+        const normalizedEmail = userEmail?.toLowerCase() ?? null;
+        const existingEmail = savedProfile.email?.toLowerCase() ?? null;
+        const shouldUpdateEmail = normalizedEmail && normalizedEmail !== existingEmail;
 
-        if (shouldUpdateId || shouldUpdateName) {
+        if (shouldUpdateId || shouldUpdateName || shouldUpdateEmail) {
           const nameToUse = shouldUpdateName ? userName : savedProfile.name;
+          if (shouldUpdateEmail) {
+            logger.warn('[userStore.initializeUser] Email mismatch detected. Updating stored email.', {
+              storedEmail: savedProfile.email,
+              currentEmail: userEmail,
+            });
+          }
           savedProfile = {
             ...savedProfile,
             id: userId,
             name: nameToUse,
+            email: shouldUpdateEmail ? userEmail ?? undefined : savedProfile.email,
           };
           await dataService.updateUserProfile(savedProfile);
         }
@@ -189,6 +207,22 @@ export const useUserStore = create<UserState>((set, get) => ({
           } catch (syncError) {
             // Log sync failure but don't affect profile save
             logger.warn('Firestore sync failed for profile (will retry later):', syncError);
+
+            // Notify user about sync failure
+            try {
+              await notificationService.createNotification({
+                userId: updatedProfile.id,
+                type: 'system',
+                title: 'Profile Updated Locally',
+                message: 'Your profile changes were saved on this device, but cloud sync failed. We\'ll automatically retry syncing when you\'re back online.',
+                data: {
+                  actionLabel: 'Dismiss',
+                  syncStatus: 'failed',
+                },
+              });
+            } catch (notifError) {
+              logger.error('Failed to create sync failure notification:', notifError);
+            }
           }
         })();
       }
@@ -243,6 +277,10 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   setProfilePicture: async (picture: string) => {
     await get().updateProfile({ profilePicture: picture });
+  },
+
+  setHasCompletedOnboarding: async (completed: boolean) => {
+    await get().updateProfile({ hasCompletedOnboarding: completed });
   },
 
   clearProfile: async () => {

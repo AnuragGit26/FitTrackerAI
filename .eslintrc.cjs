@@ -1,18 +1,17 @@
 module.exports = {
   root: true,
-  env: { 
-    browser: true, 
-    es2020: true,
+  env: {
+    browser: true,
+    es2021: true,
     node: true,
   },
   extends: [
     'eslint:recommended',
     'plugin:@typescript-eslint/recommended',
-    'plugin:react-hooks/recommended',
     'plugin:react/recommended',
     'plugin:react/jsx-runtime',
+    'plugin:react-hooks/recommended',
   ],
-  ignorePatterns: ['dist', '.eslintrc.cjs', 'node_modules', 'build', '*.config.js', '*.config.ts'],
   parser: '@typescript-eslint/parser',
   parserOptions: {
     ecmaVersion: 'latest',
@@ -21,46 +20,45 @@ module.exports = {
       jsx: true,
     },
   },
+  plugins: ['react', '@typescript-eslint', 'react-hooks', 'react-refresh'],
+  rules: {
+    'react/prop-types': 'off',
+    'react/react-in-jsx-scope': 'off',
+    'react-hooks/rules-of-hooks': 'error',
+    'react-hooks/exhaustive-deps': 'warn',
+    'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+    '@typescript-eslint/no-unused-vars': [
+      'warn',
+      {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_',
+      },
+    ],
+    '@typescript-eslint/no-explicit-any': 'warn',
+    '@typescript-eslint/explicit-module-boundary-types': 'off',
+    '@typescript-eslint/no-non-null-assertion': 'warn',
+    'no-console': ['warn', { allow: ['warn', 'error'] }],
+    'no-debugger': 'warn',
+    'prefer-const': 'warn',
+    'no-var': 'error',
+    'eqeqeq': ['error', 'always', { null: 'ignore' }],
+    'curly': ['error', 'all'],
+    'no-duplicate-imports': 'error',
+  },
   settings: {
     react: {
       version: 'detect',
     },
   },
-  plugins: ['react-refresh', 'react'],
-  rules: {
-    'react-refresh/only-export-components': [
-      'warn',
-      { allowConstantExport: true },
-    ],
-    '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
-    'react/prop-types': 'off', // TypeScript handles prop validation
-    'react/react-in-jsx-scope': 'off', // Not needed with React 17+
-    '@typescript-eslint/explicit-module-boundary-types': 'off',
-    '@typescript-eslint/no-explicit-any': ['error', { 
-      fixToUnknown: true,
-      ignoreRestArgs: false 
-    }],
-    'no-console': ['error', { allow: ['warn', 'error'] }],
-  },
-  overrides: [
-    {
-      // Scripts can use console freely
-      files: ['scripts/**/*.ts', 'scripts/**/*.js'],
-      rules: {
-        'no-console': 'off',
-      },
-    },
-    {
-      // Test files can use console and have more relaxed rules
-      files: ['**/*.test.ts', '**/*.test.tsx', '**/*.spec.ts', '**/*.spec.tsx', '**/__tests__/**/*'],
-      env: {
-        jest: true,
-      },
-      rules: {
-        'no-console': 'off',
-        '@typescript-eslint/no-explicit-any': 'off',
-      },
-    },
+  ignorePatterns: [
+    'dist',
+    'build',
+    'node_modules',
+    '*.config.js',
+    '*.config.ts',
+    'vite.config.ts',
+    'tailwind.config.js',
+    'postcss.config.js',
   ],
-}
-
+};

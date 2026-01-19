@@ -1,6 +1,8 @@
 import { SessionComparison } from '@/types/workoutSummary';
 import { formatDuration } from '@/utils/calculations';
 import { Info } from 'lucide-react';
+import { cn } from '@/utils/cn';
+import { spacing, typography, colors } from '@/styles/designSystem';
 
 interface SessionAnalysisCardProps {
   comparison: SessionComparison;
@@ -31,13 +33,13 @@ export function SessionAnalysisCard({ comparison }: SessionAnalysisCardProps) {
   };
 
   return (
-    <div className="px-4 py-6">
-      <h2 className="text-slate-900 dark:text-white text-xl font-bold mb-4 px-1">
+    <div className={cn(spacing.spacious, 'py-6')}>
+      <h2 className={cn(typography.h3, colors.textPrimary, 'mb-4 px-1')}>
         Session Analysis
       </h2>
-      <div className="grid grid-cols-2 gap-3">
+      <div className={cn('grid grid-cols-2', spacing.normal)}>
         {/* Duration */}
-        <div className="bg-white dark:bg-[#162e21] border border-gray-200 dark:border-[#316847] rounded-xl p-4 flex flex-col relative overflow-hidden">
+        <div className="bg-white dark:bg-surface-dark border dark:border-border-dark rounded-xl p-4 flex flex-col relative overflow-hidden">
           <div className="absolute top-0 right-0 p-2 opacity-10">
             <span className="material-symbols-outlined text-4xl">timer</span>
           </div>
@@ -63,13 +65,13 @@ export function SessionAnalysisCard({ comparison }: SessionAnalysisCardProps) {
           </div>
           {comparison.duration.previous !== undefined && (
             <p className="text-slate-400 dark:text-gray-500 text-[10px] mt-1">
-              vs {formatDuration(comparison.duration.previous)} last time
+              vs {formatDuration(comparison.duration.previous)} {comparison.comparisonContext || 'last time'}
             </p>
           )}
         </div>
 
         {/* Volume */}
-        <div className="bg-white dark:bg-[#162e21] border border-gray-200 dark:border-[#316847] rounded-xl p-4 flex flex-col relative overflow-hidden group">
+        <div className="bg-white dark:bg-surface-dark border dark:border-border-dark rounded-xl p-4 flex flex-col relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-2 opacity-10">
             <span className="material-symbols-outlined text-4xl">weight</span>
           </div>
@@ -103,14 +105,22 @@ export function SessionAnalysisCard({ comparison }: SessionAnalysisCardProps) {
             )}
           </div>
           {comparison.volume.previous !== undefined && (
-            <p className="text-slate-400 dark:text-gray-500 text-[10px] mt-1">
-              vs {formatVolume(comparison.volume.previous)} last time
-            </p>
+            <div className="mt-1">
+              <p className="text-slate-400 dark:text-gray-500 text-[10px]">
+                vs {formatVolume(comparison.volume.previous)} {comparison.comparisonContext || 'last time'}
+              </p>
+              {comparison.comparisonContext && comparison.comparisonContext !== 'last workout' && (
+                <div className="mt-1 text-[9px] bg-primary/10 text-primary dark:bg-primary/20 px-1.5 py-0.5 rounded inline-flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[10px]">trending_up</span>
+                  Compared to {comparison.comparisonContext}
+                </div>
+              )}
+            </div>
           )}
         </div>
 
         {/* Intensity */}
-        <div className="bg-white dark:bg-[#162e21] border border-gray-200 dark:border-[#316847] rounded-xl p-4 flex flex-col col-span-2 relative overflow-hidden">
+        <div className="bg-white dark:bg-surface-dark border dark:border-border-dark rounded-xl p-4 flex flex-col col-span-2 relative overflow-hidden">
           <div className="absolute top-0 right-0 p-2 opacity-10">
             <span className="material-symbols-outlined text-4xl">monitor_heart</span>
           </div>
@@ -140,7 +150,7 @@ export function SessionAnalysisCard({ comparison }: SessionAnalysisCardProps) {
           {/* Mini bar chart visual */}
           <div className="w-full h-1.5 bg-gray-200 dark:bg-black/40 rounded-full mt-3 overflow-hidden flex">
             <div
-              className="h-full bg-primary rounded-full shadow-[0_0_10px_rgba(13,242,105,0.5)]"
+              className="h-full bg-primary rounded-full shadow-[0_0_10px_rgba(255,153,51,0.5)]"
               style={{ width: `${comparison.intensity.current}%` }}
             ></div>
           </div>

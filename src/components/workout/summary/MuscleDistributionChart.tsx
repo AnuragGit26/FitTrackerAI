@@ -80,9 +80,15 @@ export function MuscleDistributionChart({
             MuscleGroup.HIP_FLEXORS,
           ];
 
-          if (focusArea.type === 'push') return pushMuscles.includes(m.muscle);
-          if (focusArea.type === 'pull') return pullMuscles.includes(m.muscle);
-          if (focusArea.type === 'legs') return legMuscles.includes(m.muscle);
+          if (focusArea.type === 'push') {
+    return pushMuscles.includes(m.muscle);
+  }
+          if (focusArea.type === 'pull') {
+    return pullMuscles.includes(m.muscle);
+  }
+          if (focusArea.type === 'legs') {
+    return legMuscles.includes(m.muscle);
+  }
           return true;
         })
         .reduce((sum, m) => sum + (m.changePercent || 0), 0) / topMuscles.length
@@ -91,7 +97,7 @@ export function MuscleDistributionChart({
   if (topMuscles.length === 0) {
     return (
       <div className="px-4">
-        <div className="p-5 rounded-xl bg-white dark:bg-[#1a2e23] border border-gray-100 dark:border-white/5 shadow-sm">
+        <div className="p-5 rounded-xl bg-white dark:bg-[#18181b] border border-gray-100 dark:border-white/5 shadow-sm">
           <p className="text-gray-500 dark:text-gray-400 text-center">
             No muscle distribution data available
           </p>
@@ -102,10 +108,10 @@ export function MuscleDistributionChart({
 
   return (
     <div className="px-4">
-      <div className="p-5 rounded-xl bg-white dark:bg-[#1a2e23] border border-gray-100 dark:border-white/5 shadow-sm">
+      <div className="p-5 rounded-xl bg-white dark:bg-[#18181b] border border-gray-100 dark:border-white/5 shadow-sm">
         <div className="flex justify-between items-start mb-4">
           <div>
-            <p className="text-xs font-semibold text-gray-500 dark:text-[#90cba8] uppercase tracking-wider mb-1">
+            <p className="text-xs font-semibold text-gray-500 dark:text-[#FF9933] uppercase tracking-wider mb-1">
               Focus Area
             </p>
             <h3 className="text-lg font-bold text-slate-900 dark:text-white">

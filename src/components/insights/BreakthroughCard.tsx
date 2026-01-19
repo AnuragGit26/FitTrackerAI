@@ -10,7 +10,9 @@ interface BreakthroughCardProps {
 export function BreakthroughCard({ breakthrough }: BreakthroughCardProps) {
   const { profile } = useUserStore();
 
-  if (!breakthrough || !breakthrough.exercise || !breakthrough.projectedWeight) return null;
+  if (!breakthrough || !breakthrough.exercise || !breakthrough.projectedWeight) {
+    return null;
+  }
 
   // Convert weight based on user's preferred unit
   const preferredUnit = profile?.preferredUnit || 'kg';
@@ -46,7 +48,7 @@ export function BreakthroughCard({ breakthrough }: BreakthroughCardProps) {
             {breakthrough.improvementPercent !== undefined && (
               <>
                 {' '}Your speed out of the hole has improved by{' '}
-                <span className="text-green-600 dark:text-primary font-bold">{breakthrough.improvementPercent}%</span>.
+                <span className="text-blue-600 dark:text-primary font-bold">{breakthrough.improvementPercent}%</span>.
               </>
             )}
           </p>

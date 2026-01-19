@@ -83,7 +83,9 @@ export function EditExerciseItem({ exercise, index, onUpdate, onRemove, onDuplic
 
     // Get set summary for collapsed view
     const getSetSummary = () => {
-        if (exercise.sets.length === 0) return '';
+        if (exercise.sets.length === 0) {
+    return '';
+  }
         const firstSet = exercise.sets[0];
         if (firstSet.weight && firstSet.reps) {
             const reps = exercise.sets.map(s => s.reps).filter(Boolean);
@@ -144,7 +146,7 @@ export function EditExerciseItem({ exercise, index, onUpdate, onRemove, onDuplic
                         className="w-full bg-transparent border-none p-0 font-bold text-lg leading-tight text-slate-900 dark:text-white focus:outline-none focus:ring-0"
                     />
                     {!isExpanded && (
-                        <div className="flex items-center gap-3 mt-1 text-sm text-slate-500 dark:text-[#90cba8]">
+                        <div className="flex items-center gap-3 mt-1 text-sm text-slate-500 dark:text-[#FF9933]">
                             <span className="flex items-center gap-1">
                                 <span className="material-symbols-outlined text-[16px]">fitness_center</span>
                                 {exercise.sets.length} Set{exercise.sets.length !== 1 ? 's' : ''}
@@ -158,7 +160,7 @@ export function EditExerciseItem({ exercise, index, onUpdate, onRemove, onDuplic
                         </div>
                     )}
                     {isExpanded && exerciseType && (
-                        <p className="text-xs text-slate-500 dark:text-[#90cba8] mt-0.5">
+                        <p className="text-xs text-slate-500 dark:text-[#FF9933] mt-0.5">
                             {exerciseType} • {exerciseCategory === 'strength' ? 'Compound' : exerciseCategory}
                         </p>
                     )}

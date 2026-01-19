@@ -25,7 +25,7 @@ export function ExerciseMuscleDiagram({
   return (
     <div className={cn('relative h-28 w-20 opacity-80', className)}>
       <svg
-        className="w-full h-full drop-shadow-[0_0_8px_rgba(13,242,105,0.3)]"
+        className="w-full h-full drop-shadow-[0_0_8px_rgba(255,153,51,0.3)]"
         fill="none"
         viewBox="0 0 100 150"
         xmlns="http://www.w3.org/2000/svg"
@@ -40,7 +40,9 @@ export function ExerciseMuscleDiagram({
         {/* Primary muscles - highlighted with primary color and pulse animation */}
         {primaryMuscles.map((muscle) => {
           const path = musclePaths[muscle];
-          if (!path) return null;
+          if (!path) {
+    return null;
+  }
           return (
             <path
               key={`primary-${muscle}`}
@@ -54,12 +56,14 @@ export function ExerciseMuscleDiagram({
         {/* Secondary muscles - subtle highlight */}
         {secondaryMuscles.map((muscle) => {
           const path = musclePaths[muscle];
-          if (!path) return null;
+          if (!path) {
+    return null;
+  }
           return (
             <path
               key={`secondary-${muscle}`}
               d={path}
-              fill="#316847"
+              fill="#27272a"
               opacity="0.4"
             />
           );

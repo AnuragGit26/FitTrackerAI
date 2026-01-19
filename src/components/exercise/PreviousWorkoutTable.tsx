@@ -49,10 +49,10 @@ export function PreviousWorkoutTable({ exerciseId, className }: PreviousWorkoutT
     : `${completedSets.length} sets`;
 
   return (
-    <details className={cn('group flex flex-col rounded-xl border border-slate-200 dark:border-[#316847] bg-surface-light dark:bg-surface-dark px-4 py-1 shadow-sm', className)}>
+    <details className={cn('group flex flex-col rounded-xl border border-slate-200 dark:border-border-dark bg-surface-light dark:bg-surface-dark px-4 py-1 shadow-sm', className)}>
       <summary className="flex cursor-pointer items-center justify-between gap-4 py-3 list-none">
         <div className="flex items-center gap-3">
-          <span className="material-symbols-outlined text-slate-400 dark:text-[#90cba8]" style={{ fontSize: '20px' }}>
+          <span className="material-symbols-outlined text-slate-400 dark:text-[#FF9933]" style={{ fontSize: '20px' }}>
             history
           </span>
           <p className="text-slate-600 dark:text-slate-200 text-sm font-medium leading-normal">
@@ -60,7 +60,7 @@ export function PreviousWorkoutTable({ exerciseId, className }: PreviousWorkoutT
           </p>
         </div>
         <span
-          className="material-symbols-outlined text-slate-400 dark:text-[#90cba8] transition-transform duration-200 group-open:rotate-180"
+          className="material-symbols-outlined text-slate-400 dark:text-[#FF9933] transition-transform duration-200 group-open:rotate-180"
           style={{ fontSize: '20px' }}
         >
           expand_more

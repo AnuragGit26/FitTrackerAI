@@ -1,19 +1,22 @@
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, Bot, CheckCircle2, Activity, Dumbbell, Moon } from 'lucide-react';
+import { ChevronRight, Bot, CheckCircle2, Activity, Dumbbell, Moon, Zap, TrendingUp } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAIInsights } from '@/hooks/useAIInsights';
 import { useWorkoutStore } from '@/store/workoutStore';
+import { useMuscleRecovery } from '@/hooks/useMuscleRecovery';
 import { useEffect, useMemo } from 'react';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Skeleton } from '@/components/common/Skeleton';
 import { scaleIn, prefersReducedMotion } from '@/utils/animations';
 import { cleanPlainTextResponse } from '@/utils/aiResponseCleaner';
 import { workoutAnalysisService } from '@/services/workoutAnalysisService';
+import { cn } from '@/utils/cn';
 
 export function AIFocusCard() {
   const navigate = useNavigate();
   const { insights, isLoading, generateInsights } = useAIInsights();
   const { workouts } = useWorkoutStore();
+  const { muscleStatuses } = useMuscleRecovery();
 
   useEffect(() => {
     if ((workouts ?? []).length > 0) {
@@ -127,6 +130,13 @@ export function AIFocusCard() {
   const TypeIcon = getTypeIcon();
   const typeLabel = getTypeLabel();
 
+  // Calculate overall recovery percentage
+  const overallRecovery = useMemo(() => {
+    if (!muscleStatuses || muscleStatuses.length === 0) return null;
+    const readyMuscles = muscleStatuses.filter(m => m.recoveryStatus === 'ready').length;
+    return Math.round((readyMuscles / muscleStatuses.length) * 100);
+  }, [muscleStatuses]);
+
   const shouldReduceMotion = prefersReducedMotion();
 
   return (
@@ -147,7 +157,7 @@ export function AIFocusCard() {
         whileTap={shouldReduceMotion ? {} : { scale: 0.98 }}
       >
         <div className="absolute inset-0 bg-gradient-to-r from-surface-dark via-surface-dark/80 to-transparent"></div>
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(13,242,105,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(13,242,105,0.05)_1px,transparent_1px)] bg-[size:20px_20px]"></div>
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,153,51,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,153,51,0.05)_1px,transparent_1px)] bg-[size:20px_20px]"></div>
         <div className="relative p-5 flex flex-col gap-4">
           <div className="flex justify-between items-start">
             <div className={`text-xs font-bold px-2 py-1 rounded uppercase tracking-wider flex items-center gap-1.5 ${
@@ -185,14 +195,69 @@ export function AIFocusCard() {
             </div>
           )}
           {!hasWorkoutToday && (
-            <div className="flex items-center gap-4 mt-1">
+            <>
+              {/* Recovery Status Bar */}
+              {overallRecovery !== null && (
+                <div className="flex items-center gap-3 mt-2 p-3 bg-white/5 rounded-lg border border-white/10">
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-gray-300 font-medium">Recovery Status</span>
+                      <span className={cn(
+                        'text-xs font-bold',
+                        overallRecovery >= 80 ? 'text-primary' : overallRecovery >= 50 ? 'text-yellow-400' : 'text-red-400'
+                      )}>
+                        {overallRecovery}%
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
+                      <div
+                        className={cn(
+                          'h-full rounded-full transition-all duration-500',
+                          overallRecovery >= 80 ? 'bg-primary shadow-[0_0_8px_rgba(255,153,51,0.4)]' :
+                          overallRecovery >= 50 ? 'bg-yellow-400' : 'bg-red-400'
+                        )}
+                        style={{ width: `${overallRecovery}%` }}
+                      />
+                    </div>
+                  </div>
+                  <Zap className={cn(
+                    'w-5 h-5',
+                    overallRecovery >= 80 ? 'text-primary' : overallRecovery >= 50 ? 'text-yellow-400' : 'text-red-400'
+                  )} />
+                </div>
+              )}
+
+              {/* AI Tip */}
               {insights?.tip && (
-                <div className="flex items-start gap-1.5 bg-primary/10 px-2 py-1.5 rounded-lg border border-primary/20">
-                  <Bot className="text-primary w-3 h-3 mt-0.5 flex-shrink-0" />
+                <div className="flex items-start gap-1.5 bg-primary/10 px-3 py-2 rounded-lg border border-primary/20 mt-2">
+                  <Bot className="text-primary w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
                   <span className="text-primary/90 text-xs leading-relaxed">{insights.tip}</span>
                 </div>
               )}
-            </div>
+
+              {/* Quick Actions */}
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate('/log-workout');
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-primary hover:bg-primary-dark text-background-dark rounded-lg font-semibold text-sm transition-colors"
+                >
+                  <Dumbbell className="w-4 h-4" />
+                  Start Workout
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate('/rest');
+                  }}
+                  className="px-3 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium text-sm transition-colors"
+                >
+                  <TrendingUp className="w-4 h-4" />
+                </button>
+              </div>
+            </>
           )}
         </div>
       </motion.div>

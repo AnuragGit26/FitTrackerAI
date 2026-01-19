@@ -1,8 +1,8 @@
 import { Workout } from '@/types/workout';
-import { WorkoutSet } from '@/types/exercise';
-import { ExerciseCategory } from '@/types/exercise';
+import { WorkoutSet, ExerciseCategory } from '@/types/exercise';
 import { MuscleGroupCategory } from '@/utils/muscleGroupCategories';
 import { logger } from '@/utils/logger';
+import { normalizeWorkoutStartTime } from '@/utils/validators';
 
 const STORAGE_KEYS = {
   workoutState: 'fittrackai_current_workout_state',
@@ -51,7 +51,7 @@ export interface LogExerciseStateSnapshot {
  * Serialize a Workout object for storage (convert Dates to ISO strings)
  */
 function serializeWorkout(workout: Workout | null): Record<string, unknown> | null {
-  if (!workout) return null;
+  if (!workout) {return null;}
 
   return {
     ...workout,
@@ -74,10 +74,10 @@ function serializeWorkout(workout: Workout | null): Record<string, unknown> | nu
  * Deserialize a Workout object from storage (convert ISO strings to Dates)
  */
 function deserializeWorkout(workoutData: Record<string, unknown> | null): Workout | null {
-  if (!workoutData) return null;
+  if (!workoutData) {return null;}
 
   try {
-    return {
+    const workout = {
       ...workoutData,
       date: workoutData.date ? new Date(workoutData.date as string) : new Date(),
       startTime: workoutData.startTime ? new Date(workoutData.startTime as string) : new Date(),
@@ -92,6 +92,13 @@ function deserializeWorkout(workoutData: Record<string, unknown> | null): Workou
         })) || [],
       })) || [],
     } as Workout;
+
+    // Normalize startTime to handle stale dates from persisted state
+    if (workout.startTime) {
+      workout.startTime = normalizeWorkoutStartTime(workout.date, workout.startTime);
+    }
+
+    return workout;
   } catch (error) {
     logger.error('Failed to deserialize workout:', error);
     return null;
@@ -185,7 +192,7 @@ function migrateWorkoutState(parsed: Record<string, unknown>): WorkoutStateSnaps
 export function loadWorkoutState(): WorkoutStateSnapshot | null {
   try {
     const stored = localStorage.getItem(STORAGE_KEYS.workoutState);
-    if (!stored) return null;
+    if (!stored) {return null;}
 
     const parsed = JSON.parse(stored);
     
@@ -251,7 +258,7 @@ export function saveLogWorkoutState(state: LogWorkoutStateSnapshot): void {
 export function loadLogWorkoutState(): LogWorkoutStateSnapshot | null {
   try {
     const stored = localStorage.getItem(STORAGE_KEYS.logWorkoutState);
-    if (!stored) return null;
+    if (!stored) {return null;}
 
     const parsed = JSON.parse(stored);
     
@@ -339,7 +346,7 @@ export function saveLogExerciseState(state: LogExerciseStateSnapshot): void {
 export function loadLogExerciseState(): LogExerciseStateSnapshot | null {
   try {
     const stored = sessionStorage.getItem(STORAGE_KEYS.logExerciseState);
-    if (!stored) return null;
+    if (!stored) {return null;}
 
     const parsed = JSON.parse(stored);
     

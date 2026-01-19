@@ -7,7 +7,7 @@ interface WeightChangeBadgeProps {
 }
 
 export function WeightChangeBadge({ change, className }: WeightChangeBadgeProps) {
-  if (Math.abs(change) < 0.5) return null;
+  if (Math.abs(change) < 0.5) {return null;}
 
   const isPositive = change > 0;
   const displayValue = `${isPositive ? '+' : ''}${change.toFixed(1)}`;

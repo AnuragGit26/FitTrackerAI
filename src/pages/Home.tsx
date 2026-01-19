@@ -6,6 +6,7 @@ import { useWorkoutStore, useWorkoutError } from '@/store/workoutStore';
 import { useUserStore } from '@/store/userStore';
 import { HomeHeader } from '@/components/layout/HomeHeader';
 import { StatsCarousel } from '@/components/home/StatsCarousel';
+import { EmptyStateAIMessage } from '@/components/common/EmptyStateAIMessage';
 import { AIFocusCard } from '@/components/home/AIFocusCard';
 import { MuscleRecoverySection } from '@/components/home/MuscleRecoverySection';
 import { QuickActions } from '@/components/home/QuickActions';
@@ -14,7 +15,7 @@ import { staggerContainerSlow, slideUp, prefersReducedMotion } from '@/utils/ani
 
 export function Home() {
   const navigate = useNavigate();
-  const { loadWorkouts } = useWorkoutStore();
+  const { loadWorkouts, workouts } = useWorkoutStore();
   const { profile } = useUserStore();
   const error = useWorkoutError();
 
@@ -44,6 +45,12 @@ export function Home() {
         <motion.div variants={shouldReduceMotion ? {} : slideUp}>
           <HomeHeader />
         </motion.div>
+
+        {workouts.length === 0 && (
+          <motion.div variants={shouldReduceMotion ? {} : slideUp} className="mx-4 mt-4">
+            <EmptyStateAIMessage screenName="Home" />
+          </motion.div>
+        )}
 
         {/* Error message */}
         {error && (
@@ -97,14 +104,14 @@ export function Home() {
       >
         <motion.button
           onClick={handleStartWorkout}
-          className="pointer-events-auto shadow-[0_0_20px_rgba(13,242,105,0.4)] flex items-center justify-center gap-2 bg-primary hover:bg-[#0bd65d] text-background-dark h-14 rounded-full w-full max-w-[340px] font-bold text-lg tracking-wide transition-all group"
+          className="pointer-events-auto shadow-[0_0_20px_rgba(255,153,51,0.4)] flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-background-dark h-14 rounded-full w-full max-w-[340px] font-bold text-lg tracking-wide transition-all group"
           whileHover={shouldReduceMotion ? {} : { scale: 1.02 }}
           whileTap={shouldReduceMotion ? {} : { scale: 0.98 }}
           animate={shouldReduceMotion ? {} : {
             boxShadow: [
-              '0 0 20px rgba(13,242,105,0.4)',
-              '0 0 30px rgba(13,242,105,0.6)',
-              '0 0 20px rgba(13,242,105,0.4)',
+              '0 0 20px rgba(255,153,51,0.4)',
+              '0 0 30px rgba(255,153,51,0.6)',
+              '0 0 20px rgba(255,153,51,0.4)',
             ],
           }}
           transition={{
