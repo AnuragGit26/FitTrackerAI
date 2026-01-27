@@ -125,7 +125,7 @@ class FirestoreSyncService {
    * Check if error is a Firestore offline error
    */
   private isFirestoreOfflineError(error: unknown): boolean {
-    if (!error) return false;
+    if (!error) {return false;}
     
     const message = error instanceof Error ? error.message : String(error);
     const lowerMessage = message.toLowerCase();

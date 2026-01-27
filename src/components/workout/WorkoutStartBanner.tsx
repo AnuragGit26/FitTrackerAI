@@ -71,7 +71,7 @@ export function WorkoutStartBanner({
           className="px-8 py-3 bg-primary text-background-dark font-bold text-lg rounded-xl shadow-lg hover:bg-primary/90 transition-colors flex items-center gap-2"
           aria-label="Start workout timer"
         >
-          Let's Go! <Zap className="w-5 h-5" />
+          Let&apos;s Go! <Zap className="w-5 h-5" />
         </motion.button>
 
         {/* Dismiss Button */}

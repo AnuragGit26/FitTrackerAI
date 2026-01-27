@@ -241,8 +241,8 @@ export function RestTimer({
             if (notificationPermissionRef.current === 'granted') {
               new Notification('Rest Timer Complete', {
                 body: 'Time to start your next set!',
-                icon: '/assests/img/fittrackAI_icon.png',
-                badge: '/assests/img/fittrackAI_icon.png',
+                icon: '/assets/img/FitTrackAI_Iconv2.jpg',
+                badge: '/assets/img/FitTrackAI_Iconv2.jpg',
                 tag: 'rest-timer',
               });
             }
@@ -330,8 +330,8 @@ export function RestTimer({
             if (notificationPermissionRef.current === 'granted') {
               new Notification('Rest Timer Complete', {
                 body: 'Time to start your next set!',
-                icon: '/assests/img/fittrackAI_icon.png',
-                badge: '/assests/img/fittrackAI_icon.png',
+                icon: '/assets/img/FitTrackAI_Iconv2.jpg',
+                badge: '/assets/img/FitTrackAI_Iconv2.jpg',
                 tag: 'rest-timer',
               });
             }
@@ -472,7 +472,7 @@ export function RestTimer({
 
   // Play completion sound
   const playCompletionSound = () => {
-    if (!audioContextRef.current) return;
+    if (!audioContextRef.current) {return;}
 
     try {
       const oscillator = audioContextRef.current.createOscillator();

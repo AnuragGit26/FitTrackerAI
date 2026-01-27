@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import { WorkoutExercise } from '@/types/exercise';
+import { WorkoutExercise, Exercise } from '@/types/exercise';
 import { EditExerciseItem } from './EditExerciseItem';
 import { ExerciseSelectorDropdown } from '@/components/exercise/ExerciseSelectorDropdown';
-import { Exercise } from '@/types/exercise';
 import { exerciseLibrary } from '@/services/exerciseLibrary';
 import { useToast } from '@/hooks/useToast';
 import { calculateVolume } from '@/utils/calculations';

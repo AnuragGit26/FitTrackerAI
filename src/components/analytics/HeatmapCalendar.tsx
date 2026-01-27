@@ -26,9 +26,9 @@ export function HeatmapCalendar() {
   }, [workouts]);
 
   const getIntensityColor = (count: number) => {
-    if (count === 0) return 'bg-white dark:bg-surface-dark';
-    if (count === 1) return 'bg-primary-200 dark:bg-primary-900';
-    if (count === 2) return 'bg-primary-400 dark:bg-primary-700';
+    if (count === 0) {return 'bg-white dark:bg-surface-dark';}
+    if (count === 1) {return 'bg-primary-200 dark:bg-primary-900';}
+    if (count === 2) {return 'bg-primary-400 dark:bg-primary-700';}
     return 'bg-primary-600 dark:bg-primary-500';
   };
 

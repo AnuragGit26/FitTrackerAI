@@ -17,18 +17,18 @@ export function SessionAnalysisCard({ comparison }: SessionAnalysisCardProps) {
   };
 
   const getIntensityLabel = (intensity: number): string => {
-    if (intensity >= 85) return 'High Intensity';
-    if (intensity >= 70) return 'Moderate Intensity';
+    if (intensity >= 85) {return 'High Intensity';}
+    if (intensity >= 70) {return 'Moderate Intensity';}
     return 'Low Intensity';
   };
 
   const getChangeColor = (change?: number): string => {
-    if (!change) return 'text-gray-500 dark:text-gray-400';
+    if (!change) {return 'text-gray-500 dark:text-gray-400';}
     return change > 0 ? 'text-primary' : 'text-red-500';
   };
 
   const getChangeIcon = (change?: number): string => {
-    if (!change) return 'remove';
+    if (!change) {return 'remove';}
     return change > 0 ? 'arrow_upward' : 'arrow_downward';
   };
 

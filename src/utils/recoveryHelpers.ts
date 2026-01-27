@@ -1,6 +1,5 @@
-import { MuscleStatus } from '@/types/muscle';
+import { MuscleStatus, DEFAULT_RECOVERY_SETTINGS } from '@/types/muscle';
 import { subDays, differenceInHours } from 'date-fns';
-import { DEFAULT_RECOVERY_SETTINGS } from '@/types/muscle';
 import { SleepLog } from '@/types/sleep';
 import { calculateAdjustedRecoveryHours } from '@/services/recoveryCalculator';
 

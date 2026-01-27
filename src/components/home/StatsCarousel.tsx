@@ -59,7 +59,7 @@ export function StatsCarousel() {
       return safeWorkouts.map(w => {
         try {
           const date = w?.date;
-          if (!date) return null;
+          if (!date) {return null;}
           const dateObj = new Date(date);
           return isNaN(dateObj.getTime()) ? null : dateObj;
         } catch {
@@ -199,22 +199,10 @@ export function StatsCarousel() {
     }
   }, []);
 
-  // Safe useCountUp hooks with fallback
-  let volumeCount;
-  try {
-    volumeCount = useCountUp(totalVolume, 0, { duration: 1.5, decimals: 0 });
-  } catch (err) {
-    logger.warn('[StatsCarousel] Error in useCountUp for volume:', err);
-    volumeCount = { formattedValue: String(Math.round(totalVolume)) };
-  }
+  // Safe useCountUp hooks - must be called unconditionally
+  const volumeCount = useCountUp(totalVolume, 0, { duration: 1.5, decimals: 0 });
 
-  let energyCount;
-  try {
-    energyCount = useCountUp(energy, 0, { duration: 1.5, decimals: 0 });
-  } catch (err) {
-    logger.warn('[StatsCarousel] Error in useCountUp for energy:', err);
-    energyCount = { formattedValue: String(Math.round(energy)) };
-  }
+  const energyCount = useCountUp(energy, 0, { duration: 1.5, decimals: 0 });
 
   // Safe navigation handler
   const handleNavigate = () => {

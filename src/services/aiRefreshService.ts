@@ -1,7 +1,6 @@
-import { aiCacheManager } from './aiCacheManager';
+import { aiCacheManager, InsightType } from './aiCacheManager';
 import { workoutEventTracker } from './workoutEventTracker';
 import { aiCallManager } from './aiCallManager';
-import { InsightType } from './aiCacheManager';
 import { logger } from '@/utils/logger';
 
 interface RefreshRequest<T = unknown> {

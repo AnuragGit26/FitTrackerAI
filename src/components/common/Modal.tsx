@@ -65,13 +65,13 @@ export function Modal({
 
   // Focus trap: keep focus within modal
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {return;}
 
     const handleTabKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab') return;
+      if (e.key !== 'Tab') {return;}
 
       const modal = modalRef.current;
-      if (!modal) return;
+      if (!modal) {return;}
 
       const focusableElements = modal.querySelectorAll<HTMLElement>(
         'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'

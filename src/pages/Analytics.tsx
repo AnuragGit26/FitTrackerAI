@@ -75,7 +75,7 @@ export function Analytics() {
   // Load metrics asynchronously to include sleep/recovery data
   useEffect(() => {
     async function fetchMetrics() {
-      if (!profile?.id) return;
+      if (!profile?.id) {return;}
       const data = await analyticsService.getAllMetrics(filteredWorkouts, dateRange, profile.id);
       setMetrics(data);
     }
@@ -100,7 +100,7 @@ export function Analytics() {
   }, [comparisonPeriod.workouts]);
 
   const trendPercentage = useMemo(() => {
-    if (!metrics || previousPeriodVolume === 0) return 0;
+    if (!metrics || previousPeriodVolume === 0) {return 0;}
     return Math.round(((metrics.totalVolume - previousPeriodVolume) / previousPeriodVolume) * 100);
   }, [metrics, previousPeriodVolume]);
 

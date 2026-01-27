@@ -1392,7 +1392,7 @@ export const dataExport = {
         for (const plannedWorkout of data.plannedWorkouts) {
           try {
             // Remove id, createdAt, updatedAt for import
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+             
             const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, ...plannedToImportBase } = plannedWorkout;
             
             // Ensure dates are Date objects
@@ -1466,7 +1466,7 @@ export const dataExport = {
         for (const workout of data.workouts) {
           try {
             // Remove id for import (will be auto-generated)
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+             
             const { id: _id, ...workoutToImport } = workout;
             
             // Ensure dates are Date objects

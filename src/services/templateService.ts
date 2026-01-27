@@ -1,6 +1,5 @@
 import { dbHelpers } from './database';
-import { WorkoutTemplate, TemplateCategory } from '@/types/workout';
-import { Workout } from '@/types/workout';
+import { WorkoutTemplate, TemplateCategory, Workout } from '@/types/workout';
 import { WorkoutExercise, WorkoutSet } from '@/types/exercise';
 
 class TemplateService {

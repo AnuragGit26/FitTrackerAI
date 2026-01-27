@@ -25,8 +25,8 @@ export function MuscleFocusCard({ workouts }: MuscleFocusCardProps) {
       [MuscleGroup.QUADS, MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES].includes(m)
     );
 
-    if (hasUpper && hasLower) return 'Full Body';
-    if (hasUpper) return 'Upper Body';
+    if (hasUpper && hasLower) {return 'Full Body';}
+    if (hasUpper) {return 'Upper Body';}
     return 'Lower Body';
   };
 

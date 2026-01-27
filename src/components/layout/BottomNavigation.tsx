@@ -45,7 +45,7 @@ export function BottomNavigation() {
   const [ripples, setRipples] = useState<Array<{ id: number; path: string; x: number; y: number }>>([]);
 
   const handleTap = (itemPath: string, event: React.MouseEvent<HTMLAnchorElement>) => {
-    if (shouldReduceMotion) return;
+    if (shouldReduceMotion) {return;}
     
     const rect = event.currentTarget.getBoundingClientRect();
     const x = event.clientX - rect.left;

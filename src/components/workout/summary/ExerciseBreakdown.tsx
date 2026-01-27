@@ -29,21 +29,21 @@ export function ExerciseBreakdown({ comparisons }: ExerciseBreakdownProps) {
   };
 
   const formatSetData = (set: ExerciseComparison['setComparisons'][0]) => {
-    if (!set.current.weight && !set.current.reps) return 'N/A';
+    if (!set.current.weight && !set.current.reps) {return 'N/A';}
     const weight = set.current.weight ? `${set.current.weight}${unit}` : '';
     const reps = set.current.reps ? ` x ${set.current.reps}` : '';
     return `${weight}${reps}`;
   };
 
   const formatPreviousSetData = (set: ExerciseComparison['setComparisons'][0]) => {
-    if (!set.previous) return '-';
+    if (!set.previous) {return '-';}
     const weight = set.previous.weight ? `${set.previous.weight}${unit}` : '';
     const reps = set.previous.reps ? ` x ${set.previous.reps}` : '';
     return `${weight}${reps}` || '-';
   };
 
   const formatDelta = (set: ExerciseComparison['setComparisons'][0]) => {
-    if (!set.delta) return null;
+    if (!set.delta) {return null;}
     const parts: string[] = [];
     if (set.delta.weight && set.delta.weight !== 0) {
       parts.push(`${set.delta.weight > 0 ? '+' : ''}${set.delta.weight}${unit}`);
@@ -55,7 +55,7 @@ export function ExerciseBreakdown({ comparisons }: ExerciseBreakdownProps) {
   };
 
   const getVolumeChangeBadge = (comparison: ExerciseComparison) => {
-    if (!comparison.volumeChange) return null;
+    if (!comparison.volumeChange) {return null;}
     if (comparison.volumeChange > 0) {
       return (
         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-primary/20 text-primary">
@@ -78,7 +78,7 @@ export function ExerciseBreakdown({ comparisons }: ExerciseBreakdownProps) {
   };
 
   const getBestSetText = (comparison: ExerciseComparison) => {
-    if (!comparison.bestSet) return null;
+    if (!comparison.bestSet) {return null;}
     const weight = comparison.bestSet.weight ? `${comparison.bestSet.weight}${unit}` : '';
     const reps = comparison.bestSet.reps ? ` x ${comparison.bestSet.reps}` : '';
     return `${weight}${reps}`;

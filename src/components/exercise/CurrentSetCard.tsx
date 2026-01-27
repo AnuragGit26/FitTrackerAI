@@ -80,9 +80,9 @@ export function CurrentSetCard({
     // Sync main fields
     const propWeight = set.weight !== undefined ? set.weight.toString() : '';
     const propReps = set.reps !== undefined ? set.reps.toString() : '';
-    if (set.setNumber !== setNumber || weight !== propWeight) setWeight(propWeight);
-    if (set.setNumber !== setNumber || reps !== propReps) setReps(propReps);
-    if (set.rpe !== undefined && set.rpe !== rpe) setRpe(set.rpe);
+    if (set.setNumber !== setNumber || weight !== propWeight) {setWeight(propWeight);}
+    if (set.setNumber !== setNumber || reps !== propReps) {setReps(propReps);}
+    if (set.rpe !== undefined && set.rpe !== rpe) {setRpe(set.rpe);}
 
     // Sync side fields
     const propLeftWeight = set.leftWeight !== undefined ? set.leftWeight.toString() : '';
@@ -90,10 +90,10 @@ export function CurrentSetCard({
     const propLeftReps = set.leftReps !== undefined ? set.leftReps.toString() : '';
     const propRightReps = set.rightReps !== undefined ? set.rightReps.toString() : '';
 
-    if (leftWeight !== propLeftWeight) setLeftWeight(propLeftWeight);
-    if (rightWeight !== propRightWeight) setRightWeight(propRightWeight);
-    if (leftReps !== propLeftReps) setLeftReps(propLeftReps);
-    if (rightReps !== propRightReps) setRightReps(propRightReps);
+    if (leftWeight !== propLeftWeight) {setLeftWeight(propLeftWeight);}
+    if (rightWeight !== propRightWeight) {setRightWeight(propRightWeight);}
+    if (leftReps !== propLeftReps) {setLeftReps(propLeftReps);}
+    if (rightReps !== propRightReps) {setRightReps(propRightReps);}
 
   }, [set, setNumber]);
 
@@ -106,12 +106,12 @@ export function CurrentSetCard({
 
   // Helper text logic
   const getHelperText = (): string | null => {
-    if (!exerciseEquipment || exerciseEquipment.length === 0) return null;
+    if (!exerciseEquipment || exerciseEquipment.length === 0) {return null;}
     const hasDumbbells = exerciseEquipment.some(eq => eq.toLowerCase().includes('dumbbell'));
     const hasBarbell = exerciseEquipment.some(eq => eq.toLowerCase().includes('barbell'));
     
-    if (hasDumbbells) return 'Weight = weight of both dumbbells';
-    if (hasBarbell) return 'Total weight = weight of plates + barbell rod';
+    if (hasDumbbells) {return 'Weight = weight of both dumbbells';}
+    if (hasBarbell) {return 'Total weight = weight of plates + barbell rod';}
     return null;
   };
 
@@ -165,7 +165,7 @@ export function CurrentSetCard({
   const canLogSet = hasValidReps && hasValidWeight && !validationError;
 
   const handleLogSetClick = () => {
-    if (!canLogSet || disabled) return;
+    if (!canLogSet || disabled) {return;}
     setIsLogging(true);
     setShowRipple(true);
     setShowParticles(true);

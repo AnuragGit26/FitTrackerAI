@@ -301,7 +301,7 @@ export default function Onboarding() {
             {currentStep === 1 && (
               <div className="flex flex-col flex-1 space-y-8 mt-4">
                 <div className="text-center space-y-2">
-                  <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Let's get to know you</h2>
+                  <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Let&apos;s get to know you</h2>
                   <p className="text-slate-500 dark:text-slate-400">
                     Add a photo and your name to personalize your experience.
                   </p>

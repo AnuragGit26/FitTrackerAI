@@ -36,14 +36,13 @@ export default defineConfig(({ mode }) => {
     react(),
     versionPlugin(),
     excludePrismaPlugin(),
-    // Temporarily disabled ESLint to allow dev server to start with console statements
-    // eslint({
-    //   failOnError: false, // Don't fail build on ESLint errors in dev
-    //   failOnWarning: false, // Don't fail build on ESLint warnings in dev
-    //   emitError: true, // Show errors in console
-    //   emitWarning: true, // Show warnings in console
-    //   cache: true, // Enable caching for better performance
-    // }),
+    eslint({
+      failOnError: false, // Don't fail build on ESLint errors in dev
+      failOnWarning: false, // Don't fail build on ESLint warnings in dev
+      emitError: true, // Show errors in console
+      emitWarning: true, // Show warnings in console
+      cache: true, // Enable caching for better performance
+    }),
     VitePWA({
       registerType: 'prompt', // Changed to 'prompt' since we're handling registration manually
       devOptions: {
@@ -51,7 +50,7 @@ export default defineConfig(({ mode }) => {
         type: 'module',
         navigateFallback: 'index.html',
       },
-      includeAssets: ['assests/img/fittrackAI_icon.png'],
+      includeAssets: ['assets/img/FitTrackAI_Iconv2.jpg'],
       manifest: {
         name: 'Fit Track AI',
         short_name: 'Fit Track AI',
@@ -64,15 +63,15 @@ export default defineConfig(({ mode }) => {
         start_url: '/',
         icons: [
           {
-            src: 'assests/img/fittrackAI_icon.png',
+            src: 'assets/img/FitTrackAI_Iconv2.jpg',
             sizes: '192x192',
-            type: 'image/png',
+            type: 'image/jpeg',
             purpose: 'maskable'
           },
           {
-            src: 'assests/img/fittrackAI_icon.png',
+            src: 'assets/img/FitTrackAI_Iconv2.jpg',
             sizes: '512x512',
-            type: 'image/png',
+            type: 'image/jpeg',
             purpose: 'maskable'
           }
         ],
@@ -94,7 +93,7 @@ export default defineConfig(({ mode }) => {
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,jpg,jpeg,svg,woff2}'],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -150,7 +149,7 @@ export default defineConfig(({ mode }) => {
       srcDir: 'src',
       filename: 'sw.ts',
       injectManifest: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,jpg,jpeg,svg,woff2}'],
       }
     })
   ],

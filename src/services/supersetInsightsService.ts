@@ -1,6 +1,5 @@
 import { Workout } from '@/types/workout';
-import { SupersetGroup } from './supersetService';
-import { supersetService } from './supersetService';
+import { SupersetGroup, supersetService } from './supersetService';
 import { supersetAnalyticsService } from './supersetAnalyticsService';
 
 export interface SupersetInsight {

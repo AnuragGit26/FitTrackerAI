@@ -75,7 +75,7 @@ export function EmptyStateAIMessage({ screenName, className = '' }: EmptyStateAI
                 <Sparkles className="w-5 h-5 text-primary fill-primary/20" />
             </div>
             <p className="text-sm font-medium text-slate-700 dark:text-slate-200 leading-relaxed italic">
-                "{message}"
+                &ldquo;{message}&rdquo;
             </p>
         </motion.div>
     );

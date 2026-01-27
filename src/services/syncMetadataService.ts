@@ -1,6 +1,5 @@
-import { dbHelpers } from './database';
+import { dbHelpers, LocalSyncMetadata } from './database';
 import { SyncMetadata, SyncableTable, SyncStatus } from '@/types/sync';
-import { LocalSyncMetadata } from './database';
 import { logger } from '@/utils/logger';
 
 class SyncMetadataService {

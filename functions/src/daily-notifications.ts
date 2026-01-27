@@ -72,14 +72,14 @@ export const dailyNotifications = functions
       //          notification: {
       //            title: '💪 Workout Reminder',
       //            body: `You have ${plannedWorkouts.size} workout(s) planned for today!`,
-      //            icon: '/fittrackAI_icon.png',
+      //            icon: '/assets/img/FitTrackAI_Iconv2.jpg',
       //          },
       //          webpush: {
       //            fcmOptions: {
       //              link: 'https://fittrack.ai/planner',
       //            },
       //            notification: {
-      //              badge: '/fittrackAI_icon.png',
+      //              badge: '/assets/img/FitTrackAI_Iconv2.jpg',
       //              vibrate: [200, 100, 200],
       //              requireInteraction: false,
       //              tag: 'workout-reminder',
@@ -103,14 +103,14 @@ export const dailyNotifications = functions
       //          notification: {
       //            title: '🔥 Time to Get Moving!',
       //            body: "You haven't logged a workout in 3 days. Let's stay consistent!",
-      //            icon: '/fittrackAI_icon.png',
+      //            icon: '/assets/img/FitTrackAI_Iconv2.jpg',
       //          },
       //          webpush: {
       //            fcmOptions: {
       //              link: 'https://fittrack.ai/workouts',
       //            },
       //            notification: {
-      //              badge: '/fittrackAI_icon.png',
+      //              badge: '/assets/img/FitTrackAI_Iconv2.jpg',
       //              vibrate: [200, 100, 200],
       //              requireInteraction: true, // Keep visible until user interacts
       //              tag: 'motivational-reminder',
@@ -141,7 +141,7 @@ export const dailyNotifications = functions
  * @param notification - The notification payload with title, body, and optional actions
  * @param link - The URL to open when notification is clicked
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 async function _sendChromeNotification(
   fcmToken: string,
   notification: {
@@ -166,8 +166,8 @@ async function _sendChromeNotification(
           link: link || 'https://fittrack.ai',
         },
         notification: {
-          icon: notification.icon || '/fittrackAI_icon.png',
-          badge: notification.badge || '/fittrackAI_icon.png',
+          icon: notification.icon || '/assets/img/FitTrackAI_Iconv2.jpg',
+          badge: notification.badge || '/assets/img/FitTrackAI_Iconv2.jpg',
           vibrate: [200, 100, 200],
           requireInteraction: notification.requireInteraction || false,
           tag: notification.tag || 'fittrack-notification',

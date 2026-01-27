@@ -4,7 +4,7 @@ import { Variants } from 'framer-motion';
  * Check if user prefers reduced motion
  */
 export const prefersReducedMotion = () => {
-  if (typeof window === 'undefined') return false;
+  if (typeof window === 'undefined') {return false;}
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 };
 

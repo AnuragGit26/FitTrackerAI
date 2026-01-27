@@ -1600,17 +1600,19 @@ export const dbHelpers = {
         return (await this.getAllTemplates(userId)) as unknown as Record<string, unknown>[];
       case 'planned_workouts':
         return (await this.getAllPlannedWorkouts(userId)) as unknown as Record<string, unknown>[];
-      case 'exercises':
+      case 'exercises': {
         // Exercises are global, but filter by userId for custom exercises
         const allExercises = await this.getAllExercises();
         return allExercises.filter(ex => !ex.userId || ex.userId === userId) as unknown as Record<string, unknown>[];
+      }
       case 'user_profiles':
         // User profiles - single document per user
         return [];
-      case 'muscle_statuses':
+      case 'muscle_statuses': {
         // Muscle statuses are user-scoped
         const allStatuses = await this.getAllMuscleStatuses();
         return allStatuses.filter(status => status.userId === userId) as unknown as Record<string, unknown>[];
+      }
       case 'sleep_logs':
         return (await this.getAllSleepLogs(userId)) as unknown as Record<string, unknown>[];
       case 'recovery_logs':
@@ -1645,19 +1647,21 @@ export const dbHelpers = {
       case 'user_profiles':
         // User profiles don't have separate IDs, they use userId
         return undefined;
-      case 'muscle_statuses':
+      case 'muscle_statuses': {
         const allStatuses = await this.getAllMuscleStatuses();
         return allStatuses.find(s => s.id === recordId) as unknown as Record<string, unknown> | undefined;
+      }
       case 'sleep_logs':
         return (await this.getSleepLog(recordId as number)) as unknown as Record<string, unknown> | undefined;
       case 'recovery_logs':
         return (await this.getRecoveryLog(recordId as number)) as unknown as Record<string, unknown> | undefined;
-      case 'settings':
+      case 'settings': {
         const value = await this.getSetting(recordId as string);
         if (value !== undefined) {
           return { key: recordId as string, value };
         }
         return undefined;
+      }
       case 'notifications':
         return (await this.getNotification(recordId as string)) as unknown as Record<string, unknown> | undefined;
       case 'error_logs':

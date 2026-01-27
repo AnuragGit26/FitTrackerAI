@@ -15,8 +15,7 @@ import { cn } from '@/utils/cn';
 import { useToast } from '@/hooks/useToast';
 import { staggerContainerFast, slideUp, prefersReducedMotion } from '@/utils/animations';
 import { templateService } from '@/services/templateService';
-import { TemplateCategory } from '@/types/workout';
-import { Workout } from '@/types/workout';
+import { TemplateCategory, Workout } from '@/types/workout';
 import { useWorkoutDuration, getTimerStartTime } from '@/hooks/useWorkoutDuration';
 import { clearWorkoutState, loadWorkoutState, saveWorkoutState } from '@/utils/workoutStatePersistence';
 import { saveFailedWorkout } from '@/utils/workoutErrorRecovery';
@@ -138,7 +137,7 @@ export function LogWorkout() {
   const debouncedSave = useMemo(
     () => debounce(() => {
       const storeState = getWorkoutStore.getState();
-      if (!storeState.currentWorkout) return;
+      if (!storeState.currentWorkout) {return;}
       
       // Create state hash to avoid unnecessary saves
       const stateHash = JSON.stringify({
@@ -164,7 +163,7 @@ export function LogWorkout() {
 
   // Auto-save workout state every 10 seconds when workout is active (backup)
   useEffect(() => {
-    if (!currentWorkout) return;
+    if (!currentWorkout) {return;}
 
     const autoSaveInterval = setInterval(() => {
       // Save current workout state to localStorage
@@ -672,7 +671,7 @@ export function LogWorkout() {
   };
 
   const handleConfirmFinishWorkout = async () => {
-    if (!currentWorkout) return;
+    if (!currentWorkout) {return;}
 
     // Validate manual timer inputs for template workouts
     if (templateId) {
@@ -972,7 +971,7 @@ export function LogWorkout() {
                   const isFirstInGroup = isGrouped && exercise.groupOrder === 0;
                   
                   // Only render if first in group or not grouped
-                  if (isGrouped && !isFirstInGroup) return null;
+                  if (isGrouped && !isFirstInGroup) {return null;}
                   
                   return (
                     <motion.div

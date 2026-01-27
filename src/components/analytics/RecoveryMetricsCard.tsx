@@ -7,14 +7,14 @@ interface RecoveryMetricsCardProps {
 
 export function RecoveryMetricsCard({ metrics }: RecoveryMetricsCardProps) {
   const getScoreColor = (score: number) => {
-    if (score >= 8) return 'text-blue-500';
-    if (score >= 5) return 'text-yellow-500';
+    if (score >= 8) {return 'text-blue-500';}
+    if (score >= 5) {return 'text-yellow-500';}
     return 'text-red-500';
   };
 
   const getRecoveryColor = (score: number) => {
-    if (score >= 75) return 'text-blue-500';
-    if (score >= 50) return 'text-yellow-500';
+    if (score >= 75) {return 'text-blue-500';}
+    if (score >= 50) {return 'text-yellow-500';}
     return 'text-red-500';
   };
 

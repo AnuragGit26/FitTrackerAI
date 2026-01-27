@@ -19,6 +19,8 @@ export function AIFocusCard() {
   const { workouts } = useWorkoutStore();
   const { muscleStatuses } = useMuscleRecovery();
 
+  // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL LOGIC
+
   // Safe workouts array with fallback
   const safeWorkouts = useMemo(() => {
     try {
@@ -53,7 +55,9 @@ export function AIFocusCard() {
   // Analyze workout patterns to check if workout completed today
   const patternAnalysis = useMemo(() => {
     try {
-      if (safeWorkouts.length === 0) return null;
+      if (safeWorkouts.length === 0) {
+        return null;
+      }
       return workoutAnalysisService.analyzeWorkoutPatterns(safeWorkouts);
     } catch (err) {
       logger.warn('[AIFocusCard] Error analyzing workout patterns:', err);
@@ -77,49 +81,6 @@ export function AIFocusCard() {
     }
   }, [patternAnalysis]);
 
-  // Show loading skeleton while insights are being generated
-  if (isLoading && safeWorkouts.length > 0) {
-    return (
-      <div className="px-5 mt-6">
-        <div className="flex items-center gap-2 mb-3">
-          <Bot className="w-5 h-5 text-primary" />
-          <h2 className="text-slate-900 dark:text-white text-lg font-bold">Today&apos;s Focus</h2>
-        </div>
-        <div className="rounded-2xl bg-surface-dark p-5">
-          <Skeleton height={120} className="rounded-xl" />
-        </div>
-      </div>
-    );
-  }
-
-  // Show empty state only if not loading and no data
-  if (safeWorkouts.length === 0 || (!isLoading && !insights?.recommendations?.[0])) {
-    return (
-      <div className="px-5 mt-6">
-        <div className="flex items-center gap-2 mb-3">
-          <Bot className="w-5 h-5 text-primary" />
-          <h2 className="text-slate-900 dark:text-white text-lg font-bold">Today&apos;s Focus</h2>
-        </div>
-        <div className="rounded-2xl bg-surface-dark p-6">
-          <EmptyState
-            icon={Bot}
-            title="No recommendations yet"
-            description="Log a few workouts to get personalized AI recommendations based on your training patterns."
-            action={
-                <button
-                  onClick={handleNavigateToLogWorkout}
-                  className="px-4 py-2 rounded-lg bg-primary text-background-dark font-bold text-sm hover:bg-primary/90 transition-colors"
-                >
-                  Start Logging Workouts
-                </button>
-            }
-            className="py-8"
-          />
-        </div>
-      </div>
-    );
-  }
-
   // Clean AI-generated text to remove markdown formatting and gibberish
   const cleanedTitle = useMemo(() => {
     try {
@@ -139,61 +100,16 @@ export function AIFocusCard() {
     }
   }, [insights?.analysis]);
 
-  // Determine recommendation type from title
-  const getRecommendationType = (title: string): 'rest' | 'cardio' | 'strength' | 'light_activity' => {
-    const lowerTitle = title.toLowerCase();
-    if (lowerTitle.includes('rest') || lowerTitle.includes('recovery') || lowerTitle.includes('rest day')) {
-      return 'rest';
-    }
-    if (lowerTitle.includes('cardio') || lowerTitle.includes('running') || lowerTitle.includes('cycling')) {
-      return 'cardio';
-    }
-    if (lowerTitle.includes('strength') || lowerTitle.includes('weight') || lowerTitle.includes('lifting')) {
-      return 'strength';
-    }
-    return 'light_activity';
-  };
-
-  const recommendationType = getRecommendationType(cleanedTitle);
-  
-  // Get icon and label based on type
-  const getTypeIcon = () => {
-    if (hasWorkoutToday) return CheckCircle2;
-    switch (recommendationType) {
-      case 'rest':
-        return Moon;
-      case 'cardio':
-        return Activity;
-      case 'strength':
-        return Dumbbell;
-      default:
-        return Activity;
-    }
-  };
-
-  const getTypeLabel = () => {
-    if (hasWorkoutToday) return 'Workout Completed';
-    switch (recommendationType) {
-      case 'rest':
-        return 'Rest Day';
-      case 'cardio':
-        return 'Cardio';
-      case 'strength':
-        return 'Strength Training';
-      default:
-        return 'Light Activity';
-    }
-  };
-
-  const TypeIcon = getTypeIcon();
-  const typeLabel = getTypeLabel();
-
   // Calculate overall recovery percentage with safe division
   const overallRecovery = useMemo(() => {
     try {
-      if (!safeMuscleStatuses || safeMuscleStatuses.length === 0) return null;
+      if (!safeMuscleStatuses || safeMuscleStatuses.length === 0) {
+        return null;
+      }
       const readyMuscles = safeMuscleStatuses.filter(m => m?.recoveryStatus === 'ready').length;
-      if (safeMuscleStatuses.length === 0) return null;
+      if (safeMuscleStatuses.length === 0) {
+        return null;
+      }
       const percentage = (readyMuscles / safeMuscleStatuses.length) * 100;
       return isNaN(percentage) || !isFinite(percentage) ? null : Math.round(percentage);
     } catch (err) {
@@ -210,7 +126,9 @@ export function AIFocusCard() {
     }
   }, []);
 
-  // Safe navigation handlers
+  // NOW WE CAN HAVE CONDITIONAL LOGIC
+
+  // Navigation handlers
   const handleNavigateToInsights = () => {
     try {
       navigate('/insights');
@@ -251,6 +169,102 @@ export function AIFocusCard() {
       }
     }
   };
+
+  // Show loading skeleton while insights are being generated
+  if (isLoading && safeWorkouts.length > 0) {
+    return (
+      <div className="px-5 mt-6">
+        <div className="flex items-center gap-2 mb-3">
+          <Bot className="w-5 h-5 text-primary" />
+          <h2 className="text-slate-900 dark:text-white text-lg font-bold">Today&apos;s Focus</h2>
+        </div>
+        <div className="rounded-2xl bg-surface-dark p-5">
+          <Skeleton height={120} className="rounded-xl" />
+        </div>
+      </div>
+    );
+  }
+
+  // Show empty state only if not loading and no data
+  if (safeWorkouts.length === 0 || (!isLoading && !insights?.recommendations?.[0])) {
+    return (
+      <div className="px-5 mt-6">
+        <div className="flex items-center gap-2 mb-3">
+          <Bot className="w-5 h-5 text-primary" />
+          <h2 className="text-slate-900 dark:text-white text-lg font-bold">Today&apos;s Focus</h2>
+        </div>
+        <div className="rounded-2xl bg-surface-dark p-6">
+          <EmptyState
+            icon={Bot}
+            title="No recommendations yet"
+            description="Log a few workouts to get personalized AI recommendations based on your training patterns."
+            action={
+              <button
+                onClick={handleNavigateToLogWorkout}
+                className="px-4 py-2 rounded-lg bg-primary text-background-dark font-bold text-sm hover:bg-primary/90 transition-colors"
+              >
+                Start Logging Workouts
+              </button>
+            }
+            className="py-8"
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Determine recommendation type from title
+  const getRecommendationType = (title: string): 'rest' | 'cardio' | 'strength' | 'light_activity' => {
+    const lowerTitle = title.toLowerCase();
+    if (lowerTitle.includes('rest') || lowerTitle.includes('recovery') || lowerTitle.includes('rest day')) {
+      return 'rest';
+    }
+    if (lowerTitle.includes('cardio') || lowerTitle.includes('running') || lowerTitle.includes('cycling')) {
+      return 'cardio';
+    }
+    if (lowerTitle.includes('strength') || lowerTitle.includes('weight') || lowerTitle.includes('lifting')) {
+      return 'strength';
+    }
+    return 'light_activity';
+  };
+
+  const recommendationType = getRecommendationType(cleanedTitle);
+
+  // Get icon and label based on type
+  const getTypeIcon = () => {
+    if (hasWorkoutToday) {
+      return CheckCircle2;
+    }
+    switch (recommendationType) {
+      case 'rest':
+        return Moon;
+      case 'cardio':
+        return Activity;
+      case 'strength':
+        return Dumbbell;
+      default:
+        return Activity;
+    }
+  };
+
+  const getTypeLabel = () => {
+    if (hasWorkoutToday) {
+      return 'Workout Completed';
+    }
+    switch (recommendationType) {
+      case 'rest':
+        return 'Rest Day';
+      case 'cardio':
+        return 'Cardio';
+      case 'strength':
+        return 'Strength Training';
+      default:
+        return 'Light Activity';
+    }
+  };
+
+  const TypeIcon = getTypeIcon();
+  const typeLabel = getTypeLabel();
 
   return (
     <div className="px-5 mt-6">
@@ -360,6 +374,8 @@ export function AIFocusCard() {
                 <button
                   onClick={handleNavigateToRest}
                   className="px-3 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium text-sm transition-colors"
+                  aria-label="View recovery insights"
+                  title="View recovery insights"
                 >
                   <TrendingUp className="w-4 h-4" />
                 </button>

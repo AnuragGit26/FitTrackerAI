@@ -143,9 +143,9 @@ export function Profile() {
       } else {
         setLastSyncMessage(null); // Clear previous message when there are changes
         const changesSummary = [];
-        if (totalRecordsCreated > 0) changesSummary.push(`${totalRecordsCreated} created`);
-        if (totalRecordsUpdated > 0) changesSummary.push(`${totalRecordsUpdated} updated`);
-        if (totalRecordsDeleted > 0) changesSummary.push(`${totalRecordsDeleted} deleted`);
+        if (totalRecordsCreated > 0) {changesSummary.push(`${totalRecordsCreated} created`);}
+        if (totalRecordsUpdated > 0) {changesSummary.push(`${totalRecordsUpdated} updated`);}
+        if (totalRecordsDeleted > 0) {changesSummary.push(`${totalRecordsDeleted} deleted`);}
         const summaryText = changesSummary.length > 0
           ? `Sync completed! ${changesSummary.join(', ')}.`
           : 'Sync completed successfully!';
@@ -163,17 +163,17 @@ export function Profile() {
   };
   
   const formatLastSyncTime = (date: Date | null): string => {
-    if (!date) return 'Never';
+    if (!date) {return 'Never';}
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    if (diffMins < 1) {return 'Just now';}
+    if (diffMins < 60) {return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;}
+    if (diffHours < 24) {return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;}
+    if (diffDays < 7) {return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;}
     return date.toLocaleDateString();
   };
 
@@ -182,7 +182,7 @@ export function Profile() {
   const lastProfileIdRef = useRef<string | null>(null);
   
   useEffect(() => {
-    if (!profile) return;
+    if (!profile) {return;}
     
     // Only update if profile ID changed or we're not currently updating picture
     const profileIdChanged = lastProfileIdRef.current !== profile.id;
@@ -272,7 +272,7 @@ export function Profile() {
   };
 
   const handleSave = async () => {
-    if (!profile) return;
+    if (!profile) {return;}
 
     setIsSaving(true);
 
@@ -681,7 +681,7 @@ export function Profile() {
                   Cloud Sync with Firestore
                 </p>
                 <p className="text-xs text-blue-700 dark:text-blue-400">
-                  Your data is securely synced to Firebase Firestore. Click "Sync Now" to manually sync your workouts, exercises, templates, and profile data.
+                  Your data is securely synced to Firebase Firestore. Click &ldquo;Sync Now&rdquo; to manually sync your workouts, exercises, templates, and profile data.
                 </p>
               </div>
             </div>
@@ -694,7 +694,7 @@ export function Profile() {
           <div className="space-y-3">
             <button
               onClick={async () => {
-                if (!profile?.id) return;
+                if (!profile?.id) {return;}
                 setIsExporting(true);
                 setShowExportModal(true);
                 setExportProgress({
@@ -854,7 +854,7 @@ export function Profile() {
             setShowImportStrategyModal(false);
             setImportPreview(null);
             setSelectedFile(null);
-            if (fileInputRef.current) fileInputRef.current.value = '';
+            if (fileInputRef.current) {fileInputRef.current.value = '';}
           }}
           onError={(error) => {
             logger.error('[Profile] Import strategy modal error:', error);
@@ -866,7 +866,7 @@ export function Profile() {
               preview={importPreview}
               onSelect={async (strategy: ImportStrategy) => {
               setShowImportStrategyModal(false);
-              if (!profile?.id || !selectedFile) return;
+              if (!profile?.id || !selectedFile) {return;}
               
               setIsImporting(true);
               setShowImportModal(true);

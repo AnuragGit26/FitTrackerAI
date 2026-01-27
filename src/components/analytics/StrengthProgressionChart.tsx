@@ -38,7 +38,7 @@ export function StrengthProgressionChart({ progressions }: StrengthProgressionCh
   const [selectedPoint, setSelectedPoint] = useState<{ date: string; exercise: string; value: number } | null>(null);
 
   const chartData = useMemo(() => {
-    if (progressions.length === 0) return [];
+    if (progressions.length === 0) {return [];}
 
     const allDates = new Set<string>();
     progressions.forEach((prog) => {
@@ -89,7 +89,7 @@ export function StrengthProgressionChart({ progressions }: StrengthProgressionCh
             {label && format(new Date(label), 'MMM d, yyyy')}
           </p>
           {payload.map((entry, index) => {
-            if (hiddenSeries.has(entry.dataKey)) return null;
+            if (hiddenSeries.has(entry.dataKey)) {return null;}
             const dataPoint = entry.payload[`${entry.dataKey}_data`] as { maxWeight: number; maxReps: number; totalVolume: number } | undefined;
             return (
               <div key={index} className="mb-1 last:mb-0">
@@ -212,7 +212,7 @@ export function StrengthProgressionChart({ progressions }: StrengthProgressionCh
             <Tooltip content={<CustomTooltip />} />
             <ReferenceLine y={0} stroke="#666" strokeDasharray="2 2" opacity={0.5} />
             {progressions.map((prog) => {
-              if (hiddenSeries.has(prog.exerciseName)) return null;
+              if (hiddenSeries.has(prog.exerciseName)) {return null;}
               return (
                 <Line
                   key={prog.exerciseName}

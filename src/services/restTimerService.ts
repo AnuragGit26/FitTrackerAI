@@ -58,8 +58,8 @@ class RestTimerService {
    */
   playCompletionSound(): void {
     if (!this.audioContext) {
-    return;
-  }
+      return;
+    }
 
     try {
       const oscillator = this.audioContext.createOscillator();
@@ -105,8 +105,8 @@ class RestTimerService {
       try {
         new Notification(`Fit Track AI - ${title}`, {
           body,
-          icon: '/assests/img/fittrackAI_icon.png',
-          badge: '/assests/img/fittrackAI_icon.png',
+          icon: '/assets/img/FitTrackAI_Iconv2.jpg',
+          badge: '/assets/img/FitTrackAI_Iconv2.jpg',
           tag: 'rest-timer',
         } as NotificationOptions);
       } catch (error) {

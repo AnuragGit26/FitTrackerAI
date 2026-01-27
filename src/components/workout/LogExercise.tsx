@@ -232,7 +232,7 @@ export function LogExercise({
 
       const loadExercise = async () => {
         const workout = currentWorkoutRef.current;
-        if (!workout) return;
+        if (!workout) {return;}
 
         setIsLoadingExercise(true);
         try {
@@ -602,7 +602,7 @@ export function LogExercise({
 
   // Detect unsaved changes
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {return;}
 
     const changed = hasStateChanged();
     setHasUnsavedChanges(changed);
@@ -610,7 +610,7 @@ export function LogExercise({
 
   // Auto-persist to sessionStorage when state changes
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {return;}
 
     // Only persist if there are actual changes (exercise selected and/or sets exist)
     if (selectedExercise || sets.length > 0 || notes.trim() !== '') {
@@ -626,7 +626,7 @@ export function LogExercise({
 
   // Save state on visibility change or before unload - avoid auto-save to prevent infinite loops
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {return;}
 
     const saveCurrentState = () => {
       const state = stateSnapshotRef.current;
@@ -705,14 +705,14 @@ export function LogExercise({
   // Computed state to determine if adding a new set is allowed
   const canAddNewSet = useMemo(() => {
     // Must have an exercise selected
-    if (!selectedExercise) return false;
+    if (!selectedExercise) {return false;}
 
     // Check if there's an incomplete (current) set being edited
     const hasIncompleteSet = sets.some(set => !set.completed);
-    if (hasIncompleteSet) return false;
+    if (hasIncompleteSet) {return false;}
 
     // Check if rest timer is active
-    if (restTimerVisible && settings.autoStartRestTimer) return false;
+    if (restTimerVisible && settings.autoStartRestTimer) {return false;}
 
     // All checks passed - can add new set
     return true;
@@ -720,7 +720,7 @@ export function LogExercise({
 
   // Get reason why adding set is blocked (for user feedback)
   const addSetBlockedReason = useMemo(() => {
-    if (!selectedExercise) return null;
+    if (!selectedExercise) {return null;}
 
     const hasIncompleteSet = sets.some(set => !set.completed);
     if (hasIncompleteSet) {
@@ -735,7 +735,7 @@ export function LogExercise({
   }, [selectedExercise, sets, restTimerVisible, settings.autoStartRestTimer]);
 
   const handleAddSet = () => {
-    if (!selectedExercise) return;
+    if (!selectedExercise) {return;}
 
     // Validate that we can add a new set
     if (!canAddNewSet) {
@@ -1416,7 +1416,7 @@ export function LogExercise({
 
   // Handle logging current set - ONLY completes the current set
   const handleLogCurrentSet = async () => {
-    if (!selectedExercise) return;
+    if (!selectedExercise) {return;}
 
     const setToComplete = currentSet;
 
@@ -1490,7 +1490,7 @@ export function LogExercise({
 
   // Handle group rest timer completion - navigate to next exercise
   const handleGroupRestComplete = async () => {
-    if (!nextExercise) return;
+    if (!nextExercise) {return;}
 
     setGroupRestTimerVisible(false);
 
@@ -1539,7 +1539,7 @@ export function LogExercise({
 
   // Confirm and actually delete the set
   const handleConfirmCancelSet = () => {
-    if (setToCancelNumber === null) return;
+    if (setToCancelNumber === null) {return;}
 
     const setToDelete = sets.find((s) => s.setNumber === setToCancelNumber);
     if (!setToDelete) {
@@ -1688,7 +1688,7 @@ export function LogExercise({
 
   // Superset detection and navigation
   const currentExercise = useMemo(() => {
-    if (!exerciseId || !currentWorkout) return null;
+    if (!exerciseId || !currentWorkout) {return null;}
     return currentWorkout.exercises.find((ex) => ex.id === exerciseId);
   }, [exerciseId, currentWorkout]);
 
@@ -1697,12 +1697,12 @@ export function LogExercise({
   }, [currentExercise]);
 
   const groupExercises = useMemo(() => {
-    if (!isInSuperset || !currentExercise || !currentWorkout || !currentExercise.groupId) return [];
+    if (!isInSuperset || !currentExercise || !currentWorkout || !currentExercise.groupId) {return [];}
     return supersetService.getGroupExercises(currentWorkout.exercises, currentExercise.groupId);
   }, [isInSuperset, currentExercise, currentWorkout]);
 
   const nextExercise = useMemo(() => {
-    if (!isInSuperset || !currentExercise || groupExercises.length === 0) return null;
+    if (!isInSuperset || !currentExercise || groupExercises.length === 0) {return null;}
     const group: SupersetGroup = {
       groupId: currentExercise.groupId!,
       groupType: currentExercise.groupType!,
@@ -1712,7 +1712,7 @@ export function LogExercise({
   }, [isInSuperset, currentExercise, groupExercises]);
 
   const isLastInSuperset = useMemo(() => {
-    if (!isInSuperset || !currentExercise || groupExercises.length === 0) return false;
+    if (!isInSuperset || !currentExercise || groupExercises.length === 0) {return false;}
     const currentIndex = groupExercises.findIndex((ex) => ex.id === currentExercise.id);
     return currentIndex === groupExercises.length - 1;
   }, [isInSuperset, currentExercise, groupExercises]);
@@ -1730,7 +1730,7 @@ export function LogExercise({
   }, [sets]);
 
   const currentSetNumber = useMemo(() => {
-    if (currentSet) return currentSet.setNumber;
+    if (currentSet) {return currentSet.setNumber;}
     return sets.length + 1;
   }, [currentSet, sets.length]);
 
@@ -1777,7 +1777,7 @@ export function LogExercise({
 
   // Handle Escape key to close modal
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {return;}
 
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !isSaving) {
@@ -1801,7 +1801,7 @@ export function LogExercise({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen, isSaving, defaultRestDuration, handleCloseRequest, resetSetDuration]);
 
-  if (!isOpen) return null;
+  if (!isOpen) {return null;}
 
   return (
     <div
@@ -2238,7 +2238,7 @@ export function LogExercise({
         <div className="space-y-4">
           {setToCancelNumber !== null && (() => {
             const setToDelete = sets.find((s) => s.setNumber === setToCancelNumber);
-            if (!setToDelete) return null;
+            if (!setToDelete) {return null;}
 
             const isCardio = setToDelete.distance !== undefined || setToDelete.time !== undefined;
             const isHIIT = setToDelete.workDuration !== undefined || setToDelete.rounds !== undefined;

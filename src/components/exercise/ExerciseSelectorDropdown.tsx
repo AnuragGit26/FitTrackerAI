@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useDeferredValue } from 'react';
 import { Search, Plus, ChevronDown, Filter, X, Star } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Exercise, ExerciseCategory } from '@/types/exercise';
+import { Exercise, ExerciseCategory, WorkoutExercise } from '@/types/exercise';
 import { exerciseLibrary, EquipmentCategory, getEquipmentCategories } from '@/services/exerciseLibrary';
 import { cn } from '@/utils/cn';
 import { slideDown, staggerContainerFast, prefersReducedMotion } from '@/utils/animations';
@@ -11,7 +11,6 @@ import { SearchHighlight } from './SearchHighlight';
 import { exerciseFavoritesService } from '@/services/exerciseFavorites';
 import { exerciseHistoryService } from '@/services/exerciseHistory';
 import { exerciseSuggestionsService, SuggestedExercise } from '@/services/exerciseSuggestions';
-import { WorkoutExercise } from '@/types/exercise';
 import { useUserStore } from '@/store/userStore';
 import { logger } from '@/utils/logger';
 
