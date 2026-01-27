@@ -334,6 +334,7 @@ export function LogExercise({
               eqLower === '';
           });
 
+        
         // Check if we need to update weight for bodyweight exercises
         if (trackingType === 'weight_reps' && isBodyweightExercise) {
           const hasValidWeight = profile?.weight !== undefined &&
