@@ -24,8 +24,11 @@ describe('Skeleton', () => {
   });
 
   it('should support circular variant', () => {
-    const { container } = render(<Skeleton circle width={50} height={50} />);
+    const { container } = render(<Skeleton variant="circular" width={50} height={50} />);
     expect(container.firstChild).toBeInTheDocument();
+    // Verify the circular styling is applied by checking for rounded-full class
+    const element = container.firstChild as HTMLElement;
+    expect(element.className).toContain('rounded-full');
   });
 
   it('should handle both width and height', () => {
