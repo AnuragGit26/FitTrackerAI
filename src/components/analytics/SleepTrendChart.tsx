@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, memo } from 'react';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Bar, Line } from 'recharts';
 import { SleepMetrics } from '@/types/sleep';
 
@@ -6,7 +6,7 @@ interface SleepTrendChartProps {
   data: SleepMetrics['sleepTrend'];
 }
 
-export function SleepTrendChart({ data }: SleepTrendChartProps) {
+function SleepTrendChartComponent({ data }: SleepTrendChartProps) {
   const chartData = useMemo(() => {
     if (data.length === 0) {
       return Array.from({ length: 7 }, (_, i) => ({
@@ -102,3 +102,5 @@ export function SleepTrendChart({ data }: SleepTrendChartProps) {
     </div>
   );
 }
+
+export const SleepTrendChart = memo(SleepTrendChartComponent);

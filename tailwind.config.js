@@ -58,13 +58,14 @@ export default {
       animation: {
         'bounce-slow': 'bounce 3s infinite',
         'pulse-slow': 'pulse 3s infinite',
-        'celebration': 'celebration 0.6s ease-in-out',
+        'celebration': 'celebration 0.6s ease-in-out forwards',
         'saffron-glow': 'saffron-glow 2s ease-in-out infinite',
       },
       keyframes: {
         celebration: {
-          '0%, 100%': { transform: 'scale(1)' },
+          '0%': { transform: 'scale(1)' },
           '50%': { transform: 'scale(1.1)' },
+          '100%': { transform: 'scale(1)' },
         },
         'saffron-glow': {
           '0%, 100%': { boxShadow: '0 0 20px rgba(255, 153, 51, 0.4)' },

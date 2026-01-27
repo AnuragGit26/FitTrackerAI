@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, memo } from 'react';
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { useMuscleRecovery } from '@/hooks/useMuscleRecovery';
 import { useUserStore } from '@/store/userStore';
@@ -8,7 +8,7 @@ import { motion } from 'framer-motion';
 import { slideUp, prefersReducedMotion } from '@/utils/animations';
 import { TrendingUp } from 'lucide-react';
 
-export function RecoveryTrendChart() {
+function RecoveryTrendChartComponent() {
   const { muscleStatuses, isLoading } = useMuscleRecovery();
   const { profile } = useUserStore();
   const { settings } = useSettingsStore();
@@ -107,4 +107,6 @@ export function RecoveryTrendChart() {
     </motion.div>
   );
 }
+
+export const RecoveryTrendChart = memo(RecoveryTrendChartComponent);
 

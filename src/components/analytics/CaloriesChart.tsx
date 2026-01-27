@@ -1,11 +1,11 @@
-import { useMemo } from 'react';
+import { useMemo, memo } from 'react';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 
 interface CaloriesChartProps {
   data: Array<{ date: string; calories: number }>;
 }
 
-export function CaloriesChart({ data }: CaloriesChartProps) {
+function CaloriesChartComponent({ data }: CaloriesChartProps) {
   const chartData = useMemo(() => {
     if (data.length === 0) {
       return [];
@@ -91,4 +91,7 @@ export function CaloriesChart({ data }: CaloriesChartProps) {
     </div>
   );
 }
+
+export const CaloriesChart = memo(CaloriesChartComponent);
+
 

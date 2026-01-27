@@ -166,19 +166,72 @@ export default defineConfig(({ mode }) => {
   build: {
     outDir: 'dist',
     sourcemap: true,
+    // Optimize minification and chunking for better performance
+    minify: 'terser',
+    terserOptions: {
+      parse: {
+        ecma: 2020,
+      },
+      compress: {
+        passes: 2,
+        drop_console: true, // Remove console.logs in production
+        drop_debugger: true,
+      },
+      format: {
+        comments: false,
+      },
+    },
+    // Enable CSS code splitting
+    cssCodeSplit: true,
+    // Increase chunk size warning limit (we're being aggressive with splitting)
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'three-vendor': ['three', '@react-three/fiber', '@react-three/drei'],
-          'chart-vendor': ['recharts']
-        }
+        manualChunks: (id) => {
+          // React ecosystem
+          if (id.includes('node_modules/react')) {
+            return 'react-vendor';
+          }
+          // Three.js ecosystem
+          if (id.includes('node_modules/three')) {
+            return 'three-vendor';
+          }
+          if (id.includes('node_modules/@react-three')) {
+            return 'three-vendor';
+          }
+          // Charts
+          if (id.includes('node_modules/recharts')) {
+            return 'chart-vendor';
+          }
+          // Motion/Animation libraries
+          if (id.includes('node_modules/framer-motion') || id.includes('node_modules/motion')) {
+            return 'animation-vendor';
+          }
+          // UI components and utilities
+          if (id.includes('node_modules/lucide-react')) {
+            return 'ui-vendor';
+          }
+          // Firebase (only in chunks, never main bundle)
+          if (id.includes('node_modules/firebase')) {
+            return 'firebase-vendor';
+          }
+          // Utilities
+          if (id.includes('node_modules/zod') || id.includes('node_modules/zustand')) {
+            return 'utils-vendor';
+          }
+        },
+        // Optimize chunk naming for better caching
+        chunkFileNames: 'js/[name]-[hash].js',
+        entryFileNames: 'js/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash][extname]',
       }
     },
     // Configure for Prisma Client browser compatibility
     commonjsOptions: {
       transformMixedEsModules: true,
-    }
+    },
+    // Rollup performance optimizations
+    reportCompressedSize: false, // Skip gzip reporting for faster builds
   },
   resolve: {
     alias: {

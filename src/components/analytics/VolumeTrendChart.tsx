@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, memo } from 'react';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 import { VolumeData } from '@/types/analytics';
 
@@ -6,7 +6,7 @@ interface VolumeTrendChartProps {
   data: VolumeData[];
 }
 
-export function VolumeTrendChart({ data }: VolumeTrendChartProps) {
+function VolumeTrendChartComponent({ data }: VolumeTrendChartProps) {
   const chartData = useMemo(() => {
     if (data.length === 0) {
       return Array.from({ length: 4 }, (_, i) => ({
@@ -107,4 +107,6 @@ export function VolumeTrendChart({ data }: VolumeTrendChartProps) {
     </div>
   );
 }
+
+export const VolumeTrendChart = memo(VolumeTrendChartComponent);
 

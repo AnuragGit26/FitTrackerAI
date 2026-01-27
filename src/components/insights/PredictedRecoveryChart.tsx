@@ -1,12 +1,13 @@
 import { RecoveryPrediction } from '@/types/insights';
 import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine } from 'recharts';
 import { Dumbbell, ArrowDownToLine, ArrowUpFromLine, Footprints, Moon, HeartPulse, Trophy, Battery } from 'lucide-react';
+import { memo } from 'react';
 
 interface PredictedRecoveryChartProps {
   predictions: RecoveryPrediction[];
 }
 
-export function PredictedRecoveryChart({ predictions }: PredictedRecoveryChartProps) {
+function PredictedRecoveryChartComponent({ predictions }: PredictedRecoveryChartProps) {
   if (predictions.length === 0) {
     return null;
   }
@@ -204,3 +205,6 @@ export function PredictedRecoveryChart({ predictions }: PredictedRecoveryChartPr
     </div>
   );
 }
+
+export const PredictedRecoveryChart = memo(PredictedRecoveryChartComponent);
+

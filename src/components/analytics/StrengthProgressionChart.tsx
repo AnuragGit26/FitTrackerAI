@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, memo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Brush, ReferenceLine, Dot } from 'recharts';
 import { StrengthProgression } from '@/types/analytics';
 import { format } from 'date-fns';
@@ -33,7 +33,7 @@ interface DotProps {
   [key: string]: unknown;
 }
 
-export function StrengthProgressionChart({ progressions }: StrengthProgressionChartProps) {
+function StrengthProgressionChartComponent({ progressions }: StrengthProgressionChartProps) {
   const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(new Set());
   const [selectedPoint, setSelectedPoint] = useState<{ date: string; exercise: string; value: number } | null>(null);
 
@@ -239,4 +239,6 @@ export function StrengthProgressionChart({ progressions }: StrengthProgressionCh
     </div>
   );
 }
+
+export const StrengthProgressionChart = memo(StrengthProgressionChartComponent);
 

@@ -1,4 +1,5 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { memo } from 'react';
 
 interface FocusDistributionChartProps {
   legs: number;
@@ -6,7 +7,7 @@ interface FocusDistributionChartProps {
   pull: number;
 }
 
-export function FocusDistributionChart({ legs, push, pull }: FocusDistributionChartProps) {
+function FocusDistributionChartComponent({ legs, push, pull }: FocusDistributionChartProps) {
   const data = [
     { name: 'Legs', value: legs, color: '#0df269' },
     { name: 'Push', value: push, color: '#15803d' },
@@ -81,4 +82,6 @@ export function FocusDistributionChart({ legs, push, pull }: FocusDistributionCh
     </div>
   );
 }
+
+export const FocusDistributionChart = memo(FocusDistributionChartComponent);
 
