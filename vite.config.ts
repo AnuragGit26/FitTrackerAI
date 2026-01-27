@@ -92,7 +92,7 @@ export default defineConfig(({ mode }) => {
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,jpeg,svg,woff2}', 'assets/img/Fittrack2.png', 'assets/img/fittrackAI_icon.png'],
+        globPatterns: ['**/*.{js,css,html,woff2}', '**/*.{ico,png,jpeg,svg}'],
         globIgnores: ['assets/img/FitTrackAI_Iconv2.jpg'],
         runtimeCaching: [
           {
@@ -149,7 +149,7 @@ export default defineConfig(({ mode }) => {
       srcDir: 'src',
       filename: 'sw.ts',
       injectManifest: {
-        globPatterns: ['**/*.{js,css,html,ico,png,jpeg,svg,woff2}', 'assets/img/Fittrack2.png', 'assets/img/fittrackAI_icon.png'],
+        globPatterns: ['**/*.{js,css,html,woff2}', '**/*.{ico,png,jpeg,svg}'],
         globIgnores: ['assets/img/FitTrackAI_Iconv2.jpg'],
       }
     })
