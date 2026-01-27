@@ -50,7 +50,6 @@ export default defineConfig(({ mode }) => {
         type: 'module',
         navigateFallback: 'index.html',
       },
-      includeAssets: ['assets/img/FitTrackAI_Iconv2.jpg'],
       manifest: {
         name: 'Fit Track AI',
         short_name: 'Fit Track AI',
@@ -93,7 +92,8 @@ export default defineConfig(({ mode }) => {
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,jpg,jpeg,svg,woff2}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,jpeg,svg,woff2}', 'assets/img/Fittrack2.png', 'assets/img/fittrackAI_icon.png'],
+        globIgnores: ['assets/img/FitTrackAI_Iconv2.jpg'],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -149,7 +149,8 @@ export default defineConfig(({ mode }) => {
       srcDir: 'src',
       filename: 'sw.ts',
       injectManifest: {
-        globPatterns: ['**/*.{js,css,html,ico,png,jpg,jpeg,svg,woff2}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,jpeg,svg,woff2}', 'assets/img/Fittrack2.png', 'assets/img/fittrackAI_icon.png'],
+        globIgnores: ['assets/img/FitTrackAI_Iconv2.jpg'],
       }
     })
   ],
