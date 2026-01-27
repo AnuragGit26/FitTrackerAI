@@ -67,7 +67,9 @@ export function Insights() {
         <div className="sticky top-0 z-50 flex items-center bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md p-4 pb-3 justify-between border-b border-gray-100 dark:border-border-dark">
           <h2 className="text-xl font-bold leading-tight tracking-[-0.015em] flex-1">AI Insights</h2>
         </div>
-        <InsightsTabNavigation currentView={view} onViewChange={setView} />
+        <div className="mt-3">
+          <InsightsTabNavigation currentView={view} onViewChange={setView} />
+        </div>
         <div className="flex flex-col gap-6 p-4 max-w-md mx-auto w-full">
           <Skeleton height={120} className="rounded-xl" />
           <Skeleton height={80} className="rounded-xl" />
@@ -97,7 +99,9 @@ export function Insights() {
         </div>
       </div>
 
-      <InsightsTabNavigation currentView={view} onViewChange={setView} />
+      <div className="mt-3">
+        <InsightsTabNavigation currentView={view} onViewChange={setView} />
+      </div>
 
       {/* Profile Completion Prompt */}
       {showProfilePrompt && (
