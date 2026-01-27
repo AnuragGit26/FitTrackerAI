@@ -30,7 +30,9 @@
         "test:unit": "vitest",
         "test:unit:run": "vitest run",
         "test:unit:ui": "vitest --ui",
-        "test:unit:coverage": "vitest run --coverage"
+        "test:unit:coverage": "vitest run --coverage",
+        "test:component": "cypress run --component",
+        "test:component:open": "cypress open --component"
     },
     "dependencies": {
         "@google/generative-ai": "^0.2.1",
