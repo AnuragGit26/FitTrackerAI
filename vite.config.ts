@@ -174,7 +174,8 @@ export default defineConfig(({ mode }) => {
       },
       compress: {
         passes: 2,
-        drop_console: true, // Remove console.logs in production
+        // Drop only console.log and console.debug; preserve warn/error for production visibility
+        drop_console: ['log', 'debug'],
         drop_debugger: true,
       },
       format: {

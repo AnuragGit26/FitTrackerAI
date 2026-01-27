@@ -15,18 +15,21 @@ Comprehensive performance optimizations have been implemented across FitTrackAI 
 **Impact**: Removes ~12-15 MB from initial bundle download
 
 **Implementation**: `src/main.tsx`
+
 - Firebase no longer blocks initial render
 - Dynamically imported in background using `import()`
 - AuthContext handles Firebase initialization on-demand
 - Non-blocking: App renders while Firebase loads asynchronously
 
 **Benefits**:
+
 - ✅ Reduced Time to First Byte (TTFB)
 - ✅ Faster First Contentful Paint (FCP)
 - ✅ Better performance on slow connections
 - ✅ Lower initial bandwidth requirement
 
 **Code Pattern**:
+
 ```typescript
 const initializeFirebaseOnDemand = async () => {
   try {
@@ -50,24 +53,27 @@ initializeFirebaseOnDemand()
 **File**: `vite.config.ts`
 
 #### A. Terser Minification Optimization
+
 ```typescript
 terserOptions: {
   parse: { ecma: 2020 },
   compress: {
-    passes: 2,                    // Double compression passes
-    drop_console: true,            // Remove console.logs in prod
-    drop_debugger: true,           // Remove debugger statements
+    passes: 2,                           // Double compression passes
+    drop_console: ['log', 'debug'],      // Remove console.log/debug only
+    drop_debugger: true,                 // Remove debugger statements
   },
-  format: { comments: false },     // Remove all comments
+  format: { comments: false },           // Remove all comments
 }
 ```
 
 **Benefits**:
+
 - ✅ ~5-10% smaller bundle size
-- ✅ Removed console output from production
+- ✅ Preserved console.warn/error for production debugging
 - ✅ Optimized for modern browsers
 
 #### B. Strategic Code Splitting
+
 ```typescript
 manualChunks: (id) => {
   if (id.includes('node_modules/react')) return 'react-vendor'
@@ -81,8 +87,9 @@ manualChunks: (id) => {
 ```
 
 **Chunk Strategy**:
+
 | Chunk | Size | Purpose |
-|-------|------|---------|
+| --- | --- | --- |
 | react-vendor | 187 KB | React core framework |
 | chart-vendor | 402 KB | Analytics charts (lazy loaded) |
 | firebase-vendor | 433 KB | Firebase SDK (lazy loaded) |
@@ -92,6 +99,7 @@ manualChunks: (id) => {
 | utils-vendor | 68 KB | Zod + Zustand utilities |
 
 **Benefits**:
+
 - ✅ Separate caching for each vendor
 - ✅ Firebase only downloaded when needed
 - ✅ Charts lazy-loaded for analytics pages
@@ -104,6 +112,7 @@ manualChunks: (id) => {
 **Impact**: Prevents unnecessary re-renders across page transitions
 
 **Components Optimized**:
+
 1. `StrengthProgressionChart` - Complex line chart with state
 2. `FocusDistributionChart` - Pie chart with calculations
 3. `VolumeTrendChart` - Area chart with data transformation
@@ -115,6 +124,7 @@ manualChunks: (id) => {
 9. `VolumeChart` - Already memoized (maintained)
 
 **Pattern**:
+
 ```typescript
 function MyChartComponent(props: Props) {
   // Component implementation
@@ -124,6 +134,7 @@ export const MyChart = memo(MyChartComponent);
 ```
 
 **Benefits**:
+
 - ✅ 30-50% fewer re-renders when parent updates
 - ✅ Faster route transitions
 - ✅ Better perceived performance
@@ -136,29 +147,34 @@ export const MyChart = memo(MyChartComponent);
 **File**: `index.html`
 
 #### A. Preload Critical Assets
+
 ```html
 <link rel="preload" href="/assets/img/FitTrackAI_Iconv2.jpg" as="image" type="image/jpeg" />
 <link rel="preload" href="https://fonts.googleapis.com/css2?family=Lexend..." as="style" />
 ```
 
 #### B. Async Font Loading (Prevent Render Blocking)
+
 ```html
 <link href="..." rel="stylesheet" media="print" onload="this.media='all'" />
 <noscript><link href="..." rel="stylesheet" /></noscript>
 ```
 
 **Impact**:
+
 - ✅ Fonts don't block initial render
 - ✅ Fallback fonts used until Lexend loads
 - ✅ No FOUT (Flash of Unstyled Text)
 - ✅ Faster First Paint
 
 #### C. DNS Prefetch
+
 ```html
 <link rel="dns-prefetch" href="https://challenges.cloudflare.com" />
 ```
 
 **Benefits**:
+
 - ✅ DNS resolution done in background
 - ✅ Faster subsequent connections
 - ✅ 50-300ms savings on first connection
@@ -170,6 +186,7 @@ export const MyChart = memo(MyChartComponent);
 **File**: `tailwind.config.js`
 
 #### A. Animation Fill Forward
+
 ```typescript
 animation: {
   'celebration': 'celebration 0.6s ease-in-out forwards',  // Added 'forwards'
@@ -177,6 +194,7 @@ animation: {
 ```
 
 #### B. Keyframe Completeness
+
 ```typescript
 keyframes: {
   celebration: {
@@ -188,6 +206,7 @@ keyframes: {
 ```
 
 **Benefits**:
+
 - ✅ Prevents animation loops after completion
 - ✅ Reduces CPU cycles
 - ✅ Better battery life on mobile devices
@@ -198,11 +217,13 @@ keyframes: {
 ### 6. CSS Code Splitting
 
 **Configuration**: `vite.config.ts`
+
 ```typescript
 cssCodeSplit: true,
 ```
 
 **Impact**:
+
 - ✅ Each route gets its own CSS file
 - ✅ Unused CSS not downloaded initially
 - ✅ Better caching strategy
@@ -213,8 +234,9 @@ cssCodeSplit: true,
 ## Performance Metrics Impact
 
 ### Before Optimizations (Current State)
+
 | Metric | Score | Target |
-|--------|-------|--------|
+| --- | --- | --- |
 | First Contentful Paint (FCP) | 2.65s | <1.8s |
 | Largest Contentful Paint (LCP) | 3.51s | <2.5s |
 | Cumulative Layout Shift (CLS) | 0.46 | 0 |
@@ -223,8 +245,9 @@ cssCodeSplit: true,
 | **Real Experience Score** | **63** | **100** |
 
 ### Expected Improvements
+
 | Optimization | FCP | LCP | CLS | TTFB | RES |
-|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- |
 | Firebase lazy load | -0.5s | -0.4s | - | -0.15s | +15 |
 | React.memo charts | - | -0.2s | -0.05 | - | +8 |
 | Code splitting | -0.3s | -0.3s | - | -0.08s | +12 |
@@ -233,8 +256,9 @@ cssCodeSplit: true,
 | **Projected Totals** | **-1.1s** | **-0.8s** | **-0.05** | **-0.23s** | **+45** |
 
 ### Expected Final Scores
+
 | Metric | Current | Target | Projected |
-|--------|---------|--------|-----------|
+| --- | --- | --- | --- |
 | FCP | 2.65s | <1.8s | ~1.55s ✅ |
 | LCP | 3.51s | <2.5s | ~2.71s ⚠️ |
 | CLS | 0.46 | 0 | ~0.41 ✅ |
@@ -242,6 +266,7 @@ cssCodeSplit: true,
 | **RES** | **63** | **100** | **~97** ✅ |
 
 **Note**: Some optimizations may require additional work:
+
 - LCP might need image optimization or server-side caching
 - CLS might need layout constraints on animations
 
@@ -250,6 +275,7 @@ cssCodeSplit: true,
 ## Additional Optimization Opportunities
 
 ### High Priority (Easy, High Impact)
+
 1. **Image Optimization**
    - Convert PNG → WebP with fallback
    - Add responsive image variants (192x192, 512x512)
@@ -267,27 +293,29 @@ cssCodeSplit: true,
    - Estimated impact: +5-8 RES points
 
 ### Medium Priority (Moderate Complexity)
-4. **Extract Heavy Components**
+
+1. **Extract Heavy Components**
    - GoalSelectionCard (currently 1.3 MB - tree-shaking issue)
    - RestTimer component (750 lines)
    - Estimated impact: +8-12 RES points
 
-5. **Dynamic Import of Heavy Pages**
+2. **Dynamic Import of Heavy Pages**
    - LogWorkout page (1,624 lines)
    - Profile page (1,133 lines)
    - Estimated impact: +5-10 RES points
 
-6. **Server-Side Rendering (SSR) or Static Generation**
+3. **Server-Side Rendering (SSR) or Static Generation**
    - Pre-render initial pages
    - Cache responses at edge
    - Estimated impact: +15-20 RES points
 
 ### Low Priority (Complex)
-7. **HTTP/2 Server Push**
+
+1. **HTTP/2 Server Push**
    - Push critical chunks to client early
    - Estimated impact: +5 RES points
 
-8. **Compression Middleware**
+2. **Compression Middleware**
    - Enable Brotli compression
    - Estimated impact: +3-5 RES points
 
@@ -302,6 +330,7 @@ cssCodeSplit: true,
 - [x] Implement async font loading
 - [x] Optimize animations
 - [x] Enable CSS code splitting
+- [x] Fix console logging to preserve warn/error in production
 - [ ] Convert images to WebP format
 - [ ] Add responsive image variants
 - [ ] Implement lazy loading for images
@@ -317,6 +346,7 @@ cssCodeSplit: true,
 ## Testing & Validation
 
 ### Local Testing
+
 ```bash
 # Build production bundle
 npm run build
@@ -334,6 +364,7 @@ npm run preview
 ```
 
 ### Production Monitoring
+
 - Set up Google PageSpeed Insights monitoring
 - Enable Vercel Analytics
 - Monitor Core Web Vitals via Web Vitals API
@@ -344,32 +375,57 @@ npm run preview
 ## Performance Best Practices Going Forward
 
 ### Code Splitting
+
 - Use `React.lazy()` and `Suspense` for route components ✅ Already implemented
 - Lazy load heavy libraries (Firebase, charts)
 - Use dynamic imports for feature flags
 
 ### Component Optimization
+
 - Wrap expensive components with `React.memo()` ✅ Applied to charts
 - Use `useMemo()` for heavy computations ✅ Already in place
 - Avoid creating new objects in render (within hooks)
 
 ### Bundle Management
+
 - Monitor bundle size with Vercel Analytics
 - Set bundle size budgets in CI/CD
 - Regularly audit dependencies for unused code
 - Keep dependencies updated
 
 ### Network Optimization
+
 - Preload critical assets
 - Prefetch likely next pages
 - Use CDN for static assets
 - Implement service worker caching
 
 ### Runtime Performance
+
 - Check for layout thrashing (forced reflows)
 - Optimize animations with will-change wisely
 - Virtualize long lists (already using react-window)
 - Profile with Chrome DevTools Performance tab
+
+---
+
+## Important Fix: Console Logging in Production
+
+**Issue**: Initial Terser configuration (`drop_console: true`) was removing ALL console calls, including `console.warn()` and `console.error()` which are essential for production debugging.
+
+**Solution**: Updated Terser config to only drop `console.log` and `console.debug`:
+
+```typescript
+drop_console: ['log', 'debug'],  // Only drop debug methods
+```
+
+**Rationale**: The logger utility is designed to:
+
+- Drop `console.log()` and `console.debug()` in production (unnecessary noise)
+- **Preserve** `console.warn()` and `console.error()` for production visibility
+- Send errors to Vercel tracking service in addition to console
+
+This ensures developers can still see critical warnings and errors in production browser consoles while keeping the bundle clean.
 
 ---
 
@@ -382,18 +438,20 @@ These optimizations target the most impactful performance bottlenecks:
 3. **Component memoization** prevents unnecessary re-renders
 4. **HTML/font optimizations** reduce render-blocking resources
 5. **CSS code splitting** improves caching efficiency
+6. **Smart console management** preserves production debugging capability
 
 Together, these changes should improve the **Real Experience Score from 63 to ~97**, with particularly strong improvements in:
+
 - First Contentful Paint: 2.65s → ~1.55s (42% faster)
 - Largest Contentful Paint: 3.51s → ~2.71s (23% faster)
 - Time to First Byte: Effectively eliminated via lazy loading
 - Cumulative Layout Shift: 0.46 → ~0.41 (11% improvement)
 
 The remaining gap to 100 can be closed through:
+
 - Image optimization (WebP, responsive variants)
 - Additional component extraction
 - Service worker optimization
 - Potential server-side caching
 
 Monitor actual performance with Lighthouse and Google PageSpeed Insights to validate these improvements in production.
-
