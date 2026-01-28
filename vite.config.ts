@@ -174,7 +174,7 @@ export default defineConfig(({ mode }) => {
         ecma: 2020,
       },
       compress: {
-        passes: 2,
+        passes: 1,
         // Drop only console.log and console.debug; preserve warn/error for production visibility
         drop_console: ['log', 'debug'],
         drop_debugger: true,
