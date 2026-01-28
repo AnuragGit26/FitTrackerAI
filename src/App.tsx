@@ -76,6 +76,41 @@ function App() {
   useEffect(() => {
     async function init() {
       try {
+        // EMERGENCY: Force cache clear on first load to fix production white screen
+        const emergencyCacheClear = async () => {
+          const flagKey = 'emergency-cache-cleared-v1.0.1';
+          if (!sessionStorage.getItem(flagKey)) {
+            console.log('[EMERGENCY] Clearing stale caches...');
+
+            try {
+              // Unregister all service workers
+              const registrations = await navigator.serviceWorker.getRegistrations();
+              await Promise.all(registrations.map(r => r.unregister()));
+
+              // Delete all caches
+              const cacheNames = await caches.keys();
+              await Promise.all(cacheNames.map(n => caches.delete(n)));
+
+              // Mark as done for this session
+              sessionStorage.setItem(flagKey, 'true');
+
+              console.log('[EMERGENCY] Cache cleared, reloading...');
+              window.location.reload();
+              return true;
+            } catch (error) {
+              console.error('[EMERGENCY] Failed to clear cache:', error);
+              sessionStorage.setItem(flagKey, 'true'); // Mark as attempted even if it fails
+            }
+          }
+          return false;
+        };
+
+        // Run emergency cache clear first
+        const didReload = await emergencyCacheClear();
+        if (didReload) {
+          return;
+        }
+
         // Check version and clear cache if needed (must be first, before any other initialization)
         const cacheCleared = await cacheVersionService.checkAndClearCacheIfNeeded();
         if (cacheCleared) {

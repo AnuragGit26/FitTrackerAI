@@ -168,21 +168,7 @@ export default defineConfig(({ mode }) => {
     outDir: 'dist',
     sourcemap: true,
     // Optimize minification and chunking for better performance
-    minify: 'terser',
-    terserOptions: {
-      parse: {
-        ecma: 2020,
-      },
-      compress: {
-        passes: 1,
-        // Drop only console.log and console.debug; preserve warn/error for production visibility
-        drop_console: ['log', 'debug'],
-        drop_debugger: true,
-      },
-      format: {
-        comments: false,
-      },
-    },
+    minify: 'esbuild',
     // Enable CSS code splitting
     cssCodeSplit: true,
     // Increase chunk size warning limit (we're being aggressive with splitting)
